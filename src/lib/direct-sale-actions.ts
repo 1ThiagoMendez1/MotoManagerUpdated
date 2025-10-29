@@ -1,0 +1,219 @@
+'use server';
+
+import { z } from 'zod';
+import prisma from './prisma';
+import { revalidatePath } from 'next/cache';
+
+const directSaleSchema = z.object({
+  customerId: z.string().optional(),
+  customerName: z.string().optional(),
+  paymentMethod: z.enum(['DaviPlata', 'Nequi', 'Efectivo', 'Tarjeta', 'Addi', 'Otros'], {
+    required_error: "Se requiere seleccionar un medio de pago.",
+  }),
+  date: z.date({ required_error: "Se requiere una fecha." }),
+  items: z.array(z.object({
+    inventoryItemId: z.string().min(1, "Selecciona un producto"),
+    quantity: z.coerce.number().int().min(1, "Mínimo 1"),
+    price: z.coerce.number(),
+  })).min(1, "Agrega al menos un producto."),
+});
+
+export const createDirectSaleNew = async (prevState: any, formData: FormData) => {
+  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+  console.log('🔍 createDirectSaleNew called');
+  console.log('🏢 tenantId:', tenantId);
+
+  try {
+    const itemsRaw = formData.get('items') as string;
+    const items = JSON.parse(itemsRaw || '[]');
+    const customerId = formData.get('customerId') as string || undefined;
+    const customerName = formData.get('customerName') as string || undefined;
+    const paymentMethod = formData.get('paymentMethod') as string;
+    const date = new Date(formData.get('date') as string);
+
+    const validatedFields = directSaleSchema.safeParse({
+      customerId,
+      customerName,
+      paymentMethod,
+      date,
+      items,
+    });
+
+    if (!validatedFields.success) {
+      return {
+        errors: validatedFields.error.flatten().fieldErrors,
+      };
+    }
+
+    const { customerId: cId, customerName: cName, paymentMethod: pm, date: d, items: saleItems } = validatedFields.data;
+
+    const total = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    // Check inventory availability
+    for (const item of saleItems) {
+      const inventoryItem = await prisma.inventoryItem.findUnique({
+        where: { id: item.inventoryItemId, tenantId },
+      });
+      if (!inventoryItem || inventoryItem.quantity < item.quantity) {
+        return {
+          message: `Stock insuficiente para ${inventoryItem?.name || 'producto'}.`,
+        };
+      }
+    }
+
+    // Create sale using raw SQL to avoid Prisma transaction issues
+    console.log('🔄 Using raw SQL approach for direct sale');
+
+    // Generate unique sale number
+    let saleNumber;
+    let attemptsGen = 0;
+    const maxAttemptsGen = 10;
+
+    do {
+      const lastSale = await prisma.sale.findFirst({
+        where: { tenantId },
+        orderBy: { saleNumber: 'desc' },
+      });
+
+      const nextNumber = lastSale ? (parseInt(lastSale.saleNumber.replace('V', '')) || 0) + 1 : 1;
+      saleNumber = `V${nextNumber.toString().padStart(4, '0')}`;
+
+      // Check if this sale number already exists
+      const existingSale = await prisma.sale.findUnique({
+        where: {
+          tenantId_saleNumber: {
+            tenantId,
+            saleNumber,
+          },
+        },
+      });
+
+      if (!existingSale) {
+        break; // Sale number is unique
+      }
+
+      attemptsGen++;
+      if (attemptsGen >= maxAttemptsGen) {
+        throw new Error('Unable to generate unique sale number after multiple attempts');
+      }
+
+      // Wait a bit before trying again
+      await new Promise(resolve => setTimeout(resolve, 10));
+    } while (true);
+
+    // Create sale with raw SQL and return the ID
+    const saleResult = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO "Sale" ("id", "tenantId", "saleNumber", "customerId", "customerName", "paymentMethod", "date", "total")
+      VALUES (gen_random_uuid(), ${tenantId}, ${saleNumber}, ${cId}, ${cName}, ${pm}, ${d}, ${total})
+      RETURNING id
+    `;
+
+    const saleId = saleResult[0].id;
+    console.log('Created sale with ID:', saleId);
+
+    // Force create sale items first, then get the sale
+    console.log('Force creating sale items before retrieving sale...');
+    for (const item of saleItems) {
+      console.log('Force creating item:', item);
+      await prisma.$executeRaw`
+        INSERT INTO "SaleItem" ("id", "tenantId", "saleId", "inventoryItemId", "quantity", "price")
+        VALUES (gen_random_uuid(), ${tenantId}, ${saleId}, ${item.inventoryItemId}, ${item.quantity}, ${item.price})
+        ON CONFLICT ("tenantId", "saleId", "inventoryItemId") DO UPDATE SET
+          quantity = EXCLUDED.quantity,
+          price = EXCLUDED.price
+      `;
+      console.log('Force sale item created/updated for:', item.inventoryItemId);
+
+      // Update inventory
+      await prisma.inventoryItem.update({
+        where: { id: item.inventoryItemId, tenantId },
+        data: {
+          quantity: {
+            decrement: item.quantity,
+          },
+        },
+      });
+    }
+
+    // Now get the sale with items
+    const createdSale = await prisma.sale.findUnique({
+      where: {
+        id: saleId,
+        tenantId,
+      },
+      include: {
+        saleItems: {
+          include: {
+            inventoryItem: true
+          }
+        },
+        customer: true
+      }
+    });
+
+    if (!createdSale) {
+      throw new Error('Failed to retrieve created sale');
+    }
+
+    console.log(`Final sale has ${createdSale.saleItems.length} items`);
+
+    if (!createdSale) {
+      throw new Error('Failed to create sale');
+    }
+
+    // Items are already created above, just update inventory
+    for (const item of saleItems) {
+      // Update inventory (already done above, but keeping for consistency)
+      await prisma.inventoryItem.update({
+        where: { id: item.inventoryItemId, tenantId },
+        data: {
+          quantity: {
+            decrement: item.quantity,
+          },
+        },
+      });
+      console.log('Inventory updated for:', item.inventoryItemId);
+    }
+
+    const saleData = createdSale;
+
+    console.log('✅ Direct sale created successfully:', saleData.id);
+    console.log('Sale data for receipt:', {
+      id: saleData.id,
+      saleNumber: saleData.saleNumber,
+      itemsCount: saleData.saleItems.length,
+      items: saleData.saleItems.map(item => ({
+        name: item.inventoryItem.name,
+        sku: item.inventoryItem.sku,
+        quantity: item.quantity,
+        price: item.price,
+      }))
+    });
+
+    revalidatePath('/sales');
+    return {
+      success: true,
+      sale: {
+        id: saleData.id,
+        saleNumber: saleData.saleNumber,
+        date: saleData.date.toISOString(),
+        total: saleData.total,
+        paymentMethod: pm,
+        customerName: saleData.customer?.name || saleData.customerName || 'Cliente de Mostrador',
+        items: saleData.saleItems.map(item => ({
+          name: item.inventoryItem.name,
+          sku: item.inventoryItem.sku,
+          category: item.inventoryItem.category,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+        })),
+      }
+    };
+  } catch (error) {
+    console.error('❌ Error creating direct sale:', error);
+    return {
+      message: 'Error al crear la venta directa.',
+    };
+  }
+};

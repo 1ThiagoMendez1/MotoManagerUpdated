@@ -1,0 +1,194 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum InventoryCategory {
+  Lubricantes
+  Repuestos
+  Llantas
+  Accesorios
+}
+
+enum AppointmentStatus {
+  Programada
+  Completada
+  Cancelada
+}
+
+enum WorkOrderStatus {
+  Diagnosticando
+  Reparado
+  Entregado
+}
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  email       String   @unique
+  phone       String?
+  domain      String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customers     Customer[]
+  motorcycles   Motorcycle[]
+  technicians   Technician[]
+  inventoryItems InventoryItem[]
+  appointments  Appointment[]
+  workOrders    WorkOrder[]
+  sales         Sale[]
+  saleItems     SaleItem[]
+  users         User[]
+}
+
+model Customer {
+  id          String       @id @default(cuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String
+  name        String
+  phone       String?
+  cedula      String?
+  isFrequent  Boolean      @default(false)
+  motorcycles Motorcycle[]
+  sales       Sale[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, cedula])
+}
+
+model Motorcycle {
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  make         String
+  model        String
+  year         Int
+  plate        String
+  intakeDate   DateTime      @default(now())
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  customerId   String
+  workOrders   WorkOrder[]
+  appointments Appointment[]
+
+  @@unique([tenantId, plate])
+}
+
+model Technician {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  specialty   String
+  avatarUrl   String?
+  workOrders  WorkOrder[]
+  appointments Appointment[]
+}
+
+model InventoryItem {
+  id                String           @id @default(cuid())
+  tenantId          String
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name              String
+  sku               String
+  quantity          Int
+  price             Float
+  minimumQuantity   Int
+  location          String
+  category          InventoryCategory
+  supplier          String
+  supplierPrice     Float
+  saleItems         SaleItem[]
+
+  @@unique([tenantId, sku])
+}
+
+model Appointment {
+  id           String           @id @default(cuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  motorcycle   Motorcycle       @relation(fields: [motorcycleId], references: [id])
+  motorcycleId String
+  technician   Technician       @relation(fields: [technicianId], references: [id])
+  technicianId String
+  date         DateTime
+  time         String
+  service      String
+  status       AppointmentStatus @default(Programada)
+}
+
+model WorkOrder {
+  id                String     @id @default(cuid())
+  tenantId          String
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrderNumber   String
+  motorcycle        Motorcycle @relation(fields: [motorcycleId], references: [id])
+  motorcycleId      String
+  technician        Technician @relation(fields: [technicianId], references: [id])
+  technicianId      String
+  issueDescription  String
+  status            WorkOrderStatus @default(Diagnosticando)
+  createdDate       DateTime   @default(now())
+  diagnosticandoDate DateTime? @default(now())
+  reparadoDate      DateTime?
+  entregadoDate     DateTime?
+  completedDate     DateTime?
+  sales             Sale[]
+
+  @@unique([tenantId, workOrderNumber])
+}
+
+model Sale {
+  id            String      @id @default(cuid())
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleNumber    String
+  workOrder     WorkOrder?  @relation(fields: [workOrderId], references: [id])
+  workOrderId   String?
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  customerId    String?
+  customerName  String?
+  date          DateTime    @default(now())
+  total         Float
+  paymentMethod String      @default("Efectivo") // Nuevo campo con valor por defecto
+  saleItems     SaleItem[]
+
+  @@unique([tenantId, saleNumber])
+}
+
+model SaleItem {
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sale           Sale        @relation(fields: [saleId], references: [id])
+  saleId         String
+  inventoryItem  InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  inventoryItemId String
+  quantity       Int
+  price          Float
+
+  @@unique([tenantId, saleId, inventoryItemId])
+}
+
+model User {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email       String   @unique
+  password    String
+  name        String
+  role        String   @default("user") // e.g., admin, user
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, email])
+}
