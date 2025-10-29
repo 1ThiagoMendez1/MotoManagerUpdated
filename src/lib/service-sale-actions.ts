@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
+import { withTenant } from './tenant';
 
 const serviceSaleSchema = z.object({
   workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
@@ -20,8 +21,7 @@ const serviceSaleSchema = z.object({
   })).optional(),
 });
 
-export const createServiceSaleNew = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createServiceSaleNew = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   console.log('🔍 createServiceSaleNew called');
   console.log('🏢 tenantId:', tenantId);
 
@@ -244,4 +244,4 @@ export const createServiceSaleNew = async (prevState: any, formData: FormData) =
       message: 'Error al crear la venta de servicio.',
     };
   }
-};
+});

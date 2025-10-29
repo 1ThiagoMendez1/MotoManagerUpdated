@@ -49,8 +49,8 @@ const inventorySchema = z.object({
   minimumQuantity: z.coerce.number().int().positive("La cantidad mínima debe ser un número positivo."),
 });
 
-export const createCustomer = async (prevState: any, formData: FormData) => {
-  console.log('🔍 createCustomer called (without tenant wrapper for testing)');
+export const createCustomer = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+  console.log('🔍 createCustomer called with tenant wrapper');
   console.log('📝 FormData received:');
   for (const [key, value] of formData.entries()) {
     console.log(`${key}: ${value}`);
@@ -73,7 +73,6 @@ export const createCustomer = async (prevState: any, formData: FormData) => {
     }
 
     const { name, email, phone, cedula } = validatedFields.data;
-    const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
     console.log('📋 Data to create:', { tenantId, name, email, phone, cedula });
     console.log('🔍 tenantId type:', typeof tenantId, 'value:', tenantId);
 
@@ -117,10 +116,9 @@ export const createCustomer = async (prevState: any, formData: FormData) => {
       message: 'Error al crear el cliente.',
     };
   }
-};
+});
 
-export const updateCustomer = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const updateCustomer = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -162,10 +160,9 @@ export const updateCustomer = async (prevState: any, formData: FormData) => {
       message: 'Error al actualizar el cliente.',
     };
   }
-};
+});
 
-export const deleteCustomer = async (formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const deleteCustomer = withTenant(async (tenantId: string, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -186,10 +183,9 @@ export const deleteCustomer = async (formData: FormData) => {
       message: 'Error al eliminar el cliente.',
     };
   }
-};
+});
 
-export const createMotorcycle = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createMotorcycle = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   try {
     const validatedFields = motorcycleSchema.safeParse({
       make: formData.get('make'),
@@ -265,7 +261,7 @@ export const createMotorcycle = async (prevState: any, formData: FormData) => {
       message: 'Error al crear la motocicleta.',
     };
   }
-};
+});
 
 export const getCustomerByCedula = withTenant(async (tenantId: string, cedula: string) => {
   try {
@@ -293,8 +289,7 @@ export const getCustomerByCedula = withTenant(async (tenantId: string, cedula: s
   }
 });
 
-export const createWorkOrder = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createWorkOrder = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   try {
     const validatedFields = workOrderSchema.safeParse({
       motorcycleId: formData.get('motorcycleId'),
@@ -345,10 +340,9 @@ export const createWorkOrder = async (prevState: any, formData: FormData) => {
       message: 'Error al crear la orden de trabajo.',
     };
   }
-};
+});
 
-export const createTechnician = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createTechnician = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   try {
     const validatedFields = technicianSchema.safeParse({
       name: formData.get('name'),
@@ -390,10 +384,9 @@ export const createTechnician = async (prevState: any, formData: FormData) => {
       message: 'Error al crear el técnico.',
     };
   }
-};
+});
 
-export const updateTechnician = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const updateTechnician = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -431,10 +424,9 @@ export const updateTechnician = async (prevState: any, formData: FormData) => {
       message: 'Error al actualizar el técnico.',
     };
   }
-};
+});
 
-export const deleteTechnician = async (formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const deleteTechnician = withTenant(async (tenantId: string, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -455,10 +447,9 @@ export const deleteTechnician = async (formData: FormData) => {
       message: 'Error al eliminar el técnico.',
     };
   }
-};
+});
 
-export const createInventoryItem = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createInventoryItem = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   try {
     const validatedFields = inventorySchema.safeParse({
       name: formData.get('name'),
@@ -506,15 +497,15 @@ export const createInventoryItem = async (prevState: any, formData: FormData) =>
   } catch (error) {
     console.error('❌ Error creating inventory item:', error);
     console.error('❌ Error details:', {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack,
+      name: (error as any)?.name,
+      message: (error as any)?.message,
+      stack: (error as any)?.stack,
     });
     return {
       message: 'Error al crear el artículo de inventario.',
     };
   }
-};
+});
 
 export const updateInventoryItem = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   'use server';
@@ -838,8 +829,7 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
   }
 });
 
-export const createDirectSale = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createDirectSale = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   console.log('🔍 createDirectSale called');
   console.log('🏢 tenantId:', tenantId);
 
@@ -975,10 +965,9 @@ export const createDirectSale = async (prevState: any, formData: FormData) => {
       message: 'Error al crear la venta directa.',
     };
   }
-};
+});
 
-export const updateWorkOrderStatus = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const updateWorkOrderStatus = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   try {
     const id = formData.get('id') as string;
     const status = formData.get('status') as 'Diagnosticando' | 'Reparado' | 'Entregado';
@@ -1018,4 +1007,4 @@ export const updateWorkOrderStatus = async (prevState: any, formData: FormData) 
       message: 'Error al actualizar el estado de la orden de trabajo.',
     };
   }
-};
+});

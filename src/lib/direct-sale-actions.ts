@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
+import { withTenant } from './tenant';
 
 const directSaleSchema = z.object({
   customerId: z.string().optional(),
@@ -18,8 +19,7 @@ const directSaleSchema = z.object({
   })).min(1, "Agrega al menos un producto."),
 });
 
-export const createDirectSaleNew = async (prevState: any, formData: FormData) => {
-  const tenantId = 'cmhb1y7ka003xjwuky2m6v4wo'; // Hardcoded for testing
+export const createDirectSaleNew = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
   console.log('🔍 createDirectSaleNew called');
   console.log('🏢 tenantId:', tenantId);
 
@@ -216,4 +216,4 @@ export const createDirectSaleNew = async (prevState: any, formData: FormData) =>
       message: 'Error al crear la venta directa.',
     };
   }
-};
+});
