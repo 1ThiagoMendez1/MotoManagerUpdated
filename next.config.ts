@@ -1,6 +1,11 @@
 import type {NextConfig} from 'next';
-require('dotenv').config({ path: './.env' });
 
+// Cargar variables de entorno según el entorno
+if (process.env.NODE_ENV === 'production') {
+  require('dotenv').config({ path: './.env.production' });
+} else {
+  require('dotenv').config({ path: './.env' });
+}
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -17,6 +22,7 @@ const nextConfig: NextConfig = {
         hostname: '**',
       },
     ],
+    unoptimized: false, // Optimizar imágenes en producción
   },
   env: {
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -37,6 +43,34 @@ const nextConfig: NextConfig = {
       };
     }
     return config;
+  },
+  // Configuración de producción
+  poweredByHeader: false, // Remover header X-Powered-By
+  compress: true, // Habilitar compresión gzip
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'], // Optimizar imports
+  },
+  // Configuración de headers de seguridad
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin'
+          }
+        ]
+      }
+    ];
   },
 };
 

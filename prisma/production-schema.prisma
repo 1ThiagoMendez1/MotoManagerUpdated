@@ -1,0 +1,185 @@
+// Archivo de configuración de Prisma para producción
+// Copia este contenido a tu archivo prisma/schema.prisma en el servidor
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  subdomain String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customers   Customer[]
+  motorcycles Motorcycle[]
+  technicians Technician[]
+  workOrders  WorkOrder[]
+  sales       Sale[]
+  inventory   InventoryItem[]
+
+  @@map("Tenant")
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String
+  phone     String?
+  cedula    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  motorcycles Motorcycle[]
+  sales      Sale[]
+
+  @@unique([tenantId, cedula])
+  @@map("Customer")
+}
+
+model Motorcycle {
+  id          String   @id @default(cuid())
+  tenantId    String
+  make        String
+  model       String
+  year        Int
+  plate       String
+  intakeDate  DateTime @default(now())
+  customerId  String
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer    @relation(fields: [customerId], references: [id])
+  workOrders WorkOrder[]
+
+  @@unique([tenantId, plate])
+  @@map("Motorcycle")
+}
+
+model Technician {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  specialty String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrders WorkOrder[]
+
+  @@map("Technician")
+}
+
+model WorkOrder {
+  id                String   @id @default(cuid())
+  tenantId          String
+  workOrderNumber   String
+  motorcycleId      String
+  technicianId      String
+  issueDescription  String
+  status            WorkOrderStatus @default(Diagnosticando)
+  diagnosticandoDate DateTime?
+  reparadoDate      DateTime?
+  entregadoDate     DateTime?
+  completedDate     DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  motorcycle  Motorcycle  @relation(fields: [motorcycleId], references: [id])
+  technician  Technician  @relation(fields: [technicianId], references: [id])
+  sales       Sale[]
+
+  @@unique([tenantId, workOrderNumber])
+  @@map("WorkOrder")
+}
+
+model InventoryItem {
+  id             String   @id @default(cuid())
+  tenantId       String
+  name           String
+  sku            String
+  category       InventoryCategory
+  location       String
+  supplier       String
+  quantity       Int
+  price          Float
+  supplierPrice  Float
+  minimumQuantity Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleItems  SaleItem[]
+
+  @@unique([tenantId, sku])
+  @@map("InventoryItem")
+}
+
+model Sale {
+  id          String   @id @default(cuid())
+  tenantId    String
+  saleNumber  String
+  workOrderId String?
+  customerId  String?
+  customerName String?
+  paymentMethod PaymentMethod
+  date        DateTime
+  total       Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrder  WorkOrder?  @relation(fields: [workOrderId], references: [id])
+  customer   Customer?   @relation(fields: [customerId], references: [id])
+  saleItems  SaleItem[]
+
+  @@unique([tenantId, saleNumber])
+  @@map("Sale")
+}
+
+model SaleItem {
+  id               String  @id @default(cuid())
+  tenantId         String
+  saleId           String
+  inventoryItemId  String
+  quantity         Int
+  price            Float
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sale          Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+
+  @@unique([tenantId, saleId, inventoryItemId])
+  @@map("SaleItem")
+}
+
+enum WorkOrderStatus {
+  Diagnosticando
+  Reparado
+  Entregado
+}
+
+enum InventoryCategory {
+  Lubricantes
+  Repuestos
+  Llantas
+  Accesorios
+}
+
+enum PaymentMethod {
+  DaviPlata
+  Nequi
+  Efectivo
+  Tarjeta
+  Addi
+  Otros
+}
