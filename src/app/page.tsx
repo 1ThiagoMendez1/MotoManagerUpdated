@@ -28,12 +28,12 @@ const menuItems = [
 
 export default function Dashboard() {
   return (
-    <main className="flex flex-col items-center justify-center w-full min-h-full overflow-auto" data-page="dashboard">
-      <div className="text-center mb-2 px-4">
+    <main className="flex flex-col items-center justify-center w-full p-4">
+      <div className="text-center mb-6 px-4">
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight">Bienvenido a MotoManager</h1>
         <p className="text-base sm:text-lg md:text-xl text-white/80 mt-2">Selecciona una opción para comenzar a gestionar tu taller.</p>
       </div>
-      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 w-full max-w-5xl overflow-y-auto pb-20 px-4">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 w-full max-w-5xl px-4">
         {menuItems.map(({ href, icon: Icon, label, description }) => (
           <Link href={href} key={href}>
             <Card className="bg-white/10 backdrop-blur-sm text-white border-white/20 hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1 h-full shadow-lg hover:shadow-primary/50">

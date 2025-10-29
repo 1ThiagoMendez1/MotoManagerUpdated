@@ -108,8 +108,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center px-4">
-      <Card className="w-full max-w-sm bg-white/10 backdrop-blur-sm border-white/20 text-white">
+    <div className="fixed inset-0 flex items-center justify-center px-4">
+      <Card className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-white/10 backdrop-blur-sm border-white/20 text-white">
         <CardHeader className="text-center">
             <div className="flex justify-center items-center gap-2 mb-4">
                  <Wrench className="h-8 w-8 text-primary" />

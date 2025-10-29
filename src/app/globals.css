@@ -68,16 +68,6 @@
     @apply bg-background text-foreground;
   }
 
-  /* Estilos específicos para la página de inicio */
-  body:has(main[data-page="dashboard"]) {
-    overflow: auto;
-  }
-
-  main[data-page="dashboard"] {
-    min-height: 100vh;
-    overflow: auto;
-  }
-
   /* Header con desenfoque para mejor legibilidad */
   header {
     background: rgba(0, 0, 0, 0.3);
