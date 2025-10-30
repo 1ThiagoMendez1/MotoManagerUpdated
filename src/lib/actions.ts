@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 import prisma from './prisma';
+import evolutionAPI from './whatsapp';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { withAuth } from './tenant';
@@ -160,13 +161,35 @@ export const deleteCustomer = withAuth(async (formData: FormData) => {
   }
 
   try {
+    // Check if customer has motorcycles or sales
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      include: {
+        motorcycles: true,
+        sales: true,
+      },
+    });
+
+    if (!customer) {
+      return {
+        message: 'Cliente no encontrado.',
+      };
+    }
+
+    if (customer.motorcycles.length > 0 || customer.sales.length > 0) {
+      return {
+        message: 'No se puede eliminar el cliente porque tiene motocicletas o ventas asociadas.',
+      };
+    }
+
     await prisma.customer.delete({
       where: { id },
     });
 
-    revalidatePath('/');
+    revalidatePath('/customers');
     return { success: true };
   } catch (error) {
+    console.error('Error deleting customer:', error);
     return {
       message: 'Error al eliminar el cliente.',
     };
@@ -291,13 +314,53 @@ export const createWorkOrder = withAuth(async (prevState: any, formData: FormDat
         technicianId,
         issueDescription,
       },
+      include: {
+        motorcycle: {
+          include: {
+            customer: true,
+          },
+        },
+        technician: true,
+      },
     });
 
     console.log('✅ Created work order fetched:', createdWorkOrder);
 
+    // Send WhatsApp notification for new work order (Diagnosticando status)
+    console.log('📱 Checking if customer has phone for new work order notification');
+    console.log('👤 Customer phone:', createdWorkOrder.motorcycle.customer.phone);
+
+    if (createdWorkOrder.motorcycle.customer.phone) {
+      console.log('📱 Sending WhatsApp notification for new work order');
+      try {
+        const result = await evolutionAPI.sendOrderStatusUpdate(
+          createdWorkOrder.motorcycle.customer.phone,
+          {
+            orderNumber: createdWorkOrder.workOrderNumber,
+            status: 'Diagnosticando',
+            customerName: createdWorkOrder.motorcycle.customer.name,
+            motorcycleInfo: `${createdWorkOrder.motorcycle.make} ${createdWorkOrder.motorcycle.model} (${createdWorkOrder.motorcycle.plate})`,
+            technicianName: createdWorkOrder.technician.name,
+          }
+        );
+        console.log('✅ WhatsApp notification result for new work order:', result);
+        if (result.success) {
+          console.log('✅ WhatsApp notification sent successfully for new work order');
+        } else {
+          console.log('❌ WhatsApp notification failed for new work order:', result.error);
+        }
+      } catch (whatsappError) {
+        console.error('💥 Error sending WhatsApp notification for new work order:', whatsappError);
+        // Don't fail the work order creation if WhatsApp fails
+      }
+    } else {
+      console.log('📱 No phone number found for customer, skipping WhatsApp notification for new work order');
+    }
+
     revalidatePath('/work-orders');
     return { success: true };
   } catch (error) {
+    console.error('❌ Error creating work order:', error);
     return {
       message: 'Error al crear la orden de trabajo.',
     };
@@ -388,6 +451,27 @@ export const deleteTechnician = withAuth(async (formData: FormData) => {
   }
 
   try {
+    // Check if technician has work orders
+    const technician = await prisma.technician.findUnique({
+      where: { id },
+      include: {
+        workOrders: true,
+        appointments: true,
+      },
+    });
+
+    if (!technician) {
+      return {
+        message: 'Técnico no encontrado.',
+      };
+    }
+
+    if (technician.workOrders.length > 0 || technician.appointments.length > 0) {
+      return {
+        message: 'No se puede eliminar el técnico porque tiene órdenes de trabajo o citas asociadas.',
+      };
+    }
+
     await prisma.technician.delete({
       where: { id },
     });
@@ -395,6 +479,7 @@ export const deleteTechnician = withAuth(async (formData: FormData) => {
     revalidatePath('/technicians');
     return { success: true };
   } catch (error) {
+    console.error('Error deleting technician:', error);
     return {
       message: 'Error al eliminar el técnico.',
     };
@@ -520,6 +605,26 @@ export const deleteInventoryItem = withAuth(async (prevState: any, formData: For
   }
 
   try {
+    // Check if inventory item has sale items
+    const inventoryItem = await prisma.inventoryItem.findUnique({
+      where: { id },
+      include: {
+        saleItems: true,
+      },
+    });
+
+    if (!inventoryItem) {
+      return {
+        message: 'Artículo de inventario no encontrado.',
+      };
+    }
+
+    if (inventoryItem.saleItems.length > 0) {
+      return {
+        message: 'No se puede eliminar el artículo porque tiene ventas asociadas.',
+      };
+    }
+
     await prisma.inventoryItem.delete({
       where: { id },
     });
@@ -527,6 +632,7 @@ export const deleteInventoryItem = withAuth(async (prevState: any, formData: For
     revalidatePath('/inventory');
     return { success: true };
   } catch (error) {
+    console.error('Error deleting inventory item:', error);
     return {
       message: 'Error al eliminar el artículo de inventario.',
     };
@@ -876,6 +982,43 @@ export const createDirectSale = withAuth(async (prevState: any, formData: FormDa
 
     console.log('✅ Direct sale created successfully:', saleData.id);
 
+    // Send WhatsApp confirmation if customer has phone
+    if (saleData.customerId) {
+      const customer = await prisma.customer.findUnique({
+        where: { id: saleData.customerId },
+        select: { phone: true, name: true },
+      });
+
+      if (customer?.phone) {
+        try {
+          // Get sale items for WhatsApp message
+          const saleItems = await prisma.saleItem.findMany({
+            where: { saleId: saleData.id },
+            include: { inventoryItem: true },
+          });
+
+          await evolutionAPI.sendSaleConfirmation(
+            customer.phone,
+            {
+              saleNumber: saleData.saleNumber,
+              customerName: customer.name,
+              total: saleData.total,
+              paymentMethod: pm,
+              items: saleItems.map(item => ({
+                name: item.inventoryItem.name,
+                quantity: item.quantity,
+                price: item.price,
+              })),
+            }
+          );
+          console.log('WhatsApp confirmation sent for direct sale');
+        } catch (whatsappError) {
+          console.error('Error sending WhatsApp confirmation:', whatsappError);
+          // Don't fail the sale if WhatsApp fails
+        }
+      }
+    }
+
     revalidatePath('/sales');
     return {
       success: true,
@@ -885,7 +1028,7 @@ export const createDirectSale = withAuth(async (prevState: any, formData: FormDa
         date: saleData.date.toISOString(),
         total: saleData.total,
         customerName: saleData.customerName || 'Cliente de Mostrador',
-        items: [], // Will be populated from saleItems if needed
+        items: [], // Items will be populated from saleItems if needed
       }
     };
   } catch (error) {
@@ -922,10 +1065,60 @@ export const updateWorkOrderStatus = withAuth(async (prevState: any, formData: F
       updateData.completedDate = now;
     }
 
+    // Get work order with customer info for WhatsApp notification
+    const workOrder = await prisma.workOrder.findUnique({
+      where: { id },
+      include: {
+        motorcycle: {
+          include: {
+            customer: true,
+          },
+        },
+        technician: true,
+      },
+    });
+
+    if (!workOrder) {
+      return {
+        message: 'Orden de trabajo no encontrada.',
+      };
+    }
+
     await prisma.workOrder.update({
       where: { id },
       data: updateData,
     });
+
+    // Send WhatsApp notification if customer has phone
+    console.log('📱 Checking if customer has phone for WhatsApp notification');
+    console.log('👤 Customer phone:', workOrder.motorcycle.customer.phone);
+
+    if (workOrder.motorcycle.customer.phone) {
+      console.log('📱 Sending WhatsApp notification for work order status update');
+      try {
+        const result = await evolutionAPI.sendOrderStatusUpdate(
+          workOrder.motorcycle.customer.phone,
+          {
+            orderNumber: workOrder.workOrderNumber,
+            status: status as 'Diagnosticando' | 'Reparado' | 'Entregado',
+            customerName: workOrder.motorcycle.customer.name,
+            motorcycleInfo: `${workOrder.motorcycle.make} ${workOrder.motorcycle.model} (${workOrder.motorcycle.plate})`,
+            technicianName: workOrder.technician.name,
+          }
+        );
+        console.log('✅ WhatsApp notification result:', result);
+        if (result.success) {
+          console.log('✅ WhatsApp notification sent successfully for work order status update');
+        } else {
+          console.log('❌ WhatsApp notification failed:', result.error);
+        }
+      } catch (whatsappError) {
+        console.error('💥 Error sending WhatsApp notification:', whatsappError);
+        // Don't fail the status update if WhatsApp fails
+      }
+    } else {
+      console.log('📱 No phone number found for customer, skipping WhatsApp notification');
+    }
 
     revalidatePath('/work-orders');
     revalidatePath('/technicians');

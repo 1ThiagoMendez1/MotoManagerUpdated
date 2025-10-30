@@ -123,7 +123,6 @@ export default async function InventoryPage({
                       <TableCell className="text-right hidden md:table-cell">
                         <div className="flex gap-2 justify-end">
                           <EditInventoryItem item={item} />
-                          <DeleteInventoryItem item={item} />
                         </div>
                       </TableCell>
                   </TableRow>

@@ -19,14 +19,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DiagnosticAI } from '@/components/ai/DiagnosticAI';
 import { AddWorkOrder } from '@/components/forms/AddWorkOrder';
 import { UpdateWorkOrderStatus } from '@/components/forms/UpdateWorkOrderStatus';
+import { SearchWorkOrders } from '@/components/forms/SearchWorkOrders';
 import { format } from 'date-fns';
 
-export default async function WorkOrdersPage() {
+export default async function WorkOrdersPage({
+  searchParams,
+}: {
+  searchParams: { query?: string };
+}) {
+  const resolvedSearchParams = await searchParams;
+  const query = resolvedSearchParams.query || '';
+
   const [workOrders, motorcycles, technicians] = await Promise.all([
-    getWorkOrders(),
+    getWorkOrders({ query }),
     getMotorcycles(),
     getTechnicians(),
   ]);
@@ -45,16 +52,18 @@ export default async function WorkOrdersPage() {
 
   return (
     <div className="w-full">
-       <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Órdenes de Trabajo</h1>
-            <p className="text-muted-foreground text-white/80">Rastrea y gestiona todos los trabajos en curso.</p>
-          </div>
-          <div className="flex gap-2">
-            <DiagnosticAI />
-            <AddWorkOrder motorcycles={motorcycles} technicians={technicians} />
-          </div>
-        </div>
+       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+           <div>
+             <h1 className="text-3xl font-bold tracking-tight text-white">Órdenes de Trabajo</h1>
+             <p className="text-muted-foreground text-white/80">Rastrea y gestiona todos los trabajos en curso.</p>
+           </div>
+           <div className="flex gap-2 flex-grow sm:flex-grow-0">
+             <SearchWorkOrders />
+           </div>
+           <div className="flex gap-2">
+             <AddWorkOrder motorcycles={motorcycles} technicians={technicians} />
+           </div>
+         </div>
       <Card className="bg-white/10 border-white/20 text-white">
         <CardHeader>
           <CardTitle>Trabajos Activos</CardTitle>

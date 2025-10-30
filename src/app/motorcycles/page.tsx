@@ -17,14 +17,23 @@ import {
 } from '@/components/ui/table';
 import { AddMotorcycle } from '@/components/forms/AddMotorcycle';
 import { MotorcycleDetails } from '@/components/details/MotorcycleDetails';
+import { SearchMotorcycles } from '@/components/forms/SearchMotorcycles';
+import { ExportMotorcyclesButton } from '@/components/buttons/ExportMotorcyclesButton';
 import { format } from 'date-fns';
 
 // Force dynamic rendering to avoid database connection during build
 export const dynamic = 'force-dynamic';
 
-export default async function MotorcyclesPage() {
+export default async function MotorcyclesPage({
+  searchParams,
+}: {
+  searchParams: { query?: string };
+}) {
+  const resolvedSearchParams = await searchParams;
+  const query = resolvedSearchParams.query || '';
+
   const [motorcycles, customers, technicians, workOrders] = await Promise.all([
-    getMotorcycles(),
+    getMotorcycles({ query }),
     getCustomers(),
     getTechnicians(),
     getWorkOrders(),
@@ -32,12 +41,18 @@ export default async function MotorcyclesPage() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-white">Recepción de Motocicletas</h1>
           <p className="text-muted-foreground text-white/80">Gestiona todos los registros de motocicletas.</p>
         </div>
-        <AddMotorcycle />
+        <div className="flex gap-2 flex-grow sm:flex-grow-0">
+          <SearchMotorcycles />
+        </div>
+        <div className="flex gap-2">
+          <ExportMotorcyclesButton motorcycles={motorcycles} />
+          <AddMotorcycle />
+        </div>
       </div>
       <Card className="bg-white/10 border-white/20 text-white">
         <CardHeader>

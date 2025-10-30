@@ -70,10 +70,29 @@ export const getTechnicians = async (): Promise<Technician[]> => {
 };
 
 // --- MOTORCYCLES ---
-export const getMotorcycles = async (): Promise<Motorcycle[]> => {
+export const getMotorcycles = async ({ query }: { query?: string } = {}): Promise<Motorcycle[]> => {
+  const where: Prisma.MotorcycleWhereInput = query ? {
+    OR: [
+      { make: { contains: query, mode: Prisma.QueryMode.insensitive } },
+      { model: { contains: query, mode: Prisma.QueryMode.insensitive } },
+      { plate: { contains: query, mode: Prisma.QueryMode.insensitive } },
+      { customer: {
+        OR: [
+          { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { email: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { cedula: { contains: query, mode: Prisma.QueryMode.insensitive } },
+        ]
+      }}
+    ],
+  } : {};
+
   const motorcycles = await prisma.motorcycle.findMany({
+    where,
     include: {
       customer: true,
+    },
+    orderBy: {
+      intakeDate: 'desc',
     },
   });
   return motorcycles.map(m => ({
@@ -173,8 +192,32 @@ export const getAppointments = async (): Promise<Appointment[]> => {
 };
 
 // --- WORK ORDERS ---
-export const getWorkOrders = async (): Promise<WorkOrder[]> => {
+export const getWorkOrders = async ({ query }: { query?: string } = {}): Promise<WorkOrder[]> => {
+  const where: Prisma.WorkOrderWhereInput = query ? {
+    OR: [
+      { workOrderNumber: { contains: query, mode: Prisma.QueryMode.insensitive } },
+      { motorcycle: {
+        OR: [
+          { make: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { model: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { plate: { contains: query, mode: Prisma.QueryMode.insensitive } },
+          { customer: {
+            OR: [
+              { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+              { email: { contains: query, mode: Prisma.QueryMode.insensitive } },
+            ]
+          }}
+        ]
+      }},
+      { technician: {
+        name: { contains: query, mode: Prisma.QueryMode.insensitive }
+      }},
+      { issueDescription: { contains: query, mode: Prisma.QueryMode.insensitive } },
+    ],
+  } : {};
+
   const workOrders = await prisma.workOrder.findMany({
+    where,
     include: {
       motorcycle: {
         include: {
@@ -182,6 +225,9 @@ export const getWorkOrders = async (): Promise<WorkOrder[]> => {
         },
       },
       technician: true,
+    },
+    orderBy: {
+      createdDate: 'desc',
     },
   });
   return workOrders.map(wo => ({
@@ -324,6 +370,7 @@ export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }:
     customerId: s.customerId,
     customer: s.customer || undefined,
     customerName: s.customerName || undefined,
+    paymentMethod: s.paymentMethod,
     items: s.saleItems.map(si => ({
       id: si.id,
       inventoryItemId: si.inventoryItemId,

@@ -57,6 +57,12 @@ export function DeleteCustomer({ customer }: DeleteCustomerProps) {
     }
   }, [state?.success, toast]);
 
+  useEffect(() => {
+    if (state) {
+      console.log('DeleteCustomer state:', state);
+    }
+  }, [state]);
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

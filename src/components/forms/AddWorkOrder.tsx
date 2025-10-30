@@ -49,7 +49,7 @@ export function AddWorkOrder({ motorcycles, technicians }: AddWorkOrderProps) {
     }
   }, [state?.success]);
 
-  console.log('Work order creation result:', state);
+  // console.log('Work order creation result:', state);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

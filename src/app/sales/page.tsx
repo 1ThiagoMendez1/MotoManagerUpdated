@@ -25,6 +25,7 @@ import { ExportDirectSalesButton } from '@/components/buttons/ExportDirectSalesB
 import { ExportServiceSalesButton } from '@/components/buttons/ExportServiceSalesButton';
 import { AddSale } from '@/components/forms/AddSale';
 import { AddDirectSale } from '@/components/forms/AddDirectSale';
+import { SaleDetails } from '@/components/details/SaleDetails';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -185,6 +186,7 @@ export default async function SalesPage({
                     <TableHead className="hidden md:table-cell text-white/90 text-xs sm:text-sm">Detalles</TableHead>
                     <TableHead className="text-white/90 text-xs sm:text-sm">Fecha</TableHead>
                     <TableHead className="text-right text-white/90 text-xs sm:text-sm">Total</TableHead>
+                    <TableHead className="text-center text-white/90 text-xs sm:text-sm">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -215,6 +217,9 @@ export default async function SalesPage({
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm">{format(new Date(sale.date), 'yyyy-MM-dd')}</TableCell>
                       <TableCell className="text-right font-medium text-xs sm:text-sm">{formatCurrency(sale.total)}</TableCell>
+                      <TableCell className="text-center">
+                        <SaleDetails sale={sale} inventoryItems={inventoryItems} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
