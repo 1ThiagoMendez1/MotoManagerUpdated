@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CalendarIcon, Loader2, Wrench, PlusCircle, Trash2 } from 'lucide-react';
+import { CalendarIcon, Loader2, Wrench, PlusCircle, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -68,17 +68,18 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
+  const [plateSearch, setPlateSearch] = useState('');
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-        workOrderId: '',
-        laborCost: 0,
-        paymentMethod: 'Efectivo',
-        date: new Date(),
-        items: [],
-    },
+       workOrderId: '',
+       laborCost: undefined,
+       paymentMethod: 'Efectivo',
+       date: new Date(),
+       items: [],
+   },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -93,6 +94,32 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const itemsTotal = watchItems?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
   const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
   const total = itemsTotal + laborCostValue;
+
+  // Filter work orders based on plate search
+  const filteredWorkOrders = plateSearch
+    ? workOrders.filter(order =>
+        order.motorcycle.plate.toLowerCase().includes(plateSearch.toLowerCase())
+      )
+    : workOrders;
+
+  // Auto-select work order if only one matches the plate search
+  const handlePlateSearch = (value: string) => {
+    setPlateSearch(value);
+    if (value) {
+      const matchingOrders = workOrders.filter(order =>
+        order.motorcycle.plate.toLowerCase().includes(value.toLowerCase())
+      );
+      if (matchingOrders.length === 1) {
+        form.setValue('workOrderId', matchingOrders[0].id);
+      } else if (matchingOrders.length === 0) {
+        // Clear selection if no matches
+        form.setValue('workOrderId', '');
+      }
+    } else {
+      // Clear selection if search is empty
+      form.setValue('workOrderId', '');
+    }
+  };
   
   function handleProductChange(value: string, index: number) {
     const selectedProduct = inventory.find(item => item.id === value);
@@ -161,30 +188,47 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
-            <FormField
-              control={form.control}
-              name="workOrderId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-black">Orden de Trabajo</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} name={field.name}>
-                    <FormControl>
-                      <SelectTrigger className="bg-white text-black border-black/30">
-                        <SelectValue placeholder="Selecciona una orden" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {workOrders.map(order => (
-                        <SelectItem key={order.id} value={order.id}>
-                          {order.workOrderNumber} - {order.motorcycle.make} {order.motorcycle.model}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-4">
+              <FormItem>
+                <FormLabel className="text-black">Buscar por Placa</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      placeholder="Ingresa la placa para buscar órdenes..."
+                      value={plateSearch}
+                      onChange={(e) => handlePlateSearch(e.target.value)}
+                      className="bg-white text-black border-black/30 pl-10"
+                    />
+                  </div>
+                </FormControl>
+              </FormItem>
+
+              <FormField
+                control={form.control}
+                name="workOrderId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-black">Orden de Trabajo</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} name={field.name}>
+                      <FormControl>
+                        <SelectTrigger className="bg-white text-black border-black/30">
+                          <SelectValue placeholder="Se autocompletará con la placa" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredWorkOrders.map(order => (
+                          <SelectItem key={order.id} value={order.id}>
+                            {order.workOrderNumber} - {order.motorcycle.make} {order.motorcycle.model} ({order.motorcycle.plate})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <div className="space-y-2">
                 <FormLabel className="text-black">Repuestos y Productos</FormLabel>
@@ -297,7 +341,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                      <FormItem>
                          <FormLabel className="text-black">Costo Mano de Obra (COP)</FormLabel>
                          <FormControl>
-                         <Input type="number" placeholder="120000" {...field} className="bg-white text-black border-black/30" />
+                         <Input type="number" placeholder="Ej: 120000" {...field} className="bg-white text-black border-black/30" />
                          </FormControl>
                          <FormMessage />
                      </FormItem>

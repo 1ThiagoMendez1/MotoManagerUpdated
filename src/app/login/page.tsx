@@ -3,12 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Wrench, Loader2, LogIn, ShieldCheck } from 'lucide-react';
+import { Wrench, Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/components/auth/AuthProvider';
 
 export default function LoginPage() {
@@ -130,15 +129,6 @@ export default function LoginPage() {
               Regístrate aquí
             </Link>
           </p>
-          <Separator className="my-6 bg-white/20" />
-          <div className="text-center">
-             <Button asChild variant="link" className="text-white/70">
-                <Link href="/admin">
-                     <ShieldCheck className="mr-2 h-4 w-4" />
-                     Administrar Plataforma
-                </Link>
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from './tenant';
+import { sendServiceSaleNotification } from './whatsapp';
 
 const serviceSaleSchema = z.object({
   workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
@@ -68,7 +69,7 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
       saleNumber = `V${nextNumber.toString().padStart(4, '0')}`;
 
       // Check if this sale number already exists
-      const existingSale = await prisma.sale.findUnique({
+      const existingSale = await prisma.sale.findFirst({
         where: {
           saleNumber,
         },
@@ -203,6 +204,31 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
         price: item.price,
       })) || []
     });
+
+    // Send WhatsApp notification if customer has phone
+    if (createdSale.workOrder?.motorcycle.customer.phone) {
+      console.log('📱 Sending WhatsApp service notification to customer');
+      await sendServiceSaleNotification(
+        createdSale.workOrder.motorcycle.customer.phone,
+        createdSale.workOrder.motorcycle.customer.name,
+        createdSale.saleNumber,
+        createdSale.total,
+        {
+          make: createdSale.workOrder.motorcycle.make,
+          model: createdSale.workOrder.motorcycle.model,
+          plate: createdSale.workOrder.motorcycle.plate,
+        },
+        createdSale.workOrder.technician.name,
+        lc > 0 ? lc : undefined,
+        createdSale.saleItems?.map(item => ({
+          name: item.inventoryItem.name,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      );
+    } else {
+      console.log('📱 No customer phone available, skipping WhatsApp notification');
+    }
 
     revalidatePath('/sales');
     return {

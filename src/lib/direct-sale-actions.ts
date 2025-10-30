@@ -4,6 +4,7 @@ import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from './tenant';
+import { sendSaleNotification } from './whatsapp';
 
 const directSaleSchema = z.object({
   customerId: z.string().optional(),
@@ -77,7 +78,7 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
       saleNumber = `V${nextNumber.toString().padStart(4, '0')}`;
 
       // Check if this sale number already exists
-      const existingSale = await prisma.sale.findUnique({
+      const existingSale = await prisma.sale.findFirst({
         where: {
           saleNumber,
         },
@@ -183,6 +184,24 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
         price: item.price,
       }))
     });
+
+    // Send WhatsApp notification if customer has phone
+    if (saleData.customer?.phone) {
+      console.log('📱 Sending WhatsApp notification to customer');
+      await sendSaleNotification(
+        saleData.customer.phone,
+        saleData.customer.name,
+        saleData.saleNumber,
+        saleData.total,
+        saleData.saleItems.map(item => ({
+          name: item.inventoryItem.name,
+          quantity: item.quantity,
+          price: item.price,
+        }))
+      );
+    } else {
+      console.log('📱 No customer phone available, skipping WhatsApp notification');
+    }
 
     revalidatePath('/sales');
     return {

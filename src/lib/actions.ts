@@ -997,7 +997,7 @@ export const createDirectSale = withAuth(async (prevState: any, formData: FormDa
             include: { inventoryItem: true },
           });
 
-          await evolutionAPI.sendSaleConfirmation(
+          await evolutionAPI.sendSaleNotification(
             customer.phone,
             {
               saleNumber: saleData.saleNumber,

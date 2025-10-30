@@ -1,172 +1,213 @@
 import axios from 'axios';
 
-interface EvolutionAPIConfig {
-  baseURL: string;
-  apiKey: string;
-  instanceName: string;
+const evolutionApiUrl = process.env.EVOLUTION_API_URL;
+const evolutionApiKey = process.env.EVOLUTION_API_KEY;
+const whatsappInstance = process.env.EVOLUTION_INSTANCE_NAME;
+
+if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+  console.warn('Evolution API credentials not configured. WhatsApp notifications will be disabled.');
 }
 
-class EvolutionAPI {
-  private config: EvolutionAPIConfig;
-
-  constructor(config: EvolutionAPIConfig) {
-    this.config = config;
+export async function sendSaleNotification(
+  customerPhone: string,
+  customerName: string,
+  saleNumber: string,
+  total: number,
+  items: Array<{ name: string; quantity: number; price: number }>
+) {
+  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+    console.log('Evolution API not configured, skipping WhatsApp notification');
+    return { success: false, error: 'Evolution API not configured' };
   }
 
-  private getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'apikey': this.config.apiKey,
-    };
-  }
+  try {
+    // Format phone number for WhatsApp (remove + and add country code if needed)
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
 
-  private getBaseURL() {
-    return `${this.config.baseURL}/message/sendText/${this.config.instanceName}`;
-  }
-
-  async sendTextMessage(phone: string, message: string): Promise<any> {
-    try {
-      console.log('📱 Attempting to send WhatsApp message to:', phone);
-
-      const phoneNumber = phone.replace(/\D/g, ''); // Remove non-numeric characters
-      console.log('📞 Cleaned phone number:', phoneNumber);
-
-      const formattedPhone = phoneNumber.startsWith('57') ? phoneNumber : `57${phoneNumber}`;
-      console.log('📱 Formatted phone number:', formattedPhone);
-
-      const payload = {
-        number: formattedPhone,
-        text: message,
-        delay: 1200, // 1.2 seconds delay
-      };
-
-      console.log('📤 Sending payload to Evolution API:', {
-        url: this.getBaseURL(),
-        payload: { ...payload, text: payload.text.substring(0, 50) + '...' }
-      });
-
-      const response = await axios.post(this.getBaseURL(), payload, {
-        headers: this.getHeaders(),
-      });
-
-      console.log('✅ WhatsApp API Response:', response.data);
-
-      return {
-        success: true,
-        data: response.data,
-        messageId: response.data?.key?.id,
-      };
-    } catch (error: any) {
-      console.error('❌ Error sending WhatsApp message:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: this.getBaseURL()
-      });
-      return {
-        success: false,
-        error: error.response?.data || error.message,
-      };
-    }
-  }
-
-  async sendOrderStatusUpdate(phone: string, orderDetails: {
-    orderNumber: string;
-    status: string;
-    customerName: string;
-    motorcycleInfo: string;
-    technicianName?: string;
-  }): Promise<any> {
-    console.log('📱 Sending order status update to:', phone, 'Order:', orderDetails.orderNumber);
-
-    const statusMessages = {
-      'Diagnosticando': '🔧 Estamos diagnosticando tu motocicleta',
-      'Reparado': '✅ Tu motocicleta ha sido reparada',
-      'Entregado': '🚀 Tu motocicleta está lista para recoger',
-    };
-
-    const message = `*Águilas de Asfalto - Actualización de Orden*
-
-Hola ${orderDetails.customerName},
-
-${statusMessages[orderDetails.status as keyof typeof statusMessages] || 'Estado actualizado'}
-
-*Detalles de la orden:*
-📋 Número: ${orderDetails.orderNumber}
-🏍️ Vehículo: ${orderDetails.motorcycleInfo}
-${orderDetails.technicianName ? `👨‍🔧 Técnico: ${orderDetails.technicianName}` : ''}
-
-*Estado actual:* ${orderDetails.status}
-
-Gracias por confiar en nosotros.
-¡Nos vemos pronto!
-
-*Águilas de Asfalto*
-🏍️ Tu taller de confianza`;
-
-    console.log('📝 Order status message:', message.substring(0, 100) + '...');
-    return this.sendTextMessage(phone, message);
-  }
-
-  async sendSaleConfirmation(phone: string, saleDetails: {
-    saleNumber: string;
-    customerName: string;
-    total: number;
-    items: Array<{ name: string; quantity: number; price: number }>;
-    paymentMethod: string;
-  }): Promise<any> {
-    const itemsText = saleDetails.items.map(item =>
-      `• ${item.name} x${item.quantity} - $${item.price.toLocaleString('es-CO')}`
+    const itemsText = items.map(item =>
+      `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`
     ).join('\n');
 
-    const message = `*Águilas de Asfalto - Confirmación de Venta*
+    const message = `🛍️ *MotoManager - Nueva Venta*
 
-¡Gracias por tu compra, ${saleDetails.customerName}!
+¡Hola ${customerName}!
 
-*Detalles de la venta:*
-📄 Número: ${saleDetails.saleNumber}
-💰 Total: $${saleDetails.total.toLocaleString('es-CO')}
-💳 Método de pago: ${saleDetails.paymentMethod}
+Tu compra ha sido procesada exitosamente.
 
-*Artículos comprados:*
+📋 *Detalles de la venta:*
+Número: ${saleNumber}
+Total: $${total.toLocaleString('es-CO')}
+
+🛒 *Productos:*
 ${itemsText}
 
-¡Gracias por elegirnos!
+¡Gracias por tu preferencia! Si tienes alguna duda, no dudes en contactarnos.
 
-*Águilas de Asfalto*
-🏍️ Tu taller de confianza`;
+🏍️ *Águilas de Asfalto*`;
 
-    return this.sendTextMessage(phone, message);
-  }
+    const response = await axios.post(
+      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+      {
+        number: formattedPhone,
+        text: message,
+        delay: 1000
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        }
+      }
+    );
 
-  async sendLowStockAlert(phone: string, stockDetails: {
-    itemName: string;
-    currentStock: number;
-    minimumStock: number;
-  }): Promise<any> {
-    const message = `*Águilas de Asfalto - Alerta de Stock Bajo*
-
-⚠️ *ATENCIÓN: Stock Bajo*
-
-*Producto:* ${stockDetails.itemName}
-📦 Stock actual: ${stockDetails.currentStock}
-🎯 Stock mínimo: ${stockDetails.minimumStock}
-
-Es necesario reponer este artículo pronto.
-
-*Sistema de Inventario*
-Águilas de Asfalto`;
-
-    return this.sendTextMessage(phone, message);
+    console.log('✅ WhatsApp notification sent via Evolution API:', response.data);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp notification via Evolution API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
   }
 }
 
-// Initialize with environment variables
-const evolutionAPI = new EvolutionAPI({
-  baseURL: process.env.EVOLUTION_API_URL || 'http://localhost:8080',
-  apiKey: process.env.EVOLUTION_API_KEY || '',
-  instanceName: process.env.EVOLUTION_INSTANCE_NAME || 'default',
-});
+export async function sendServiceSaleNotification(
+  customerPhone: string,
+  customerName: string,
+  saleNumber: string,
+  total: number,
+  motorcycleInfo: { make: string; model: string; plate: string },
+  technicianName: string,
+  laborCost?: number,
+  items?: Array<{ name: string; quantity: number; price: number }>
+) {
+  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+    console.log('Evolution API not configured, skipping WhatsApp notification');
+    return { success: false, error: 'Evolution API not configured' };
+  }
 
-export default evolutionAPI;
-export { EvolutionAPI };
+  try {
+    // Format phone number for WhatsApp (remove + and add country code if needed)
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+
+    let itemsText = '';
+    if (items && items.length > 0) {
+      itemsText = '\n\n🛒 *Repuestos utilizados:*\n' +
+        items.map(item =>
+          `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`
+        ).join('\n');
+    }
+
+    const laborText = laborCost ? `\nMano de obra: $${laborCost.toLocaleString('es-CO')}` : '';
+
+    const message = `🔧 *MotoManager - Servicio Completado*
+
+¡Hola ${customerName}!
+
+Tu motocicleta ${motorcycleInfo.make} ${motorcycleInfo.model} (${motorcycleInfo.plate}) ha sido reparada exitosamente.
+
+📋 *Detalles del servicio:*
+Número: ${saleNumber}
+Técnico: ${technicianName}
+Total: $${total.toLocaleString('es-CO')}${laborText}${itemsText}
+
+✅ *Estado:* Entregado
+
+¡Gracias por confiar en nosotros! Tu motocicleta está lista para recoger.
+
+🏍️ *Águilas de Asfalto*`;
+
+    const response = await axios.post(
+      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+      {
+        number: formattedPhone,
+        text: message,
+        delay: 1000
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        }
+      }
+    );
+
+    console.log('✅ WhatsApp service notification sent via Evolution API:', response.data);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp service notification via Evolution API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
+export async function sendOrderStatusUpdate(
+  customerPhone: string,
+  orderData: {
+    orderNumber: string;
+    status: 'Diagnosticando' | 'Reparado' | 'Entregado';
+    customerName: string;
+    motorcycleInfo: string;
+    technicianName: string;
+  }
+) {
+  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+    console.log('Evolution API not configured, skipping WhatsApp notification');
+    return { success: false, error: 'Evolution API not configured' };
+  }
+
+  try {
+    // Format phone number for WhatsApp (remove + and add country code if needed)
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+
+    const statusEmojis = {
+      'Diagnosticando': '🔍',
+      'Reparado': '🔧',
+      'Entregado': '✅'
+    };
+
+    const statusMessages = {
+      'Diagnosticando': 'está siendo diagnosticada',
+      'Reparado': 'ha sido reparada',
+      'Entregado': 'está lista para recoger'
+    };
+
+    const message = `${statusEmojis[orderData.status]} *MotoManager - Actualización de Orden*
+
+¡Hola ${orderData.customerName}!
+
+Tu motocicleta ${orderData.motorcycleInfo} ${statusMessages[orderData.status]}.
+
+📋 *Detalles:*
+Orden: ${orderData.orderNumber}
+Estado: ${orderData.status}
+Técnico: ${orderData.technicianName}
+
+Te mantendremos informado sobre cualquier actualización.
+
+🏍️ *Águilas de Asfalto*`;
+
+    const response = await axios.post(
+      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+      {
+        number: formattedPhone,
+        text: message,
+        delay: 1000
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        }
+      }
+    );
+
+    console.log('✅ WhatsApp order status update sent via Evolution API:', response.data);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp order status update via Evolution API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
+export default {
+  sendSaleNotification,
+  sendServiceSaleNotification,
+  sendOrderStatusUpdate
+};
