@@ -1,4 +1,7 @@
 import { getWorkOrders, getMotorcycles, getTechnicians } from '@/lib/data';
+
+// Force dynamic rendering to avoid database connection during build
+export const dynamic = 'force-dynamic';
 import type { WorkOrder } from '@/lib/types';
 import {
   Card,

@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { CreateTicket } from '@/components/forms/CreateTicket';
 import TenantSwitcher from '@/components/TenantSwitcher';
-import { getTenantAwareHref } from '@/lib/navigation';
 
 const notifications = [
     { title: "Ticket Actualizado", description: "Tu ticket #TKT-001 ha sido marcado como 'En Revisión'.", time: "hace 5 min" },
@@ -29,17 +28,9 @@ const notifications = [
 
 export default function Header() {
   const router = useRouter();
-  const [homeHref, setHomeHref] = useState('/');
-
-  useEffect(() => {
-    getTenantAwareHref('/').then(setHomeHref);
-  }, []);
 
   const handleSignOut = async () => {
     try {
-      // Clear local storage
-      localStorage.removeItem('tenantId');
-
       // Call logout API to clear server-side session
       await fetch('/api/auth/logout', {
         method: 'POST',
@@ -58,7 +49,7 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 text-white z-50">
       <div className="flex items-center gap-4">
-        <Link href={homeHref} className="flex items-center gap-2 font-semibold text-lg">
+        <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
           <Wrench className="h-6 w-6 text-primary" />
           <span className="text-white hidden sm:inline">MotoManager</span>
           <span className="text-white sm:hidden">MM</span>

@@ -1,21 +1,8 @@
-import { notFound } from 'next/navigation';
-import { getTenantId } from '@/lib/tenant';
-
-interface TenantLayoutProps {
+interface LayoutProps {
   children: React.ReactNode;
-  params: {
-    tenant: string;
-  };
 }
 
-export default function TenantLayout({ children, params }: TenantLayoutProps) {
-  // This layout will handle tenant-specific routing
-  // The middleware already handles tenant validation
+export default function Layout({ children }: LayoutProps) {
+  // Since we removed tenant logic, this is now a simple layout
   return <>{children}</>;
-}
-
-export async function generateStaticParams() {
-  // In a real app, you might fetch available tenants here
-  // For now, we'll let Next.js handle dynamic routes
-  return [];
 }

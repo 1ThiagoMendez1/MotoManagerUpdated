@@ -1,101 +1,78 @@
-import { PrismaClient, AppointmentStatus, WorkOrderStatus, InventoryCategory } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Iniciando seeding de datos...');
+  console.log('🌱 Starting seed for single-tenant system...');
 
-  // Create a default tenant
-  const tenant = await prisma.tenant.upsert({
-    where: { id: 'cmhb1y7ka003xjwuky2m6v4wo' },
-    update: {},
-    create: {
-      id: 'cmhb1y7ka003xjwuky2m6v4wo',
-      name: 'MotoManager Demo',
-      domain: 'demo.motomanager.com',
-      email: 'admin@demo.motomanager.com',
-      phone: '555-0000',
-    },
-  });
-
-  console.log('✅ Tenant creado/actualizado:', tenant.name);
-
-  // Solo crear usuarios si no existen (para evitar duplicados)
+  // Create a default admin user
   const existingAdmin = await prisma.user.findUnique({
-    where: { email: 'admin@motomanager.com' }
+    where: { email: 'admin@workshop.com' }
   });
 
   if (!existingAdmin) {
-    const hashedPassword = await bcrypt.hash('Admin123!', 10);
+    const hashedPassword = await bcrypt.hash('admin123', 10);
     const adminUser = await prisma.user.create({
       data: {
-        tenantId: tenant.id,
-        email: 'admin@motomanager.com',
+        email: 'admin@workshop.com',
         password: hashedPassword,
-        name: 'Administrador',
+        name: 'Administrator',
         role: 'admin',
       },
     });
-    console.log('✅ Usuario administrador creado:', adminUser.email);
-    console.log('🔑 Contraseña por defecto: Admin123!');
+    console.log('✅ Admin user created:', adminUser.email);
   } else {
-    console.log('ℹ️ Usuario administrador ya existe');
+    console.log('ℹ️ Admin user already exists');
   }
 
-  // Crear algunos datos de ejemplo para inventario
+  // Create some sample inventory items
   const existingInventory = await prisma.inventoryItem.count();
   if (existingInventory === 0) {
     const inventoryItems = await prisma.inventoryItem.createMany({
       data: [
         {
-          tenantId: tenant.id,
-          name: 'Aceite 20W50',
-          sku: 'ACEITE-20W50',
-          category: 'Lubricantes',
-          location: 'Estante A1',
-          supplier: 'Castrol',
+          name: 'Aceite de Motor 10W-30',
+          sku: 'OIL-001',
           quantity: 50,
           price: 45000,
-          supplierPrice: 35000,
           minimumQuantity: 10,
+          location: 'Estante A1',
+          category: 'Lubricantes',
+          supplier: 'Petrobras',
+          supplierPrice: 35000,
         },
         {
-          tenantId: tenant.id,
           name: 'Filtro de Aceite',
-          sku: 'FILTRO-ACEITE',
-          category: 'Repuestos',
-          location: 'Estante B2',
-          supplier: 'Bosch',
-          quantity: 25,
+          sku: 'FILTER-001',
+          quantity: 30,
           price: 25000,
-          supplierPrice: 18000,
           minimumQuantity: 5,
+          location: 'Estante A2',
+          category: 'Repuestos',
+          supplier: 'Bosch',
+          supplierPrice: 18000,
         },
         {
-          tenantId: tenant.id,
-          name: 'Bujía NGK',
-          sku: 'BUJIA-NGK',
+          name: 'Pastillas de Freno Delanteras',
+          sku: 'BRAKE-001',
+          quantity: 20,
+          price: 120000,
+          minimumQuantity: 3,
+          location: 'Estante B1',
           category: 'Repuestos',
-          location: 'Estante C3',
-          supplier: 'NGK',
-          quantity: 100,
-          price: 15000,
-          supplierPrice: 10000,
-          minimumQuantity: 20,
+          supplier: 'Ferodo',
+          supplierPrice: 90000,
         },
       ],
     });
-    console.log('✅ Items de inventario creados:', inventoryItems.count);
+    console.log('✅ Created inventory items:', inventoryItems.count);
   }
 
-  console.log('🎉 Seeding completado exitosamente!');
-  console.log('');
-  console.log('📋 Credenciales de acceso:');
-  console.log('   Email: admin@motomanager.com');
-  console.log('   Password: Admin123!');
-  console.log('');
-  console.log('💡 Recomendación: Cambia la contraseña después del primer inicio de sesión.');
+  console.log('✅ Seed completed successfully!');
+  console.log('🔐 Admin credentials:');
+  console.log('   Email: admin@workshop.com');
+  console.log('   Password: admin123');
 }
 
 main()

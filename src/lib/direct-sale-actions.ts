@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
-import { withTenant } from './tenant';
+import { withAuth } from './tenant';
 
 const directSaleSchema = z.object({
   customerId: z.string().optional(),
@@ -19,9 +19,8 @@ const directSaleSchema = z.object({
   })).min(1, "Agrega al menos un producto."),
 });
 
-export const createDirectSaleNew = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createDirectSaleNew = withAuth(async (prevState: any, formData: FormData) => {
   console.log('🔍 createDirectSaleNew called');
-  console.log('🏢 tenantId:', tenantId);
 
   try {
     const itemsRaw = formData.get('items') as string;
@@ -52,7 +51,7 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
     // Check inventory availability
     for (const item of saleItems) {
       const inventoryItem = await prisma.inventoryItem.findUnique({
-        where: { id: item.inventoryItemId, tenantId },
+        where: { id: item.inventoryItemId },
       });
       if (!inventoryItem || inventoryItem.quantity < item.quantity) {
         return {
@@ -71,7 +70,6 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
 
     do {
       const lastSale = await prisma.sale.findFirst({
-        where: { tenantId },
         orderBy: { saleNumber: 'desc' },
       });
 
@@ -81,10 +79,7 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
       // Check if this sale number already exists
       const existingSale = await prisma.sale.findUnique({
         where: {
-          tenantId_saleNumber: {
-            tenantId,
-            saleNumber,
-          },
+          saleNumber,
         },
       });
 
@@ -103,8 +98,8 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
 
     // Create sale with raw SQL and return the ID
     const saleResult = await prisma.$queryRaw<{ id: string }[]>`
-      INSERT INTO "Sale" ("id", "tenantId", "saleNumber", "customerId", "customerName", "paymentMethod", "date", "total")
-      VALUES (gen_random_uuid(), ${tenantId}, ${saleNumber}, ${cId}, ${cName}, ${pm}, ${d}, ${total})
+      INSERT INTO "Sale" ("id", "saleNumber", "customerId", "customerName", "paymentMethod", "date", "total")
+      VALUES (gen_random_uuid(), ${saleNumber}, ${cId}, ${cName}, ${pm}, ${d}, ${total})
       RETURNING id
     `;
 
@@ -116,9 +111,9 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
     for (const item of saleItems) {
       console.log('Force creating item:', item);
       await prisma.$executeRaw`
-        INSERT INTO "SaleItem" ("id", "tenantId", "saleId", "inventoryItemId", "quantity", "price")
-        VALUES (gen_random_uuid(), ${tenantId}, ${saleId}, ${item.inventoryItemId}, ${item.quantity}, ${item.price})
-        ON CONFLICT ("tenantId", "saleId", "inventoryItemId") DO UPDATE SET
+        INSERT INTO "SaleItem" ("id", "saleId", "inventoryItemId", "quantity", "price")
+        VALUES (gen_random_uuid(), ${saleId}, ${item.inventoryItemId}, ${item.quantity}, ${item.price})
+        ON CONFLICT ("saleId", "inventoryItemId") DO UPDATE SET
           quantity = EXCLUDED.quantity,
           price = EXCLUDED.price
       `;
@@ -126,7 +121,7 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
 
       // Update inventory
       await prisma.inventoryItem.update({
-        where: { id: item.inventoryItemId, tenantId },
+        where: { id: item.inventoryItemId },
         data: {
           quantity: {
             decrement: item.quantity,
@@ -139,7 +134,6 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
     const createdSale = await prisma.sale.findUnique({
       where: {
         id: saleId,
-        tenantId,
       },
       include: {
         saleItems: {
@@ -165,7 +159,7 @@ export const createDirectSaleNew = withTenant(async (tenantId: string, prevState
     for (const item of saleItems) {
       // Update inventory (already done above, but keeping for consistency)
       await prisma.inventoryItem.update({
-        where: { id: item.inventoryItemId, tenantId },
+        where: { id: item.inventoryItemId },
         data: {
           quantity: {
             decrement: item.quantity,

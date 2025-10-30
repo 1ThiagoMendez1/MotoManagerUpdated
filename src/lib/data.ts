@@ -2,18 +2,10 @@ import prisma from './prisma';
 import { Prisma } from '@prisma/client';
 import type { Customer, Motorcycle, Technician, InventoryItem, Appointment, WorkOrder, Sale } from './types';
 import { subDays, format, startOfMonth } from 'date-fns';
-import { getTenantId } from './tenant';
 
 // --- CUSTOMERS ---
 export const getCustomers = async (): Promise<Customer[]> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
   const customers = await prisma.customer.findMany({
-    where: {
-      tenantId,
-    },
     select: {
       id: true,
       name: true,
@@ -31,14 +23,7 @@ export const getCustomers = async (): Promise<Customer[]> => {
 
 // --- TECHNICIANS ---
 export const getTechnicians = async (): Promise<Technician[]> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
   const technicians = await prisma.technician.findMany({
-    where: {
-      tenantId,
-    },
     include: {
       workOrders: {
         include: {
@@ -86,14 +71,7 @@ export const getTechnicians = async (): Promise<Technician[]> => {
 
 // --- MOTORCYCLES ---
 export const getMotorcycles = async (): Promise<Motorcycle[]> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
   const motorcycles = await prisma.motorcycle.findMany({
-    where: {
-      tenantId,
-    },
     include: {
       customer: true,
     },
@@ -113,19 +91,15 @@ export const getMotorcycles = async (): Promise<Motorcycle[]> => {
 };
 
 // --- INVENTORY ---
-export const getInventory = async ({ query, page = 1, limit = 10 }: { query?: string; page?: number; limit?: number; }): Promise<{items: InventoryItem[], totalPages: number}> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
+export const getInventory = async ({ query, category, page = 1, limit = 10 }: { query?: string; category?: string; page?: number; limit?: number; }): Promise<{items: InventoryItem[], totalPages: number}> => {
   const where: Prisma.InventoryItemWhereInput = {
-    tenantId,
     ...(query ? {
       OR: [
         { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
         { sku: { contains: query, mode: Prisma.QueryMode.insensitive } },
       ],
     } : {}),
+    ...(category && category !== 'all' ? { category: category as any } : {}),
   };
 
   const [items, total] = await Promise.all([
@@ -169,14 +143,7 @@ export const getInventory = async ({ query, page = 1, limit = 10 }: { query?: st
 
 // --- APPOINTMENTS ---
 export const getAppointments = async (): Promise<Appointment[]> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
   const appointments = await prisma.appointment.findMany({
-    where: {
-      tenantId,
-    },
     include: {
       motorcycle: {
         include: {
@@ -207,14 +174,7 @@ export const getAppointments = async (): Promise<Appointment[]> => {
 
 // --- WORK ORDERS ---
 export const getWorkOrders = async (): Promise<WorkOrder[]> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
   const workOrders = await prisma.workOrder.findMany({
-    where: {
-      tenantId,
-    },
     include: {
       motorcycle: {
         include: {
@@ -248,71 +208,94 @@ export const getWorkOrders = async (): Promise<WorkOrder[]> => {
 };
 
 // --- SALES ---
-export const getSales = async (): Promise<Sale[]> => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
+export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }: { dateFrom?: string; dateTo?: string; type?: 'direct' | 'service' | 'all'; page?: number; limit?: number; } = {}): Promise<{items: Sale[], totalPages: number}> => {
+  // Build where clause for filters
+  const where: any = {};
+
+  // Date range filter
+  if (dateFrom || dateTo) {
+    where.date = {};
+    if (dateFrom) {
+      where.date.gte = new Date(dateFrom);
+    }
+    if (dateTo) {
+      where.date.lte = new Date(dateTo);
+    }
   }
-  // First, get basic sales data
-  const sales = await prisma.sale.findMany({
-    where: {
-      tenantId,
-    },
-    include: {
-      workOrder: {
-        select: {
-          id: true,
-          workOrderNumber: true,
-          issueDescription: true,
-          motorcycle: {
-            select: {
-              id: true,
-              make: true,
-              model: true,
-              year: true,
-              plate: true,
-              customer: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  phone: true,
+
+  // Type filter
+  if (type === 'direct') {
+    where.workOrderId = null;
+  } else if (type === 'service') {
+    where.workOrderId = { not: null };
+  }
+  // 'all' or undefined means no type filter
+
+  // Get paginated sales data
+  const [sales, total] = await Promise.all([
+    prisma.sale.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        workOrder: {
+          select: {
+            id: true,
+            workOrderNumber: true,
+            issueDescription: true,
+            motorcycle: {
+              select: {
+                id: true,
+                make: true,
+                model: true,
+                year: true,
+                plate: true,
+                customer: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                  },
                 },
               },
             },
           },
         },
-      },
-      customer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
         },
-      },
-      saleItems: {
-        select: {
-          id: true,
-          inventoryItemId: true,
-          quantity: true,
-          price: true,
-          inventoryItem: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
+        saleItems: {
+          select: {
+            id: true,
+            inventoryItemId: true,
+            quantity: true,
+            price: true,
+            inventoryItem: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+              },
             },
           },
         },
       },
-    },
-    orderBy: {
-      date: 'desc',
-    },
-  });
+      orderBy: {
+        date: 'desc',
+      },
+    }),
+    prisma.sale.count({ where })
+  ]);
 
-  return sales.map(s => ({
+  const totalPages = Math.ceil(total / limit);
+
+  const typedItems = sales.map(s => ({
     id: s.id,
     saleNumber: s.saleNumber,
     workOrderId: s.workOrderId,
@@ -346,18 +329,18 @@ export const getSales = async (): Promise<Sale[]> => {
       inventoryItemId: si.inventoryItemId,
       quantity: si.quantity,
       price: si.price,
+      name: si.inventoryItem.name,
+      sku: si.inventoryItem.sku,
     })),
     date: s.date.toISOString(),
     total: s.total,
   }));
+
+  return { items: typedItems, totalPages };
 };
 
 // --- SALES CHART DATA ---
 export const getSalesDataForChart = async () => {
-  const tenantId = getTenantId();
-  if (!tenantId) {
-    throw new Error('Tenant context not set');
-  }
   const today = new Date();
   const salesData = [];
 
@@ -370,7 +353,7 @@ export const getSalesDataForChart = async () => {
     const monthlyTotalResult = await prisma.$queryRaw`
       SELECT COALESCE(SUM(total), 0) as monthly_sales
       FROM "Sale"
-      WHERE tenantId = ${tenantId} AND date >= ${monthStart} AND date < ${monthEnd}
+      WHERE date >= ${monthStart} AND date < ${monthEnd}
     ` as { monthly_sales: number }[];
 
     const monthlySales = monthlyTotalResult[0]?.monthly_sales || 0;

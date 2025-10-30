@@ -1,4 +1,7 @@
 import { getSales, getWorkOrders, getInventory, getCustomers } from '@/lib/data';
+
+// Force dynamic rendering to avoid database connection during build
+export const dynamic = 'force-dynamic';
 import {
   Card,
   CardContent,
@@ -16,6 +19,10 @@ import {
 } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { ExportSalesButton } from '@/components/buttons/ExportSalesButton';
+import { SalesFilters } from '@/components/SalesFilters';
+import { SalesPagination } from '@/components/SalesPagination';
+import { ExportDirectSalesButton } from '@/components/buttons/ExportDirectSalesButton';
+import { ExportServiceSalesButton } from '@/components/buttons/ExportServiceSalesButton';
 import { AddSale } from '@/components/forms/AddSale';
 import { AddDirectSale } from '@/components/forms/AddDirectSale';
 import { Badge } from '@/components/ui/badge';
@@ -66,6 +73,13 @@ function SalesPageSkeleton() {
           </div>
         </CardContent>
       </Card>
+      {totalPages > 1 && (
+        <SalesPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          searchParams={resolvedSearchParams}
+        />
+      )}
     </div>
   );
 }
@@ -89,19 +103,37 @@ function SalesPageError({ error }: { error: string }) {
   );
 }
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: {
+    dateFrom?: string;
+    dateTo?: string;
+    type?: string;
+    page?: string;
+  };
+}) {
+  const resolvedSearchParams = await searchParams;
+  const dateFrom = resolvedSearchParams.dateFrom || '';
+  const dateTo = resolvedSearchParams.dateTo || '';
+  const type = resolvedSearchParams.type as 'direct' | 'service' | 'all' || 'all';
+  const currentPage = Number(resolvedSearchParams.page) || 1;
+
   try {
-    const [sls, wos, inv, custs] = await Promise.all([
-      getSales(),
+    const [sls, wos, inv, custs, allSales] = await Promise.all([
+      getSales({ dateFrom, dateTo, type, page: currentPage, limit: 20 }),
       getWorkOrders(),
       getInventory({ limit: 200 }),
       getCustomers(),
+      getSales({ dateFrom, dateTo, type, limit: 1000 }), // For export
     ]);
 
-    const sales = sls;
+    const sales = sls.items;
+    const totalPages = sls.totalPages;
     const workOrders = wos;
     const inventoryItems = inv.items as InventoryItem[];
     const customers = custs;
+    const allFilteredSales = allSales.items;
 
     const getSaleDetails = (sale: Sale) => {
       if (sale.workOrderId && sale.workOrder) {
@@ -128,9 +160,11 @@ export default async function SalesPage() {
             <p className="text-sm sm:text-base text-muted-foreground text-white/80">Revisa todas las ventas y transacciones.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <AddSale workOrders={workOrders} inventory={inventoryItems} />
-            <AddDirectSale inventory={inventoryItems} customers={customers} />
-            <ExportSalesButton sales={sales} />
+              <SalesFilters currentDateFrom={dateFrom} currentDateTo={dateTo} currentType={type} />
+              <AddSale workOrders={workOrders} inventory={inventoryItems} />
+              <AddDirectSale inventory={inventoryItems} customers={customers} />
+              <ExportDirectSalesButton sales={allFilteredSales.filter(s => !s.workOrderId)} />
+              <ExportServiceSalesButton sales={allFilteredSales.filter(s => s.workOrderId)} />
           </div>
         </div>
         <Card className="bg-white/10 border-white/20 text-white">

@@ -1,32 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient();
-
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, tenantId } = await request.json();
+    const { email, password } = await request.json();
 
-    console.log('API Login received:', { email, password, tenantId });
+    console.log('API Login received:', { email, password });
 
-    if (!email || !password || !tenantId) {
-      return NextResponse.json({ error: 'Email, password, and tenant are required' }, { status: 400 });
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
-    // Find user by email and tenant
+    // Find user by email
     const user = await prisma.user.findUnique({
-      where: {
-        tenantId_email: {
-          tenantId,
-          email,
-        },
-      },
+      where: { email },
     });
 
     console.log('User found:', user ? 'YES' : 'NO');
-    console.log('User data:', user);
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
@@ -40,9 +32,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Generate JWT token
+    // Generate JWT token (without tenantId)
     const token = jwt.sign(
-      { userId: user.id, tenantId: user.tenantId, email: user.email, role: user.role },
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '7d' }
     );
@@ -52,7 +44,6 @@ export async function POST(request: NextRequest) {
       id: user.id,
       email: user.email,
       name: user.name,
-      tenantId: user.tenantId,
       role: user.role,
     };
 

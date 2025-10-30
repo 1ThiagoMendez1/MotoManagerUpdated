@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 export default function RegisterPage() {
@@ -18,9 +17,6 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [tenantName, setTenantName] = useState('');
-  const [tenantEmail, setTenantEmail] = useState('');
-  const [tenantPhone, setTenantPhone] = useState('');
   const [error, setError] = useState('');
   const { toast } = useToast();
 
@@ -29,7 +25,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     setError('');
 
-    if (!name || !email || !password || !confirmPassword || !tenantName || !tenantEmail) {
+    if (!name || !email || !password || !confirmPassword) {
         setError('Por favor, completa todos los campos obligatorios.');
         setIsLoading(false);
         return;
@@ -48,29 +44,7 @@ export default function RegisterPage() {
     }
 
     try {
-      // First create the tenant
-      const tenantResponse = await fetch('/api/tenants', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: tenantName,
-          email: tenantEmail,
-          phone: tenantPhone || undefined,
-        }),
-      });
-
-      if (!tenantResponse.ok) {
-        const tenantError = await tenantResponse.json();
-        setError(tenantError.error || 'Error al crear el tenant.');
-        setIsLoading(false);
-        return;
-      }
-
-      const tenant = await tenantResponse.json();
-
-      // Then register the user
+      // Register the user directly
       const userResponse = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
@@ -80,7 +54,6 @@ export default function RegisterPage() {
           name,
           email,
           password,
-          tenantId: tenant.id,
         }),
       });
 
@@ -117,7 +90,7 @@ export default function RegisterPage() {
                 <h1 className="text-3xl font-bold text-white">MotoManager</h1>
             </div>
             <CardTitle className="text-2xl">Crear Cuenta</CardTitle>
-            <CardDescription className="text-white/80">Regístrate para comenzar a gestionar tu taller de motocicletas.</CardDescription>
+            <CardDescription className="text-white/80">Regístrate para comenzar a gestionar tu taller de motocicletas. Solo necesitas crear tu cuenta de usuario.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -168,44 +141,6 @@ export default function RegisterPage() {
                 required
                 className="bg-white/10 border-white/20 placeholder:text-white/60"
               />
-            </div>
-            <div className="border-t border-white/20 pt-4 mt-6">
-              <h3 className="text-lg font-semibold mb-4 text-white">Información del Taller</h3>
-              <div className="space-y-2">
-                <Label htmlFor="tenantName">Nombre del Taller *</Label>
-                <Input
-                  id="tenantName"
-                  type="text"
-                  placeholder="Nombre de tu taller"
-                  value={tenantName}
-                  onChange={(e) => setTenantName(e.target.value)}
-                  required
-                  className="bg-white/10 border-white/20 placeholder:text-white/60"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tenantEmail">Email del Taller *</Label>
-                <Input
-                  id="tenantEmail"
-                  type="email"
-                  placeholder="contacto@taller.com"
-                  value={tenantEmail}
-                  onChange={(e) => setTenantEmail(e.target.value)}
-                  required
-                  className="bg-white/10 border-white/20 placeholder:text-white/60"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tenantPhone">Teléfono del Taller</Label>
-                <Input
-                  id="tenantPhone"
-                  type="tel"
-                  placeholder="Número de teléfono"
-                  value={tenantPhone}
-                  onChange={(e) => setTenantPhone(e.target.value)}
-                  className="bg-white/10 border-white/20 placeholder:text-white/60"
-                />
-              </div>
             </div>
             {error && <p className="text-destructive text-sm text-center">{error}</p>}
             <Button type="submit" className="w-full" disabled={isLoading}>

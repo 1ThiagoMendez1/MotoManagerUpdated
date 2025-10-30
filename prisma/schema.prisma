@@ -30,63 +30,32 @@ enum WorkOrderStatus {
   Entregado
 }
 
-model Tenant {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  email       String   @unique
-  phone       String?
-  domain      String?  @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  customers     Customer[]
-  motorcycles   Motorcycle[]
-  technicians   Technician[]
-  inventoryItems InventoryItem[]
-  appointments  Appointment[]
-  workOrders    WorkOrder[]
-  sales         Sale[]
-  saleItems     SaleItem[]
-  users         User[]
-}
-
 model Customer {
   id          String       @id @default(cuid())
-  tenantId    String
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  email       String
+  email       String       @unique
   name        String
   phone       String?
   cedula      String?
   isFrequent  Boolean      @default(false)
   motorcycles Motorcycle[]
   sales       Sale[]
-
-  @@unique([tenantId, email])
-  @@unique([tenantId, cedula])
 }
 
 model Motorcycle {
   id           String        @id @default(cuid())
-  tenantId     String
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   make         String
   model        String
   year         Int
-  plate        String
+  plate        String        @unique
   intakeDate   DateTime      @default(now())
   customer     Customer      @relation(fields: [customerId], references: [id])
   customerId   String
   workOrders   WorkOrder[]
   appointments Appointment[]
-
-  @@unique([tenantId, plate])
 }
 
 model Technician {
   id          String        @id @default(cuid())
-  tenantId    String
-  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   specialty   String
   avatarUrl   String?
@@ -96,10 +65,8 @@ model Technician {
 
 model InventoryItem {
   id                String           @id @default(cuid())
-  tenantId          String
-  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name              String
-  sku               String
+  sku               String           @unique
   quantity          Int
   price             Float
   minimumQuantity   Int
@@ -108,14 +75,10 @@ model InventoryItem {
   supplier          String
   supplierPrice     Float
   saleItems         SaleItem[]
-
-  @@unique([tenantId, sku])
 }
 
 model Appointment {
   id           String           @id @default(cuid())
-  tenantId     String
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   motorcycle   Motorcycle       @relation(fields: [motorcycleId], references: [id])
   motorcycleId String
   technician   Technician       @relation(fields: [technicianId], references: [id])
@@ -128,9 +91,7 @@ model Appointment {
 
 model WorkOrder {
   id                String     @id @default(cuid())
-  tenantId          String
-  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  workOrderNumber   String
+  workOrderNumber   String     @unique
   motorcycle        Motorcycle @relation(fields: [motorcycleId], references: [id])
   motorcycleId      String
   technician        Technician @relation(fields: [technicianId], references: [id])
@@ -143,15 +104,11 @@ model WorkOrder {
   entregadoDate     DateTime?
   completedDate     DateTime?
   sales             Sale[]
-
-  @@unique([tenantId, workOrderNumber])
 }
 
 model Sale {
   id            String      @id @default(cuid())
-  tenantId      String
-  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  saleNumber    String
+  saleNumber    String      @unique
   workOrder     WorkOrder?  @relation(fields: [workOrderId], references: [id])
   workOrderId   String?
   customer      Customer?   @relation(fields: [customerId], references: [id])
@@ -159,16 +116,12 @@ model Sale {
   customerName  String?
   date          DateTime    @default(now())
   total         Float
-  paymentMethod String      @default("Efectivo") // Nuevo campo con valor por defecto
+  paymentMethod String      @default("Efectivo")
   saleItems     SaleItem[]
-
-  @@unique([tenantId, saleNumber])
 }
 
 model SaleItem {
   id             String      @id @default(cuid())
-  tenantId       String
-  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sale           Sale        @relation(fields: [saleId], references: [id])
   saleId         String
   inventoryItem  InventoryItem @relation(fields: [inventoryItemId], references: [id])
@@ -176,19 +129,15 @@ model SaleItem {
   quantity       Int
   price          Float
 
-  @@unique([tenantId, saleId, inventoryItemId])
+  @@unique([saleId, inventoryItemId])
 }
 
 model User {
   id          String   @id @default(cuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   email       String   @unique
   password    String
   name        String
-  role        String   @default("user") // e.g., admin, user
+  role        String   @default("user")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  @@unique([tenantId, email])
 }

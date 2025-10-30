@@ -1,20 +1,18 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { getTenantId } from '@/lib/tenant';
 
 interface User {
   id: string;
   email: string;
   name: string;
-  tenantId: string;
   role: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string, tenantId: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (email: string, password: string, name: string, tenantId: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -49,16 +47,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     checkAuth();
   }, []);
 
-  const signIn = async (email: string, password: string, tenantId: string) => {
+  const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 AuthProvider signIn called with:', { email, password, tenantId });
+      console.log('🔐 AuthProvider signIn called with:', { email, password });
 
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, tenantId }),
+        body: JSON.stringify({ email, password }),
         credentials: 'include', // Include cookies
       });
 
@@ -94,14 +92,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, tenantId: string) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, name, tenantId }),
+        body: JSON.stringify({ email, password, name }),
       });
 
       const data = await response.json();

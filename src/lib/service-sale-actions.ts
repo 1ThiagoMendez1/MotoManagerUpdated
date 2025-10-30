@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
-import { withTenant } from './tenant';
+import { withAuth } from './tenant';
 
 const serviceSaleSchema = z.object({
   workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
@@ -21,9 +21,9 @@ const serviceSaleSchema = z.object({
   })).optional(),
 });
 
-export const createServiceSaleNew = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createServiceSaleNew = withAuth(async (prevState: any, formData: FormData) => {
   console.log('🔍 createServiceSaleNew called');
-  console.log('🏢 tenantId:', tenantId);
+  console.log('🔍 createServiceSaleNew called');
 
   try {
     const itemsRaw = formData.get('items') as string;
@@ -52,7 +52,7 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
     }
 
     const { workOrderId: woId, laborCost: lc, paymentMethod: pm, date: d, items: saleItems } = validatedFields.data;
-    console.log('📋 Data to create:', { tenantId, woId, lc, pm, d, saleItems });
+    console.log('📋 Data to create:', { woId, lc, pm, d, saleItems });
 
     // Generate unique sale number
     let saleNumber;
@@ -61,7 +61,6 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
 
     do {
       const lastSale = await prisma.sale.findFirst({
-        where: { tenantId },
         orderBy: { saleNumber: 'desc' },
       });
 
@@ -71,10 +70,7 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
       // Check if this sale number already exists
       const existingSale = await prisma.sale.findUnique({
         where: {
-          tenantId_saleNumber: {
-            tenantId,
-            saleNumber,
-          },
+          saleNumber,
         },
       });
 
@@ -97,7 +93,7 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
     // Check inventory availability
     for (const item of saleItems || []) {
       const inventoryItem = await prisma.inventoryItem.findUnique({
-        where: { id: item.inventoryItemId, tenantId },
+        where: { id: item.inventoryItemId },
       });
       if (!inventoryItem || inventoryItem.quantity < item.quantity) {
         return {
@@ -106,77 +102,76 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
       }
     }
 
-    // Create sale using raw SQL to avoid Prisma transaction issues
-    console.log('🔄 Using raw SQL approach for service sale');
+    // Create sale using Prisma transaction
+    console.log('🔄 Using Prisma transaction for service sale');
 
-    // Create sale with raw SQL and return the ID
-    const saleResult = await prisma.$queryRaw<{ id: string }[]>`
-      INSERT INTO "Sale" ("id", "tenantId", "saleNumber", "workOrderId", "paymentMethod", "date", "total")
-      VALUES (gen_random_uuid(), ${tenantId}, ${saleNumber}, ${woId}, ${pm}, ${d}, ${total})
-      RETURNING id
-    `;
-
-    const saleId = saleResult[0].id;
-    console.log('Created service sale with ID:', saleId);
-
-    // Force create sale items first, then get the sale
-    console.log('Force creating sale items before retrieving sale...');
-    for (const item of saleItems || []) {
-      console.log('Force creating service item:', item);
-      await prisma.$executeRaw`
-        INSERT INTO "SaleItem" ("id", "tenantId", "saleId", "inventoryItemId", "quantity", "price")
-        VALUES (gen_random_uuid(), ${tenantId}, ${saleId}, ${item.inventoryItemId}, ${item.quantity}, ${item.price})
-        ON CONFLICT ("tenantId", "saleId", "inventoryItemId") DO UPDATE SET
-          quantity = EXCLUDED.quantity,
-          price = EXCLUDED.price
-      `;
-      console.log('Force service sale item created/updated for:', item.inventoryItemId);
-
-      // Update inventory
-      await prisma.inventoryItem.update({
-        where: { id: item.inventoryItemId, tenantId },
+    const createdSale = await prisma.$transaction(async (tx) => {
+      // Create sale
+      const sale = await tx.sale.create({
         data: {
-          quantity: {
-            decrement: item.quantity,
+          saleNumber,
+          workOrderId: woId,
+          paymentMethod: pm,
+          date: d,
+          total,
+        },
+        include: {
+          saleItems: {
+            include: {
+              inventoryItem: true
+            }
           },
-        },
-      });
-    }
-
-    // Now get the sale with items
-    const createdSale = await prisma.sale.findUnique({
-      where: {
-        id: saleId,
-        tenantId,
-      },
-      include: {
-        saleItems: {
-          include: {
-            inventoryItem: true
-          }
-        },
-        workOrder: {
-          include: {
-            motorcycle: {
-              include: {
-                customer: true
-              }
-            },
-            technician: true
+          workOrder: {
+            include: {
+              motorcycle: {
+                include: {
+                  customer: true
+                }
+              },
+              technician: true
+            }
           }
         }
+      });
+
+      console.log('Created service sale with ID:', sale.id);
+
+      // Create sale items and update inventory
+      for (const item of saleItems || []) {
+        console.log('Creating service sale item:', item);
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            inventoryItemId: item.inventoryItemId,
+            quantity: item.quantity,
+            price: item.price,
+          },
+        });
+
+        // Update inventory
+        await tx.inventoryItem.update({
+          where: { id: item.inventoryItemId },
+          data: {
+            quantity: {
+              decrement: item.quantity,
+            },
+          },
+        });
+        console.log('Inventory updated for service sale item:', item.inventoryItemId);
       }
+
+      return sale;
     });
 
     if (!createdSale) {
       throw new Error('Failed to retrieve created sale');
     }
 
-    console.log(`Final service sale has ${createdSale.saleItems.length} items`);
+    console.log(`Final service sale has ${createdSale.saleItems?.length || 0} items`);
 
     // Update work order status to Entregado
     await prisma.workOrder.update({
-      where: { id: woId, tenantId },
+      where: { id: woId },
       data: {
         status: 'Entregado',
         entregadoDate: new Date(),
@@ -189,24 +184,24 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
     console.log('Service sale data after creation:', {
       id: createdSale.id,
       saleNumber: createdSale.saleNumber,
-      saleItemsCount: createdSale.saleItems.length,
-      saleItems: createdSale.saleItems.map(item => ({
+      saleItemsCount: createdSale.saleItems?.length || 0,
+      saleItems: createdSale.saleItems?.map(item => ({
         id: item.id,
         inventoryItemName: item.inventoryItem.name,
         quantity: item.quantity,
         price: item.price,
-      }))
+      })) || []
     });
     console.log('Sale data for receipt:', {
       id: createdSale.id,
       saleNumber: createdSale.saleNumber,
-      itemsCount: createdSale.saleItems.length,
-      items: createdSale.saleItems.map(item => ({
+      itemsCount: createdSale.saleItems?.length || 0,
+      items: createdSale.saleItems?.map(item => ({
         name: item.inventoryItem.name,
         sku: item.inventoryItem.sku,
         quantity: item.quantity,
         price: item.price,
-      }))
+      })) || []
     });
 
     revalidatePath('/sales');
@@ -228,14 +223,14 @@ export const createServiceSaleNew = withTenant(async (tenantId: string, prevStat
         } : undefined,
         technicianName: createdSale.workOrder?.technician.name,
         laborCost: lc > 0 ? lc : undefined,
-        items: createdSale.saleItems.map(item => ({
+        items: createdSale.saleItems?.map((item: any) => ({
           name: item.inventoryItem.name,
           sku: item.inventoryItem.sku,
           category: item.inventoryItem.category,
           quantity: item.quantity,
           price: item.price,
           total: item.price * item.quantity,
-        })),
+        })) || [],
       }
     };
   } catch (error) {

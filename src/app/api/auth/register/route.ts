@@ -1,26 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient();
-
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, tenantId } = await request.json();
+    console.log('Registration request received');
+    const rawBody = await request.text();
+    console.log('Raw request body:', rawBody);
 
-    if (!email || !password || !name || !tenantId) {
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+      console.log('Parsed request body:', body);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return NextResponse.json({ error: 'Invalid JSON format' }, { status: 400 });
+    }
+
+    const { email, password, name } = body;
+
+    if (!email || !password || !name) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
     }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: {
-        tenantId_email: {
-          tenantId,
-          email,
-        },
-      },
+      where: { email },
     });
 
     if (existingUser) {
@@ -36,13 +42,12 @@ export async function POST(request: NextRequest) {
         email,
         password: hashedPassword,
         name,
-        tenantId,
       },
     });
 
-    // Generate JWT token
+    // Generate JWT token (without tenantId)
     const token = jwt.sign(
-      { userId: user.id, tenantId: user.tenantId, email: user.email, role: user.role },
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'fallback-secret',
       { expiresIn: '7d' }
     );
@@ -52,7 +57,6 @@ export async function POST(request: NextRequest) {
       id: user.id,
       email: user.email,
       name: user.name,
-      tenantId: user.tenantId,
       role: user.role,
     };
 

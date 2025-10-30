@@ -1,4 +1,7 @@
 import { getInventory } from '@/lib/data';
+
+// Force dynamic rendering to avoid database connection during build
+export const dynamic = 'force-dynamic';
 import type { InventoryItem } from '@/lib/types';
 import {
   Card,
@@ -23,6 +26,7 @@ import { DeleteInventoryItem } from '@/components/forms/DeleteInventoryItem';
 import { ExportInventoryButton } from '@/components/buttons/ExportInventoryButton';
 import { ExportLowStockButton } from '@/components/buttons/ExportLowStockButton';
 import { SearchInventory } from '@/components/forms/SearchInventory';
+import { CategoryFilter } from '@/components/CategoryFilter';
 import { Pagination } from '@/components/Pagination';
 
 function formatCurrency(amount: number) {
@@ -41,15 +45,17 @@ export default async function InventoryPage({
 }: {
   searchParams: {
     query?: string;
+    category?: string;
     page?: string;
   };
 }) {
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams.query || '';
+  const category = resolvedSearchParams.category || '';
   const currentPage = Number(resolvedSearchParams.page) || 1;
 
   const [paginated, full] = await Promise.all([
-    getInventory({ query, page: currentPage, limit: ITEMS_PER_PAGE }),
+    getInventory({ query, category, page: currentPage, limit: ITEMS_PER_PAGE }),
     getInventory({ limit: 1000 }), // Fetch all for export
   ]);
 
@@ -66,6 +72,7 @@ export default async function InventoryPage({
         </div>
         <div className="flex gap-2 flex-grow sm:flex-grow-0">
             <SearchInventory placeholder="Buscar por nombre o SKU..." />
+            <CategoryFilter currentCategory={category} />
         </div>
         <div className="flex gap-2">
             <ExportInventoryButton inventory={allInventory} />

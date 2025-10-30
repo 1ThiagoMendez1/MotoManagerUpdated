@@ -19,6 +19,9 @@ import { AddMotorcycle } from '@/components/forms/AddMotorcycle';
 import { MotorcycleDetails } from '@/components/details/MotorcycleDetails';
 import { format } from 'date-fns';
 
+// Force dynamic rendering to avoid database connection during build
+export const dynamic = 'force-dynamic';
+
 export default async function MotorcyclesPage() {
   const [motorcycles, customers, technicians, workOrders] = await Promise.all([
     getMotorcycles(),
@@ -72,7 +75,7 @@ export default async function MotorcyclesPage() {
                   <TableCell>
                     <MotorcycleDetails
                       motorcycle={moto}
-                      workOrders={workOrders.filter(wo => wo.motorcycleId === moto.id)}
+                      workOrders={workOrders.filter(wo => wo.motorcycle.id === moto.id)}
                     />
                   </TableCell>
                 </TableRow>

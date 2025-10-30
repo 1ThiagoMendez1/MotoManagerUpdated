@@ -1,15 +1,5 @@
-export type Tenant = {
-  id: string;
-  name: string;
-  domain?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type Customer = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   name: string;
   email: string;
   phone?: string | null;
@@ -19,8 +9,6 @@ export type Customer = {
 
 export type Motorcycle = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   make: string;
   model: string;
   year: number;
@@ -31,8 +19,6 @@ export type Motorcycle = {
 
 export type Technician = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   name: string;
   specialty: string;
   avatarUrl?: string | null;
@@ -43,8 +29,6 @@ export type InventoryCategory = 'Lubricantes' | 'Repuestos' | 'Llantas' | 'Acces
 
 export type InventoryItem = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   name: string;
   sku: string;
   quantity: number;
@@ -58,8 +42,6 @@ export type InventoryItem = {
 
 export type Appointment = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   motorcycle: Motorcycle;
   technician: Technician;
   date: string;
@@ -70,8 +52,6 @@ export type Appointment = {
 
 export type WorkOrder = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   workOrderNumber: string;
   motorcycle: Motorcycle;
   technician: Technician;
@@ -86,17 +66,15 @@ export type WorkOrder = {
 
 export type SaleItem = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   inventoryItemId: string;
   quantity: number;
   price: number;
+  name?: string;
+  sku?: string;
 };
 
 export type Sale = {
   id: string;
-  tenantId: string;
-  tenant: Tenant;
   saleNumber: string;
   workOrderId?: string | null;
   workOrder?: WorkOrder;
@@ -106,4 +84,5 @@ export type Sale = {
   items?: SaleItem[];
   date: string;
   total: number;
+  paymentMethod?: string;
 };

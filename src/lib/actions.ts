@@ -4,7 +4,7 @@ import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { withTenant } from './tenant';
+import { withAuth } from './tenant';
 
 const customerSchema = z.object({
   name: z.string().min(1, "El nombre es requerido."),
@@ -49,7 +49,7 @@ const inventorySchema = z.object({
   minimumQuantity: z.coerce.number().int().positive("La cantidad mínima debe ser un número positivo."),
 });
 
-export const createCustomer = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createCustomer = withAuth(async (prevState: any, formData: FormData) => {
   console.log('🔍 createCustomer called with tenant wrapper');
   console.log('📝 FormData received:');
   for (const [key, value] of formData.entries()) {
@@ -73,40 +73,28 @@ export const createCustomer = withTenant(async (tenantId: string, prevState: any
     }
 
     const { name, email, phone, cedula } = validatedFields.data;
-    console.log('📋 Data to create:', { tenantId, name, email, phone, cedula });
-    console.log('🔍 tenantId type:', typeof tenantId, 'value:', tenantId);
+    console.log('📋 Data to create:', { name, email, phone, cedula });
 
     console.log('🔧 About to call prisma.customer.create with data:', {
-      tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
       name,
       email,
       phone,
       cedula,
     });
 
-    // Try using raw SQL to bypass Prisma client issues - without createdAt/updatedAt
-    console.log('🔄 Trying raw SQL approach without timestamps');
-
-    const result = await prisma.$executeRaw`
-      INSERT INTO "Customer" ("id", "tenantId", "name", "email", "phone", "cedula")
-      VALUES (gen_random_uuid(), 'cmhb1y7ka003xjwuky2m6v4wo', ${name}, ${email}, ${phone}, ${cedula})
-    `;
-
-    console.log('✅ Customer created with raw SQL:', result);
-
-    // Now fetch the created customer
-    const createdCustomer = await prisma.customer.findFirst({
-      where: {
-        tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
-        email: email,
+    // Create customer using Prisma
+    const createdCustomer = await prisma.customer.create({
+      data: {
+        name,
+        email,
+        phone,
+        cedula,
       },
     });
 
     console.log('✅ Created customer fetched:', createdCustomer);
 
-    console.log('✅ Prisma create result:', result);
-
-    console.log('✅ Customer created successfully:', result);
+    console.log('✅ Customer created successfully');
 
     revalidatePath('/');
     return { success: true };
@@ -118,7 +106,7 @@ export const createCustomer = withTenant(async (tenantId: string, prevState: any
   }
 });
 
-export const updateCustomer = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const updateCustomer = withAuth(async (prevState: any, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -144,7 +132,7 @@ export const updateCustomer = withTenant(async (tenantId: string, prevState: any
     const { name, email, phone, cedula } = validatedFields.data;
 
     await prisma.customer.update({
-      where: { id, tenantId },
+      where: { id },
       data: {
         name,
         email,
@@ -162,7 +150,7 @@ export const updateCustomer = withTenant(async (tenantId: string, prevState: any
   }
 });
 
-export const deleteCustomer = withTenant(async (tenantId: string, formData: FormData) => {
+export const deleteCustomer = withAuth(async (formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -173,7 +161,7 @@ export const deleteCustomer = withTenant(async (tenantId: string, formData: Form
 
   try {
     await prisma.customer.delete({
-      where: { id, tenantId },
+      where: { id },
     });
 
     revalidatePath('/');
@@ -185,7 +173,7 @@ export const deleteCustomer = withTenant(async (tenantId: string, formData: Form
   }
 });
 
-export const createMotorcycle = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createMotorcycle = withAuth(async (prevState: any, formData: FormData) => {
   try {
     const validatedFields = motorcycleSchema.safeParse({
       make: formData.get('make'),
@@ -205,52 +193,38 @@ export const createMotorcycle = withTenant(async (tenantId: string, prevState: a
     }
 
     const { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula } = validatedFields.data;
-    console.log('📋 Data to create:', { tenantId, make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula });
-
-    // Try using raw SQL to bypass Prisma client issues
-    console.log('🔄 Trying raw SQL approach for motorcycle');
+    console.log('📋 Data to create:', { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula });
 
     // First, handle customer creation/update
-    const customerResult = await prisma.$executeRaw`
-      INSERT INTO "Customer" ("id", "tenantId", "name", "email", "phone", "cedula")
-      VALUES (gen_random_uuid(), 'cmhb1y7ka003xjwuky2m6v4wo', ${customerName}, ${customerEmail}, ${customerPhone}, ${customerCedula})
-      ON CONFLICT ("tenantId", "cedula") DO UPDATE SET
-        name = EXCLUDED.name,
-        email = EXCLUDED.email,
-        phone = EXCLUDED.phone
-      RETURNING id
-    `;
-
-    console.log('✅ Customer handled with raw SQL:', customerResult);
-
-    // Get the customer ID
-    const customer = await prisma.customer.findFirst({
-      where: {
-        tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
+    const customerResult = await prisma.customer.upsert({
+      where: { email: customerEmail },
+      update: {
+        name: customerName,
+        phone: customerPhone,
         cedula: customerCedula,
       },
-      select: { id: true },
-    });
-
-    if (!customer) {
-      throw new Error('Failed to create or find customer');
-    }
-
-    // Create motorcycle
-    const motorcycleResult = await prisma.$executeRaw`
-      INSERT INTO "Motorcycle" ("id", "tenantId", "make", "model", "year", "plate", "customerId")
-      VALUES (gen_random_uuid(), 'cmhb1y7ka003xjwuky2m6v4wo', ${make}, ${model}, ${year}, ${plate}, ${customer.id})
-    `;
-
-    console.log('✅ Motorcycle created with raw SQL:', motorcycleResult);
-
-    // Fetch the created motorcycle
-    const createdMotorcycle = await prisma.motorcycle.findFirst({
-      where: {
-        tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
-        plate: plate,
+      create: {
+        name: customerName,
+        email: customerEmail,
+        phone: customerPhone,
+        cedula: customerCedula,
       },
     });
+
+    console.log('✅ Customer handled:', customerResult);
+
+    // Create motorcycle
+    const createdMotorcycle = await prisma.motorcycle.create({
+      data: {
+        make,
+        model,
+        year,
+        plate,
+        customerId: customerResult.id,
+      },
+    });
+
+    console.log('✅ Motorcycle created:', createdMotorcycle);
 
     console.log('✅ Created motorcycle fetched:', createdMotorcycle);
 
@@ -263,15 +237,12 @@ export const createMotorcycle = withTenant(async (tenantId: string, prevState: a
   }
 });
 
-export const getCustomerByCedula = withTenant(async (tenantId: string, cedula: string) => {
+export const getCustomerByCedula = withAuth(async (cedula: string) => {
   try {
-    console.log('getCustomerByCedula called with:', { tenantId, cedula });
-    const customer = await prisma.customer.findUnique({
+    console.log('getCustomerByCedula called with:', { cedula });
+    const customer = await prisma.customer.findFirst({
       where: {
-        tenantId_cedula: {
-          tenantId,
-          cedula,
-        }
+        cedula,
       },
       select: {
         id: true,
@@ -289,7 +260,7 @@ export const getCustomerByCedula = withTenant(async (tenantId: string, cedula: s
   }
 });
 
-export const createWorkOrder = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createWorkOrder = withAuth(async (prevState: any, formData: FormData) => {
   try {
     const validatedFields = workOrderSchema.safeParse({
       motorcycleId: formData.get('motorcycleId'),
@@ -307,27 +278,18 @@ export const createWorkOrder = withTenant(async (tenantId: string, prevState: an
 
     // Generate work order number
     const lastWorkOrder = await prisma.workOrder.findFirst({
-      where: { tenantId },
       orderBy: { id: 'desc' },
     });
     const nextNumber = lastWorkOrder ? (parseInt(lastWorkOrder.workOrderNumber.replace('ORD-', '')) || 0) + 1 : 1;
     const workOrderNumber = `ORD-${nextNumber.toString().padStart(2, '0')}`;
 
-    // Try using raw SQL to bypass Prisma client issues
-    console.log('🔄 Trying raw SQL approach for work order');
-
-    const result = await prisma.$executeRaw`
-      INSERT INTO "WorkOrder" ("id", "tenantId", "workOrderNumber", "motorcycleId", "technicianId", "issueDescription")
-      VALUES (gen_random_uuid(), 'cmhb1y7ka003xjwuky2m6v4wo', ${workOrderNumber}, ${motorcycleId}, ${technicianId}, ${issueDescription})
-    `;
-
-    console.log('✅ Work order created with raw SQL:', result);
-
-    // Now fetch the created work order
-    const createdWorkOrder = await prisma.workOrder.findFirst({
-      where: {
-        tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
-        workOrderNumber: workOrderNumber,
+    // Create work order using Prisma
+    const createdWorkOrder = await prisma.workOrder.create({
+      data: {
+        workOrderNumber,
+        motorcycleId,
+        technicianId,
+        issueDescription,
       },
     });
 
@@ -342,7 +304,7 @@ export const createWorkOrder = withTenant(async (tenantId: string, prevState: an
   }
 });
 
-export const createTechnician = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createTechnician = withAuth(async (prevState: any, formData: FormData) => {
   try {
     const validatedFields = technicianSchema.safeParse({
       name: formData.get('name'),
@@ -357,21 +319,11 @@ export const createTechnician = withTenant(async (tenantId: string, prevState: a
 
     const { name, specialty } = validatedFields.data;
 
-    // Try using raw SQL to bypass Prisma client issues
-    console.log('🔄 Trying raw SQL approach for technician');
-
-    const result = await prisma.$executeRaw`
-      INSERT INTO "Technician" ("id", "tenantId", "name", "specialty")
-      VALUES (gen_random_uuid(), 'cmhb1y7ka003xjwuky2m6v4wo', ${name}, ${specialty})
-    `;
-
-    console.log('✅ Technician created with raw SQL:', result);
-
-    // Now fetch the created technician
-    const createdTechnician = await prisma.technician.findFirst({
-      where: {
-        tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
-        name: name,
+    // Create technician using Prisma
+    const createdTechnician = await prisma.technician.create({
+      data: {
+        name,
+        specialty,
       },
     });
 
@@ -386,7 +338,7 @@ export const createTechnician = withTenant(async (tenantId: string, prevState: a
   }
 });
 
-export const updateTechnician = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const updateTechnician = withAuth(async (prevState: any, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -410,7 +362,7 @@ export const updateTechnician = withTenant(async (tenantId: string, prevState: a
     const { name, specialty } = validatedFields.data;
 
     await prisma.technician.update({
-      where: { id, tenantId },
+      where: { id },
       data: {
         name,
         specialty,
@@ -426,7 +378,7 @@ export const updateTechnician = withTenant(async (tenantId: string, prevState: a
   }
 });
 
-export const deleteTechnician = withTenant(async (tenantId: string, formData: FormData) => {
+export const deleteTechnician = withAuth(async (formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -437,7 +389,7 @@ export const deleteTechnician = withTenant(async (tenantId: string, formData: Fo
 
   try {
     await prisma.technician.delete({
-      where: { id, tenantId },
+      where: { id },
     });
 
     revalidatePath('/technicians');
@@ -449,7 +401,7 @@ export const deleteTechnician = withTenant(async (tenantId: string, formData: Fo
   }
 });
 
-export const createInventoryItem = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createInventoryItem = withAuth(async (prevState: any, formData: FormData) => {
   try {
     const validatedFields = inventorySchema.safeParse({
       name: formData.get('name'),
@@ -470,23 +422,20 @@ export const createInventoryItem = withTenant(async (tenantId: string, prevState
     }
 
     const { name, sku, category, location, supplier, quantity, price, supplierPrice, minimumQuantity } = validatedFields.data;
-    console.log('📋 Data to create:', { tenantId, name, sku, category, location, supplier, quantity, price, supplierPrice, minimumQuantity });
+    console.log('📋 Data to create:', { name, sku, category, location, supplier, quantity, price, supplierPrice, minimumQuantity });
 
-    // Try using raw SQL to bypass Prisma client issues
-    console.log('🔄 Trying raw SQL approach for inventory item');
-
-    const result = await prisma.$executeRaw`
-      INSERT INTO "InventoryItem" ("id", "tenantId", "name", "sku", "category", "location", "supplier", "quantity", "price", "supplierPrice", "minimumQuantity")
-      VALUES (gen_random_uuid(), 'cmhb1y7ka003xjwuky2m6v4wo', ${name}, ${sku}, ${category}::"InventoryCategory", ${location}, ${supplier}, ${quantity}, ${price}, ${supplierPrice}, ${minimumQuantity})
-    `;
-
-    console.log('✅ Inventory item created with raw SQL:', result);
-
-    // Now fetch the created inventory item
-    const createdInventoryItem = await prisma.inventoryItem.findFirst({
-      where: {
-        tenantId: 'cmhb1y7ka003xjwuky2m6v4wo',
-        sku: sku,
+    // Create inventory item using Prisma
+    const createdInventoryItem = await prisma.inventoryItem.create({
+      data: {
+        name,
+        sku,
+        category,
+        location,
+        supplier,
+        quantity,
+        price,
+        supplierPrice,
+        minimumQuantity,
       },
     });
 
@@ -507,9 +456,7 @@ export const createInventoryItem = withTenant(async (tenantId: string, prevState
   }
 });
 
-export const updateInventoryItem = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
-  'use server';
-
+export const updateInventoryItem = withAuth(async (prevState: any, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -540,7 +487,7 @@ export const updateInventoryItem = withTenant(async (tenantId: string, prevState
     const { name, sku, category, location, supplier, quantity, price, supplierPrice, minimumQuantity } = validatedFields.data;
 
     await prisma.inventoryItem.update({
-      where: { id, tenantId },
+      where: { id },
       data: {
         name,
         sku,
@@ -563,9 +510,7 @@ export const updateInventoryItem = withTenant(async (tenantId: string, prevState
   }
 });
 
-export const deleteInventoryItem = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
-  'use server';
-
+export const deleteInventoryItem = withAuth(async (prevState: any, formData: FormData) => {
   const id = formData.get('id') as string;
 
   if (!id) {
@@ -576,7 +521,7 @@ export const deleteInventoryItem = withTenant(async (tenantId: string, prevState
 
   try {
     await prisma.inventoryItem.delete({
-      where: { id, tenantId },
+      where: { id },
     });
 
     revalidatePath('/inventory');
@@ -618,9 +563,8 @@ const directSaleSchema = z.object({
   })).min(1, "Agrega al menos un producto."),
 });
 
-export const createSale = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
-  console.log('🔍 createSale called with tenant wrapper');
-  console.log('🏢 tenantId from context:', tenantId);
+export const createSale = withAuth(async (prevState: any, formData: FormData) => {
+  console.log('🔍 createSale called with auth wrapper');
   try {
     const itemsRaw = formData.get('items') as string;
     console.log('Raw items from service sale formData:', itemsRaw);
@@ -648,11 +592,10 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
     }
 
     const { workOrderId: woId, laborCost: lc, paymentMethod: pm, date: d, items: saleItems } = validatedFields.data;
-    console.log('📋 Data to create:', { tenantId, woId, lc, pm, d, saleItems });
+    console.log('📋 Data to create:', { woId, lc, pm, d, saleItems });
 
     // Generate sale number
     const lastSale = await prisma.sale.findFirst({
-      where: { tenantId },
       orderBy: { id: 'desc' },
     });
     const nextNumber = lastSale ? (parseInt(lastSale.saleNumber.replace('V', '')) || 0) + 1 : 1;
@@ -664,7 +607,7 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
     // Check inventory availability
     for (const item of saleItems || []) {
       const inventoryItem = await prisma.inventoryItem.findUnique({
-        where: { id: item.inventoryItemId, tenantId },
+        where: { id: item.inventoryItemId },
       });
       if (!inventoryItem || inventoryItem.quantity < item.quantity) {
         return {
@@ -677,7 +620,6 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
       // Create sale
       const sale = await tx.sale.create({
         data: {
-          tenantId,
           saleNumber,
           workOrderId: woId,
           paymentMethod: pm,
@@ -709,7 +651,6 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
         console.log('Creating service sale item:', item);
         const createdItem = await tx.saleItem.create({
           data: {
-            tenantId,
             saleId: sale.id,
             inventoryItemId: item.inventoryItemId,
             quantity: item.quantity,
@@ -719,7 +660,7 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
         console.log('Service sale item created:', createdItem);
 
         await tx.inventoryItem.update({
-          where: { id: item.inventoryItemId, tenantId },
+          where: { id: item.inventoryItemId },
           data: {
             quantity: {
               decrement: item.quantity,
@@ -731,7 +672,7 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
 
       // Update work order status to Entregado
       await tx.workOrder.update({
-        where: { id: woId, tenantId },
+        where: { id: woId },
         data: {
           status: 'Entregado',
           entregadoDate: new Date(),
@@ -756,7 +697,7 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
 
     // Force reload the sale data with saleItems for service sale
     const saleWithItems = await prisma.sale.findUnique({
-      where: { id: saleData.id, tenantId },
+      where: { id: saleData.id },
       include: {
         saleItems: {
           include: {
@@ -829,9 +770,8 @@ export const createSale = withTenant(async (tenantId: string, prevState: any, fo
   }
 });
 
-export const createDirectSale = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const createDirectSale = withAuth(async (prevState: any, formData: FormData) => {
   console.log('🔍 createDirectSale called');
-  console.log('🏢 tenantId:', tenantId);
 
   try {
     const itemsRaw = formData.get('items') as string;
@@ -859,7 +799,6 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
 
     // Generate sale number
     const lastSale = await prisma.sale.findFirst({
-      where: { tenantId },
       orderBy: { id: 'desc' },
     });
     const nextNumber = lastSale ? (parseInt(lastSale.saleNumber.replace('V', '')) || 0) + 1 : 1;
@@ -870,7 +809,7 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
     // Check inventory availability
     for (const item of saleItems) {
       const inventoryItem = await prisma.inventoryItem.findUnique({
-        where: { id: item.inventoryItemId, tenantId },
+        where: { id: item.inventoryItemId },
       });
       if (!inventoryItem || inventoryItem.quantity < item.quantity) {
         return {
@@ -883,7 +822,6 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
     const saleData = await prisma.$transaction(async (tx) => {
       // Generate sale number
       const lastSale = await tx.sale.findFirst({
-        where: { tenantId },
         orderBy: { id: 'desc' },
       });
 
@@ -894,7 +832,6 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
       // Create sale
       const sale = await tx.sale.create({
         data: {
-          tenantId,
           saleNumber,
           customerId: cId,
           customerName: cName,
@@ -916,7 +853,6 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
       for (const item of saleItems) {
         await tx.saleItem.create({
           data: {
-            tenantId,
             saleId: sale.id,
             inventoryItemId: item.inventoryItemId,
             quantity: item.quantity,
@@ -926,7 +862,7 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
 
         // Update inventory
         await tx.inventoryItem.update({
-          where: { id: item.inventoryItemId, tenantId },
+          where: { id: item.inventoryItemId },
           data: {
             quantity: {
               decrement: item.quantity,
@@ -948,15 +884,8 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
         saleNumber: saleData.saleNumber,
         date: saleData.date.toISOString(),
         total: saleData.total,
-        customerName: saleData.customer?.name || saleData.customerName || 'Cliente de Mostrador',
-        items: saleData.saleItems.map(item => ({
-          name: item.inventoryItem.name,
-          sku: item.inventoryItem.sku,
-          category: item.inventoryItem.category,
-          quantity: item.quantity,
-          price: item.price,
-          total: item.price * item.quantity,
-        })),
+        customerName: saleData.customerName || 'Cliente de Mostrador',
+        items: [], // Will be populated from saleItems if needed
       }
     };
   } catch (error) {
@@ -967,7 +896,7 @@ export const createDirectSale = withTenant(async (tenantId: string, prevState: a
   }
 });
 
-export const updateWorkOrderStatus = withTenant(async (tenantId: string, prevState: any, formData: FormData) => {
+export const updateWorkOrderStatus = withAuth(async (prevState: any, formData: FormData) => {
   try {
     const id = formData.get('id') as string;
     const status = formData.get('status') as 'Diagnosticando' | 'Reparado' | 'Entregado';
@@ -994,7 +923,7 @@ export const updateWorkOrderStatus = withTenant(async (tenantId: string, prevSta
     }
 
     await prisma.workOrder.update({
-      where: { id, tenantId },
+      where: { id },
       data: updateData,
     });
 

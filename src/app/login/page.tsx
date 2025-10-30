@@ -1,22 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Wrench, Loader2, LogIn, ShieldCheck, Building2 } from 'lucide-react';
+import { Wrench, Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/components/auth/AuthProvider';
-
-interface Tenant {
-  id: string;
-  name: string;
-  domain?: string | null;
-}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -24,37 +17,16 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [tenantId, setTenantId] = useState('');
-  const [tenants, setTenants] = useState<Tenant[]>([]);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchTenants = async () => {
-      try {
-        const response = await fetch('/api/tenants');
-        if (response.ok) {
-          const data = await response.json();
-          setTenants(data);
-          if (data.length > 0) {
-            setTenantId(data[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching tenants:', error);
-      }
-    };
-
-    fetchTenants();
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    console.log('🚀 Login attempt:', { email, password, tenantId });
+    console.log('🚀 Login attempt:', { email, password });
 
-    if (email === '' || password === '' || tenantId === '') {
+    if (email === '' || password === '') {
         setError('Por favor, completa todos los campos.');
         setIsLoading(false);
         return;
@@ -68,7 +40,7 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, tenantId }),
+        body: JSON.stringify({ email, password }),
         credentials: 'include',
       });
 
@@ -91,9 +63,8 @@ export default function LoginPage() {
 
       if (response.ok && data.user && data.token) {
         console.log('🎉 Direct login successful!');
-        // Manually set cookie and tenant context
+        // Manually set cookie
         document.cookie = `auth-token=${data.token}; path=/; max-age=604800`;
-        localStorage.setItem('tenantId', tenantId);
         router.push('/');
       } else {
         console.log('❌ Direct login failed:', data.error);
@@ -120,27 +91,6 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tenant">Organización</Label>
-              <Select value={tenantId} onValueChange={setTenantId} required>
-                <SelectTrigger className="bg-white/10 border-white/20">
-                  <SelectValue placeholder="Selecciona tu organización" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tenants.map((tenant) => (
-                    <SelectItem key={tenant.id} value={tenant.id}>
-                      <div className="flex items-center">
-                        <Building2 className="mr-2 h-4 w-4" />
-                        {tenant.name}
-                        {tenant.domain && (
-                          <span className="ml-2 text-xs text-gray-500">({tenant.domain})</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>
               <Input
@@ -175,9 +125,9 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="mt-4 text-center text-sm text-white/70">
-            ¿Quieres contratar?{' '}
+            ¿No tienes cuenta?{' '}
             <Link href="/register" className="font-semibold text-primary hover:underline">
-              Contacta con nosotros
+              Regístrate aquí
             </Link>
           </p>
           <Separator className="my-6 bg-white/20" />
