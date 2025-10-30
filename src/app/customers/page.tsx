@@ -77,7 +77,6 @@ export default async function CustomersPage() {
                     <TableCell className="text-right">
                       <div className="flex gap-1 sm:gap-2 justify-end">
                         <EditCustomer customer={customer} />
-                        <DeleteCustomer customer={customer} />
                       </div>
                     </TableCell>
                   </TableRow>

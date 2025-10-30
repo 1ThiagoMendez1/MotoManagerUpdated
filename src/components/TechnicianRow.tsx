@@ -61,7 +61,6 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
               </Button>
             )}
             <EditTechnician technician={technician} />
-            <DeleteTechnician technician={technician} />
           </div>
         </TableCell>
       </TableRow>

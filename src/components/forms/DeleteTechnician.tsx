@@ -49,6 +49,12 @@ export function DeleteTechnician({ technician }: DeleteTechnicianProps) {
     }
   }, [state?.success]);
 
+  useEffect(() => {
+    if (state) {
+      console.log('DeleteTechnician state:', state);
+    }
+  }, [state]);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>

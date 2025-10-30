@@ -3,6 +3,7 @@
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Sale } from '@/lib/types';
+import * as XLSX from 'xlsx';
 
 interface ExportDirectSalesButtonProps {
   sales: Sale[];
@@ -10,38 +11,37 @@ interface ExportDirectSalesButtonProps {
 
 export function ExportDirectSalesButton({ sales }: ExportDirectSalesButtonProps) {
   const handleExport = () => {
-    // Create CSV content
-    const headers = [
-      'Número de Venta',
-      'Fecha',
-      'Cliente',
-      'Método de Pago',
-      'Total',
-      'Artículos'
+    // Prepare data for Excel
+    const data = sales.map(sale => ({
+      'Número de Venta': sale.saleNumber,
+      'Fecha': new Date(sale.date).toLocaleDateString('es-CO'),
+      'Cliente': sale.customer?.name || sale.customerName || 'Cliente de Mostrador',
+      'Método de Pago': sale.paymentMethod || 'N/A',
+      'Total': sale.total,
+      'Artículos': sale.items?.map(item => `${item.quantity}x ${item.name || 'N/A'}`).join('; ') || 'N/A'
+    }));
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    // Auto-size columns
+    const colWidths = [
+      { wch: 15 }, // Número de Venta
+      { wch: 12 }, // Fecha
+      { wch: 25 }, // Cliente
+      { wch: 15 }, // Método de Pago
+      { wch: 12 }, // Total
+      { wch: 40 }  // Artículos
     ];
+    ws['!cols'] = colWidths;
 
-    const csvContent = [
-      headers.join(','),
-      ...sales.map(sale => [
-        sale.saleNumber,
-        new Date(sale.date).toLocaleDateString('es-CO'),
-        sale.customer?.name || sale.customerName || 'Cliente de Mostrador',
-        sale.paymentMethod || 'N/A',
-        sale.total,
-        sale.items?.map(item => `${item.quantity}x ${item.name || 'N/A'}`).join('; ') || 'N/A'
-      ].map(field => `"${field}"`).join(','))
-    ].join('\n');
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Ventas Directas');
 
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `ventas-directas-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Generate and download file
+    const fileName = `ventas-directas-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
   };
 
   return (

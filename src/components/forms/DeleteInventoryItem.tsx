@@ -57,6 +57,12 @@ export function DeleteInventoryItem({ item }: DeleteInventoryItemProps) {
     }
   }, [state?.success, toast]);
 
+  useEffect(() => {
+    if (state) {
+      console.log('DeleteInventoryItem state:', state);
+    }
+  }, [state]);
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

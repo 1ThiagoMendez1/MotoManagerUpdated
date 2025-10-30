@@ -39,6 +39,7 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "axios": "^1.13.1",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
