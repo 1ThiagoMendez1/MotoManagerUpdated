@@ -15,6 +15,9 @@ export interface ReceiptData {
     total: number;
   }>;
   laborCost?: number;
+  subtotal?: number;
+  discountPercentage?: number;
+  discountAmount?: number;
   total: number;
   workOrderId?: string;
   motorcycleInfo?: {
@@ -189,6 +192,26 @@ function generateReceiptHTML(data: ReceiptData): string {
           </tbody>
         </table>
       </div>
+
+      <!-- Subtotal -->
+      ${data.subtotal && data.subtotal !== data.total ? `
+      <div style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-weight: bold;">Subtotal:</span>
+          <span>${formatCurrency(data.subtotal)}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Discount -->
+      ${data.discountAmount && data.discountAmount > 0 ? `
+      <div style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between; color: #dc2626;">
+          <span style="font-weight: bold;">Descuento (${data.discountPercentage}%):</span>
+          <span>-${formatCurrency(data.discountAmount)}</span>
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Labor Cost -->
       ${data.laborCost && data.laborCost > 0 ? `

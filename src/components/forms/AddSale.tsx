@@ -57,6 +57,7 @@ const formSchema = z.object({
     required_error: "Se requiere una fecha.",
   }),
   items: z.array(saleItemSchema).optional(),
+  discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
 });
 
 type AddSaleProps = {
@@ -74,12 +75,13 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-       workOrderId: '',
-       laborCost: undefined,
-       paymentMethod: 'Efectivo',
-       date: new Date(),
-       items: [],
-   },
+        workOrderId: '',
+        laborCost: undefined,
+        paymentMethod: 'Efectivo',
+        date: new Date(),
+        items: [],
+        discountPercentage: 0,
+    },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -90,10 +92,13 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const { isSubmitting } = form.formState;
   const watchItems = form.watch("items");
   const watchLaborCost = form.watch("laborCost");
+  const watchDiscount = form.watch("discountPercentage");
 
   const itemsTotal = watchItems?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
   const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
-  const total = itemsTotal + laborCostValue;
+  const subtotal = itemsTotal + laborCostValue;
+  const discountAmount = subtotal * ((watchDiscount || 0) / 100);
+  const total = subtotal - discountAmount;
 
   // Filter work orders based on plate search
   const filteredWorkOrders = plateSearch
@@ -147,6 +152,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
     formData.append('paymentMethod', values.paymentMethod);
     formData.append('date', values.date.toISOString());
     formData.append('items', JSON.stringify(values.items || []));
+    formData.append('discountPercentage', (values.discountPercentage || 0).toString());
 
     const result = await createServiceSaleNew(null, formData);
 
@@ -412,9 +418,34 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                  />
             </div>
 
-             <div className="text-right font-bold text-lg text-black pt-4">
-                Total: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}
-            </div>
+             <div className="space-y-2 pt-4">
+                 <FormField
+                     control={form.control}
+                     name="discountPercentage"
+                     render={({ field }) => (
+                     <FormItem>
+                         <FormLabel className="text-black">Descuento (%)</FormLabel>
+                         <FormControl>
+                         <Input type="number" placeholder="0" {...field} className="bg-white text-black border-black/30" />
+                         </FormControl>
+                         <FormMessage />
+                     </FormItem>
+                     )}
+                 />
+                 <div className="text-right space-y-1">
+                     <div className="text-sm text-black/70">
+                         Subtotal: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(subtotal)}
+                     </div>
+                     {discountAmount > 0 && (
+                         <div className="text-sm text-red-600">
+                             Descuento ({watchDiscount}%): -{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(discountAmount)}
+                         </div>
+                     )}
+                     <div className="font-bold text-lg text-black">
+                         Total: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}
+                     </div>
+                 </div>
+             </div>
 
             <DialogFooter className="pt-4">
               <Button type="submit" disabled={isSubmitting}>

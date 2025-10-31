@@ -33,6 +33,8 @@ async function printReceipt(receiptData: ReceiptData) {
     receiptElement.style.top = '-9999px';
     receiptElement.style.width = '400px';
     receiptElement.style.fontFamily = 'Arial, sans-serif';
+    receiptElement.style.fontSize = '12px';
+    receiptElement.style.lineHeight = '1.2';
     document.body.appendChild(receiptElement);
 
     const html2canvas = (await import('html2canvas')).default;
@@ -41,14 +43,28 @@ async function printReceipt(receiptData: ReceiptData) {
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
+      height: receiptElement.scrollHeight,
     });
 
     const imgData = canvas.toDataURL('image/png');
     const imgWidth = 210;
     const pageHeight = 297;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const heightLeft = imgHeight;
 
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+    let position = 0;
+
+    // Agregar primera página
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    let remainingHeight = heightLeft - pageHeight;
+
+    // Agregar páginas adicionales si es necesario
+    while (remainingHeight > 0) {
+      position = remainingHeight - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      remainingHeight -= pageHeight;
+    }
 
     // Convert PDF to blob and create URL
     const pdfBlob = pdf.output('blob');
@@ -181,6 +197,26 @@ function generateReceiptHTML(data: ReceiptData): string {
         </table>
       </div>
 
+      <!-- Subtotal -->
+      ${data.subtotal && data.subtotal !== data.total ? `
+      <div style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-weight: bold;">Subtotal:</span>
+          <span>${formatCurrency(data.subtotal)}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Discount -->
+      ${data.discountAmount && data.discountAmount > 0 ? `
+      <div style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between; color: #dc2626;">
+          <span style="font-weight: bold;">Descuento (${data.discountPercentage}%):</span>
+          <span>-${formatCurrency(data.discountAmount)}</span>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- Labor Cost -->
       ${data.laborCost && data.laborCost > 0 ? `
       <div style="margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
@@ -200,9 +236,23 @@ function generateReceiptHTML(data: ReceiptData): string {
       </div>
 
       <!-- Footer -->
-      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 10px; color: #666;">
-        <p>Gracias por su preferencia</p>
-        <p>MotoManager - Sistema de Gestión para Talleres</p>
+      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; font-size: 9px; color: #333;">
+        <p style="font-weight: bold; margin-bottom: 10px; font-size: 11px;">Gracias por su preferencia</p>
+
+        <div style="text-align: left; max-width: 350px; margin: 0 auto 15px auto; line-height: 1.3;">
+          <p style="margin-bottom: 3px;"><strong>Este documento es un comprobante interno de venta generado por el sistema MotoManager para control administrativo del taller.</strong></p>
+          <p style="margin-bottom: 3px;">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
+          <p style="margin-bottom: 3px;">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
+          <p style="margin-bottom: 3px;">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
+          <p style="margin-bottom: 3px; font-style: italic;">"Documento generado automáticamente por MotoManager — Sin validez tributaria."</p>
+        </div>
+
+        <div style="border-top: 1px solid #666; padding-top: 8px; margin-top: 10px;">
+          <p style="font-weight: bold; font-size: 10px; margin-bottom: 2px;">MotoManager - Sistema de Gestión para Talleres</p>
+          <p style="font-size: 8px;">Created by - DevS&STech S.A.S</p>
+          <p style="font-size: 8px;">www.devsystech.com.co</p>
+          <p style="font-size: 8px; font-style: italic; margin-top: 3px;">MotoManager — Sin validez tributaria.</p>
+        </div>
       </div>
     </div>
   `;
@@ -337,6 +387,25 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
             </tbody>
           </table>
 
+          {/* Subtotal */}
+          {(receiptData.subtotal && receiptData.subtotal !== receiptData.total) && (
+            <div className="flex justify-between text-sm mb-1">
+              <span className="font-semibold">Subtotal:</span>
+              <span>{formatCurrency(receiptData.subtotal)}</span>
+            </div>
+          )}
+
+          {/* Discount */}
+          {receiptData.discountAmount && receiptData.discountAmount > 0 && (
+            <div className="flex justify-between text-sm mb-1 text-red-600">
+              <span className="font-semibold">
+                Descuento ({receiptData.discountPercentage}%):
+              </span>
+              <span>-{formatCurrency(receiptData.discountAmount)}</span>
+            </div>
+          )}
+
+          {/* Labor Cost */}
           {receiptData.laborCost && receiptData.laborCost > 0 && (
             <div className="bg-gray-100 p-2 rounded mb-2">
               <div className="flex justify-between text-sm">

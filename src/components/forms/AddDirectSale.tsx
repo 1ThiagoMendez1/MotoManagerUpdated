@@ -55,6 +55,7 @@ const formSchema = z.object({
   }),
   date: z.date({ required_error: "Se requiere una fecha." }),
   items: z.array(saleItemSchema).min(1, "Agrega al menos un producto."),
+  discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
 });
 
 type AddDirectSaleProps = {
@@ -75,6 +76,7 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
       paymentMethod: 'Efectivo',
       date: new Date(),
       customerName: "",
+      discountPercentage: 0,
     },
   });
 
@@ -85,8 +87,11 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
 
   const { isSubmitting } = form.formState;
   const watchItems = form.watch("items");
+  const watchDiscount = form.watch("discountPercentage");
 
-  const total = watchItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = watchItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discountAmount = subtotal * ((watchDiscount || 0) / 100);
+  const total = subtotal - discountAmount;
   
   function handleProductChange(value: string, index: number) {
     const selectedProduct = inventory.find(item => item.id === value);
@@ -115,6 +120,7 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
     formData.append('paymentMethod', values.paymentMethod);
     formData.append('date', values.date.toISOString());
     formData.append('items', JSON.stringify(values.items));
+    formData.append('discountPercentage', (values.discountPercentage || 0).toString());
 
     console.log('FormData contents:');
     for (const [key, value] of formData.entries()) {
@@ -361,8 +367,33 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                 <FormMessage>{form.formState.errors.items?.message}</FormMessage>
             </div>
             
-            <div className="text-right font-bold text-lg text-black">
-                Total: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}
+            <div className="space-y-2">
+                <FormField
+                    control={form.control}
+                    name="discountPercentage"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="text-black">Descuento (%)</FormLabel>
+                        <FormControl>
+                        <Input type="number" placeholder="0" {...field} className="bg-white text-black border-black/30" />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <div className="text-right space-y-1">
+                    <div className="text-sm text-black/70">
+                        Subtotal: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(subtotal)}
+                    </div>
+                    {discountAmount > 0 && (
+                        <div className="text-sm text-red-600">
+                            Descuento ({watchDiscount}%): -{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(discountAmount)}
+                        </div>
+                    )}
+                    <div className="font-bold text-lg text-black">
+                        Total: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}
+                    </div>
+                </div>
             </div>
 
             <DialogFooter className='pt-2'>

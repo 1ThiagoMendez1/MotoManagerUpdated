@@ -13,7 +13,10 @@ export async function sendSaleNotification(
   customerName: string,
   saleNumber: string,
   total: number,
-  items: Array<{ name: string; quantity: number; price: number }>
+  items: Array<{ name: string; quantity: number; price: number }>,
+  subtotal?: number,
+  discountPercentage?: number,
+  discountAmount?: number
 ) {
   if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
     console.log('Evolution API not configured, skipping WhatsApp notification');
@@ -28,6 +31,8 @@ export async function sendSaleNotification(
       `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`
     ).join('\n');
 
+    const discountText = (discountPercentage && discountPercentage > 0) ? `\nDescuento: ${discountPercentage}% (-$${discountAmount?.toLocaleString('es-CO')})` : '';
+
     const message = `🛍️ *MotoManager - Nueva Venta*
 
 ¡Hola ${customerName}!
@@ -36,7 +41,7 @@ Tu compra ha sido procesada exitosamente.
 
 📋 *Detalles de la venta:*
 Número: ${saleNumber}
-Total: $${total.toLocaleString('es-CO')}
+${subtotal ? `Subtotal: $${subtotal.toLocaleString('es-CO')}` : `Total: $${total.toLocaleString('es-CO')}`}${discountText}${subtotal ? `\nTotal: $${total.toLocaleString('es-CO')}` : ''}
 
 🛒 *Productos:*
 ${itemsText}
@@ -76,7 +81,10 @@ export async function sendServiceSaleNotification(
   motorcycleInfo: { make: string; model: string; plate: string },
   technicianName: string,
   laborCost?: number,
-  items?: Array<{ name: string; quantity: number; price: number }>
+  items?: Array<{ name: string; quantity: number; price: number }>,
+  subtotal?: number,
+  discountPercentage?: number,
+  discountAmount?: number
 ) {
   if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
     console.log('Evolution API not configured, skipping WhatsApp notification');
@@ -97,6 +105,11 @@ export async function sendServiceSaleNotification(
 
     const laborText = laborCost ? `\nMano de obra: $${laborCost.toLocaleString('es-CO')}` : '';
 
+    const discountText = (discountPercentage && discountPercentage > 0) ?
+      `\nDescuento: ${discountPercentage}% (-$${discountAmount?.toLocaleString('es-CO')})` : '';
+
+    const subtotalText = subtotal ? `\nSubtotal: $${subtotal.toLocaleString('es-CO')}` : '';
+
     const message = `🔧 *MotoManager - Servicio Completado*
 
 ¡Hola ${customerName}!
@@ -105,8 +118,8 @@ Tu motocicleta ${motorcycleInfo.make} ${motorcycleInfo.model} (${motorcycleInfo.
 
 📋 *Detalles del servicio:*
 Número: ${saleNumber}
-Técnico: ${technicianName}
-Total: $${total.toLocaleString('es-CO')}${laborText}${itemsText}
+Técnico: ${technicianName}${subtotalText}${discountText}${laborText}${itemsText}
+Total: $${total.toLocaleString('es-CO')}
 
 ✅ *Estado:* Entregado
 

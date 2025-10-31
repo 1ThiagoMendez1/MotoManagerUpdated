@@ -20,6 +20,7 @@ const serviceSaleSchema = z.object({
     quantity: z.coerce.number().int().min(1, "Mínimo 1"),
     price: z.coerce.number(),
   })).optional(),
+  discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
 });
 
 export const createServiceSaleNew = withAuth(async (prevState: any, formData: FormData) => {
@@ -35,6 +36,7 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
     const laborCost = parseFloat(formData.get('laborCost') as string);
     const paymentMethod = formData.get('paymentMethod') as string;
     const date = new Date(formData.get('date') as string);
+    const discountPercentage = parseFloat(formData.get('discountPercentage') as string) || 0;
 
     const validatedFields = serviceSaleSchema.safeParse({
       workOrderId,
@@ -42,6 +44,7 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
       paymentMethod,
       date,
       items,
+      discountPercentage,
     });
 
     console.log('✅ Validation result:', validatedFields.success);
@@ -52,7 +55,7 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
       };
     }
 
-    const { workOrderId: woId, laborCost: lc, paymentMethod: pm, date: d, items: saleItems } = validatedFields.data;
+    const { workOrderId: woId, laborCost: lc, paymentMethod: pm, date: d, items: saleItems, discountPercentage: dp } = validatedFields.data;
     console.log('📋 Data to create:', { woId, lc, pm, d, saleItems });
 
     // Generate unique sale number
@@ -89,7 +92,9 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
     } while (true);
 
     const itemsTotal = saleItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
-    const total = itemsTotal + (lc || 0);
+    const subtotal = itemsTotal + (lc || 0);
+    const discountAmount = subtotal * ((dp || 0) / 100);
+    const total = subtotal - discountAmount;
 
     // Check inventory availability
     for (const item of saleItems || []) {
@@ -185,6 +190,10 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
     console.log('Service sale data after creation:', {
       id: createdSale.id,
       saleNumber: createdSale.saleNumber,
+      subtotal: subtotal,
+      discountPercentage: dp || 0,
+      discountAmount: discountAmount,
+      total: total,
       saleItemsCount: createdSale.saleItems?.length || 0,
       saleItems: createdSale.saleItems?.map(item => ({
         id: item.id,
@@ -196,6 +205,10 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
     console.log('Sale data for receipt:', {
       id: createdSale.id,
       saleNumber: createdSale.saleNumber,
+      subtotal: subtotal,
+      discountPercentage: dp || 0,
+      discountAmount: discountAmount,
+      total: total,
       itemsCount: createdSale.saleItems?.length || 0,
       items: createdSale.saleItems?.map(item => ({
         name: item.inventoryItem.name,
@@ -224,7 +237,10 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
           name: item.inventoryItem.name,
           quantity: item.quantity,
           price: item.price,
-        }))
+        })),
+        subtotal,
+        dp || 0,
+        discountAmount
       );
     } else {
       console.log('📱 No customer phone available, skipping WhatsApp notification');
@@ -237,6 +253,9 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
         id: createdSale.id,
         saleNumber: createdSale.saleNumber,
         date: createdSale.date.toISOString(),
+        subtotal: subtotal,
+        discountPercentage: dp || 0,
+        discountAmount: discountAmount,
         total: createdSale.total,
         paymentMethod: pm,
         workOrderId: createdSale.workOrder?.workOrderNumber || woId,

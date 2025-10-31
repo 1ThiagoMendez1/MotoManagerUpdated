@@ -46,6 +46,8 @@ export function AddWorkOrder({ motorcycles, technicians }: AddWorkOrderProps) {
   useEffect(() => {
     if (state?.success) {
       setIsOpen(false);
+      // Reset form by triggering a re-render
+      window.location.reload();
     }
   }, [state?.success]);
 

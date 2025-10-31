@@ -4,7 +4,7 @@ import { z } from 'zod';
 import prisma from './prisma';
 import { revalidatePath } from 'next/cache';
 import { withAuth } from './tenant';
-import { sendSaleNotification } from './whatsapp';
+import evolutionAPI from './whatsapp';
 
 const directSaleSchema = z.object({
   customerId: z.string().optional(),
@@ -18,6 +18,7 @@ const directSaleSchema = z.object({
     quantity: z.coerce.number().int().min(1, "Mínimo 1"),
     price: z.coerce.number(),
   })).min(1, "Agrega al menos un producto."),
+  discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
 });
 
 export const createDirectSaleNew = withAuth(async (prevState: any, formData: FormData) => {
@@ -30,6 +31,7 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
     const customerName = formData.get('customerName') as string || undefined;
     const paymentMethod = formData.get('paymentMethod') as string;
     const date = new Date(formData.get('date') as string);
+    const discountPercentage = parseFloat(formData.get('discountPercentage') as string) || 0;
 
     const validatedFields = directSaleSchema.safeParse({
       customerId,
@@ -37,6 +39,7 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
       paymentMethod,
       date,
       items,
+      discountPercentage,
     });
 
     if (!validatedFields.success) {
@@ -45,9 +48,11 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
       };
     }
 
-    const { customerId: cId, customerName: cName, paymentMethod: pm, date: d, items: saleItems } = validatedFields.data;
+    const { customerId: cId, customerName: cName, paymentMethod: pm, date: d, items: saleItems, discountPercentage: dp } = validatedFields.data;
 
-    const total = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountAmount = subtotal * ((dp || 0) / 100);
+    const total = subtotal - discountAmount;
 
     // Check inventory availability
     for (const item of saleItems) {
@@ -176,6 +181,10 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
     console.log('Sale data for receipt:', {
       id: saleData.id,
       saleNumber: saleData.saleNumber,
+      subtotal: subtotal,
+      discountPercentage: dp || 0,
+      discountAmount: discountAmount,
+      total: total,
       itemsCount: saleData.saleItems.length,
       items: saleData.saleItems.map(item => ({
         name: item.inventoryItem.name,
@@ -188,16 +197,19 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
     // Send WhatsApp notification if customer has phone
     if (saleData.customer?.phone) {
       console.log('📱 Sending WhatsApp notification to customer');
-      await sendSaleNotification(
+      await evolutionAPI.sendSaleNotification(
         saleData.customer.phone,
         saleData.customer.name,
         saleData.saleNumber,
-        saleData.total,
+        total,
         saleData.saleItems.map(item => ({
           name: item.inventoryItem.name,
           quantity: item.quantity,
           price: item.price,
-        }))
+        })),
+        subtotal,
+        dp || 0,
+        discountAmount
       );
     } else {
       console.log('📱 No customer phone available, skipping WhatsApp notification');
@@ -210,7 +222,10 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
         id: saleData.id,
         saleNumber: saleData.saleNumber,
         date: saleData.date.toISOString(),
-        total: saleData.total,
+        subtotal: subtotal,
+        discountPercentage: dp || 0,
+        discountAmount: discountAmount,
+        total: total,
         paymentMethod: pm,
         customerName: saleData.customer?.name || saleData.customerName || 'Cliente de Mostrador',
         items: saleData.saleItems.map(item => ({

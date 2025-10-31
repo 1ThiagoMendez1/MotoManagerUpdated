@@ -74,13 +74,6 @@ function SalesPageSkeleton() {
           </div>
         </CardContent>
       </Card>
-      {totalPages > 1 && (
-        <SalesPagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          searchParams={resolvedSearchParams}
-        />
-      )}
     </div>
   );
 }
@@ -172,7 +165,7 @@ export default async function SalesPage({
           <CardHeader>
             <CardTitle className="text-lg sm:text-xl">Historial de Transacciones</CardTitle>
             <CardDescription className="text-white/80 text-sm sm:text-base">
-              Un registro detallado de todas las ventas completadas.
+              Un registro detallado de todas las ventas completadas. Página {currentPage} de {totalPages}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -225,6 +218,70 @@ export default async function SalesPage({
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex justify-center">
+                <div className="flex items-center space-x-2">
+                  {/* Previous Button */}
+                  <a
+                    href={`/sales?${new URLSearchParams({
+                      ...(dateFrom && { dateFrom }),
+                      ...(dateTo && { dateTo }),
+                      ...(type !== 'all' && { type }),
+                      page: Math.max(1, currentPage - 1).toString(),
+                    }).toString()}`}
+                    className={`px-3 py-2 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-md hover:bg-white/20 ${
+                      currentPage === 1 ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    }`}
+                  >
+                    ← Anterior
+                  </a>
+
+                  {/* Page Numbers */}
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      if (pageNum > totalPages) return null;
+
+                      return (
+                        <a
+                          key={pageNum}
+                          href={`/sales?${new URLSearchParams({
+                            ...(dateFrom && { dateFrom }),
+                            ...(dateTo && { dateTo }),
+                            ...(type !== 'all' && { type }),
+                            page: pageNum.toString(),
+                          }).toString()}`}
+                          className={`px-3 py-2 text-sm font-medium rounded-md ${
+                            pageNum === currentPage
+                              ? 'bg-blue-600 text-white'
+                              : 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
+                          }`}
+                        >
+                          {pageNum}
+                        </a>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Button */}
+                  <a
+                    href={`/sales?${new URLSearchParams({
+                      ...(dateFrom && { dateFrom }),
+                      ...(dateTo && { dateTo }),
+                      ...(type !== 'all' && { type }),
+                      page: Math.min(totalPages, currentPage + 1).toString(),
+                    }).toString()}`}
+                    className={`px-3 py-2 text-sm font-medium text-white bg-white/10 border border-white/20 rounded-md hover:bg-white/20 ${
+                      currentPage === totalPages ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    }`}
+                  >
+                    Siguiente →
+                  </a>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
