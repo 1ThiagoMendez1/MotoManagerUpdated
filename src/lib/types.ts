@@ -57,6 +57,9 @@ export type WorkOrder = {
   motorcycle: Motorcycle;
   technician: Technician | null;
   issueDescription?: string | null;
+  solutionDescription?: string | null;
+  /** Monto total de abonos realizados por el cliente para esta orden */
+  depositAmount?: number;
   createdDate: string;
   diagnosticandoDate?: string;
   reparadoDate?: string;

@@ -166,6 +166,12 @@ function generateReceiptHTML(data: ReceiptData): string {
           <span>${data.technicianName}</span>
         </div>
         ` : ''}
+        ${data.paymentMethod ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span style="font-weight: bold;">Medio de Pago:</span>
+          <span>${data.paymentMethod}</span>
+        </div>
+        ` : ''}
       </div>
 
       <!-- Items Table -->
@@ -227,10 +233,30 @@ function generateReceiptHTML(data: ReceiptData): string {
       </div>
       ` : ''}
 
+      <!-- Deposit (Abono) -->
+      ${data.depositAmount && data.depositAmount > 0 ? `
+      <div style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between; color: #16a34a;">
+          <span style="font-weight: bold;">Abono recibido:</span>
+          <span>- ${formatCurrency(data.depositAmount)}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Remaining Balance -->
+      ${data.remainingBalance && data.remainingBalance > 0 ? `
+      <div style="margin-bottom: 10px; padding: 8px; background: #fef9c3; border-radius: 4px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-weight: bold;">Saldo pendiente:</span>
+          <span>${formatCurrency(data.remainingBalance)}</span>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- Total -->
       <div style="border-top: 2px solid #333; padding-top: 10px; margin-top: 20px;">
         <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold;">
-          <span>TOTAL:</span>
+          <span>TOTAL SERVICIO:</span>
           <span>${formatCurrency(data.total)}</span>
         </div>
       </div>
@@ -415,9 +441,25 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
             </div>
           )}
 
+          {/* Deposit (Abono) */}
+          {receiptData.depositAmount && receiptData.depositAmount > 0 && (
+            <div className="flex justify-between text-sm mb-1 text-emerald-600">
+              <span className="font-semibold">Abono recibido:</span>
+              <span>-{formatCurrency(receiptData.depositAmount)}</span>
+            </div>
+          )}
+
+          {/* Remaining Balance */}
+          {receiptData.remainingBalance && receiptData.remainingBalance > 0 && (
+            <div className="flex justify-between text-sm mb-2 bg-yellow-50 text-yellow-800 px-2 py-1 rounded">
+              <span className="font-semibold">Saldo pendiente:</span>
+              <span>{formatCurrency(receiptData.remainingBalance)}</span>
+            </div>
+          )}
+
           <div className="border-t-2 border-gray-800 pt-2">
             <div className="flex justify-between text-lg font-bold">
-              <span>TOTAL:</span>
+              <span>TOTAL SERVICIO:</span>
               <span>{formatCurrency(receiptData.total)}</span>
             </div>
           </div>

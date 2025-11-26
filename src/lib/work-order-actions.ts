@@ -19,8 +19,19 @@ export async function getWorkOrderById(id: string) {
     },
   });
   if (!workOrder) return null;
+
+  // Obtener depositAmount directamente desde SQL crudo porque el cliente Prisma actual
+  // aún no conoce esta columna en el modelo tipado
+  const depositRows = await prisma.$queryRaw<{ depositAmount: number }[]>`
+    SELECT "depositAmount"
+    FROM "WorkOrder"
+    WHERE "id" = ${id}
+  `;
+  const depositAmount = depositRows[0]?.depositAmount ?? 0;
+
   return {
     ...workOrder,
+    depositAmount,
     createdDate: workOrder.createdDate.toISOString(),
     sales: workOrder.sales.map(s => ({
       ...s,
@@ -32,6 +43,51 @@ export async function getWorkOrderById(id: string) {
       })),
     })),
   };
+}
+
+export async function addDepositToWorkOrder(formData: FormData) {
+  const workOrderId = formData.get('workOrderId') as string;
+  const amountStr = formData.get('amount') as string | null;
+
+  if (!workOrderId) {
+    throw new Error('workOrderId es requerido');
+  }
+
+  const amount = parseFloat(amountStr || '0');
+
+  if (!amountStr || isNaN(amount) || amount <= 0) {
+    throw new Error('El monto de abono debe ser un número mayor que 0.');
+  }
+
+  // Usamos SQL crudo porque el cliente de Prisma aún no conoce el campo depositAmount
+  await prisma.$executeRaw`
+    UPDATE "WorkOrder"
+    SET "depositAmount" = COALESCE("depositAmount", 0) + ${amount}
+    WHERE "id" = ${workOrderId}
+  `;
+
+  revalidatePath('/work-orders/' + workOrderId);
+  revalidatePath('/work-orders');
+}
+
+
+export async function updateWorkOrderSolution(formData: FormData) {
+  const workOrderId = formData.get('workOrderId') as string;
+  const solutionDescription = (formData.get('solutionDescription') as string | null) ?? null;
+
+  if (!workOrderId) {
+    throw new Error('workOrderId es requerido');
+  }
+
+  await prisma.workOrder.update({
+    where: { id: workOrderId },
+    data: {
+      solutionDescription,
+    } as any,
+  });
+
+  revalidatePath('/work-orders/' + workOrderId);
+  revalidatePath('/work-orders');
 }
 
 export async function addItemToWorkOrder(formData: FormData) {

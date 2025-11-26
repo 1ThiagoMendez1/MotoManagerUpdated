@@ -92,20 +92,23 @@ model Appointment {
 }
 
 model WorkOrder {
-  id                String     @id @default(cuid())
-  workOrderNumber   String     @unique
-  motorcycle        Motorcycle @relation(fields: [motorcycleId], references: [id])
-  motorcycleId      String
-  technician        Technician? @relation(fields: [technicianId], references: [id])
-  technicianId      String?
-  issueDescription  String?
-  status            WorkOrderStatus @default(Diagnosticando)
-  createdDate       DateTime   @default(now())
-  diagnosticandoDate DateTime? @default(now())
-  reparadoDate      DateTime?
-  entregadoDate     DateTime?
-  completedDate     DateTime?
-  sales             Sale[]
+  id                 String     @id @default(cuid())
+  workOrderNumber    String     @unique
+  motorcycle         Motorcycle @relation(fields: [motorcycleId], references: [id])
+  motorcycleId       String
+  technician         Technician? @relation(fields: [technicianId], references: [id])
+  technicianId       String?
+  issueDescription   String?
+  solutionDescription String?
+  /** Monto total de abonos realizados por el cliente para esta orden */
+  depositAmount      Float      @default(0)
+  status             WorkOrderStatus @default(Diagnosticando)
+  createdDate        DateTime   @default(now())
+  diagnosticandoDate DateTime?  @default(now())
+  reparadoDate       DateTime?
+  entregadoDate      DateTime?
+  completedDate      DateTime?
+  sales              Sale[]
 }
 
 model Sale {

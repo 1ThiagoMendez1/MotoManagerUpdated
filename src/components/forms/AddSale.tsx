@@ -139,18 +139,26 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const discountAmount = itemsTotal * ((watchDiscount || 0) / 100);
   const total = subtotal - discountAmount;
 
-  // Filter work orders based on plate search
+  // Información de abonos desde la orden de trabajo seleccionada
+  const selectedWorkOrder = workOrders.find(order => order.id === watchWorkOrderId);
+  const depositAmountFromWorkOrder = selectedWorkOrder?.depositAmount ?? 0;
+  const remainingBalanceTotal = Math.max(0, total - depositAmountFromWorkOrder);
+
+  // Solo considerar órdenes de trabajo activas (no Entregadas) para facturación
+  const activeWorkOrders = workOrders.filter(order => order.status !== 'Entregado');
+
+  // Filter work orders based on plate search (solo activas)
   const filteredWorkOrders = plateSearch
-    ? workOrders.filter(order =>
+    ? activeWorkOrders.filter(order =>
         order.motorcycle.plate.toLowerCase().includes(plateSearch.toLowerCase())
       )
-    : workOrders;
+    : activeWorkOrders;
 
-  // Auto-select work order if only one matches the plate search
+  // Auto-select work order if only one matches the plate search (solo activas)
   const handlePlateSearch = (value: string) => {
     setPlateSearch(value);
     if (value) {
-      const matchingOrders = workOrders.filter(order =>
+      const matchingOrders = activeWorkOrders.filter(order =>
         order.motorcycle.plate.toLowerCase().includes(value.toLowerCase())
       );
       if (matchingOrders.length === 1) {
@@ -466,32 +474,71 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
             </div>
 
              <div className="space-y-2 pt-4">
-                 <FormField
-                     control={form.control}
-                     name="discountPercentage"
-                     render={({ field }) => (
-                     <FormItem>
-                         <FormLabel className="text-black">Descuento (%)</FormLabel>
-                         <FormControl>
-                         <Input type="number" placeholder="0" {...field} className="bg-white text-black border-black/30" />
-                         </FormControl>
-                         <FormMessage />
-                     </FormItem>
-                     )}
-                 />
-                 <div className="text-right space-y-1">
-                     <div className="text-sm text-black/70">
-                         Subtotal: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(subtotal)}
-                     </div>
-                     {discountAmount > 0 && (
-                         <div className="text-sm text-red-600">
-                             Descuento ({watchDiscount}%): -{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(discountAmount)}
-                         </div>
-                     )}
-                     <div className="font-bold text-lg text-black">
-                         Total: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}
-                     </div>
+               <FormField
+                 control={form.control}
+                 name="discountPercentage"
+                 render={({ field }) => (
+                   <FormItem>
+                     <FormLabel className="text-black">Descuento (%)</FormLabel>
+                     <FormControl>
+                       <Input
+                         type="number"
+                         placeholder="0"
+                         {...field}
+                         className="bg-white text-black border-black/30"
+                       />
+                     </FormControl>
+                     <FormMessage />
+                   </FormItem>
+                 )}
+               />
+               <div className="text-right space-y-1">
+                 <div className="text-sm text-black/70">
+                   Subtotal: {new Intl.NumberFormat('es-CO', {
+                     style: 'currency',
+                     currency: 'COP',
+                     minimumFractionDigits: 0,
+                   }).format(subtotal)}
                  </div>
+                 {discountAmount > 0 && (
+                   <div className="text-sm text-red-600">
+                     Descuento ({watchDiscount}%): -
+                     {new Intl.NumberFormat('es-CO', {
+                       style: 'currency',
+                       currency: 'COP',
+                       minimumFractionDigits: 0,
+                     }).format(discountAmount)}
+                   </div>
+                 )}
+                 {depositAmountFromWorkOrder > 0 && (
+                   <div className="text-sm text-emerald-700">
+                     Abono registrado en la orden:{' '}
+                     {new Intl.NumberFormat('es-CO', {
+                       style: 'currency',
+                       currency: 'COP',
+                       minimumFractionDigits: 0,
+                     }).format(depositAmountFromWorkOrder)}
+                   </div>
+                 )}
+                 {depositAmountFromWorkOrder > 0 && remainingBalanceTotal > 0 && (
+                   <div className="text-sm text-amber-700">
+                     Saldo pendiente (Total - Abono):{' '}
+                     {new Intl.NumberFormat('es-CO', {
+                       style: 'currency',
+                       currency: 'COP',
+                       minimumFractionDigits: 0,
+                     }).format(remainingBalanceTotal)}
+                   </div>
+                 )}
+                 <div className="font-bold text-lg text-black">
+                   Total servicio:{' '}
+                   {new Intl.NumberFormat('es-CO', {
+                     style: 'currency',
+                     currency: 'COP',
+                     minimumFractionDigits: 0,
+                   }).format(total)}
+                 </div>
+               </div>
              </div>
 
             <DialogFooter className="pt-4">

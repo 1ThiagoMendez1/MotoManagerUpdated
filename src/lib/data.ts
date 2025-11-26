@@ -253,6 +253,8 @@ export const getWorkOrders = async ({ query, page = 1, limit = 20 }: { query?: s
     },
     technician: wo.technician,
     issueDescription: wo.issueDescription,
+    solutionDescription: (wo as any).solutionDescription,
+    depositAmount: (wo as any).depositAmount ?? 0,
     createdDate: wo.createdDate.toISOString(),
     diagnosticandoDate: wo.diagnosticandoDate ? wo.diagnosticandoDate.toISOString() : undefined,
     reparadoDate: wo.reparadoDate ? wo.reparadoDate.toISOString() : undefined,
@@ -288,6 +290,14 @@ export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }:
   }
   // 'all' or undefined means no type filter
 
+  // Excluir ventas internas usadas solo para acumular items de órdenes de trabajo
+  // Esas ventas usan saleNumber tipo "WO-<timestamp>" y NO deben aparecer como facturas.
+  where.saleNumber = {
+    not: {
+      startsWith: 'WO-',
+    },
+  };
+
   // Get paginated sales data
   const [sales, total] = await Promise.all([
     prisma.sale.findMany({
@@ -300,6 +310,14 @@ export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }:
             id: true,
             workOrderNumber: true,
             issueDescription: true,
+            technician: {
+              select: {
+                id: true,
+                name: true,
+                specialty: true,
+                avatarUrl: true,
+              },
+            },
             motorcycle: {
               select: {
                 id: true,
@@ -368,12 +386,15 @@ export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }:
         intakeDate: '', // Not needed for sales display
         customer: s.workOrder.motorcycle.customer,
       },
-      technician: {
-        id: '',
-        name: '',
-        specialty: '',
-      }, // Dummy technician since it's required by type but not used in sales page
+      technician: s.workOrder.technician ? {
+        id: s.workOrder.technician.id,
+        name: s.workOrder.technician.name,
+        specialty: s.workOrder.technician.specialty,
+        avatarUrl: s.workOrder.technician.avatarUrl ?? undefined,
+      } : null,
       issueDescription: s.workOrder.issueDescription,
+      solutionDescription: (s.workOrder as any).solutionDescription,
+      depositAmount: (s.workOrder as any).depositAmount ?? 0,
       createdDate: '', // Not needed for sales display
       completedDate: undefined,
       status: 'Entregado' as const, // Sales are always completed

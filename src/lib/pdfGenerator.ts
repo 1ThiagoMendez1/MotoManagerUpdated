@@ -18,6 +18,10 @@ export interface ReceiptData {
   subtotal?: number;
   discountPercentage?: number;
   discountAmount?: number;
+  /** Total abonado previamente por el cliente para esta orden */
+  depositAmount?: number;
+  /** Saldo pendiente después de restar abonos */
+  remainingBalance?: number;
   total: number;
   workOrderId?: string;
   motorcycleInfo?: {
@@ -223,10 +227,30 @@ function generateReceiptHTML(data: ReceiptData): string {
       </div>
       ` : ''}
 
+      <!-- Deposit (Abono) -->
+      ${data.depositAmount && data.depositAmount > 0 ? `
+      <div style="margin-bottom: 5px;">
+        <div style="display: flex; justify-content: space-between; color: #16a34a;">
+          <span style="font-weight: bold;">Abono recibido:</span>
+          <span>- ${formatCurrency(data.depositAmount)}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Remaining Balance -->
+      ${data.remainingBalance && data.remainingBalance > 0 ? `
+      <div style="margin-bottom: 10px; padding: 8px; background: #fef9c3; border-radius: 4px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-weight: bold;">Saldo pendiente:</span>
+          <span>${formatCurrency(data.remainingBalance)}</span>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- Total -->
       <div style="border-top: 2px solid #333; padding-top: 10px; margin-top: 20px;">
         <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold;">
-          <span>TOTAL:</span>
+          <span>TOTAL SERVICIO:</span>
           <span>${formatCurrency(data.total)}</span>
         </div>
       </div>

@@ -58,28 +58,28 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
     const { workOrderId: woId, laborCost: lc, paymentMethod: pm, date: d, items: saleItems, discountPercentage: dp } = validatedFields.data;
     console.log('📋 Data to create:', { woId, lc, pm, d, saleItems });
 
-    // Generate unique sale number
-    let saleNumber;
+    // Generate unique sale number (timestamp-based to evitar colisiones con numeración previa)
+    const generateSaleNumber = () => {
+      // Usa los últimos 8 dígitos del timestamp para tener un número creciente y muy poco probable de repetir
+      const now = Date.now().toString();
+      const suffix = now.slice(-8);
+      return `V${suffix}`;
+    };
+
+    let saleNumber: string;
     let attemptsGen = 0;
     const maxAttemptsGen = 10;
 
     do {
-      const lastSale = await prisma.sale.findFirst({
-        orderBy: { saleNumber: 'desc' },
-      });
+      saleNumber = generateSaleNumber();
 
-      const nextNumber = lastSale ? (parseInt(lastSale.saleNumber.replace('V', '')) || 0) + 1 : 1;
-      saleNumber = `V${nextNumber.toString().padStart(4, '0')}`;
-
-      // Check if this sale number already exists
+      // Verificar que no exista ya una venta con este número
       const existingSale = await prisma.sale.findFirst({
-        where: {
-          saleNumber,
-        },
+        where: { saleNumber },
       });
 
       if (!existingSale) {
-        break; // Sale number is unique
+        break; // Número de venta único
       }
 
       attemptsGen++;
@@ -87,7 +87,7 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
         throw new Error('Unable to generate unique sale number after multiple attempts');
       }
 
-      // Wait a bit before trying again
+      // Esperar un poco para que el timestamp cambie
       await new Promise(resolve => setTimeout(resolve, 10));
     } while (true);
 
@@ -177,6 +177,10 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
 
     console.log(`Final service sale has ${createdSale.saleItems?.length || 0} items`);
 
+    // Leer abonos registrados en la orden de trabajo (si existen)
+    const depositAmount = (createdSale.workOrder as any)?.depositAmount ?? 0;
+    const remainingBalance = Math.max(0, total - depositAmount);
+
     // Update work order status to Entregado
     await prisma.workOrder.update({
       where: { id: woId },
@@ -196,6 +200,8 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
       discountPercentage: dp || 0,
       discountAmount: discountAmount,
       total: total,
+      depositAmount,
+      remainingBalance,
       saleItemsCount: createdSale.saleItems?.length || 0,
       saleItems: createdSale.saleItems?.map(item => ({
         id: item.id,
@@ -271,6 +277,8 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
         } : undefined,
         technicianName: createdSale.workOrder?.technician?.name,
         laborCost: lc > 0 ? lc : undefined,
+        depositAmount: depositAmount > 0 ? depositAmount : undefined,
+        remainingBalance: remainingBalance > 0 ? remainingBalance : undefined,
         items: createdSale.saleItems?.map((item: any) => ({
           name: item.inventoryItem.name,
           sku: item.inventoryItem.sku,

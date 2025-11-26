@@ -34,7 +34,14 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
 
   const getSaleDetails = (sale: Sale) => {
     if (sale.workOrderId && sale.workOrder) {
-      return sale.workOrder.issueDescription;
+      // Para servicios, el resumen debe reflejar la solución aplicada
+      // y, si no existe, al menos el problema reportado
+      const wo: any = sale.workOrder;
+      return (
+        wo.solutionDescription ||
+        wo.issueDescription ||
+        'Servicio de mantenimiento / reparación realizado a la motocicleta'
+      );
     }
     if (sale.items && sale.items.length > 0) {
       const firstItem = inventoryItems.find(invItem => invItem.id === sale.items![0].inventoryItemId);
@@ -128,13 +135,26 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
             <div className="p-4 bg-green-50 rounded-lg">
               <h3 className="font-semibold text-sm text-green-700 mb-2">SERVICIO REALIZADO</h3>
               <div className="text-sm space-y-2">
-                <div><span className="font-medium">Técnico:</span> {sale.workOrder.technician.name}</div>
-                <div><span className="font-medium">Especialidad:</span> {sale.workOrder.technician.specialty}</div>
+                <div>
+                  <span className="font-medium">Técnico:</span>{' '}
+                  {sale.workOrder.technician?.name || 'Sin asignar'}
+                </div>
+                {sale.workOrder.technician?.specialty && (
+                  <div>
+                    <span className="font-medium">Especialidad:</span>{' '}
+                    {sale.workOrder.technician.specialty}
+                  </div>
+                )}
                 <div><span className="font-medium">Problema Reportado:</span></div>
                 <div className="bg-white p-3 rounded border text-gray-700 italic">
-                  "{sale.workOrder.issueDescription}"
+                  "{sale.workOrder.issueDescription || 'No registrado por el cliente.'}"
                 </div>
-                <div><span className="font-medium">Estado Final:</span>
+                <div><span className="font-medium">Solución Realizada:</span></div>
+                <div className="bg-white p-3 rounded border text-gray-700 italic">
+                  "{(sale.workOrder as any).solutionDescription || 'No se registró una solución específica.'}"
+                </div>
+                <div>
+                  <span className="font-medium">Estado Final:</span>
                   <Badge variant="secondary" className="ml-2">
                     {sale.workOrder.status}
                   </Badge>

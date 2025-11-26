@@ -1,15 +1,18 @@
-import { getWorkOrderById } from '@/lib/work-order-actions';
+import { getWorkOrderById, updateWorkOrderSolution, addDepositToWorkOrder } from '@/lib/work-order-actions';
 import { getInventory } from '@/lib/data';
 import { AddItemToWorkOrder } from '@/components/forms/AddItemToWorkOrder';
 import { RemoveItemFromWorkOrder } from '@/components/forms/RemoveItemFromWorkOrder';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { revalidatePath } from 'next/cache';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export const dynamic = 'force-dynamic';
 
-export default async function WorkOrderDetailPage({ params }: { params: { id: string } }) {
-  const workOrder = await getWorkOrderById(params.id);
+export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
+  const workOrder = await getWorkOrderById(resolvedParams.id);
 
   if (!workOrder) return <div className="text-white">Orden no encontrada</div>;
 
@@ -74,6 +77,81 @@ export default async function WorkOrderDetailPage({ params }: { params: { id: st
           </CardContent>
         </Card>
       </div>
+
+      <Card className="bg-white/10 border-white/20 backdrop-blur-sm overflow-hidden mb-8">
+        <CardHeader className="border-b border-white/20">
+          <CardTitle className="text-2xl text-white">Solución del arreglo</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-4">
+          {isCompleted ? (
+            <div className="space-y-2">
+              <p className="text-sm text-white/80">
+                Resumen de la solución aplicada a la motocicleta:
+              </p>
+              <Textarea
+                readOnly
+                value={(workOrder as any).solutionDescription ?? 'Sin solución registrada.'}
+                className="bg-white/5 text-white border border-white/20 min-h-[120px]"
+              />
+            </div>
+          ) : (
+            <form action={updateWorkOrderSolution} className="space-y-4">
+              <input type="hidden" name="workOrderId" value={workOrder.id} />
+              <div>
+                <label className="block text-sm font-medium text-white mb-1">
+                  Descripción de la solución
+                </label>
+                <Textarea
+                  name="solutionDescription"
+                  defaultValue={(workOrder as any).solutionDescription ?? ''}
+                  placeholder="Ejemplo: Se reemplazó la bomba de gasolina y se ajustó el carburador..."
+                  className="bg-white/5 text-white border border-white/20 min-h-[120px]"
+                />
+              </div>
+              <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                Guardar solución
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white/10 border-white/20 backdrop-blur-sm overflow-hidden mb-8">
+        <CardHeader className="border-b border-white/20">
+          <CardTitle className="text-2xl text-white">Abonos</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm text-white/70">Total abonado por el cliente para esta orden:</p>
+              <p className="text-2xl font-bold text-green-400">
+                ${((workOrder as any).depositAmount ?? 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
+
+          {!isCompleted ? (
+            <form action={addDepositToWorkOrder} className="mt-4 flex flex-col sm:flex-row gap-3">
+              <input type="hidden" name="workOrderId" value={workOrder.id} />
+              <Input
+                type="number"
+                name="amount"
+                step="0.01"
+                min="0"
+                placeholder="Monto del abono"
+                className="bg-white/5 text-white border border-white/20"
+              />
+              <Button type="submit" className="bg-emerald-600 hover:bg-emerald-700">
+                Registrar abono
+              </Button>
+            </form>
+          ) : (
+            <p className="text-sm text-white/70">
+              La orden está finalizada. No se pueden registrar nuevos abonos.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="bg-white/10 border-white/20 backdrop-blur-sm overflow-hidden">
         <CardHeader className="border-b border-white/20">
