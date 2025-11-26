@@ -15,6 +15,7 @@ export type Motorcycle = {
   plate: string;
   intakeDate: string;
   customer: Customer;
+  issueDescription?: string | null;
 };
 
 export type Technician = {
@@ -54,8 +55,8 @@ export type WorkOrder = {
   id: string;
   workOrderNumber: string;
   motorcycle: Motorcycle;
-  technician: Technician;
-  issueDescription: string;
+  technician: Technician | null;
+  issueDescription?: string | null;
   createdDate: string;
   diagnosticandoDate?: string;
   reparadoDate?: string;
@@ -85,4 +86,14 @@ export type Sale = {
   date: string;
   total: number;
   paymentMethod?: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  motorcycleId: string;
+  sender: 'admin' | 'client';
+  message: string;
+  isFromClient: boolean;
+  sentAt: string;
+  readAt?: string | null;
 };

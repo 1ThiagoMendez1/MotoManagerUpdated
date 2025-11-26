@@ -50,8 +50,10 @@ model Motorcycle {
   intakeDate   DateTime      @default(now())
   customer     Customer      @relation(fields: [customerId], references: [id])
   customerId   String
+  issueDescription String?
   workOrders   WorkOrder[]
   appointments Appointment[]
+  chatMessages ChatMessage[]
 }
 
 model Technician {
@@ -94,9 +96,9 @@ model WorkOrder {
   workOrderNumber   String     @unique
   motorcycle        Motorcycle @relation(fields: [motorcycleId], references: [id])
   motorcycleId      String
-  technician        Technician @relation(fields: [technicianId], references: [id])
-  technicianId      String
-  issueDescription  String
+  technician        Technician? @relation(fields: [technicianId], references: [id])
+  technicianId      String?
+  issueDescription  String?
   status            WorkOrderStatus @default(Diagnosticando)
   createdDate       DateTime   @default(now())
   diagnosticandoDate DateTime? @default(now())
@@ -114,6 +116,8 @@ model Sale {
   customer      Customer?   @relation(fields: [customerId], references: [id])
   customerId    String?
   customerName  String?
+  cedula        String?
+  phone         String?
   date          DateTime    @default(now())
   total         Float
   paymentMethod String      @default("Efectivo")
@@ -140,4 +144,15 @@ model User {
   role        String   @default("user")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  motorcycleId String
+  motorcycle  Motorcycle @relation(fields: [motorcycleId], references: [id])
+  sender      String   // 'admin' or 'client'
+  message     String
+  isFromClient Boolean @default(false)
+  sentAt      DateTime @default(now())
+  readAt      DateTime?
 }

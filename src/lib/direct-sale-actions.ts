@@ -8,7 +8,9 @@ import evolutionAPI from './whatsapp';
 
 const directSaleSchema = z.object({
   customerId: z.string().optional(),
+  cedula: z.string().optional(),
   customerName: z.string().optional(),
+  phone: z.string().optional(),
   paymentMethod: z.enum(['DaviPlata', 'Nequi', 'Efectivo', 'Tarjeta', 'Addi', 'Otros'], {
     required_error: "Se requiere seleccionar un medio de pago.",
   }),
@@ -28,14 +30,18 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
     const itemsRaw = formData.get('items') as string;
     const items = JSON.parse(itemsRaw || '[]');
     const customerId = formData.get('customerId') as string || undefined;
+    const cedula = formData.get('cedula') as string || undefined;
     const customerName = formData.get('customerName') as string || undefined;
+    const phone = formData.get('phone') as string || undefined;
     const paymentMethod = formData.get('paymentMethod') as string;
     const date = new Date(formData.get('date') as string);
     const discountPercentage = parseFloat(formData.get('discountPercentage') as string) || 0;
 
     const validatedFields = directSaleSchema.safeParse({
       customerId,
+      cedula,
       customerName,
+      phone,
       paymentMethod,
       date,
       items,
@@ -48,7 +54,32 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
       };
     }
 
-    const { customerId: cId, customerName: cName, paymentMethod: pm, date: d, items: saleItems, discountPercentage: dp } = validatedFields.data;
+    const { customerId: cId, cedula: ced, customerName: cName, phone: ph, paymentMethod: pm, date: d, items: saleItems, discountPercentage: dp } = validatedFields.data;
+
+    // Handle customer creation if cedula is provided but customer doesn't exist
+    let finalCustomerId = cId;
+    if (ced && !cId && cName) {
+      // Check if customer with this cedula already exists
+      const existingCustomer = await prisma.customer.findFirst({
+        where: { cedula: ced }
+      });
+
+      if (!existingCustomer) {
+        // Create new customer
+        const newCustomer = await prisma.customer.create({
+          data: {
+            name: cName,
+            cedula: ced,
+            phone: ph || null,
+            email: `${ced}@temp.com`, // Temporary email since it's required
+          }
+        });
+        finalCustomerId = newCustomer.id;
+        console.log('Created new customer:', newCustomer.id);
+      } else {
+        finalCustomerId = existingCustomer.id;
+      }
+    }
 
     const subtotal = saleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const discountAmount = subtotal * ((dp || 0) / 100);
@@ -104,8 +135,8 @@ export const createDirectSaleNew = withAuth(async (prevState: any, formData: For
 
     // Create sale with raw SQL and return the ID
     const saleResult = await prisma.$queryRaw<{ id: string }[]>`
-      INSERT INTO "Sale" ("id", "saleNumber", "customerId", "customerName", "paymentMethod", "date", "total")
-      VALUES (gen_random_uuid(), ${saleNumber}, ${cId}, ${cName}, ${pm}, ${d}, ${total})
+      INSERT INTO "Sale" ("id", "saleNumber", "customerId", "customerName", "cedula", "phone", "paymentMethod", "date", "total")
+      VALUES (gen_random_uuid(), ${saleNumber}, ${finalCustomerId}, ${cName}, ${ced}, ${ph}, ${pm}, ${d}, ${total})
       RETURNING id
     `;
 

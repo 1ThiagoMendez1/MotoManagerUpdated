@@ -36,6 +36,7 @@ const formSchema = z.object({
   model: z.string().min(1, "El modelo es requerido."),
   year: z.coerce.number().min(1900).max(new Date().getFullYear() + 1),
   plate: z.string().min(1, "La placa es requerida."),
+  issueDescription: z.string().min(10, "La descripción del problema debe tener al menos 10 caracteres."),
 });
 
 type AddMotorcycleProps = {
@@ -58,6 +59,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
       model: '',
       year: new Date().getFullYear(),
       plate: '',
+      issueDescription: '',
     },
   });
 
@@ -89,21 +91,32 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   }, [watchCedula, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const formData = new FormData();
-    formData.append('customerCedula', values.customerCedula);
-    formData.append('customerName', values.customerName);
-    formData.append('customerEmail', values.customerEmail);
-    if (values.customerPhone) formData.append('customerPhone', values.customerPhone);
-    formData.append('make', values.make);
-    formData.append('model', values.model);
-    formData.append('year', values.year.toString());
-    formData.append('plate', values.plate);
+    try {
+      const formData = new FormData();
+      formData.append('customerCedula', values.customerCedula);
+      formData.append('customerName', values.customerName);
+      formData.append('customerEmail', values.customerEmail);
+      if (values.customerPhone) formData.append('customerPhone', values.customerPhone);
+      formData.append('make', values.make);
+      formData.append('model', values.model);
+      formData.append('year', values.year.toString());
+      formData.append('plate', values.plate);
+      formData.append('issueDescription', values.issueDescription);
 
-    const result = await createMotorcycle(null, formData);
+      console.log('Submitting form with values:', values);
 
-    if (result?.success) {
-      setIsOpen(false);
-      form.reset();
+      const result = await createMotorcycle(null, formData);
+
+      console.log('Result from createMotorcycle:', result);
+
+      if (result?.success) {
+        setIsOpen(false);
+        form.reset();
+      } else {
+        console.error('Error creating motorcycle:', result);
+      }
+    } catch (error) {
+      console.error('Error in onSubmit:', error);
     }
   }
 
@@ -123,7 +136,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-96 overflow-y-auto">
             <FormField
               control={form.control}
               name="customerCedula"
@@ -268,6 +281,23 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="issueDescription"
+              render={({ field }) => (
+                <FormItem className="w-full border border-black/30 rounded-md p-3">
+                  <FormLabel className="text-black">Descripción del Problema</FormLabel>
+                  <FormControl>
+                    <textarea
+                      placeholder="Describe qué le pasa a la motocicleta..."
+                      className="bg-white text-black border-none resize-none h-32 w-full focus:outline-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>

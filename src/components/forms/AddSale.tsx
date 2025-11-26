@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -45,6 +45,8 @@ const saleItemSchema = z.object({
     sku: z.string().optional(),
     quantity: z.coerce.number().int().min(1, "Mínimo 1"),
     price: z.coerce.number(),
+    // Marca si el ítem viene precargado desde la orden de trabajo
+    fromWorkOrder: z.boolean().optional(),
 });
 
 const formSchema = z.object({
@@ -93,11 +95,48 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const watchItems = form.watch("items");
   const watchLaborCost = form.watch("laborCost");
   const watchDiscount = form.watch("discountPercentage");
+  const watchWorkOrderId = form.watch("workOrderId");
+
+  // Cargar automáticamente los ítems ya usados en la orden de trabajo seleccionada
+  useEffect(() => {
+    async function loadWorkOrderItems(workOrderId: string) {
+      try {
+        const res = await fetch(`/api/work-orders/${workOrderId}/items`);
+        if (!res.ok) {
+          console.error('Error fetching work order items for service sale:', await res.text());
+          return;
+        }
+        const data = await res.json();
+        if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+          return;
+        }
+
+        const mappedItems = data.items.map((item: any) => ({
+          inventoryItemId: item.inventoryItemId,
+          sku: item.sku,
+          quantity: item.quantity,
+          price: item.price,
+          fromWorkOrder: true,
+        }));
+
+        form.setValue('items', mappedItems, { shouldValidate: true });
+      } catch (error) {
+        console.error('Unexpected error loading work order items for service sale:', error);
+      }
+    }
+
+    // Solo cargar si hay una orden seleccionada y aún no hay ítems en el formulario
+    if (watchWorkOrderId && (!watchItems || watchItems.length === 0)) {
+      loadWorkOrderItems(watchWorkOrderId);
+    }
+  }, [watchWorkOrderId, form, watchItems]);
 
   const itemsTotal = watchItems?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
   const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
+  // Subtotal general (productos + mano de obra)
   const subtotal = itemsTotal + laborCostValue;
-  const discountAmount = subtotal * ((watchDiscount || 0) / 100);
+  // El descuento solo aplica sobre el valor de los productos
+  const discountAmount = itemsTotal * ((watchDiscount || 0) / 100);
   const total = subtotal - discountAmount;
 
   // Filter work orders based on plate search
@@ -245,6 +284,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                   const itemPrice = currentItem?.price || 0;
                   const itemQuantity = currentItem?.quantity || 0;
                   const itemSubtotal = itemPrice * itemQuantity;
+                  const isFromWorkOrder = (currentItem as any)?.fromWorkOrder === true;
 
                   return (
                     <div key={field.id} className="space-y-2">
@@ -262,6 +302,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                                                 field.onChange(e);
                                                 handleSkuChange(e.target.value, index);
                                             }}
+                                            disabled={isFromWorkOrder}
                                          />
                                     </FormControl>
                                 </FormItem>
@@ -272,9 +313,13 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                             name={`items.${index}.inventoryItemId`}
                             render={({ field: selectField }) => (
                                 <FormItem>
-                                    <Select onValueChange={(value) => handleProductChange(value, index)} value={selectField.value}>
+                                    <Select
+                                      onValueChange={(value) => handleProductChange(value, index)}
+                                      value={selectField.value}
+                                      disabled={isFromWorkOrder}
+                                    >
                                         <FormControl>
-                                        <SelectTrigger className={`bg-white border-black/30 ${isOutOfStock ? 'text-red-600 border-red-500' : 'text-black'}`}>
+                                        <SelectTrigger className={`bg-white border-black/30 ${isOutOfStock ? 'text-red-600 border-red-500' : 'text-black'} ${isFromWorkOrder ? 'opacity-70 cursor-not-allowed' : ''}`}>
                                             <SelectValue placeholder="Selecciona un producto" />
                                         </SelectTrigger>
                                         </FormControl>
@@ -304,16 +349,18 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                                             type="number"
                                             {...field}
                                             className={`bg-white border-black/30 ${isOutOfStock ? 'text-red-600 border-red-500 bg-red-50' : 'text-black'}`}
-                                            disabled={isOutOfStock}
+                                            disabled={isOutOfStock || isFromWorkOrder}
                                             placeholder={isOutOfStock ? "Sin stock" : undefined}
                                         />
                                     </FormControl>
                                 </FormItem>
                             )}
                           />
-                        <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {!isFromWorkOrder && (
+                          <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}>
+                              <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                       {watchItems?.[index]?.inventoryItemId && (
                         <div className={`text-sm pl-2 border-l-2 ${isOutOfStock ? 'text-red-600 border-red-500' : 'text-black/70 border-black/20'}`}>

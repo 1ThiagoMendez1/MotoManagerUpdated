@@ -92,8 +92,10 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
     } while (true);
 
     const itemsTotal = saleItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0;
+    // Subtotal general (productos + mano de obra)
     const subtotal = itemsTotal + (lc || 0);
-    const discountAmount = subtotal * ((dp || 0) / 100);
+    // El descuento solo aplica sobre el valor de los productos
+    const discountAmount = itemsTotal * ((dp || 0) / 100);
     const total = subtotal - discountAmount;
 
     // Check inventory availability
@@ -231,7 +233,8 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
           model: createdSale.workOrder.motorcycle.model,
           plate: createdSale.workOrder.motorcycle.plate,
         },
-        createdSale.workOrder.technician.name,
+        // Técnico puede ser opcional en la orden
+        createdSale.workOrder.technician?.name ?? 'Sin técnico',
         lc > 0 ? lc : undefined,
         createdSale.saleItems?.map(item => ({
           name: item.inventoryItem.name,
@@ -266,7 +269,7 @@ export const createServiceSaleNew = withAuth(async (prevState: any, formData: Fo
           year: createdSale.workOrder.motorcycle.year,
           plate: createdSale.workOrder.motorcycle.plate,
         } : undefined,
-        technicianName: createdSale.workOrder?.technician.name,
+        technicianName: createdSale.workOrder?.technician?.name,
         laborCost: lc > 0 ? lc : undefined,
         items: createdSale.saleItems?.map((item: any) => ({
           name: item.inventoryItem.name,

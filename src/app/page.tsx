@@ -30,6 +30,9 @@ export default function Dashboard() {
   return (
     <main className="flex flex-col items-center justify-center w-full p-4">
       <div className="text-center mb-6 px-4">
+        <div className="flex justify-center mb-2 text-3xl sm:text-4xl md:text-5xl">
+          <span className="inline-block animate-bounce">🦌🛷🎅🦌🦌</span>
+        </div>
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight">Bienvenido a MotoManager</h1>
         <p className="text-base sm:text-lg md:text-xl text-white/80 mt-2">Selecciona una opción para comenzar a gestionar tu taller.</p>
       </div>

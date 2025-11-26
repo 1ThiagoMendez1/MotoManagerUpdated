@@ -116,7 +116,7 @@ export default async function SalesPage({
   try {
     const [sls, wos, inv, custs, allSales] = await Promise.all([
       getSales({ dateFrom, dateTo, type, page: currentPage, limit: 20 }),
-      getWorkOrders(),
+      getWorkOrders({ limit: 200 }), // Get all work orders for forms
       getInventory({ limit: 200 }),
       getCustomers(),
       getSales({ dateFrom, dateTo, type, limit: 1000 }), // For export
@@ -124,7 +124,7 @@ export default async function SalesPage({
 
     const sales = sls.items;
     const totalPages = sls.totalPages;
-    const workOrders = wos;
+    const workOrders = wos.items || wos; // Handle both paginated and non-paginated responses
     const inventoryItems = inv.items as InventoryItem[];
     const customers = custs;
     const allFilteredSales = allSales.items;

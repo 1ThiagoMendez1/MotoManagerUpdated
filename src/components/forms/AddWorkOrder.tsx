@@ -99,16 +99,6 @@ export function AddWorkOrder({ motorcycles, technicians }: AddWorkOrderProps) {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-sm font-medium text-black">Descripción del Problema</label>
-            <Textarea
-              name="issueDescription"
-              placeholder="p. ej., 'El motor falla al acelerar...'"
-              className="bg-white text-black border-black/30"
-              required
-              minLength={10}
-            />
-          </div>
           <DialogFooter>
             <SubmitButton />
           </DialogFooter>

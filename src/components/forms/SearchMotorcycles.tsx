@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,11 +30,9 @@ export function SearchMotorcycles() {
     router.push(`/motorcycles?${params.toString()}`);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch(query);
-    }
-  };
+  useEffect(() => {
+    handleSearch(query);
+  }, [query]);
 
   return (
     <div className="flex items-center gap-2">
@@ -45,7 +43,6 @@ export function SearchMotorcycles() {
           placeholder="Buscar motocicletas..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyPress={handleKeyPress}
           className="pl-10 pr-10 bg-white/10 border-white/20 text-white placeholder:text-white/60 w-64"
         />
         {query && (
@@ -59,14 +56,6 @@ export function SearchMotorcycles() {
           </Button>
         )}
       </div>
-      <Button
-        onClick={() => handleSearch(query)}
-        variant="outline"
-        size="sm"
-        className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-      >
-        Buscar
-      </Button>
     </div>
   );
 }

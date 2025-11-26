@@ -219,8 +219,73 @@ Te mantendremos informado sobre cualquier actualización.
   }
 }
 
+export async function sendOrderItemAddedNotification(
+  customerPhone: string,
+  customerName: string,
+  orderNumber: string,
+  itemName: string,
+  quantity: number,
+  price: number,
+  motorcycleMake: string,
+  motorcycleModel: string,
+  technicianName: string
+) {
+  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+    console.log('Evolution API not configured, skipping WhatsApp notification');
+    return { success: false, error: 'Evolution API not configured' };
+  }
+
+  try {
+    // Format phone number for WhatsApp (remove + and add country code if needed)
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+
+    const total = price * quantity;
+
+    const message = `🔧 *MotoManager - Item Agregado a Orden*
+
+¡Hola ${customerName}!
+
+Se ha agregado un nuevo ítem a tu orden de trabajo.
+
+📋 *Detalles:*
+Orden: ${orderNumber}
+Motocicleta: ${motorcycleMake} ${motorcycleModel}
+Técnico: ${technicianName}
+
+🛒 *Ítem agregado:*
+• ${itemName} x${quantity} - $${price.toLocaleString('es-CO')} c/u
+Total: $${total.toLocaleString('es-CO')}
+
+Te mantendremos informado sobre el progreso de tu reparación.
+
+🏍️ *Águilas de Asfalto*`;
+
+    const response = await axios.post(
+      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+      {
+        number: formattedPhone,
+        text: message,
+        delay: 1000
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        }
+      }
+    );
+
+    console.log('✅ WhatsApp item added notification sent via Evolution API:', response.data);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp item added notification via Evolution API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
 export default {
   sendSaleNotification,
   sendServiceSaleNotification,
-  sendOrderStatusUpdate
+  sendOrderStatusUpdate,
+  sendOrderItemAddedNotification
 };

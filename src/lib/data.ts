@@ -1,6 +1,6 @@
 import prisma from './prisma';
 import { Prisma } from '@prisma/client';
-import type { Customer, Motorcycle, Technician, InventoryItem, Appointment, WorkOrder, Sale } from './types';
+import type { Customer, Motorcycle, Technician, InventoryItem, Appointment, WorkOrder, Sale, ChatMessage } from './types';
 import { subDays, format, startOfMonth } from 'date-fns';
 
 // --- CUSTOMERS ---
@@ -106,6 +106,7 @@ export const getMotorcycles = async ({ query }: { query?: string } = {}): Promis
       ...m.customer,
       isFrequent: false, // TODO
     },
+    issueDescription: (m as any).issueDescription,
   }));
 };
 
@@ -192,7 +193,7 @@ export const getAppointments = async (): Promise<Appointment[]> => {
 };
 
 // --- WORK ORDERS ---
-export const getWorkOrders = async ({ query }: { query?: string } = {}): Promise<WorkOrder[]> => {
+export const getWorkOrders = async ({ query, page = 1, limit = 20 }: { query?: string; page?: number; limit?: number } = {}): Promise<{items: WorkOrder[], totalPages: number}> => {
   const where: Prisma.WorkOrderWhereInput = query ? {
     OR: [
       { workOrderNumber: { contains: query, mode: Prisma.QueryMode.insensitive } },
@@ -216,21 +217,29 @@ export const getWorkOrders = async ({ query }: { query?: string } = {}): Promise
     ],
   } : {};
 
-  const workOrders = await prisma.workOrder.findMany({
-    where,
-    include: {
-      motorcycle: {
-        include: {
-          customer: true,
+  const [workOrders, total] = await Promise.all([
+    prisma.workOrder.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        motorcycle: {
+          include: {
+            customer: true,
+          },
         },
+        technician: true,
       },
-      technician: true,
-    },
-    orderBy: {
-      createdDate: 'desc',
-    },
-  });
-  return workOrders.map(wo => ({
+      orderBy: {
+        createdDate: 'desc',
+      },
+    }),
+    prisma.workOrder.count({ where })
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  const typedItems = workOrders.map(wo => ({
     id: wo.id,
     workOrderNumber: wo.workOrderNumber,
     motorcycle: {
@@ -251,6 +260,8 @@ export const getWorkOrders = async ({ query }: { query?: string } = {}): Promise
     completedDate: wo.completedDate ? wo.completedDate.toISOString() : undefined,
     status: wo.status as 'Diagnosticando' | 'Reparado' | 'Entregado',
   }));
+
+  return { items: typedItems, totalPages };
 };
 
 // --- SALES ---
@@ -413,3 +424,20 @@ export const getSalesDataForChart = async () => {
 
   return salesData;
 };
+
+export const getChatMessages = async (motorcycleId: string): Promise<ChatMessage[]> => {
+  const messages = await prisma.chatMessage.findMany({
+    where: { motorcycleId },
+    orderBy: { sentAt: 'asc' },
+  });
+
+  return messages.map(m => ({
+    id: m.id,
+    motorcycleId: m.motorcycleId,
+    sender: m.sender as "client" | "admin",
+    message: m.message,
+    isFromClient: m.isFromClient,
+    sentAt: m.sentAt.toISOString(),
+    readAt: m.readAt ? m.readAt.toISOString() : undefined,
+  }));
+}

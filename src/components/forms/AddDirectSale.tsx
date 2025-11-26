@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -49,7 +49,9 @@ const saleItemSchema = z.object({
 
 const formSchema = z.object({
   customerId: z.string().optional(),
+  cedula: z.string().optional(),
   customerName: z.string().optional(),
+  phone: z.string().optional(),
   paymentMethod: z.enum(['DaviPlata', 'Nequi', 'Efectivo', 'Tarjeta', 'Addi', 'Otros'], {
     required_error: "Se requiere seleccionar un medio de pago.",
   }),
@@ -75,10 +77,40 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
       items: [{ inventoryItemId: "", sku: "", quantity: 1, price: 0 }],
       paymentMethod: 'Efectivo',
       date: new Date(),
+      cedula: "",
       customerName: "",
+      phone: "",
       discountPercentage: 0,
     },
   });
+
+  // Function to find customer by cedula
+  const findCustomerByCedula = (cedula: string) => {
+    return customers.find(customer => customer.cedula === cedula);
+  };
+
+  // Watch cedula field to auto-fill customer info
+  const watchCedula = form.watch("cedula");
+  useEffect(() => {
+    if (watchCedula) {
+      const customer = findCustomerByCedula(watchCedula);
+      if (customer) {
+        form.setValue("customerId", customer.id);
+        form.setValue("customerName", customer.name);
+        form.setValue("phone", customer.phone || "");
+      } else {
+        // Clear fields if cedula doesn't match any existing customer
+        form.setValue("customerId", "");
+        form.setValue("customerName", "");
+        form.setValue("phone", "");
+      }
+    } else {
+      // Clear fields if cedula is empty
+      form.setValue("customerId", "");
+      form.setValue("customerName", "");
+      form.setValue("phone", "");
+    }
+  }, [watchCedula, customers]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -103,10 +135,25 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
   }
 
   function handleSkuChange(sku: string, index: number) {
-    const selectedProduct = inventory.find(item => item.sku.toLowerCase() === sku.toLowerCase());
-    if (selectedProduct) {
-        form.setValue(`items.${index}.price`, selectedProduct.price);
-        form.setValue(`items.${index}.inventoryItemId`, selectedProduct.id, { shouldValidate: true });
+    if (!sku.trim()) {
+      form.setValue(`items.${index}.inventoryItemId`, '');
+      form.setValue(`items.${index}.price`, 0);
+      return;
+    }
+  
+    const matches = inventory.filter(item =>
+      item.sku.toLowerCase().startsWith(sku.toLowerCase()) ||
+      item.name.toLowerCase().includes(sku.toLowerCase())
+    );
+  
+    if (matches.length === 1) {
+      const selectedProduct = matches[0];
+      form.setValue(`items.${index}.price`, selectedProduct.price);
+      form.setValue(`items.${index}.inventoryItemId`, selectedProduct.id, { shouldValidate: true });
+      form.setValue(`items.${index}.sku`, selectedProduct.sku);
+    } else if (matches.length === 0) {
+      form.setValue(`items.${index}.inventoryItemId`, '');
+      form.setValue(`items.${index}.price`, 0);
     }
   }
 
@@ -116,7 +163,9 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
 
     const formData = new FormData();
     if (values.customerId) formData.append('customerId', values.customerId);
+    if (values.cedula) formData.append('cedula', values.cedula);
     if (values.customerName) formData.append('customerName', values.customerName);
+    if (values.phone) formData.append('phone', values.phone);
     formData.append('paymentMethod', values.paymentMethod);
     formData.append('date', values.date.toISOString());
     formData.append('items', JSON.stringify(values.items));
@@ -173,37 +222,39 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <FormField
-                control={form.control}
-                name="customerId"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel className="text-black">Cliente Registrado (Opcional)</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} name={field.name}>
-                        <FormControl>
-                        <SelectTrigger className="bg-white text-black border-black/30">
-                            <SelectValue placeholder="Selecciona un cliente" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {customers.map(customer => (
-                            <SelectItem key={customer.id} value={customer.id}>
-                            {customer.name}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
+                    control={form.control}
+                    name="cedula"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="text-black">Cédula del Cliente</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Ingresa la cédula" {...field} className="bg-white text-black border-black/30" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
                 <FormField
                     control={form.control}
                     name="customerName"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-black">Cliente Mostrador (Opcional)</FormLabel>
+                            <FormLabel className="text-black">Nombre del Cliente</FormLabel>
                             <FormControl>
-                                <Input placeholder="p.ej., Juan Valdes" {...field} className="bg-white text-black border-black/30" />
+                                <Input placeholder="Se autocompletará con la cédula" {...field} className="bg-white text-black border-black/30" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="text-black">Teléfono (Opcional)</FormLabel>
+                            <FormControl>
+                                <Input placeholder="Número de teléfono" {...field} className="bg-white text-black border-black/30" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -272,6 +323,15 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                   const itemQuantity = currentItem?.quantity || 0;
                   const itemSubtotal = itemPrice * itemQuantity;
 
+                  const currentSku = currentItem?.sku || '';
+                  const filteredInventory = currentSku
+                    ? inventory.filter(item =>
+                        item.sku.toLowerCase().startsWith(currentSku.toLowerCase()) ||
+                        item.name.toLowerCase().includes(currentSku.toLowerCase())
+                      )
+                    : inventory;
+                  const placeholderText = currentSku && filteredInventory.length === 0 ? "No hay coincidencias" : "Selecciona un producto";
+
                   return (
                     <div key={field.id} className="space-y-2">
                       <div className="grid grid-cols-[1fr,2fr,100px,auto] items-start gap-2">
@@ -301,11 +361,11 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                                    <Select onValueChange={(value) => handleProductChange(value, index)} value={field.value}>
                                        <FormControl>
                                        <SelectTrigger className={`bg-white border-black/30 ${isOutOfStock ? 'text-red-600 border-red-500' : 'text-black'}`}>
-                                           <SelectValue placeholder="Selecciona un producto" />
+                                           <SelectValue placeholder={placeholderText} />
                                        </SelectTrigger>
                                        </FormControl>
                                        <SelectContent>
-                                       {inventory.map(item => (
+                                       {filteredInventory.map(item => (
                                            <SelectItem
                                                key={item.id}
                                                value={item.id}

@@ -75,4 +75,165 @@
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   }
+
+  /* 🎄 Detalles y animaciones navideñas globales */
+
+  .christmas-logo {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .christmas-logo-hat {
+    position: absolute;
+    top: -0.85rem;
+    left: 0.3rem;
+    width: 1.6rem;
+    height: 1.1rem;
+    transform: rotate(-18deg);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .christmas-logo-hat::before {
+    content: '';
+    position: absolute;
+    bottom: 0.35rem;
+    left: 0;
+    width: 100%;
+    height: 0.9rem;
+    background: linear-gradient(135deg, #ff4d4f, #b8001f);
+    border-radius: 0.2rem 0.2rem 0.6rem 0.6rem;
+  }
+
+  .christmas-logo-hat::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: -0.15rem;
+    width: 120%;
+    height: 0.35rem;
+    background: #ffffff;
+    border-radius: 999px;
+    box-shadow: 1.1rem 1.1rem 0 0 #ffffff;
+  }
+
+  .christmas-tree {
+    position: fixed;
+    right: 1.75rem;
+    bottom: 1.25rem;
+    font-size: 4rem; /* Árbol más grande */
+    filter: drop-shadow(0 0 14px rgba(0, 0, 0, 0.85));
+    animation: tree-bounce 3.4s ease-in-out infinite;
+    z-index: 40;
+    pointer-events: none;
+  }
+
+  @keyframes tree-bounce {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-8px) scale(1.06);
+    }
+  }
+
+  /* Tira de luces navideñas con bolitas */
+  .christmas-lights {
+    position: fixed;
+    top: 0.75rem;
+    left: 0;
+    right: 0;
+    height: 2.5rem;
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    padding: 0 2rem;
+    pointer-events: none;
+    z-index: 35;
+  }
+
+  .christmas-lights::before {
+    content: '';
+    position: absolute;
+    top: 1rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.45),
+      rgba(255, 255, 255, 0.08)
+    );
+  }
+
+  .christmas-lights-bulb {
+    position: relative;
+    width: 0.75rem;
+    height: 1.4rem;
+    border-radius: 999px 999px 70% 70%;
+    background: #ff4d4f;
+    color: #ff4d4f;
+    box-shadow: 0 0 6px currentColor;
+    transform-origin: top center;
+    animation: lights-glow 1.8s ease-in-out infinite alternate;
+  }
+
+  .christmas-lights-bulb::after {
+    content: '';
+    position: absolute;
+    top: -0.3rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0.4rem;
+    height: 0.3rem;
+    border-radius: 2px;
+    background: rgba(20, 20, 20, 0.8);
+  }
+
+  .christmas-lights-bulb--red {
+    background: linear-gradient(#ff9a9e, #ff4d4f);
+    color: #ff4d4f;
+    animation-delay: 0s;
+  }
+
+  .christmas-lights-bulb--yellow {
+    background: linear-gradient(#fff3a3, #ffd666);
+    color: #ffd666;
+    animation-delay: 0.3s;
+  }
+
+  .christmas-lights-bulb--green {
+    background: linear-gradient(#b5ffce, #52c41a);
+    color: #52c41a;
+    animation-delay: 0.6s;
+  }
+
+  .christmas-lights-bulb--blue {
+    background: linear-gradient(#a0d8ff, #1890ff);
+    color: #1890ff;
+    animation-delay: 0.9s;
+  }
+
+  .christmas-lights-bulb--pink {
+    background: linear-gradient(#ffc1e3, #eb2f96);
+    color: #eb2f96;
+    animation-delay: 1.2s;
+  }
+
+  @keyframes lights-glow {
+    0% {
+      opacity: 0.4;
+      transform: translateY(0) scale(0.96);
+      box-shadow: 0 0 3px currentColor;
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(2px) scale(1.08);
+      box-shadow: 0 0 10px currentColor;
+    }
+  }
 }

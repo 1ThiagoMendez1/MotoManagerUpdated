@@ -32,12 +32,20 @@ export default async function MotorcyclesPage({
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams.query || '';
 
-  const [motorcycles, customers, technicians, workOrders] = await Promise.all([
+  const [motorcycles, customers, technicians, workOrdersData] = await Promise.all([
     getMotorcycles({ query }),
     getCustomers(),
     getTechnicians(),
     getWorkOrders(),
   ]);
+
+  const workOrders = workOrdersData.items;
+
+  // Filtrar motocicletas que no tengan una orden de trabajo activa (estado distinto de "Entregado")
+  const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
+  const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
+    (moto) => !activeWorkOrders.some((wo) => wo.motorcycle.id === moto.id)
+  );
 
   return (
     <div className="w-full">
@@ -50,7 +58,7 @@ export default async function MotorcyclesPage({
           <SearchMotorcycles />
         </div>
         <div className="flex gap-2">
-          <ExportMotorcyclesButton motorcycles={motorcycles} />
+          <ExportMotorcyclesButton motorcycles={motorcyclesWithoutActiveWorkOrders} />
           <AddMotorcycle />
         </div>
       </div>
@@ -69,13 +77,14 @@ export default async function MotorcyclesPage({
                 <TableHead className="text-white/90">Placa</TableHead>
                 <TableHead className="hidden md:table-cell text-white/90">Cliente</TableHead>
                 <TableHead className="hidden md:table-cell text-white/90">Fecha de Ingreso</TableHead>
+                <TableHead className="hidden lg:table-cell text-white/90">Reporte del Cliente</TableHead>
                 <TableHead>
                   <span className="sr-only">Acciones</span>
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {motorcycles.map((moto) => (
+              {motorcyclesWithoutActiveWorkOrders.map((moto) => (
                 <TableRow key={moto.id} className="border-white/20 hover:bg-white/10">
                   <TableCell className="font-medium">
                     <div>{moto.make} {moto.model}</div>
@@ -87,6 +96,11 @@ export default async function MotorcyclesPage({
                     <div className="text-sm text-white/70">{moto.customer.phone}</div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">{format(new Date(moto.intakeDate), 'yyyy-MM-dd')}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <div className="max-w-xs truncate" title={moto.issueDescription || 'Sin descripción'}>
+                      {moto.issueDescription || 'Sin descripción'}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <MotorcycleDetails
                       motorcycle={moto}

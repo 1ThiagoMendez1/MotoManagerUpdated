@@ -1,8 +1,9 @@
-/*  */'use server';
+'use server';
 
 import { z } from 'zod';
 import prisma from './prisma';
 import evolutionAPI from './whatsapp';
+import axios from 'axios';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { withAuth } from './tenant';
@@ -23,6 +24,7 @@ const motorcycleSchema = z.object({
   customerName: z.string().min(1, "El nombre del cliente es requerido."),
   customerEmail: z.string().email("Email válido requerido.").transform(val => val.toLowerCase()),
   customerPhone: z.string().optional(),
+  issueDescription: z.string().min(10, "La descripción del problema debe tener al menos 10 caracteres."),
 });
 
 const technicianSchema = z.object({
@@ -33,9 +35,6 @@ const technicianSchema = z.object({
 const workOrderSchema = z.object({
   motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
   technicianId: z.string().min(1, 'Se requiere el técnico.'),
-  issueDescription: z.string().min(10, {
-    message: "La descripción del problema debe tener al menos 10 caracteres.",
-  }),
 });
 
 const inventorySchema = z.object({
@@ -198,7 +197,9 @@ export const deleteCustomer = withAuth(async (formData: FormData) => {
 
 export const createMotorcycle = withAuth(async (prevState: any, formData: FormData) => {
   try {
-    const validatedFields = motorcycleSchema.safeParse({
+    console.log('🔍 createMotorcycle called');
+
+    const formDataObj = {
       make: formData.get('make'),
       model: formData.get('model'),
       year: formData.get('year'),
@@ -207,16 +208,23 @@ export const createMotorcycle = withAuth(async (prevState: any, formData: FormDa
       customerName: formData.get('customerName'),
       customerPhone: formData.get('customerPhone'),
       customerCedula: formData.get('customerCedula'),
-    });
+      issueDescription: formData.get('issueDescription'),
+    };
 
+    console.log('📝 Form data received:', formDataObj);
+
+    const validatedFields = motorcycleSchema.safeParse(formDataObj);
+
+    console.log('✅ Validation result:', validatedFields.success);
     if (!validatedFields.success) {
+      console.log('❌ Validation errors:', validatedFields.error.flatten().fieldErrors);
       return {
         errors: validatedFields.error.flatten().fieldErrors,
       };
     }
 
-    const { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula } = validatedFields.data;
-    console.log('📋 Data to create:', { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula });
+    const { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula, issueDescription } = validatedFields.data;
+    console.log('📋 Data to create:', { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula, issueDescription });
 
     // First, handle customer creation/update
     const customerResult = await prisma.customer.upsert({
@@ -244,16 +252,16 @@ export const createMotorcycle = withAuth(async (prevState: any, formData: FormDa
         year,
         plate,
         customerId: customerResult.id,
+        issueDescription,
       },
     });
 
     console.log('✅ Motorcycle created:', createdMotorcycle);
 
-    console.log('✅ Created motorcycle fetched:', createdMotorcycle);
-
     revalidatePath('/motorcycles');
     return { success: true };
   } catch (error) {
+    console.error('❌ Error creating motorcycle:', error);
     return {
       message: 'Error al crear la motocicleta.',
     };
@@ -288,7 +296,6 @@ export const createWorkOrder = withAuth(async (prevState: any, formData: FormDat
     const validatedFields = workOrderSchema.safeParse({
       motorcycleId: formData.get('motorcycleId'),
       technicianId: formData.get('technicianId'),
-      issueDescription: formData.get('issueDescription'),
     });
 
     if (!validatedFields.success) {
@@ -297,7 +304,7 @@ export const createWorkOrder = withAuth(async (prevState: any, formData: FormDat
       };
     }
 
-    const { motorcycleId, technicianId, issueDescription } = validatedFields.data;
+    const { motorcycleId, technicianId } = validatedFields.data;
 
     // Generate work order number
     const lastWorkOrder = await prisma.workOrder.findFirst({
@@ -312,7 +319,7 @@ export const createWorkOrder = withAuth(async (prevState: any, formData: FormDat
         workOrderNumber,
         motorcycleId,
         technicianId,
-        issueDescription,
+        issueDescription: '',
       },
       include: {
         motorcycle: {
@@ -340,7 +347,7 @@ export const createWorkOrder = withAuth(async (prevState: any, formData: FormDat
             status: 'Diagnosticando',
             customerName: createdWorkOrder.motorcycle.customer.name,
             motorcycleInfo: `${createdWorkOrder.motorcycle.make} ${createdWorkOrder.motorcycle.model} (${createdWorkOrder.motorcycle.plate})`,
-            technicianName: createdWorkOrder.technician.name,
+            technicianName: createdWorkOrder.technician?.name || 'No asignado',
           }
         );
         console.log('✅ WhatsApp notification result for new work order:', result);
@@ -856,7 +863,7 @@ export const createSale = withAuth(async (prevState: any, formData: FormData) =>
           year: saleData.workOrder.motorcycle.year,
           plate: saleData.workOrder.motorcycle.plate,
         } : undefined,
-        technicianName: saleWithItems?.workOrder?.technician.name || saleData.workOrder?.technician.name,
+        technicianName: saleWithItems?.workOrder?.technician?.name || saleData.workOrder?.technician?.name || 'No asignado',
         items: (saleWithItems?.saleItems || saleData.saleItems).map(item => ({
           name: item.inventoryItem.name,
           sku: item.inventoryItem.sku,
@@ -999,17 +1006,14 @@ export const createDirectSale = withAuth(async (prevState: any, formData: FormDa
 
           await evolutionAPI.sendSaleNotification(
             customer.phone,
-            {
-              saleNumber: saleData.saleNumber,
-              customerName: customer.name,
-              total: saleData.total,
-              paymentMethod: pm,
-              items: saleItems.map(item => ({
-                name: item.inventoryItem.name,
-                quantity: item.quantity,
-                price: item.price,
-              })),
-            }
+            customer.name,
+            saleData.saleNumber,
+            saleData.total,
+            saleItems.map(item => ({
+              name: item.inventoryItem.name,
+              quantity: item.quantity,
+              price: item.price,
+            }))
           );
           console.log('WhatsApp confirmation sent for direct sale');
         } catch (whatsappError) {
@@ -1103,7 +1107,7 @@ export const updateWorkOrderStatus = withAuth(async (prevState: any, formData: F
             status: status as 'Diagnosticando' | 'Reparado' | 'Entregado',
             customerName: workOrder.motorcycle.customer.name,
             motorcycleInfo: `${workOrder.motorcycle.make} ${workOrder.motorcycle.model} (${workOrder.motorcycle.plate})`,
-            technicianName: workOrder.technician.name,
+            technicianName: workOrder.technician?.name || 'No asignado',
           }
         );
         console.log('✅ WhatsApp notification result:', result);
@@ -1128,5 +1132,83 @@ export const updateWorkOrderStatus = withAuth(async (prevState: any, formData: F
     return {
       message: 'Error al actualizar el estado de la orden de trabajo.',
     };
+  }
+});
+
+export const sendChatMessage = withAuth(async (prevState: any, formData: FormData) => {
+  try {
+    const motorcycleId = formData.get('motorcycleId') as string;
+    const message = formData.get('message') as string;
+    const isFromClient = formData.get('isFromClient') === 'true';
+
+    if (!motorcycleId || !message) {
+      return { errors: { motorcycleId: 'Required', message: 'Required' } };
+    }
+
+    // Get motorcycle and customer phone
+    const motorcycle = await prisma.motorcycle.findUnique({
+      where: { id: motorcycleId },
+      include: { customer: true },
+    });
+
+    if (!motorcycle) {
+      return { error: 'Motocicleta no encontrada' };
+    }
+
+    const phone = motorcycle.customer.phone;
+    if (!phone && !isFromClient) {
+      return { error: 'No hay número de teléfono del cliente' };
+    }
+
+    // Save message to DB
+    const chatMessage = await prisma.chatMessage.create({
+      data: {
+        motorcycleId,
+        sender: isFromClient ? 'client' : 'admin',
+        message,
+        isFromClient,
+      },
+    });
+
+    // Send via WhatsApp if from admin
+    if (!isFromClient && phone) {
+      try {
+        const evolutionApiUrl = process.env.EVOLUTION_API_URL;
+        const evolutionApiKey = process.env.EVOLUTION_API_KEY;
+        const whatsappInstance = process.env.EVOLUTION_INSTANCE_NAME;
+
+        if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+          console.log('Evolution API not configured, skipping WhatsApp chat message');
+        } else {
+          const formattedPhone = phone.replace('+', '').startsWith('57') ? phone.replace('+', '') : `57${phone.replace('+', '')}`;
+
+          const response = await axios.post(
+            `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+            {
+              number: formattedPhone,
+              text: message,
+              delay: 1000,
+            },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey,
+              },
+            }
+          );
+
+          console.log('✅ WhatsApp chat message sent:', response.data);
+        }
+      } catch (error: any) {
+        console.error('❌ Error sending WhatsApp chat message:', error.response?.data || error.message);
+        // Don't fail the save if WhatsApp fails
+      }
+    }
+
+    revalidatePath('/motorcycles');
+    return { success: true, chatMessage };
+  } catch (error) {
+    console.error('Error sending chat message:', error);
+    return { error: 'Error al enviar el mensaje' };
   }
 });
