@@ -90,13 +90,3 @@ export type Sale = {
   total: number;
   paymentMethod?: string;
 };
-
-export type ChatMessage = {
-  id: string;
-  motorcycleId: string;
-  sender: 'admin' | 'client';
-  message: string;
-  isFromClient: boolean;
-  sentAt: string;
-  readAt?: string | null;
-};

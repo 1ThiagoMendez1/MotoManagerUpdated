@@ -1,6 +1,6 @@
 import prisma from './prisma';
 import { Prisma } from '@prisma/client';
-import type { Customer, Motorcycle, Technician, InventoryItem, Appointment, WorkOrder, Sale, ChatMessage } from './types';
+import type { Customer, Motorcycle, Technician, InventoryItem, Appointment, WorkOrder, Sale } from './types';
 import { subDays, format, startOfMonth } from 'date-fns';
 
 // --- CUSTOMERS ---
@@ -446,19 +446,3 @@ export const getSalesDataForChart = async () => {
   return salesData;
 };
 
-export const getChatMessages = async (motorcycleId: string): Promise<ChatMessage[]> => {
-  const messages = await prisma.chatMessage.findMany({
-    where: { motorcycleId },
-    orderBy: { sentAt: 'asc' },
-  });
-
-  return messages.map(m => ({
-    id: m.id,
-    motorcycleId: m.motorcycleId,
-    sender: m.sender as "client" | "admin",
-    message: m.message,
-    isFromClient: m.isFromClient,
-    sentAt: m.sentAt.toISOString(),
-    readAt: m.readAt ? m.readAt.toISOString() : undefined,
-  }));
-}

@@ -11,10 +11,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import type { Motorcycle, WorkOrder } from '@/lib/types';
-import { User, Calendar, Wrench, FileText, MessageCircle } from 'lucide-react';
+import { User, Calendar, Wrench, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Chat } from '../chat/Chat';
 
 type MotorcycleDetailsProps = {
   motorcycle: Motorcycle;
@@ -84,7 +83,7 @@ export function MotorcycleDetails({ motorcycle, workOrders = [] }: MotorcycleDet
                                          <span className="text-xs text-gray-500">#{workOrder.id}</span>
                                      </div>
                                      <div className="text-sm text-black/70 space-y-1">
-                                         <p><strong>Técnico:</strong> {workOrder.technician.name}</p>
+                                         <p><strong>Técnico:</strong> {workOrder.technician?.name ?? 'Sin asignar'}</p>
                                          {workOrder.issueDescription && <p><strong>Problema:</strong> {workOrder.issueDescription}</p>}
                                          <div className="text-xs text-gray-600 mt-2">
                                              <p><strong>Creada:</strong> {format(new Date(workOrder.createdDate), 'dd/MM/yyyy HH:mm')}</p>
@@ -107,10 +106,6 @@ export function MotorcycleDetails({ motorcycle, workOrders = [] }: MotorcycleDet
                          </div>
                      </div>
                  )}
-                 <div>
-                     <h4 className="font-semibold mb-2 flex items-center text-black"><MessageCircle className="mr-2 h-4 w-4" /> Chat con Cliente</h4>
-                     <Chat motorcycleId={motorcycle.id} customerPhone={motorcycle.customer.phone} />
-                 </div>
             </div>
         </div>
       </DialogContent>
