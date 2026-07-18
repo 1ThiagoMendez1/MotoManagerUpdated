@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 33% 96%; /* Ligeramente más oscuro, reduce la fatiga visual (similar a slate-100) */
+    --foreground: 221 39% 11%; /* #111827 */
+    --card: 210 33% 98%; /* Off-white, en lugar de blanco puro (similar a slate-50) */
+    --card-foreground: 221 39% 11%;
+    --popover: 210 33% 98%;
+    --popover-foreground: 221 39% 11%;
+    --primary: 214 82% 51%; /* #2F80ED - Azul Acero Premium */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 24 95% 53%; /* #F97316 - Naranja Moto */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 13% 91%; /* #E5E7EB */
+    --muted-foreground: 215 16% 47%;
+    --accent: 24 95% 53%; /* #F97316 */
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 13% 91%; /* #E5E7EB */
+    --input: 220 13% 91%;
+    --ring: 214 82% 51%; /* #2F80ED */
+    --radius: 0.75rem; /* Bordes un poco más redondeados para look premium */
+    --chart-1: 214 82% 51%;
+    --chart-2: 24 95% 53%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 224 71% 4%; /* #030712 - Dark Premium */
+    --foreground: 210 40% 98%; /* #F8FAFC */
+    --card: 222 47% 7%; /* Ligeramente más claro que el fondo para elevación */
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 7%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 214 82% 51%; /* #2F80ED */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 24 95% 53%; /* #F97316 */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 24 95% 53%; /* #F97316 */
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 214 82% 51%;
+    --chart-1: 214 82% 51%;
+    --chart-2: 24 95% 53%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Transiciones Globales Premium */
+  button, a, input, select, textarea, .card-hover, .row-hover {
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 250ms;
+    touch-action: manipulation;
+  }
+
+  /* Header con desenfoque para mejor legibilidad */
+  header {
+    background: rgba(var(--background), 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1); /* Slate 400 con 10% opacidad */
+  }
+
+  .dark header {
+    background: rgba(3, 7, 18, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Utilidades Glow Premium */
+  .glow-primary {
+    box-shadow: 0 0 15px 0px rgba(47, 128, 237, 0.3);
+  }
+  
+  .glow-secondary {
+    box-shadow: 0 0 15px 0px rgba(249, 115, 22, 0.3);
+  }
+  
+  .glow-destructive {
+    box-shadow: 0 0 15px 0px rgba(239, 68, 68, 0.3);
+  }
+
+  .glass-card {
+    background: rgba(248, 250, 252, 0.85); /* En lugar de blanco puro, un slate-50 translúcido */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(226, 232, 240, 0.6);
+  }
+
+  .dark .glass-card {
+    background: rgba(17, 24, 39, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Premium Tour Popover Styling (driver.js) */
+.premium-tour-popover {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--primary) / 0.5) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 0 25px 0px rgba(47, 128, 237, 0.25) !important;
+  color: hsl(var(--foreground)) !important;
+  padding: 1.5rem !important;
+}
+
+.premium-tour-popover .driver-popover-title {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  color: hsl(var(--foreground)) !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.premium-tour-popover .driver-popover-description {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 0.95rem !important;
+  line-height: 1.5 !important;
+}
+
+.premium-tour-popover .driver-popover-footer {
+  margin-top: 1.5rem !important;
+}
+
+.premium-tour-popover .driver-popover-progress-text {
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+}
+
+.premium-tour-popover .driver-popover-next-btn,
+.premium-tour-popover .driver-popover-prev-btn,
+.premium-tour-popover .driver-popover-done-btn {
+  border-radius: var(--radius) !important;
+  padding: 0.5rem 1rem !important;
+  font-weight: 500 !important;
+  transition: all 250ms ease-in-out !important;
+  text-shadow: none !important;
+}
+
+.premium-tour-popover .driver-popover-next-btn,
+.premium-tour-popover .driver-popover-done-btn {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border: none !important;
+}
+
+.premium-tour-popover .driver-popover-next-btn:hover,
+.premium-tour-popover .driver-popover-done-btn:hover {
+  background-color: hsl(var(--primary) / 0.9) !important;
+  box-shadow: 0 0 10px rgba(47, 128, 237, 0.4) !important;
+}
+
+.premium-tour-popover .driver-popover-prev-btn {
+  background-color: transparent !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--input)) !important;
+}
+
+.premium-tour-popover .driver-popover-prev-btn:hover {
+  background-color: hsl(var(--muted)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.premium-tour-popover .driver-popover-close-btn {
+  color: hsl(var(--muted-foreground)) !important;
+  transition: all 250ms ease-in-out !important;
+}
+
+.premium-tour-popover .driver-popover-close-btn:hover {
+  color: hsl(var(--destructive)) !important;
+}
+
+/* Ocultar la flecha por defecto para un look más limpio de tarjeta flotante */
+.premium-tour-popover .driver-popover-arrow {
+  display: none !important;
+}
+
+/* Ocultar el fondo y la flecha por defecto de MapLibre para los popups personalizados */
+.maplibregl-popup-content {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.maplibregl-popup-tip {
+  display: none !important;
+}
