@@ -59,7 +59,7 @@ export default async function RootLayout({
     <html lang="es" suppressHydrationWarning className={cn(inter.variable, spaceGrotesk.variable)}>
       <body className={cn('font-body antialiased bg-background text-foreground min-h-screen flex flex-col relative')}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <ShaderBackground />
+          {/* <ShaderBackground /> */}
           <TenantProvider>
           {/* Subscription Status Check */}
           {workshop && (
