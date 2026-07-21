@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
-import { createTicket, replyToTicketWorkshop, getTicketMessagesWorkshop } from '@/lib/actions/tickets';
+import { createTicket, getTicketMessagesWorkshop } from '@/lib/actions/tickets';
 import {
   Dialog,
   DialogContent,
@@ -18,14 +17,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Search, Send, Clock, User, ShieldAlert } from 'lucide-react';
+import { PlusCircle, Search, Clock, CheckCircle2, AlertCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
-      {pending ? 'Enviando...' : 'Reportar Problema'}
+    <Button type="submit" className="w-full bg-primary/90 hover:bg-primary text-primary-foreground shadow-lg transition-all" disabled={pending}>
+      {pending ? 'Enviando...' : 'Crear Solicitud'}
     </Button>
   );
 }
@@ -36,92 +37,58 @@ export function WorkshopTicketsClient({ initialTickets }: { initialTickets: any[
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  
-  const [replyText, setReplyText] = useState('');
-  const [isReplying, setIsReplying] = useState(false);
+  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+  const [ticketSolutions, setTicketSolutions] = useState<Record<string, string | null>>({});
+  const [loadingSolutions, setLoadingSolutions] = useState<Record<string, boolean>>({});
   
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('Todos');
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const selectedTicket = tickets.find(t => t.id === selectedTicketId);
 
   useEffect(() => {
     setTickets(initialTickets);
   }, [initialTickets]);
 
-  useEffect(() => {
-    if (selectedTicketId) {
-      loadMessages();
-    } else {
-      setMessages([]);
-    }
-  }, [selectedTicketId]);
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (!selectedTicketId) return;
-    const supabase = createClient();
-    const channel = supabase.channel(`workshop_ticket_${selectedTicketId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'ticket_messages',
-        filter: `ticket_id=eq.${selectedTicketId}`
-      }, (payload) => {
-        const newMsg = payload.new;
-        let parsed = { text: newMsg.message, sender: 'agent', isInternal: false };
-        try {
-          if (newMsg.message.startsWith('{')) {
-            parsed = JSON.parse(newMsg.message);
-          }
-        } catch(e) {}
-
-        setMessages(prev => {
-          if (prev.find(m => m.id === newMsg.id)) return prev;
-          return [...prev, {
-            id: newMsg.id,
-            message: parsed.text || newMsg.message,
-            createdAt: newMsg.created_at,
-            senderId: newMsg.sender_id,
-            senderName: parsed.sender === 'user' ? 'Cliente' : 'Admin',
-          }];
-        });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedTicketId]);
-
-  const loadMessages = async () => {
-    if (!selectedTicketId) return;
-    setIsLoadingMessages(true);
+  const loadSolution = async (ticketId: string) => {
+    if (ticketSolutions[ticketId] !== undefined) return; // already loaded or attempted
+    
+    setLoadingSolutions(prev => ({ ...prev, [ticketId]: true }));
     try {
-      const msgs = await getTicketMessagesWorkshop(selectedTicketId);
-      setMessages(msgs);
+      console.log(`=== CARGANDO SOLUCIÓN PARA TICKET ${ticketId} ===`);
+      const msgs = await getTicketMessagesWorkshop(ticketId);
+      console.log("Mensajes crudos recibidos del servidor:", msgs);
+
+      // Find the last message that is actually from an agent (not a system event)
+      const adminMsg = [...msgs].reverse().find(m => 
+        (m.senderName === 'Admin' || m.senderName === 'Sistema') && 
+        m.raw_json?.sender !== 'system' && 
+        m.raw_json?.type !== 'event'
+      );
+      console.log("Mensaje identificado como solución:", adminMsg);
+
+      setTicketSolutions(prev => ({ ...prev, [ticketId]: adminMsg ? adminMsg.message : null }));
     } catch (e) {
-      console.error(e);
+      console.error('Error al cargar la solución:', e);
+      setTicketSolutions(prev => ({ ...prev, [ticketId]: null }));
     } finally {
-      setIsLoadingMessages(false);
+      setLoadingSolutions(prev => ({ ...prev, [ticketId]: false }));
+      console.log(`=== FIN CARGA SOLUCIÓN TICKET ${ticketId} ===`);
+    }
+  };
+
+  const toggleExpand = (ticketId: string) => {
+    if (expandedTicketId === ticketId) {
+      setExpandedTicketId(null);
+    } else {
+      setExpandedTicketId(ticketId);
+      loadSolution(ticketId);
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Pendiente': return <Badge variant="destructive" className="uppercase text-[10px]">Pendiente</Badge>;
-      case 'En Revisión': return <Badge variant="secondary" className="uppercase text-[10px]">En Revisión</Badge>;
-      case 'Finalizado': return <Badge variant="outline" className="uppercase text-[10px] text-green-500 border-green-500">Finalizado</Badge>;
+      case 'Pendiente': return <Badge className="bg-destructive/10 text-destructive border-destructive/20 uppercase text-[10px] shadow-sm"><AlertCircle className="w-3 h-3 mr-1"/> Pendiente</Badge>;
+      case 'En Revisión': return <Badge className="bg-secondary/20 text-secondary-foreground border-secondary/30 uppercase text-[10px] shadow-sm"><Clock className="w-3 h-3 mr-1"/> En Revisión</Badge>;
+      case 'Finalizado': return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 uppercase text-[10px] shadow-sm"><CheckCircle2 className="w-3 h-3 mr-1"/> Resuelto</Badge>;
       default: return <Badge className="uppercase text-[10px]">{status}</Badge>;
     }
   };
@@ -132,39 +99,15 @@ export function WorkshopTicketsClient({ initialTickets }: { initialTickets: any[
       const result = await createTicket(null, formData);
       if (result?.errors) {
         const firstError = Object.values(result.errors)[0]?.[0];
-        if (firstError) setError(firstError);
+        if (firstError) setError(firstError as string);
       } else if (result?.message) {
         setError(result.message);
       } else if (result?.success) {
-        toast({ title: 'Ticket creado exitosamente' });
+        toast({ title: 'Solicitud enviada exitosamente' });
         setOpen(false);
       }
     } catch (e) {
       setError('Ocurrió un error inesperado.');
-    }
-  };
-
-  const handleReply = async () => {
-    if (!selectedTicketId || !replyText.trim()) return;
-    setIsReplying(true);
-    try {
-      const res = await replyToTicketWorkshop(selectedTicketId, replyText);
-      if (res.success) {
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          message: replyText,
-          createdAt: new Date().toISOString(),
-          senderId: 'user', // optimistic
-          senderName: 'Cliente',
-        }]);
-        setReplyText('');
-      } else {
-        toast({ title: 'Error', description: res.message, variant: 'destructive' });
-      }
-    } catch (error) {
-      toast({ title: 'Error', description: 'No se pudo enviar el mensaje', variant: 'destructive' });
-    } finally {
-      setIsReplying(false);
     }
   };
 
@@ -175,226 +118,180 @@ export function WorkshopTicketsClient({ initialTickets }: { initialTickets: any[
     return matchesSearch && matchesFilter;
   });
 
+  const getShortId = (ticket: any) => {
+    const wsPrefix = ticket.workshopName ? ticket.workshopName.substring(0, 3).toUpperCase() : 'TKT';
+    const idPrefix = ticket.id.split('-')[0].toUpperCase();
+    return `${wsPrefix}-${idPrefix}`;
+  };
+
   return (
-    <div className="flex h-[calc(100vh-6rem)] -mt-4 bg-background overflow-hidden border border-border rounded-xl">
-      
-      {/* Left Panel: Inbox */}
-      <div className={cn(
-        "w-full lg:w-[350px] flex-shrink-0 flex flex-col border-r border-border bg-card/30",
-        selectedTicketId ? "hidden lg:flex" : "flex"
-      )}>
-        <div className="p-4 border-b border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">Bandeja de Entrada</h2>
-            <Badge variant="secondary" className="bg-primary/10 text-primary">{tickets.length} total</Badge>
-          </div>
-          
-          <div className="relative">
+    <div className="space-y-6">
+      {/* Header section with liquid glass style */}
+      <div className="p-6 rounded-2xl bg-card/40 backdrop-blur-md border border-border/50 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="flex-1 w-full">
+          <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Centro de Soporte</h2>
+          <p className="text-sm text-muted-foreground mt-1">Gestiona tus solicitudes y revisa las soluciones.</p>
+        </div>
+        
+        <div className="flex w-full md:w-auto items-center gap-3">
+          <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Buscar tickets..." 
+              placeholder="Buscar solicitudes..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-background"
+              className="pl-9 bg-background/50 border-border/50 focus-visible:ring-1 transition-all h-10 rounded-xl"
             />
           </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {['Todos', 'Pendiente', 'En Revisión', 'Finalizado'].map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={cn(
-                  "px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
-                  filter === f ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-                )}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full text-sm h-9" variant="outline">
-                <PlusCircle className="w-4 h-4 mr-2" />
-                Nuevo Ticket
+              <Button className="h-10 rounded-xl shadow-md bg-primary hover:bg-primary/90 transition-all gap-2">
+                <PlusCircle className="w-4 h-4" />
+                Nueva Solicitud
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[425px] rounded-2xl border-border/50 bg-card/95 backdrop-blur-xl">
               <DialogHeader>
-                <DialogTitle>Crear Ticket de Soporte</DialogTitle>
+                <DialogTitle className="text-xl">Nueva Solicitud de Soporte</DialogTitle>
                 <DialogDescription>
-                  Describe detalladamente el problema que estás experimentando para que nuestro equipo lo revise.
+                  Describe el requerimiento de manera sencilla y clara.
                 </DialogDescription>
               </DialogHeader>
-              <form action={handleCreateTicket} className="space-y-4">
-                {error && <p className="text-sm text-destructive">{error}</p>}
+              <form action={handleCreateTicket} className="space-y-5 mt-4">
+                {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">{error}</div>}
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Asunto</Label>
-                  <Input id="subject" name="subject" placeholder="Ej: Problema con inventario" required />
+                  <Label htmlFor="subject" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Asunto</Label>
+                  <Input id="subject" name="subject" placeholder="Ej: Error al registrar venta" className="rounded-xl bg-background/50 border-border/50" required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Descripción detallada</Label>
-                  <Textarea id="description" name="description" placeholder="Explica exactamente lo que sucede..." rows={5} required />
+                  <Label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Detalle de la solicitud</Label>
+                  <Textarea id="description" name="description" placeholder="Explica lo que necesitas..." rows={5} className="rounded-xl bg-background/50 border-border/50 resize-none" required />
                 </div>
                 <SubmitButton />
               </form>
             </DialogContent>
           </Dialog>
         </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {filteredTickets.map(ticket => (
-            <div
-              key={ticket.id}
-              onClick={() => setSelectedTicketId(ticket.id)}
-              className={cn(
-                "p-4 border-b border-border/50 cursor-pointer transition-colors hover:bg-accent/50",
-                selectedTicketId === ticket.id ? "bg-accent/50 border-l-2 border-l-primary" : "border-l-2 border-l-transparent"
-              )}
-            >
-              <div className="flex items-center justify-between mb-2">
-                {getStatusBadge(ticket.status)}
-                <span className="text-[10px] text-muted-foreground flex items-center">
-                  <Clock className="w-3 h-3 mr-1" />
-                  {new Date(ticket.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              <h3 className="font-semibold text-sm mb-1 truncate">{ticket.subject}</h3>
-              <p className="text-xs text-muted-foreground line-clamp-2">{ticket.description}</p>
-            </div>
-          ))}
-          {filteredTickets.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              No hay tickets que coincidan con la búsqueda.
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Right Panel: Chat */}
-      <div className={cn(
-        "flex-1 flex flex-col bg-card relative",
-        !selectedTicketId ? "hidden lg:flex items-center justify-center" : "flex"
-      )}>
-        {!selectedTicketId ? (
-          <div className="text-center max-w-md p-6">
-            <ShieldAlert className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-2">Soporte MotoManager</h3>
-            <p className="text-muted-foreground">Selecciona un ticket de la bandeja de entrada para ver el historial y conversar con el equipo de soporte.</p>
+      {/* Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar px-1">
+        {['Todos', 'Pendiente', 'En Revisión', 'Finalizado'].map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap transition-all duration-200 border",
+              filter === f 
+                ? "bg-primary text-primary-foreground border-primary shadow-md" 
+                : "bg-card/40 backdrop-blur-sm border-border/50 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            )}
+          >
+            {f === 'Finalizado' ? 'Resueltos' : f}
+          </button>
+        ))}
+      </div>
+
+      {/* Tickets List */}
+      <div className="space-y-4">
+        {filteredTickets.length === 0 ? (
+          <div className="p-12 text-center flex flex-col items-center bg-card/30 backdrop-blur-sm rounded-2xl border border-border/50">
+            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4 border border-border/50">
+              <FileText className="w-8 h-8 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground">No hay solicitudes</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">No encontramos solicitudes que coincidan con tu búsqueda o filtro actual.</p>
           </div>
         ) : (
-          <>
-            {/* Chat Header */}
-            <div className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-card/80 backdrop-blur-sm z-10 sticky top-0">
-              <div className="flex items-center gap-3">
-                <button 
-                  className="lg:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setSelectedTicketId(null)}
+          filteredTickets.map(ticket => {
+            const isExpanded = expandedTicketId === ticket.id;
+            const shortId = getShortId(ticket);
+            
+            return (
+              <div 
+                key={ticket.id} 
+                className={cn(
+                  "overflow-hidden transition-all duration-300 rounded-2xl border",
+                  isExpanded ? "bg-card shadow-lg border-primary/20" : "bg-card/40 backdrop-blur-sm border-border/50 hover:bg-card/60 hover:border-border"
+                )}
+              >
+                {/* Card Header (Clickable) */}
+                <div 
+                  onClick={() => toggleExpand(ticket.id)}
+                  className="p-5 flex items-center justify-between cursor-pointer gap-4"
                 >
-                  ← Atrás
-                </button>
-                <div>
-                  <h2 className="font-bold text-lg">{selectedTicket.subject}</h2>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                    <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {selectedTicket.creatorName}</span>
-                    <span>•</span>
-                    <span>{new Date(selectedTicket.createdAt).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">ESTADO:</span>
-                {getStatusBadge(selectedTicket.status)}
-              </div>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-              
-              {/* Original Description as first message */}
-              <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex flex-col gap-1 max-w-[85%]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold">{selectedTicket.creatorName}</span>
-                    <span className="text-xs text-muted-foreground">Taller (Tú)</span>
-                  </div>
-                  <div className="bg-muted text-foreground p-3 sm:p-4 rounded-2xl rounded-tl-none border border-border/50 text-sm whitespace-pre-wrap">
-                    {selectedTicket.description}
-                  </div>
-                </div>
-              </div>
-
-              {isLoadingMessages ? (
-                <div className="flex justify-center p-4">
-                  <span className="text-xs text-muted-foreground animate-pulse">Cargando mensajes...</span>
-                </div>
-              ) : (
-                messages.map(msg => {
-                  const isAdmin = msg.senderName === 'Admin';
-                  return (
-                    <div key={msg.id} className={cn("flex gap-4", isAdmin ? "" : "")}>
-                      <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                        isAdmin ? "bg-red-500/20 text-red-500" : "bg-primary/20 text-primary"
-                      )}>
-                        {isAdmin ? <ShieldAlert className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                      </div>
-                      <div className="flex flex-col gap-1 max-w-[85%]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold">{isAdmin ? 'Soporte MotoManager' : selectedTicket.creatorName}</span>
-                          <span className="text-[10px] text-muted-foreground">{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                        </div>
-                        <div className={cn(
-                          "p-3 sm:p-4 rounded-2xl border text-sm whitespace-pre-wrap",
-                          isAdmin 
-                            ? "bg-accent/50 text-accent-foreground border-accent rounded-tl-none" 
-                            : "bg-muted text-foreground border-border/50 rounded-tl-none"
-                        )}>
-                          {msg.message}
-                        </div>
+                  <div className="flex items-center gap-4 flex-1 overflow-hidden">
+                    <div className={cn(
+                      "flex items-center justify-center font-mono text-xs font-bold px-3 py-1.5 rounded-lg border",
+                      ticket.status === 'Finalizado' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-accent text-accent-foreground border-border/50"
+                    )}>
+                      #{shortId}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base truncate">{ticket.subject}</h3>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {format(new Date(ticket.createdAt), "d 'de' MMMM, yyyy", { locale: es })}</span>
                       </div>
                     </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4 shrink-0">
+                    {getStatusBadge(ticket.status)}
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
+                      isExpanded ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </div>
+                </div>
 
-            {/* Chat Input */}
-            <div className="p-4 border-t border-border bg-card/80 backdrop-blur-sm">
-              <div className="flex items-end gap-2 bg-background border border-border rounded-xl p-2 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
-                <Textarea
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Escribe tu respuesta..."
-                  className="min-h-[44px] max-h-32 bg-transparent border-0 focus-visible:ring-0 resize-none py-3"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleReply();
-                    }
-                  }}
-                />
-                <Button 
-                  size="icon" 
-                  onClick={handleReply} 
-                  disabled={isReplying || !replyText.trim()}
-                  className="rounded-lg h-11 w-11 shrink-0"
+                {/* Card Body (Expanded) */}
+                <div 
+                  className={cn(
+                    "grid transition-all duration-300 ease-in-out",
+                    isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                  )}
                 >
-                  <Send className="w-4 h-4" />
-                </Button>
+                  <div className="overflow-hidden">
+                    <div className="p-5 pt-0 border-t border-border/30 mt-2 space-y-6">
+                      
+                      {/* Problema */}
+                      <div className="space-y-2 mt-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5" /> Descripción de la solicitud
+                        </h4>
+                        <div className="p-4 rounded-xl bg-muted/40 border border-border/50 text-sm whitespace-pre-wrap leading-relaxed">
+                          {ticket.description}
+                        </div>
+                      </div>
+
+                      {/* Solución */}
+                      {ticket.status === 'Finalizado' && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-emerald-600 flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Solución aplicada
+                          </h4>
+                          <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-sm whitespace-pre-wrap leading-relaxed text-foreground/90">
+                            {loadingSolutions[ticket.id] ? (
+                              <span className="flex items-center gap-2 text-muted-foreground animate-pulse">
+                                Cargando solución...
+                              </span>
+                            ) : ticketSolutions[ticket.id] ? (
+                              ticketSolutions[ticket.id]
+                            ) : (
+                              <span className="text-muted-foreground italic">No se ha registrado un texto de solución para esta solicitud.</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center mt-2">
-                Presiona Enter para enviar, o Shift + Enter para salto de línea.
-              </p>
-            </div>
-          </>
+            );
+          })
         )}
       </div>
     </div>

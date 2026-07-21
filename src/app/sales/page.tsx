@@ -56,7 +56,7 @@ function SalesPageSkeleton() {
           <Skeleton className="h-10 w-24" />
         </div>
       </div>
-      <Card className="bg-card/50 border-border/50 text-foreground">
+      <Card className="glass-card text-foreground">
         <CardHeader>
           <Skeleton className="h-7 w-48 mb-2" />
           <Skeleton className="h-5 w-96" />
@@ -163,8 +163,9 @@ export default async function SalesPage({
               <ExportServiceSalesButton sales={allFilteredSales.filter(s => s.workOrderId)} />
           </div>
         </div>
-        <Card className="bg-card/50 border-border/50 text-foreground">
-          <CardHeader>
+        <Card className="glass-card relative overflow-hidden group text-foreground glow-primary">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+          <CardHeader className="relative z-10">
             <CardTitle className="text-lg sm:text-xl">Historial de Transacciones</CardTitle>
             <CardDescription className="text-muted-foreground text-sm sm:text-base">
               Un registro detallado de todas las ventas completadas. Página {currentPage} de {totalPages}
@@ -174,7 +175,7 @@ export default async function SalesPage({
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border/50 hover:bg-card/50">
+                  <TableRow className="border-border/50 hover:bg-transparent">
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Número</TableHead>
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Tipo</TableHead>
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Cliente / Vehículo</TableHead>
@@ -186,7 +187,7 @@ export default async function SalesPage({
                 </TableHeader>
                 <TableBody>
                   {sales.map((sale) => (
-                    <TableRow key={sale.id} className="border-border/50 hover:bg-card/50">
+                    <TableRow key={sale.id} className="border-border/50 hover:bg-primary/5 transition-colors">
                       <TableCell className="font-medium text-xs sm:text-sm">{sale.saleNumber}</TableCell>
                       <TableCell className="text-xs sm:text-sm">
                         {sale.workOrderId ? (

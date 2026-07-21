@@ -64,8 +64,9 @@ export default async function MotorcyclesPage({
           <AddMotorcycle />
         </div>
       </div>
-      <Card className="bg-card/50 border-border/50 text-foreground">
-        <CardHeader>
+      <Card className="glass-card relative overflow-hidden group text-foreground">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+        <CardHeader className="relative z-10">
           <CardTitle>Motocicletas Registradas</CardTitle>
           <CardDescription className="text-muted-foreground">
             Una lista de todas las motocicletas registradas en el sistema.
@@ -74,7 +75,7 @@ export default async function MotorcyclesPage({
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow className="border-border/50 hover:bg-card/50">
+              <TableRow className="border-border/50 hover:bg-transparent">
                 <TableHead className="text-foreground/90">Marca y Modelo</TableHead>
                 <TableHead className="text-foreground/90">Placa</TableHead>
                 <TableHead className="hidden md:table-cell text-foreground/90">Cliente</TableHead>
@@ -87,7 +88,7 @@ export default async function MotorcyclesPage({
             </TableHeader>
             <TableBody>
               {motorcyclesWithoutActiveWorkOrders.map((moto) => (
-                <TableRow key={moto.id} className="border-border/50 hover:bg-card/50">
+                <TableRow key={moto.id} className="border-border/50 hover:bg-primary/5 transition-colors">
                   <TableCell className="font-medium">
                     <div>{moto.make} {moto.model}</div>
                     <div className="text-sm text-muted-foreground">{moto.year}</div>

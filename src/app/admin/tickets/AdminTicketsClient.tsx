@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect } from 'react';
 import { updateAdminTicketStatus, replyToTicketAdmin, getTicketMessagesAdmin } from '@/lib/actions/tickets';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,217 +10,177 @@ import {
   Search, 
   Send, 
   Clock, 
-  User, 
-  Check, 
-  CheckCheck,
-  MoreVertical,
-  CircleDot
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Building2,
+  ChevronDown
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 export function AdminTicketsClient({ initialTickets }: { initialTickets: any[] }) {
   const { toast } = useToast();
   const [tickets, setTickets] = useState(initialTickets);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [replyText, setReplyText] = useState('');
-  const [isReplying, setIsReplying] = useState(false);
+  
+  const [solutionText, setSolutionText] = useState('');
+  const [isSolving, setIsSolving] = useState(false);
+  const [existingSolution, setExistingSolution] = useState<string | null>(null);
+  const [isLoadingSolution, setIsLoadingSolution] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('Todos');
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const selectedTicket = tickets.find(t => t.id === selectedTicketId);
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
-  useEffect(() => {
     if (selectedTicketId) {
-      loadMessages(selectedTicketId);
+      loadSolution(selectedTicketId);
     } else {
-      setMessages([]);
+      setExistingSolution(null);
+      setSolutionText('');
     }
   }, [selectedTicketId]);
 
-  useEffect(() => {
-    const supabase = createClient();
-    
-    const ticketsChannel = supabase.channel('admin_tickets_updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets' }, (payload) => {
-        setTickets(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t));
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, (payload) => {
-        // Handle insert locally if needed, for now just wait for reload or optimistically add
-      })
-      .subscribe();
-
-    let messagesChannel: any = null;
-    if (selectedTicketId) {
-      messagesChannel = supabase.channel(`admin_ticket_${selectedTicketId}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'ticket_messages',
-          filter: `ticket_id=eq.${selectedTicketId}`
-        }, (payload) => {
-          const newMsg = payload.new;
-          let parsed = { text: newMsg.message, sender: 'agent', type: 'message' };
-          try {
-            if (newMsg.message.startsWith('{')) parsed = JSON.parse(newMsg.message);
-          } catch(e) {}
-          
-          setMessages(prev => {
-            if (prev.find(m => m.id === newMsg.id)) return prev;
-            return [...prev, {
-              id: newMsg.id,
-              message: parsed.text || newMsg.message,
-              createdAt: newMsg.created_at,
-              senderId: newMsg.sender_id,
-              senderName: parsed.sender === 'user' ? 'Cliente' : parsed.sender === 'system' ? 'Sistema' : 'Admin',
-              type: parsed.type || 'message'
-            }];
-          });
-          
-          if (parsed.sender === 'user') {
-            toast({ title: 'Nuevo mensaje recibido', description: selectedTicket?.workshopName });
-          }
-        })
-        .subscribe();
-    }
-
-    return () => {
-      supabase.removeChannel(ticketsChannel);
-      if (messagesChannel) supabase.removeChannel(messagesChannel);
-    };
-  }, [selectedTicketId, selectedTicket, toast]);
-
-  const loadMessages = async (ticketId: string) => {
-    setIsLoadingMessages(true);
+  const loadSolution = async (ticketId: string) => {
+    setIsLoadingSolution(true);
+    setExistingSolution(null);
     try {
       const msgs = await getTicketMessagesAdmin(ticketId);
-      setMessages(msgs);
+      const adminMsg = msgs.find(m => m.senderName === 'Admin' || m.senderName === 'Sistema');
+      if (adminMsg && adminMsg.message) {
+        setExistingSolution(adminMsg.message);
+      }
     } catch (e) {
       console.error(e);
-      toast({ title: 'Error', description: 'No se pudieron cargar los mensajes', variant: 'destructive' });
     } finally {
-      setIsLoadingMessages(false);
+      setIsLoadingSolution(false);
     }
   };
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
+    // Update local state first for optimistic UI
     setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
     
     const result = await updateAdminTicketStatus(ticketId, newStatus);
     if (!result.success) {
       toast({ title: "Error", description: result.message, variant: "destructive" });
+      // Revert on error could be implemented here
+    } else {
+      toast({ title: "Estado Actualizado", description: `El ticket ahora está ${newStatus}` });
     }
   };
 
-  const handleReply = async () => {
-    if (!selectedTicketId || !replyText.trim()) return;
-    const text = replyText;
-    setReplyText('');
-    setIsReplying(true);
+  const handleSolve = async () => {
+    if (!selectedTicketId || !solutionText.trim()) return;
+    setIsSolving(true);
     
-    const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-    const newMsg = {
-      id: tempId,
-      message: text,
-      createdAt: new Date().toISOString(),
-      senderId: 'admin',
-      senderName: 'Admin',
-      type: 'message'
-    };
-    setMessages(prev => [...prev, newMsg]);
-
     try {
-      const res = await replyToTicketAdmin(selectedTicketId, text);
+      console.log("=== FINALIZAR TICKET BUTTON CLICKED ===");
+      console.log("Selected ticket:", selectedTicketId);
+      console.log("New message:", solutionText);
+
+      // 1. Reply to ticket to save the solution text in ticket_messages (no functional change)
+      const res = await replyToTicketAdmin(selectedTicketId, solutionText);
+      console.log("Resultado de replyToTicketAdmin:", res);
+      
       if (!res.success) {
         toast({ title: 'Error', description: res.message, variant: 'destructive' });
-        setMessages(prev => prev.filter(m => m.id !== tempId));
+        setIsSolving(false);
+        return;
+      }
+
+      console.log("Cambiando estado a Finalizado...");
+      // 2. Update status to Finalizado
+      const updateRes = await updateAdminTicketStatus(selectedTicketId, 'Finalizado');
+      console.log("Estado cambiado exitosamente:", updateRes);
+
+      if (!updateRes.success) {
+        toast({ title: 'Error', description: updateRes.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'Ticket Resuelto', description: 'La solución ha sido enviada al taller.' });
+        // Update local state
+        setTickets(prev => prev.map(t => t.id === selectedTicketId ? { ...t, status: 'Finalizado' } : t));
+        setExistingSolution(solutionText);
+        setSolutionText('');
       }
     } catch (error) {
-      toast({ title: 'Error', description: 'Error al enviar', variant: 'destructive' });
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+      console.error("Excepción durante el envío:", error);
+      toast({ title: 'Error', description: 'Error al enviar la solución', variant: 'destructive' });
     } finally {
-      setIsReplying(false);
+      setIsSolving(false);
+      console.log("=== FINALIZAR TICKET PROCESS COMPLETED ===");
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Pendiente': return <Badge variant="destructive" className="uppercase text-[10px]">Pendiente</Badge>;
-      case 'En Revisión': return <Badge variant="secondary" className="uppercase text-[10px]">En Revisión</Badge>;
-      case 'Esperando cliente': return <Badge variant="outline" className="uppercase text-[10px] text-amber-500 border-amber-500">Esperando cliente</Badge>;
-      case 'Finalizado': return <Badge variant="outline" className="uppercase text-[10px] text-emerald-500 border-emerald-500">Finalizado</Badge>;
+      case 'Pendiente': return <Badge className="bg-destructive/10 text-destructive border-destructive/20 uppercase text-[10px] shadow-sm"><AlertCircle className="w-3 h-3 mr-1"/> Pendiente</Badge>;
+      case 'En Revisión': return <Badge className="bg-secondary/20 text-secondary-foreground border-secondary/30 uppercase text-[10px] shadow-sm"><Clock className="w-3 h-3 mr-1"/> En Revisión</Badge>;
+      case 'Finalizado': return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 uppercase text-[10px] shadow-sm"><CheckCircle2 className="w-3 h-3 mr-1"/> Resuelto</Badge>;
       default: return <Badge className="uppercase text-[10px]">{status}</Badge>;
     }
   };
 
-  const formatMessageTime = (dateString: string) => {
-    const date = new Date(dateString);
-    if (isToday(date)) return `Hoy ${format(date, 'h:mm a')}`;
-    if (isYesterday(date)) return `Ayer ${format(date, 'h:mm a')}`;
-    return format(date, 'd MMM yyyy h:mm a', { locale: es });
+  const getShortId = (ticket: any) => {
+    const wsPrefix = ticket.workshopName ? ticket.workshopName.substring(0, 3).toUpperCase() : 'TKT';
+    const idPrefix = ticket.id.split('-')[0].toUpperCase();
+    return `${wsPrefix}-${idPrefix}`;
   };
 
   const filteredTickets = tickets.filter(t => {
     const searchMatch = t.subject?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                         t.workshopName?.toLowerCase().includes(searchQuery.toLowerCase());
-    const filterMatch = filter === 'Todos' || t.status === filter;
+    const filterMatch = filter === 'Todos' || (filter === 'Resueltos' ? t.status === 'Finalizado' : t.status === filter);
     return searchMatch && filterMatch;
   });
-
-  const chatMessages = messages.filter(m => m.type !== 'event');
 
   return (
     <div className="flex h-[calc(100vh-6rem)] -mt-4 bg-background overflow-hidden border border-border/40 rounded-xl shadow-lg">
       
       {/* Left Sidebar: Inbox */}
       <div className={cn(
-        "w-full lg:w-[320px] xl:w-[380px] flex-shrink-0 flex flex-col border-r border-border bg-card/30",
+        "w-full lg:w-[380px] xl:w-[420px] flex-shrink-0 flex flex-col border-r border-border bg-card/30 backdrop-blur-sm",
         selectedTicketId ? "hidden lg:flex" : "flex"
       )}>
-        <div className="p-4 border-b border-border space-y-4">
+        <div className="p-5 border-b border-border/50 space-y-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold tracking-tight">Inbox</h2>
-            <Badge variant="secondary" className="bg-primary/10 text-primary rounded-full px-2">{filteredTickets.length}</Badge>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Panel de Soporte</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Gestión de tickets de talleres</p>
+            </div>
+            <Badge variant="secondary" className="bg-primary/10 text-primary font-bold text-sm px-3 rounded-full">{filteredTickets.length}</Badge>
           </div>
           
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input 
-              placeholder="Buscar tickets..." 
+              placeholder="Buscar por asunto o taller..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-background/50 border-border/50 focus-visible:ring-1 transition-all h-9"
+              className="pl-9 bg-background/50 border-border/50 focus-visible:ring-1 transition-all h-10 rounded-xl"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            {['Todos', 'Pendiente', 'En Revisión', 'Esperando cliente', 'Finalizado'].map(f => (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {['Todos', 'Pendiente', 'En Revisión', 'Resueltos'].map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={cn(
-                  "px-3 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors",
-                  filter === f ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  "px-4 py-1.5 rounded-full text-[12px] font-medium whitespace-nowrap transition-all",
+                  filter === f 
+                    ? "bg-primary text-primary-foreground shadow-md" 
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 )}
               >
                 {f}
@@ -236,272 +195,159 @@ export function AdminTicketsClient({ initialTickets }: { initialTickets: any[] }
               key={ticket.id}
               onClick={() => setSelectedTicketId(ticket.id)}
               className={cn(
-                "p-4 border-b border-border/30 cursor-pointer transition-all duration-200 hover:bg-accent/40 relative",
-                selectedTicketId === ticket.id ? "bg-accent/40" : ""
+                "p-4 border-b border-border/30 cursor-pointer transition-all duration-200 hover:bg-card/60 relative",
+                selectedTicketId === ticket.id ? "bg-card shadow-sm border-l-4 border-l-primary" : "border-l-4 border-l-transparent"
               )}
             >
-              {selectedTicketId === ticket.id && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full" />
-              )}
               <div className="flex items-center justify-between mb-2">
-                <span className="font-semibold text-[13px] truncate pr-2">{ticket.workshopName}</span>
-                <span className="text-[10px] text-muted-foreground flex-shrink-0 flex items-center">
-                  {format(new Date(ticket.createdAt), 'MMM d', { locale: es })}
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "font-mono text-[10px] font-bold px-2 py-0.5 rounded border",
+                    ticket.status === 'Finalizado' ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-accent text-accent-foreground border-border/50"
+                  )}>
+                    #{getShortId(ticket)}
+                  </span>
+                  <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                    <Building2 className="w-3 h-3" /> {ticket.workshopName}
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {format(new Date(ticket.createdAt), "d MMM", { locale: es })}
                 </span>
               </div>
-              <h3 className="font-medium text-sm mb-1.5 truncate text-foreground/90">{ticket.subject}</h3>
+              <h3 className="font-semibold text-sm mb-2 text-foreground/90 truncate">{ticket.subject}</h3>
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground line-clamp-1 flex-1 pr-4">
-                  {ticket.description}
-                </p>
                 {getStatusBadge(ticket.status)}
               </div>
             </div>
           ))}
           {filteredTickets.length === 0 && (
-            <div className="p-8 text-center flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-                <CheckCheck className="w-5 h-5 text-muted-foreground" />
+            <div className="p-12 text-center flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4 border border-border/50">
+                <CheckCircle2 className="w-8 h-8 text-muted-foreground/40" />
               </div>
-              <p className="text-sm font-medium text-foreground">Todo al día</p>
-              <p className="text-xs text-muted-foreground mt-1">No hay tickets en esta vista.</p>
+              <p className="text-base font-semibold text-foreground">Bandeja limpia</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-[200px]">No hay tickets que requieran tu atención con estos filtros.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Main Resolution Area */}
       <div className={cn(
         "flex-1 flex flex-col bg-card/10 relative",
         !selectedTicketId ? "hidden lg:flex items-center justify-center" : "flex"
       )}>
         {!selectedTicketId ? (
           <div className="text-center max-w-md p-6">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <CircleDot className="w-8 h-8 text-primary" />
+            <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-6 shadow-inner border border-primary/20">
+              <FileText className="w-10 h-10 text-primary" />
             </div>
-            <h3 className="text-xl font-bold mb-2 tracking-tight">Inbox de Soporte</h3>
-            <p className="text-sm text-muted-foreground">Selecciona un ticket de la barra lateral para ver la conversación y el historial.</p>
+            <h3 className="text-2xl font-bold mb-3 tracking-tight">Resolución Rápida</h3>
+            <p className="text-sm text-muted-foreground">Selecciona una solicitud del panel lateral para revisarla y proporcionar una solución al taller.</p>
           </div>
         ) : (
           <>
-            <div className="h-16 px-4 sm:px-6 border-b border-border flex items-center justify-between bg-card/80 backdrop-blur-md z-10 shrink-0">
-              <div className="flex items-center gap-3 overflow-hidden">
+            <div className="p-6 border-b border-border/50 bg-card/60 backdrop-blur-md shrink-0 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+              <div className="flex items-start gap-4">
                 <button 
-                  className="lg:hidden p-1.5 -ml-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-accent"
+                  className="lg:hidden p-2 -ml-2 text-muted-foreground hover:text-foreground rounded-lg bg-muted/50 mt-1"
                   onClick={() => setSelectedTicketId(null)}
                 >
                   <Search className="w-5 h-5" />
-                  <span className="text-sm ml-1">Volver</span>
                 </button>
-                <div className="truncate">
-                  <h2 className="font-semibold text-sm truncate">{selectedTicket?.subject}</h2>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <span className="font-medium text-foreground/80">{selectedTicket?.workshopName}</span>
-                    <span className="w-1 h-1 rounded-full bg-border" />
-                    <span>{selectedTicket?.creatorName}</span>
+                <div>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-accent text-accent-foreground border border-border/50 shadow-sm">
+                      #{getShortId(selectedTicket)}
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 px-2 gap-2 border-border/50 hover:bg-accent/50 text-[10px] uppercase shadow-sm">
+                          Cambiar Estado <ChevronDown className="w-3 h-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-40">
+                        {['Pendiente', 'En Revisión', 'Finalizado'].map(s => (
+                          <DropdownMenuItem 
+                            key={s} 
+                            onClick={() => handleStatusChange(selectedTicket!.id, s)}
+                            className={selectedTicket?.status === s ? "bg-accent font-semibold" : ""}
+                          >
+                            {s}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {getStatusBadge(selectedTicket?.status || '')}
+                  </div>
+                  <h2 className="text-xl font-bold text-foreground mt-2">{selectedTicket?.subject}</h2>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                    <span className="flex items-center gap-1 font-medium text-foreground/70"><Building2 className="w-3.5 h-3.5" /> {selectedTicket?.workshopName}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {selectedTicket?.createdAt ? format(new Date(selectedTicket.createdAt), "d 'de' MMMM, yyyy - HH:mm", { locale: es }) : ''}</span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 bg-gradient-to-b from-transparent to-muted/20">
               
-              <div className="flex items-center gap-3">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 gap-2 border-border/50 hover:bg-accent/50 text-xs shadow-sm">
-                      {getStatusBadge(selectedTicket?.status || '')}
-                      <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">Cambiar Estado</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {['Pendiente', 'En Revisión', 'Esperando cliente', 'Finalizado'].map(s => (
-                      <DropdownMenuItem 
-                        key={s} 
-                        onClick={() => handleStatusChange(selectedTicket!.id, s)}
-                        className={selectedTicket?.status === s ? "bg-accent" : ""}
+              {/* Problem Section */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-destructive/70" /> 
+                  Problema Reportado
+                </h4>
+                <div className="p-6 rounded-2xl bg-card border border-border/60 shadow-sm text-[15px] leading-relaxed whitespace-pre-wrap text-foreground/90">
+                  {selectedTicket?.description}
+                </div>
+              </div>
+
+              {/* Solution Section */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500/70" /> 
+                  Solución
+                </h4>
+                
+                {isLoadingSolution ? (
+                   <div className="p-8 rounded-2xl bg-card border border-border/60 shadow-sm flex items-center justify-center">
+                     <span className="animate-pulse text-muted-foreground text-sm font-medium">Obteniendo información...</span>
+                   </div>
+                ) : selectedTicket?.status === 'Finalizado' ? (
+                  <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 shadow-sm text-[15px] leading-relaxed whitespace-pre-wrap text-foreground/90">
+                    {existingSolution || <span className="italic text-muted-foreground">Solución aplicada pero no se registró texto.</span>}
+                  </div>
+                ) : (
+                  <div className="p-1 rounded-2xl bg-gradient-to-b from-card to-card/50 border border-border/60 shadow-lg relative focus-within:border-primary/50 focus-within:shadow-primary/10 transition-all duration-300">
+                    <Textarea
+                      value={solutionText}
+                      onChange={(e) => setSolutionText(e.target.value)}
+                      placeholder="Describe la solución detallada aquí..."
+                      className="min-h-[160px] bg-transparent border-0 focus-visible:ring-0 resize-none p-5 text-[15px] leading-relaxed"
+                    />
+                    <div className="p-4 border-t border-border/40 bg-card/50 rounded-b-2xl flex justify-end">
+                      <Button 
+                        onClick={handleSolve} 
+                        disabled={isSolving || !solutionText.trim()}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all px-6 gap-2 rounded-xl"
                       >
-                        {s}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 scroll-smooth bg-fixed bg-opacity-5">
-              
-              <div className="flex justify-center my-4">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60 bg-background/60 px-3 py-1 rounded-full">
-                  Inicio de la conversación
-                </span>
-              </div>
-
-              <div className="flex gap-3 justify-start">
-                <div className="w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center shrink-0 mt-0.5">
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
-                </div>
-                <div className="flex flex-col gap-1 max-w-[85%] md:max-w-[75%]">
-                  <div className="flex items-center gap-2 pl-1">
-                    <span className="text-xs font-medium text-foreground/80">{selectedTicket?.creatorName}</span>
-                    <span className="text-[10px] text-muted-foreground">{selectedTicket?.createdAt ? formatMessageTime(selectedTicket.createdAt) : ''}</span>
-                  </div>
-                  <div className="bg-muted/80 text-foreground p-3.5 rounded-2xl rounded-tl-sm text-[13px] leading-relaxed shadow-sm border border-border/30 whitespace-pre-wrap">
-                    {selectedTicket?.description}
-                  </div>
-                </div>
-              </div>
-
-              {isLoadingMessages ? (
-                <div className="flex justify-center py-10">
-                  <div className="flex gap-1.5 items-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40 animate-bounce" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce [animation-delay:0.2s]" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary/80 animate-bounce [animation-delay:0.4s]" />
-                  </div>
-                </div>
-              ) : (
-                chatMessages.map((msg, i) => {
-                  const isAdmin = msg.senderName === 'Admin' || msg.senderName === 'Sistema';
-                  const isLast = i === chatMessages.length - 1;
-                  
-                  return (
-                    <div key={msg.id} className={cn("flex gap-3", isAdmin ? "justify-end" : "justify-start")}>
-                      {!isAdmin && (
-                        <div className="w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center shrink-0 mt-0.5">
-                          <User className="w-3.5 h-3.5 text-muted-foreground" />
-                        </div>
-                      )}
-                      
-                      <div className={cn("flex flex-col gap-1 max-w-[85%] md:max-w-[75%]", isAdmin ? "items-end" : "items-start")}>
-                        <div className="flex items-center gap-2 px-1">
-                          <span className="text-xs font-medium text-foreground/80">
-                            {isAdmin ? 'Tú (Soporte)' : msg.senderName}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.createdAt)}</span>
-                        </div>
-                        
-                        <div className={cn(
-                          "p-3.5 rounded-2xl text-[13px] leading-relaxed shadow-sm whitespace-pre-wrap",
-                          isAdmin 
-                            ? "bg-primary text-primary-foreground rounded-tr-sm" 
-                            : "bg-muted/80 text-foreground border border-border/30 rounded-tl-sm"
-                        )}>
-                          {msg.message}
-                        </div>
-                        
-                        {isAdmin && isLast && (
-                          <div className="flex items-center gap-1 pr-1 opacity-70">
-                            <span className="text-[10px] text-muted-foreground">Enviado</span>
-                            <CheckCheck className="w-3 h-3 text-muted-foreground" />
-                          </div>
+                        {isSolving ? 'Procesando...' : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4" />
+                            Resolver Ticket
+                          </>
                         )}
-                      </div>
+                      </Button>
                     </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} className="h-2" />
-            </div>
+                  </div>
+                )}
+              </div>
 
-            <div className="p-4 border-t border-border bg-card/80 backdrop-blur-md">
-              <div className="flex items-end gap-2 bg-background border border-border/60 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all shadow-sm">
-                <Textarea
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Responde al cliente..."
-                  className="min-h-[44px] max-h-32 bg-transparent border-0 focus-visible:ring-0 resize-none py-3 px-3 text-[13px]"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleReply();
-                    }
-                  }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-                  }}
-                />
-                <Button 
-                  size="icon" 
-                  onClick={handleReply} 
-                  disabled={isReplying || !replyText.trim()}
-                  className="rounded-lg h-[44px] w-[44px] shrink-0 shadow-sm transition-transform active:scale-95"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex justify-between items-center mt-2 px-1">
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <span className="font-medium">Enter</span> enviar • <span className="font-medium">Shift+Enter</span> nueva línea
-                </p>
-              </div>
             </div>
           </>
         )}
       </div>
-
-      {selectedTicketId && (
-        <div className="hidden xl:flex w-[280px] flex-shrink-0 flex-col border-l border-border bg-card/30">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-semibold text-sm">Historial del Ticket</h3>
-          </div>
-          <div className="flex-1 overflow-y-auto p-5 relative">
-            
-            <div className="absolute left-[29px] top-6 bottom-6 w-px bg-border" />
-            
-            <div className="space-y-6 relative z-10">
-              
-              <div className="flex gap-4">
-                <div className="w-5 h-5 rounded-full bg-background border-2 border-primary flex items-center justify-center shrink-0 mt-0.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium">Ticket Creado</span>
-                  <span className="text-[10px] text-muted-foreground">{selectedTicket?.createdAt ? formatMessageTime(selectedTicket.createdAt) : ''}</span>
-                </div>
-              </div>
-
-              {messages.map(msg => {
-                if (msg.type === 'event') {
-                  return (
-                    <div key={msg.id} className="flex gap-4">
-                      <div className="w-5 h-5 rounded-full bg-background border-2 border-muted-foreground/30 flex items-center justify-center shrink-0 mt-0.5" />
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium text-foreground">{msg.message}</span>
-                        <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.createdAt)}</span>
-                      </div>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div key={msg.id} className="flex gap-4 opacity-75">
-                      <div className="w-5 h-5 rounded-full bg-background border-2 border-muted-foreground/20 flex items-center justify-center shrink-0 mt-0.5" />
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-medium text-foreground/80">
-                          {msg.senderName === 'Admin' || msg.senderName === 'Sistema' ? 'Soporte respondió' : 'Cliente respondió'}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">{formatMessageTime(msg.createdAt)}</span>
-                      </div>
-                    </div>
-                  );
-                }
-              })}
-              
-              <div className="flex gap-4 pt-2">
-                <div className="w-5 h-5 rounded-full bg-background border-2 border-primary/50 flex items-center justify-center shrink-0 mt-0.5" />
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium">Estado Actual:</span>
-                  <div className="mt-1">{getStatusBadge(selectedTicket?.status || '')}</div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );

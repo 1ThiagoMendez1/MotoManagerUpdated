@@ -22,7 +22,7 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
 
   return (
     <>
-      <TableRow className="border-border/50 hover:bg-card/50">
+      <TableRow className="border-border/50 hover:bg-primary/5 transition-colors">
         <TableCell className="font-medium">
           <div className="flex items-center gap-3">
             <Avatar className="h-9 w-9">
@@ -57,11 +57,11 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
       {isExpanded && hasOrders && (
         <TableRow>
           <TableCell colSpan={4} className="p-0">
-            <div className="px-4 py-2 bg-card/30 rounded-md mx-4 mb-2">
+            <div className="px-4 py-2 bg-primary/5 rounded-md mx-4 mb-2">
               <h4 className="text-sm font-medium text-foreground/90 mb-3">Órdenes de Trabajo Asignadas</h4>
               <div className="space-y-2">
                 {technician.workOrders!.map((workOrder) => (
-                  <div key={workOrder.id} className="flex items-center justify-between p-3 bg-card/30 rounded border border-border/30">
+                  <div key={workOrder.id} className="flex items-center justify-between p-3 bg-card/50 rounded border border-border/30 hover:bg-primary/5 transition-colors">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant={workOrder.status === 'Completado' ? 'secondary' : workOrder.status === 'En Reparación' ? 'default' : 'outline'}>

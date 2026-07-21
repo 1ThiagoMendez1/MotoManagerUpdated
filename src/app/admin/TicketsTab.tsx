@@ -57,7 +57,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
     fetchMessages();
 
     return () => { isMounted = false; };
-  }, [selectedTicket]);
+  }, [selectedTicket?.id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -120,13 +120,27 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
 
   const handleStatusChange = async (newStatus: string) => {
     if (!selectedTicket) return;
-    const result = await updateAdminTicketStatus(selectedTicket.id, newStatus);
-    if (result.success) {
-      setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: newStatus } : t));
-      setSelectedTicket({ ...selectedTicket, status: newStatus });
+    try {
+      const result = await updateAdminTicketStatus(selectedTicket.id, newStatus);
+      if (result?.success) {
+        setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: newStatus } : t));
+        setSelectedTicket({ ...selectedTicket, status: newStatus });
+        toast({
+          title: "Estado Actualizado",
+          description: `El ticket ahora está "${newStatus}".`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result?.message || "Error al actualizar el ticket.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
       toast({
-        title: "Estado Actualizado",
-        description: `El ticket ahora está "${newStatus}".`,
+        title: "Error de servidor",
+        description: error.message || "Hubo un error al conectar con el servidor",
+        variant: "destructive"
       });
     }
   };
@@ -138,7 +152,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
     setIsSending(true);
     try {
       const result = await replyToTicketAdmin(selectedTicket.id, newMessage);
-      if (result.success) {
+      if (result?.success) {
         setMessages(prev => [...prev, {
           id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(),
           message: newMessage,
@@ -151,7 +165,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
       } else {
         toast({
           title: "Error",
-          description: result.message,
+          description: result?.message || "No se pudo enviar el mensaje",
           variant: "destructive"
         });
       }
@@ -319,79 +333,138 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
               </div>
             </div>
 
-            {/* Chat Area */}
+            {/* Ticket Details & Solution Area */}
             <div className="flex-1 overflow-y-auto p-6 bg-muted/5 flex flex-col gap-6">
               
-              {/* Original Ticket Description as First Message */}
+              {/* Original Ticket Description */}
               <div className="flex gap-4">
                 <div className="w-10 h-10 rounded-full bg-primary/20 flex flex-shrink-0 items-center justify-center border border-primary/30">
                   <User className="w-5 h-5 text-primary" />
                 </div>
-                <div className="flex flex-col gap-1 max-w-[80%]">
+                <div className="flex flex-col gap-1 w-full max-w-4xl">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-foreground">{selectedTicket.creatorName}</span>
                     <span className="text-xs text-muted-foreground">Taller original</span>
                   </div>
-                  <div className="bg-card border border-border p-4 rounded-2xl rounded-tl-none shadow-sm text-foreground text-sm whitespace-pre-wrap">
+                  <div className="bg-card border border-border p-5 rounded-2xl rounded-tl-none shadow-sm text-foreground text-sm whitespace-pre-wrap">
                     {selectedTicket.description}
                   </div>
                 </div>
               </div>
 
+              {/* Soluciones previas (si existen) */}
               {isLoadingMessages ? (
                 <div className="flex justify-center py-4">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                messages.map(msg => {
-                  const isAdmin = !msg.senderId; // null implies admin/system
-                  return (
-                    <div key={msg.id} className={`flex gap-4 ${isAdmin ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center border ${isAdmin ? 'bg-blue-600 border-blue-500' : 'bg-primary/20 border-primary/30'}`}>
-                        {isAdmin ? <div className="text-white font-bold text-xs">A</div> : <User className="w-5 h-5 text-primary" />}
+                messages.filter(msg => msg.senderName === 'Admin').map(msg => (
+                  <div key={msg.id} className="flex gap-4">
+                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex flex-shrink-0 items-center justify-center border border-emerald-500/30">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    <div className="flex flex-col gap-1 w-full max-w-4xl">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-emerald-500">Solución (Admin)</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(msg.createdAt), "d MMM, h:mm a")}</span>
                       </div>
-                      <div className={`flex flex-col gap-1 max-w-[80%] ${isAdmin ? 'items-end' : 'items-start'}`}>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-foreground">{msg.senderName}</span>
-                          <span className="text-xs text-muted-foreground">{format(new Date(msg.createdAt), "h:mm a")}</span>
-                        </div>
-                        <div className={`p-4 rounded-2xl shadow-sm text-sm whitespace-pre-wrap ${isAdmin ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-card border border-border text-foreground rounded-tl-none'}`}>
-                          {msg.message}
-                        </div>
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl rounded-tl-none shadow-sm text-foreground text-sm whitespace-pre-wrap">
+                        {msg.message}
                       </div>
                     </div>
-                  );
-                })
+                  </div>
+                ))
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
-            <div className="p-4 bg-card border-t border-border">
-              <form onSubmit={handleSendMessage} className="flex gap-3 max-w-4xl mx-auto">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Escribe tu respuesta como Administrador..."
-                  disabled={selectedTicket.status === 'Finalizado'}
-                  className="flex-1 bg-muted border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-                <button 
-                  type="submit" 
-                  disabled={!newMessage.trim() || isSending || selectedTicket.status === 'Finalizado'}
-                  className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            {/* Solution Input */}
+            {selectedTicket.status !== 'Finalizado' ? (
+              <div className="p-6 bg-card border-t border-border">
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    console.log("=== FINALIZAR TICKET BUTTON CLICKED ===");
+                    console.log("Selected ticket:", selectedTicket?.id);
+                    console.log("New message:", newMessage);
+                    console.log("Is sending:", isSending);
+
+                    if (!newMessage.trim() || isSending || !selectedTicket) {
+                      console.log("Submission aborted: empty message, already sending, or no ticket selected.");
+                      return;
+                    }
+                    
+                    const messageToSend = newMessage.trim();
+                    setIsSending(true);
+                    
+                    try {
+                      console.log("Enviando solución al backend...");
+                      // 1. Enviar el mensaje
+                      const result = await replyToTicketAdmin(selectedTicket.id, messageToSend);
+                      console.log("Resultado de replyToTicketAdmin:", result);
+
+                      if (result?.success) {
+                        // Actualizar localmente de inmediato para mayor rapidez (el realtime también lo hará)
+                        setMessages(prev => [...prev, {
+                          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(),
+                          message: messageToSend,
+                          createdAt: new Date().toISOString(),
+                          senderId: null,
+                          senderName: 'Admin',
+                        }]);
+                        setNewMessage('');
+                        
+                        console.log("Cambiando estado a Finalizado...");
+                        // 2. Cambiar estado a finalizado
+                        await handleStatusChange('Finalizado');
+                        console.log("Estado cambiado exitosamente.");
+                      } else {
+                        console.error("Error al enviar solución:", result);
+                        toast({ title: 'Error', description: result?.message || 'Error al enviar la solución', variant: 'destructive' });
+                      }
+                    } catch(err: any) {
+                      console.error("Excepción durante el envío:", err);
+                      toast({ title: 'Error de servidor', description: err.message, variant: 'destructive' });
+                    } finally {
+                      setIsSending(false);
+                      console.log("=== FINALIZAR TICKET PROCESS COMPLETED ===");
+                    }
+                  }} 
+                  className="flex flex-col gap-3 max-w-4xl mx-auto"
                 >
-                  {isSending ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : <Send className="w-5 h-5" />}
-                  <span className="hidden sm:inline">Enviar</span>
-                </button>
-              </form>
-              {selectedTicket.status === 'Finalizado' && (
-                <p className="text-xs text-center text-muted-foreground mt-3">
-                  Este ticket está finalizado. Cambia el estado a "En Revisión" para enviar más mensajes.
+                  <label className="text-sm font-semibold text-foreground">Dar Solución y Finalizar Ticket</label>
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Describe la solución dada al problema..."
+                    className="w-full min-h-[100px] bg-muted border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+                  />
+                  <div className="flex justify-end gap-3 mt-2">
+                    <button 
+                      type="button"
+                      onClick={() => handleStatusChange('En Revisión')}
+                      className="px-4 py-2 rounded-xl text-sm font-medium border border-border text-foreground hover:bg-muted transition-colors"
+                    >
+                      Marcar en Revisión
+                    </button>
+                    <button 
+                      type="submit" 
+                      disabled={!newMessage.trim() || isSending}
+                      className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                    >
+                      {isSending ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> : <CheckCircle2 className="w-4 h-4" />}
+                      Finalizar Ticket
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="p-4 bg-card border-t border-border text-center">
+                <p className="text-sm text-emerald-500 font-medium">
+                  Este ticket ha sido finalizado. Si necesitas añadir otra solución, cambia el estado a "En Revisión".
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
       </div>

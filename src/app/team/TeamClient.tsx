@@ -300,8 +300,9 @@ export default function TeamPage() {
           
           {/* Main User List */}
           <div className="lg:col-span-2 space-y-6">
-            <Card className="bg-card border-border/50">
-              <CardHeader className="pb-3 border-b border-border/50 flex flex-col gap-4">
+            <Card className="glass-card relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <CardHeader className="pb-3 border-b border-border/50 flex flex-col gap-4 relative z-10">
                 <div className="flex flex-row items-center justify-between">
                   <h2 className="text-xl font-bold">Técnicos Activos</h2>
                 </div>
@@ -322,7 +323,7 @@ export default function TeamPage() {
                       key={user.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center justify-between p-4 sm:p-6 hover:bg-muted/20 transition-colors"
+                      className="flex items-center justify-between p-4 sm:p-6 hover:bg-primary/5 transition-colors relative z-10"
                     >
                       <div className="flex items-center gap-4">
                         <Avatar className="h-10 w-10 border border-border">
@@ -394,8 +395,9 @@ export default function TeamPage() {
 
           {/* Sidebar Info */}
           <div className="space-y-6">
-            <Card className="bg-card border-border/50 sticky top-6">
-              <CardHeader>
+            <Card className="glass-card relative overflow-hidden group sticky top-6">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <CardHeader className="relative z-10">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Shield className="h-5 w-5 text-primary" />
                   Niveles de Acceso

@@ -56,8 +56,9 @@ export default async function TechniciansPage() {
         </div>
 
         <TabsContent value="list" className="mt-0">
-          <Card className="bg-card/50 border-border/50 text-foreground">
-            <CardHeader>
+          <Card className="glass-card relative overflow-hidden group text-foreground">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            <CardHeader className="relative z-10">
               <CardTitle>Lista de Personal</CardTitle>
               <CardDescription className="text-muted-foreground">
                 Una lista de todos los técnicos de tu equipo.
@@ -71,7 +72,7 @@ export default async function TechniciansPage() {
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-border/50 hover:bg-card/50">
+                    <TableRow className="border-border/50 hover:bg-transparent">
                       <TableHead className="text-foreground/90">Nombre</TableHead>
                       <TableHead className="text-foreground/90">Especialidad</TableHead>
                       <TableHead className="text-foreground/90 text-center">Órdenes de Trabajo</TableHead>
@@ -101,8 +102,9 @@ export default async function TechniciansPage() {
 
         {isAdminOrOwner && (
           <TabsContent value="analysis" className="mt-0">
-            <Card className="bg-card/50 border-border/50 text-foreground">
-              <CardHeader className="flex flex-row items-center justify-between">
+            <Card className="glass-card relative overflow-hidden group text-foreground">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+              <CardHeader className="flex flex-row items-center justify-between relative z-10">
                 <div className="space-y-1.5">
                   <CardTitle>Rendimiento de Técnicos</CardTitle>
                   <CardDescription className="text-muted-foreground">

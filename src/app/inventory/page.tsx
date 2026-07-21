@@ -87,8 +87,9 @@ export default async function InventoryPage({
             <AddInventoryItem />
         </div>
       </div>
-      <Card className="bg-card/50 border-border/50 text-foreground">
-        <CardHeader>
+      <Card className="glass-card relative overflow-hidden group text-foreground">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+        <CardHeader className="relative z-10">
           <CardTitle>Repuestos y Suministros</CardTitle>
           <CardDescription className="text-muted-foreground">
             Una lista de todos los artículos en tu inventario.
@@ -97,7 +98,7 @@ export default async function InventoryPage({
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow className="border-border/50 hover:bg-card/50">
+              <TableRow className="border-border/50 hover:bg-transparent">
                 <TableHead className="text-foreground/90">Nombre del Artículo</TableHead>
                 <TableHead className="hidden md:table-cell text-foreground/90">Categoría</TableHead>
                 <TableHead className="hidden lg:table-cell text-foreground/90">Ubicación</TableHead>
@@ -111,7 +112,7 @@ export default async function InventoryPage({
               {inventory.map((item) => {
                 const isLowStock = item.quantity <= item.minimumQuantity;
                 return (
-                  <TableRow key={item.id} className={cn('border-border/50 hover:bg-card/50', isLowStock && 'bg-destructive/20')}>
+                  <TableRow key={item.id} className={cn('border-border/50 hover:bg-primary/5 transition-colors', isLowStock && 'bg-destructive/20 hover:bg-destructive/30')}>
                     <TableCell className="font-medium">
                         <div>{item.name}</div>
                         <div className="text-sm text-muted-foreground font-mono">{item.sku}</div>

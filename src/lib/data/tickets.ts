@@ -19,7 +19,8 @@ export const getWorkshopTickets = async () => {
     .from('tickets')
     .select(`
       id, subject, description, status, created_at,
-      creator:user_profiles!created_by (name)
+      creator:user_profiles!created_by (name),
+      workshop:workshops (name)
     `)
     .eq('workshop_id', workshopId)
     .order('created_at', { ascending: false });
@@ -36,6 +37,7 @@ export const getWorkshopTickets = async () => {
     status: t.status,
     createdAt: t.created_at,
     creatorName: t.creator?.name || 'Desconocido',
+    workshopName: t.workshop?.name || 'Taller',
   }));
 };
 

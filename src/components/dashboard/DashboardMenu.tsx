@@ -17,14 +17,24 @@ import {
 } from 'lucide-react';
 import { hasPermission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
+import { AddWorkOrder } from '@/components/forms/AddWorkOrder';
+import type { Motorcycle, Technician } from '@/lib/types';
 
 interface DashboardMenuProps {
   role: string;
   userName?: string;
   workshopName?: string;
+  motorcycles?: Motorcycle[];
+  technicians?: Technician[];
 }
 
-export function DashboardMenu({ role, userName = 'Usuario', workshopName = 'Tu Taller' }: DashboardMenuProps) {
+export function DashboardMenu({ 
+  role, 
+  userName = 'Usuario', 
+  workshopName = 'Tu Taller',
+  motorcycles = [],
+  technicians = []
+}: DashboardMenuProps) {
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -101,12 +111,18 @@ export function DashboardMenu({ role, userName = 'Usuario', workshopName = 'Tu T
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-4 mt-auto">
-                    <Link href="/work-orders/new" className="flex-1">
-                      <button className="w-full py-3.5 px-6 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98]">
-                        <PlusCircle className="w-5 h-5" />
-                        Nueva Orden
-                      </button>
-                    </Link>
+                    <div className="flex-1">
+                      <AddWorkOrder 
+                        motorcycles={motorcycles} 
+                        technicians={technicians}
+                        customTrigger={
+                          <button className="w-full py-3.5 px-6 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98]">
+                            <PlusCircle className="w-5 h-5" />
+                            Nueva Orden
+                          </button>
+                        }
+                      />
+                    </div>
                     <Link href="/work-orders" className="flex-1">
                       <button className="w-full py-3.5 px-6 rounded-2xl bg-foreground/5 hover:bg-foreground/10 text-foreground font-medium border border-foreground/10 transition-all flex items-center justify-center gap-2 active:scale-[0.98]">
                         Ver todas

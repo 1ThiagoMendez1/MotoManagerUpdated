@@ -27,6 +27,7 @@ import type { Motorcycle, Technician } from '@/lib/types';
 type AddWorkOrderProps = {
   motorcycles: Motorcycle[];
   technicians: Technician[];
+  customTrigger?: React.ReactNode;
 };
 
 function SubmitButton() {
@@ -38,7 +39,7 @@ function SubmitButton() {
   );
 }
 
-export function AddWorkOrder({ motorcycles, technicians }: AddWorkOrderProps) {
+export function AddWorkOrder({ motorcycles, technicians, customTrigger }: AddWorkOrderProps) {
   const [isOpen, setIsOpen] = useState(false);
   // @ts-ignore
   const [state, formAction] = useActionState(createWorkOrder, undefined);
@@ -56,10 +57,12 @@ export function AddWorkOrder({ motorcycles, technicians }: AddWorkOrderProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Nueva Orden de Trabajo
-        </Button>
+        {customTrigger ? customTrigger : (
+          <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Nueva Orden de Trabajo
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground">
         <DialogHeader>
