@@ -1,7 +1,7 @@
 'use client'
 
 import { registerWorkshop } from './actions'
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,6 +11,15 @@ import { useFormStatus } from 'react-dom'
 import { Wrench, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Calendar as CalendarIcon } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { format, differenceInDays } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { DateRange } from 'react-day-picker'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 
 const initialState = {
     error: '',
@@ -31,9 +40,28 @@ function SubmitButton() {
 }
 
 export default function RegisterForm() {
+    const router = useRouter()
     // @ts-ignore - useFormState types might conflict in some setups but this is valid
     const [state, formAction] = useActionState(registerWorkshop, initialState)
     const [plan, setPlan] = useState('monthly')
+    const [dateRange, setDateRange] = useState<DateRange | undefined>({
+        from: new Date(),
+        to: new Date(new Date().setDate(new Date().getDate() + 15)),
+    })
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+
+    useEffect(() => {
+        if (state?.error) {
+            toast.error('Error al registrar', {
+                description: state.error,
+                duration: 5000,
+            });
+        }
+        if (state?.success && state?.data) {
+            setShowSuccessDialog(true);
+            toast.success('Registro exitoso');
+        }
+    }, [state]);
 
     return (
         <div className="w-full flex flex-col items-center justify-center p-4 py-12 relative z-10">
@@ -84,6 +112,28 @@ export default function RegisterForm() {
                             <p className="text-xs text-muted-foreground">Usado en tu URL personalizada</p>
                         </div>
 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="legalName">Razón Social (Opcional)</Label>
+                                <Input
+                                    id="legalName"
+                                    name="legalName"
+                                    placeholder="Motos y Repuestos S.A.S."
+                                    className="bg-card/50 border-border/50 placeholder:text-muted-foreground"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="taxIdentifier">RUT / NIT (Opcional)</Label>
+                                <Input
+                                    id="taxIdentifier"
+                                    name="taxIdentifier"
+                                    placeholder="900.123.456-7"
+                                    className="bg-card/50 border-border/50 placeholder:text-muted-foreground"
+                                />
+                            </div>
+                        </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="subscriptionPlan">Plan de Suscripción</Label>
                             <Select name="subscriptionPlan" value={plan} onValueChange={setPlan} required>
@@ -101,17 +151,44 @@ export default function RegisterForm() {
 
                         {plan === 'demo' && (
                             <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                                <Label htmlFor="demoDays">Días de Vigencia (Demo)</Label>
-                                <Input
-                                    id="demoDays"
-                                    name="demoDays"
-                                    type="number"
-                                    min="1"
-                                    required
-                                    placeholder="Ej: 15"
-                                    className="bg-card/50 border-border/50 placeholder:text-muted-foreground"
-                                />
-                                <p className="text-xs text-muted-foreground">La cuenta se bloqueará automáticamente después de estos días.</p>
+                                <Label>Vigencia de la Demo (Ida y Vuelta)</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            id="date"
+                                            variant={"outline"}
+                                            className={`w-full justify-start text-left font-normal bg-card/50 border-border/50 text-foreground hover:bg-card/70 ${!dateRange && "text-muted-foreground"}`}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dateRange?.from ? (
+                                                dateRange.to ? (
+                                                    <>
+                                                        {format(dateRange.from, "LLL dd, y", { locale: es })} -{" "}
+                                                        {format(dateRange.to, "LLL dd, y", { locale: es })}
+                                                    </>
+                                                ) : (
+                                                    format(dateRange.from, "LLL dd, y", { locale: es })
+                                                )
+                                            ) : (
+                                                <span>Selecciona fecha de inicio y fin</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 bg-background border-border" align="start">
+                                        <Calendar
+                                            initialFocus
+                                            mode="range"
+                                            defaultMonth={dateRange?.from}
+                                            selected={dateRange}
+                                            onSelect={setDateRange}
+                                            numberOfMonths={2}
+                                            locale={es}
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                                <input type="hidden" name="demoStartDate" value={dateRange?.from?.toISOString() || ''} />
+                                <input type="hidden" name="demoEndDate" value={dateRange?.to?.toISOString() || ''} />
+                                <p className="text-xs text-muted-foreground">La cuenta mostrará que está en demo y se bloqueará al finalizar este periodo.</p>
                             </div>
                         )}
 
@@ -182,6 +259,57 @@ export default function RegisterForm() {
                     </p>
                 </CardContent>
             </Card>
+
+            <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+                <AlertDialogContent className="bg-card text-foreground border-border max-w-md">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">¡Taller Registrado Exitosamente!</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-4 text-sm mt-4 text-muted-foreground">
+                                <p>El taller ha sido creado y tu cuenta configurada correctamente.</p>
+                                <div className="bg-background/50 border border-border/50 p-4 rounded-xl space-y-3">
+                                    <p><strong className="text-foreground">Taller:</strong> {state?.data?.workshopName}</p>
+                                    {state?.data?.legalName && (
+                                        <p><strong className="text-foreground">Razón Social:</strong> {state.data.legalName}</p>
+                                    )}
+                                    {state?.data?.taxIdentifier && (
+                                        <p><strong className="text-foreground">RUT/NIT:</strong> {state.data.taxIdentifier}</p>
+                                    )}
+                                    <p><strong className="text-foreground">URL (Slug):</strong> {state?.data?.slug}</p>
+                                    
+                                    <div className="h-px bg-border my-2" />
+                                    
+                                    <p><strong className="text-foreground">Propietario:</strong> {state?.data?.fullName}</p>
+                                    <p><strong className="text-foreground">Email:</strong> {state?.data?.email}</p>
+                                    <p><strong className="text-foreground">Teléfono:</strong> {state?.data?.phone}</p>
+                                    
+                                    <div className="h-px bg-border my-2" />
+                                    
+                                    <p><strong className="text-foreground">Plan:</strong> {state?.data?.subscriptionPlan === 'demo' ? 'Demo (Solo Administradores)' : state?.data?.subscriptionPlan}</p>
+                                    
+                                    {state?.data?.subscriptionPlan === 'demo' && state?.data?.demoStartDate && state?.data?.demoEndDate && (
+                                        <>
+                                            <div className="h-px bg-border my-2" />
+                                            <p><strong className="text-foreground">Inicio de Demo:</strong> {format(new Date(state.data.demoStartDate), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                                            <p><strong className="text-foreground">Fin de Demo:</strong> {format(new Date(state.data.demoEndDate), "dd 'de' MMMM, yyyy", { locale: es })}</p>
+                                            <div className="mt-3 p-3 bg-primary/10 rounded-lg border border-primary/20 text-center">
+                                                <p className="text-primary font-semibold">
+                                                    Días de prueba: {differenceInDays(new Date(state.data.demoEndDate), new Date(state.data.demoStartDate))} días
+                                                </p>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-6">
+                        <AlertDialogAction onClick={() => router.push('/admin')} className="w-full">
+                            Volver al Administrador
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

@@ -14,7 +14,7 @@ export async function loginAction(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -25,7 +25,15 @@ export async function loginAction(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/dashboard');
+
+  const user = data?.user;
+  const isSuperAdmin = user?.user_metadata?.is_super_admin === true || user?.email?.startsWith('admin@');
+
+  if (isSuperAdmin) {
+    redirect('/admin');
+  } else {
+    redirect('/dashboard');
+  }
 }
 
 export async function registerWorkshopAction(formData: FormData) {

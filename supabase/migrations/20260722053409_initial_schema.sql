@@ -154,7 +154,14 @@ CREATE POLICY "Admins can manage organization members" ON public.organization_me
 -- Función para crear una nueva organización y asignar al creador como Owner
 CREATE OR REPLACE FUNCTION public.create_organization_with_owner(
     org_name TEXT,
-    org_slug TEXT
+    org_slug TEXT,
+    org_email TEXT DEFAULT NULL,
+    org_phone TEXT DEFAULT NULL,
+    org_legal_name TEXT DEFAULT NULL,
+    org_tax_identifier TEXT DEFAULT NULL,
+    sub_plan TEXT DEFAULT 'monthly',
+    demo_start TEXT DEFAULT NULL,
+    demo_end TEXT DEFAULT NULL
 ) RETURNS UUID AS $$
 DECLARE
     new_org_id UUID;
@@ -165,8 +172,23 @@ BEGIN
     END IF;
 
     -- Insertar organización
-    INSERT INTO public.organizations (name, slug)
-    VALUES (org_name, org_slug)
+    INSERT INTO public.organizations (name, slug, email, phone, legal_name, tax_identifier, settings)
+    VALUES (
+        org_name, 
+        org_slug,
+        org_email,
+        org_phone,
+        org_legal_name,
+        org_tax_identifier,
+        (
+            CASE 
+                WHEN sub_plan = 'demo' AND demo_start IS NOT NULL AND demo_end IS NOT NULL THEN
+                    jsonb_build_object('plan', sub_plan, 'demoStartDate', demo_start, 'demoEndDate', demo_end)
+                ELSE
+                    jsonb_build_object('plan', sub_plan)
+            END
+        )
+    )
     RETURNING id INTO new_org_id;
 
     -- Añadir como owner

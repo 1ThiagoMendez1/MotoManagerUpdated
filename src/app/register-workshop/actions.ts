@@ -1,6 +1,5 @@
 'use server';
 
-import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
@@ -13,7 +12,10 @@ const registrationSchema = z.object({
     fullName: z.string().min(2),
     phone: z.string().min(8, 'El teléfono debe tener al menos 8 dígitos'),
     subscriptionPlan: z.enum(['monthly', 'biannual', 'yearly', 'demo']),
-    demoDays: z.string().optional(),
+    demoStartDate: z.string().optional(),
+    demoEndDate: z.string().optional(),
+    legalName: z.string().optional(),
+    taxIdentifier: z.string().optional(),
 })
 
 export async function registerWorkshop(prevState: any, formData: FormData) {
@@ -35,7 +37,7 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         return { error: 'Datos inválidos', details: validation.error.flatten().fieldErrors }
     }
 
-    const { workshopName, slug, email, fullName, phone, subscriptionPlan, demoDays } = validation.data
+    const { workshopName, slug, email, fullName, phone, subscriptionPlan, demoStartDate, demoEndDate, legalName, taxIdentifier } = validation.data
 
     const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
 
@@ -72,37 +74,50 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         return { error: 'No se pudo crear el usuario.' }
     }
 
-    console.log('User created:', authData.user.id);
-
-    console.log('Signing in the new user to create organization...');
-    // Iniciar sesión con el nuevo usuario para obtener el contexto de RLS y auth.uid()
-    const { createClient } = await import('@/lib/supabase/server');
-    const supabase = await createClient();
+    console.log('Signing in the new user in a memory client to create organization...');
     
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    // Creamos un cliente en memoria que NO usa cookies, para no sobreescribir la sesión del admin
+    const tempClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+            }
+        }
+    );
+
+    const { error: signInError } = await tempClient.auth.signInWithPassword({
         email,
         password: generatedPassword
     });
 
     if (signInError) {
         console.error('Sign In Error:', signInError);
-        return { error: 'Error al iniciar sesión tras el registro: ' + signInError.message };
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        return { error: 'Error de autenticación temporal: ' + signInError.message };
     }
 
     console.log('Calling create_organization_with_owner RPC...');
     
-    // Llamar al RPC usando la sesión del usuario recién creado
-    const { data: orgId, error: rpcError } = await supabase.rpc('create_organization_with_owner', {
+    // Llamar al RPC usando la sesión en memoria
+    const { data: orgId, error: rpcError } = await tempClient.rpc('create_organization_with_owner', {
         org_name: workshopName,
-        org_slug: slug
+        org_slug: slug,
+        org_email: email,
+        org_phone: phone,
+        org_legal_name: legalName || null,
+        org_tax_identifier: taxIdentifier || null,
+        sub_plan: subscriptionPlan,
+        demo_start: demoStartDate || null,
+        demo_end: demoEndDate || null
     });
 
     if (rpcError) {
         console.error('RPC Error creating organization:', rpcError);
-        // Fallback: cleanup is hard here because they are logged in, but we can try
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        await supabase.auth.signOut();
-        return { error: 'Error al crear el taller: ' + rpcError.message };
+        return { error: 'Error al crear el taller en la base de datos: ' + rpcError.message };
     }
 
     if (phone) {
@@ -117,5 +132,19 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
     }
 
     console.log('Workshop created successfully:', orgId);
-    redirect('/dashboard?firstLogin=true');
+    return {
+        success: true,
+        data: {
+            workshopName,
+            slug,
+            email,
+            phone,
+            fullName,
+            legalName,
+            taxIdentifier,
+            subscriptionPlan,
+            demoStartDate,
+            demoEndDate
+        }
+    };
 }

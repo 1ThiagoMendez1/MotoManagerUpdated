@@ -35,6 +35,11 @@ export async function requireWorkshop() {
     redirect('/login');
   }
   if (!user.workshopId) {
+    const { data: authData } = await (await createClient()).auth.getUser();
+    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.startsWith('admin@');
+    if (isSuperAdmin) {
+        redirect('/admin');
+    }
     redirect('/register-workshop');
   }
   return user;
@@ -46,6 +51,11 @@ export async function authorize(path: string) {
     redirect('/login');
   }
   if (!user.workshopId) {
+    const { data: authData } = await (await createClient()).auth.getUser();
+    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.startsWith('admin@');
+    if (isSuperAdmin) {
+        redirect('/admin');
+    }
     redirect('/register-workshop');
   }
   return user;
