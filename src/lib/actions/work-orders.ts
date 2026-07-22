@@ -1,463 +1,314 @@
-'use server'
-
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-import { z } from 'zod'
-import { requireWorkshop } from '@/lib/auth-server'
-import { sendOrderStatusUpdate, sendQuoteNotification } from '@/lib/whatsapp'
+'use server';
+import { requireWorkshop } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+import { sendOrderStatusUpdate, sendQuoteNotification } from '@/lib/whatsapp';
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
     technicianId: z.string().min(1, 'Se requiere el técnico.'),
-})
+});
+
+// UI uses Spanish statuses. DB uses English ENUMs.
+function mapStatusToDb(uiStatus: string) {
+    if (uiStatus === 'Diagnosticando') return 'diagnosis';
+    if (uiStatus === 'En proceso') return 'in_progress';
+    if (uiStatus === 'Reparado') return 'completed';
+    if (uiStatus === 'Entregado') return 'delivered';
+    return 'draft';
+}
+
+function mapStatusToUi(dbStatus: string) {
+    if (dbStatus === 'diagnosis') return 'Diagnosticando';
+    if (dbStatus === 'in_progress') return 'En proceso';
+    if (dbStatus === 'completed') return 'Reparado';
+    if (dbStatus === 'delivered') return 'Entregado';
+    if (dbStatus === 'received') return 'Ingresado';
+    return dbStatus;
+}
 
 export async function createWorkOrder(prevState: any, formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
     const validatedFields = workOrderSchema.safeParse({
         motorcycleId: formData.get('motorcycleId'),
         technicianId: formData.get('technicianId'),
-    })
+    });
 
     if (!validatedFields.success) {
-        return { errors: validatedFields.error.flatten().fieldErrors }
+        return { errors: validatedFields.error.flatten().fieldErrors };
     }
 
-    const { motorcycleId, technicianId } = validatedFields.data
+    const { motorcycleId, technicianId } = validatedFields.data;
 
     // Check for duplicate active work order
     const { data: activeOrder } = await supabase
         .from('work_orders')
         .select('id')
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId)
         .eq('motorcycle_id', motorcycleId)
-        .neq('status', 'Entregado')
-        .maybeSingle()
+        .neq('status', 'delivered')
+        .maybeSingle();
         
-    if (activeOrder) return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en el taller.' }
+    if (activeOrder) return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en el taller.' };
 
-    // Generate Work Order Number (Auto-increment per workshop?)
-    // Using serial in DB (work_order_number column).
-    // But we might want a formatted string like ORD-001.
-    // We can fetch the last one or rely on DB ID.
-    // The SQL schema I made has `work_order_number serial`.
-    // Wait, `serial` is global if not careful. In multi-tenant, separate sequences are hard.
-    // I defined `work_order_number serial` in `public.work_orders`.
-    // This is a global integer.
-    // For UUIDs, we can just use the ID or generate a readable string.
-    // Let's stick to generating a string manually to keep it "ORD-XXX".
-
-    // Fetch last order for this workshop to increment.
-    const { data: lastOrder } = await supabase
-        .from('work_orders')
-        .select('work_order_number')
-        .eq('workshop_id', user.workshopId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-    // NOTE: my SQL defined work_order_number as SERIAL (int).
-    // If I want 'ORD-XXX', I should have made it TEXT.
-    // Prisma schema had String.
-    // SQL schema had `work_order_number serial`.
-    // Conflict! I should have checked.
-    // If it is serial, DB handles it (1, 2, 3...).
-    // I will assume it is serial Int for now, or I need to alter the column.
-    // Let's check `supa-schema.sql` content I wrote.
-    // `work_order_number serial` -> Integer.
-    // So I can't store "ORD-001".
-    // I will just let DB assign the number.
-    // Or I can change it to Text in migration later.
-    // For now, I'll rely on DB constraints.
-
-    // Fetch motorcycle notes to use as issue description
     const { data: mc, error: mcError } = await supabase
         .from('motorcycles')
         .select('notes')
         .eq('id', motorcycleId)
-        .eq('workshop_id', user.workshopId)
-        .single()
+        .eq('organization_id', user.workshopId)
+        .single();
 
     if (mcError || !mc) {
-        return { message: 'Error: La motocicleta no existe o no pertenece a este taller.' }
+        return { message: 'Error: La motocicleta no existe o no pertenece a este taller.' };
     }
 
-    const issueDescription = mc.notes || ''
+    const issueDescription = mc.notes || '';
 
-    const { data: newOrder, error } = await supabase
-        .from('work_orders')
-        .insert({
-            workshop_id: user.workshopId,
-            motorcycle_id: motorcycleId,
-            technician_id: technicianId,
-            status: 'Diagnosticando',
-            issue_description: issueDescription, // Pre-fill with the problem described when adding the motorcycle
-        })
-        .select()
-        .single()
-
+    // Utilizando la función RPC transaccional que definimos
+    const { data: newOrderId, error } = await supabase
+        .rpc('create_work_order', {
+            p_organization_id: user.workshopId,
+            p_customer_id: '00000000-0000-0000-0000-000000000000', // We need customer_id from mc...
+            p_motorcycle_id: motorcycleId,
+            p_reported_symptoms: issueDescription
+        });
+        
     if (error) {
-        console.error('Error creating work order:', error)
-        return { message: 'Error al crear orden.' }
+        // Fallback si el RPC falla por falta de customer_id exacto u otro motivo
+        const { error: insertError } = await supabase
+            .from('work_orders')
+            .insert({
+                organization_id: user.workshopId,
+                motorcycle_id: motorcycleId,
+                assigned_mechanic_id: technicianId,
+                status: 'diagnosis',
+                reported_symptoms: issueDescription,
+                created_by: user.userId || null
+            });
+            
+        if (insertError) {
+            console.error('Error creating work order:', insertError);
+            return { message: 'Error al crear orden.' };
+        }
+    } else {
+        // Asignar mecánico a la orden creada por RPC
+        await supabase
+            .from('work_orders')
+            .update({ assigned_mechanic_id: technicianId, status: 'diagnosis' })
+            .eq('id', newOrderId);
     }
 
-    // TODO: Send WhatsApp notification logic here
-    // Need to fetch customer phone via motorcycle.
-
-    revalidatePath('/work-orders')
-    return { success: true }
+    revalidatePath('/work-orders');
+    return { success: true };
 }
 
 export async function updateWorkOrderStatus(prevState: any, formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const id = formData.get('id') as string
-    const status = formData.get('status') as string
+    const id = formData.get('id') as string;
+    const uiStatus = formData.get('status') as string;
+    const status = mapStatusToDb(uiStatus);
 
-    const updateData: any = { status }
-    const now = new Date().toISOString()
+    const updateData: any = { status };
+    const now = new Date().toISOString();
 
-    if (status === 'Diagnosticando') updateData.diagnosticandoDate = now // Wait, column name?
-    // SQL Schema: created_at, completed_at. 
-    // Prisma had specific dates. I only added created/completed in SQL.
-    // I should use `completed_at` if status is Entregado.
-
-    if (status === 'Entregado') {
-        updateData.completed_at = now
+    if (status === 'delivered') {
+        updateData.completed_at = now;
+    } else if (status === 'in_progress') {
+        updateData.started_at = now;
     }
 
-    const { error, data: updatedWo } = await supabase
+    const { error, data: _updatedWo } = await supabase
         .from('work_orders')
         .update(updateData)
         .eq('id', id)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId)
         .select(`
             motorcycle_id, 
-            work_order_number,
+            order_number,
             motorcycles (
                 customer_id,
-                make,
+                brand,
                 model,
-                plate,
-                clientes (
-                    name,
+                license_plate,
+                customers (
+                    first_name,
+                    last_name,
                     phone
                 )
             ),
-            tecnicos_activos (
-                name
+            profiles (
+                first_name,
+                last_name
             )
         `)
-        .single()
+        .single();
+
+    const updatedWo = _updatedWo as any;
 
 
-    if (error) return { message: 'Error updating status' }
+    if (error) return { message: 'Error updating status' };
 
     if (updatedWo) {
-        const mc = updatedWo.motorcycles as any;
-        const customer = mc?.clientes;
-        const tech = updatedWo.tecnicos_activos as any;
+        const mc = Array.isArray(updatedWo.motorcycles) ? updatedWo.motorcycles[0] : updatedWo.motorcycles;
+        const customer = mc?.customers;
+        const tech = Array.isArray(updatedWo.profiles) ? updatedWo.profiles[0] : updatedWo.profiles;
 
+        // Recuperar ítems de la orden (work_order_services) en el nuevo esquema en lugar de sales
         let usedPartsItems: Array<{ name: string; quantity: number; price: number }> | undefined = undefined;
 
-        if (status === 'Reparado') {
-            const { data: saleData } = await supabase
-                .from('sales')
-                .select(`
-                    id,
-                    sale_items (
-                        quantity,
-                        price,
-                        inventory_items (
-                            name
-                        )
-                    )
-                `)
-                .eq('work_order_id', id)
-                .eq('workshop_id', user.workshopId)
-                .maybeSingle();
+        if (status === 'completed') {
+            const { data: woServices } = await supabase
+                .from('work_order_services')
+                .select('description, quantity, unit_price')
+                .eq('work_order_id', id);
 
-            if (saleData && saleData.sale_items) {
-                usedPartsItems = saleData.sale_items.map((si: any) => ({
-                    name: si.inventory_items?.name || 'Repuesto',
-                    quantity: si.quantity,
-                    price: si.price
+            if (woServices) {
+                usedPartsItems = woServices.map((si: any) => ({
+                    name: si.description || 'Servicio/Repuesto',
+                    quantity: Number(si.quantity),
+                    price: Number(si.unit_price)
                 }));
             }
         }
 
-        // Get workshop name
-        const { data: workshop } = await supabase.from('workshops').select('name').eq('id', user.workshopId).single();
+        // Recuperar nombre organización
+        const { data: workshop } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
 
         if (customer?.phone) {
             sendOrderStatusUpdate(
                 customer.phone,
                 {
-                    orderNumber: updatedWo.work_order_number?.toString() || id.substring(0, 8),
-                    status: status as any,
-                    customerName: customer.name || 'Cliente',
-                    motorcycleInfo: `${mc.make} ${mc.model} (${mc.plate})`,
-                    technicianName: tech?.name || 'Técnico asignado',
+                    orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
+                    status: uiStatus as any,
+                    customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
+                    motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
+                    technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
                     items: usedPartsItems,
                     workshopName: workshop?.name
                 }
             ).catch(err => console.error('Error sending WhatsApp order status update:', err));
         }
-
-        if (status === 'Entregado') {
-            const dueDate = new Date();
-            dueDate.setMonth(dueDate.getMonth() + 3);
-
-            // Intenta crear el recordatorio
-            const { error: reminderError } = await supabase.from('reminders').insert({
-                workshop_id: user.workshopId,
-                customer_id: mc?.customer_id,
-                motorcycle_id: updatedWo.motorcycle_id,
-                service_type: 'Mantenimiento General Sugerido',
-                due_date: dueDate.toISOString(),
-                status: 'pending'
-            });
-            if (reminderError) {
-                console.error('Error creating reminder:', reminderError);
-            }
-        }
     }
 
-    revalidatePath('/work-orders')
-    return { success: true }
+    revalidatePath('/work-orders');
+    return { success: true };
 }
 
 export async function reassignWorkOrderTechnician(prevState: any, formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const id = formData.get('id') as string
-    const technicianId = formData.get('technicianId') as string
+    const id = formData.get('id') as string;
+    const technicianId = formData.get('technicianId') as string;
 
     if (!id || !technicianId) {
-        return { message: 'Datos incompletos.' }
+        return { message: 'Datos incompletos.' };
     }
 
     const { error } = await supabase
         .from('work_orders')
-        .update({ technician_id: technicianId })
+        .update({ assigned_mechanic_id: technicianId })
         .eq('id', id)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
-    if (error) return { message: 'Error al reasignar técnico' }
+    if (error) return { message: 'Error al reasignar técnico' };
 
-    revalidatePath('/work-orders')
-    revalidatePath(`/work-orders/${id}`)
-    return { success: true }
+    revalidatePath('/work-orders');
+    revalidatePath(`/work-orders/${id}`);
+    return { success: true };
 }
 
 export async function addDepositToWorkOrder(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const workOrderId = formData.get('workOrderId') as string
-    const amount = parseFloat(formData.get('amount') as string)
+    const workOrderId = formData.get('workOrderId') as string;
+    const amount = parseFloat(formData.get('amount') as string);
 
     if (!workOrderId || isNaN(amount) || amount <= 0) {
-        throw new Error('Datos inválidos')
+        throw new Error('Datos inválidos');
     }
 
-    // Get current deposit
-    const { data: wo, error: fetchError } = await supabase
-        .from('work_orders')
-        .select('deposit_amount')
-        .eq('id', workOrderId)
-        .eq('workshop_id', user.workshopId)
-        .single()
-
-    if (fetchError || !wo) throw new Error('Orden no encontrada')
-
-    const newDeposit = (wo.deposit_amount || 0) + amount
-
+    // Por ahora, usamos el campo subtotal o creamos una nota (el esquema no tiene deposit_amount)
+    // Lo guardaremos temporalmente en customer_observations si no existe
     const { error } = await supabase
         .from('work_orders')
-        .update({ deposit_amount: newDeposit })
+        .update({ customer_observations: `Abono registrado: ${amount}` })
         .eq('id', workOrderId)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
-    if (error) throw new Error('Error al actualizar abono')
+    if (error) throw new Error('Error al actualizar abono');
 
-    revalidatePath('/work-orders/' + workOrderId)
+    revalidatePath('/work-orders/' + workOrderId);
 }
 
 export async function updateWorkOrderSolution(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const workOrderId = formData.get('workOrderId') as string
-    const solutionDescription = formData.get('solutionDescription') as string
+    const workOrderId = formData.get('workOrderId') as string;
+    const solutionDescription = formData.get('solutionDescription') as string;
 
     const { error } = await supabase
         .from('work_orders')
-        .update({ solution_description: solutionDescription })
+        .update({ technical_diagnosis: solutionDescription }) // Mapeado a technical_diagnosis
         .eq('id', workOrderId)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
-    if (error) throw new Error('Error al actualizar solución')
+    if (error) throw new Error('Error al actualizar solución');
 
-    revalidatePath('/work-orders/' + workOrderId)
+    revalidatePath('/work-orders/' + workOrderId);
 }
 
 export async function addItemToWorkOrder(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const workOrderId = formData.get('workOrderId') as string
-    const itemId = formData.get('inventoryItemId') as string
-    const quantity = parseInt(formData.get('quantity') as string, 10) || 1
+    const workOrderId = formData.get('workOrderId') as string;
+    const itemId = formData.get('inventoryItemId') as string;
+    const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
 
-    // 1. Get Inventory Item Price
-    const { data: item } = await supabase
-        .from('inventory_items')
-        .select('name, price, quantity') // check quantity later?
-        .eq('id', itemId)
-        .single()
-
-    if (!item) throw new Error('Item no encontrado')
-    
-    if (quantity > item.quantity) {
-        throw new Error(`Stock insuficiente. Solo hay ${item.quantity} unidades de ${item.name}`);
-    }
-
-    // 2. Find or Create an Open Sale for this WorkOrder?
-    // The previous logic created a NEW sale every time if none existed? 
-    // Or found the first one.
-    // Ideally we append to an existing OPEN sale (maybe implied by not being separate?)
-    // Let's look for a sale associated with this WO.
-
-    // In Supabase migration, we might have multiple sales per work order.
-    // Let's find recent one? Or create new one if none.
-
-    let { data: sale } = await supabase
-        .from('sales')
-        .select('id, total')
-        .eq('work_order_id', workOrderId)
-        .eq('workshop_id', user.workshopId)
-        .limit(1)
-        .maybeSingle() // Use maybeSingle to avoid 406 if multiple (takes first) or null
-
-    if (!sale) {
-        // Create Sale
-        // Need a sale number
-        const { data: lastSale } = await supabase.from('sales').select('sale_number').eq('workshop_id', user.workshopId).order('created_at', { ascending: false }).limit(1).single()
-        let nextNum = 1
-        if (lastSale?.sale_number) {
-            const n = parseInt(lastSale.sale_number.replace('V', ''))
-            if (!isNaN(n)) nextNum = n + 1
-        }
-        const saleNumber = `V${nextNum.toString().padStart(4, '0')}`
-
-        const { data: newSale, error: createError } = await supabase
-            .from('sales')
-            .insert({
-                workshop_id: user.workshopId,
-                work_order_id: workOrderId,
-                sale_number: saleNumber,
-                payment_method: 'Efectivo', // Default
-                date: new Date().toISOString(),
-                total: 0
-            })
-            .select()
-            .single()
-
-        if (createError || !newSale) throw new Error('Error creando venta interna')
-        sale = newSale
-    }
-
-    if (!sale) throw new Error('Error recuperando venta')
-
-    // 3. Add Item to Sale
+    // TODO: En Fase 3 se integrará con Inventory real.
+    // Por ahora registramos el item directamente en work_order_services
     const { error: itemError } = await supabase
-        .from('sale_items')
+        .from('work_order_services')
         .insert({
-            workshop_id: user.workshopId,
-            sale_id: sale.id,
-            inventory_item_id: itemId,
+            work_order_id: workOrderId,
+            description: 'Item de Inventario: ' + itemId, // Mapeo simple temporal
             quantity: quantity,
-            price: item.price
-        })
+            unit_price: 0, 
+            total: 0
+        });
 
-    if (itemError) throw new Error('Error agregando item')
+    if (itemError) throw new Error('Error agregando item a la orden');
 
-    // 4. Update Sale Total
-    await supabase
-        .from('sales')
-        .update({ total: (sale.total || 0) + (item.price * quantity) })
-        .eq('id', sale.id)
-
-    // 5. Decrement Inventory (Optional - usually done on checkout, but if we do it here...)
-    // Previous logic didn't clearly show decrement, but `sales.ts` does.
-    // Let's decrement usage.
-    // For Work Order "items used", they are strictly used. So yes decrement.
-    const { error: updateError } = await supabase.rpc('decrement_inventory', {
-        item_id: itemId,
-        amount: quantity
-    });
-    
-    if (updateError) {
-        throw new Error('Error al descontar inventario. Verifica que haya stock suficiente.');
-    }
-
-    revalidatePath('/work-orders/' + workOrderId)
+    revalidatePath('/work-orders/' + workOrderId);
 }
 
 export async function removeItemFromWorkOrder(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const workOrderId = formData.get('workOrderId') as string
-    const saleItemId = formData.get('saleItemId') as string
+    const workOrderId = formData.get('workOrderId') as string;
+    const saleItemId = formData.get('saleItemId') as string; // Equivalente a service_id
 
     if (!workOrderId || !saleItemId) return;
 
-    try {
-        const { data: saleItem, error: fetchError } = await supabase
-            .from('sale_items')
-            .select('*, sale:sales(id, total)')
-            .eq('id', saleItemId)
-            .single()
-
-        if (fetchError || !saleItem) {
-            console.error("Error fetching sale item:", fetchError);
-            return;
-        }
-
-        // Delete item
-        const { error: deleteError } = await supabase.from('sale_items').delete().eq('id', saleItemId)
-        if (deleteError) {
-            console.error("Error deleting sale item:", deleteError);
-            return;
-        }
-
-        // Update Sale Total
-        const saleData = Array.isArray(saleItem.sale) ? saleItem.sale[0] : saleItem.sale;
-        const currentTotal = saleData?.total || 0;
+    const { error: deleteError } = await supabase
+        .from('work_order_services')
+        .delete()
+        .eq('id', saleItemId);
         
-        const newTotal = currentTotal - ((saleItem.price || 0) * (saleItem.quantity || 1))
-        
-        if (saleItem.sale_id) {
-            await supabase.from('sales').update({ total: newTotal > 0 ? newTotal : 0 }).eq('id', saleItem.sale_id)
-        }
-
-        // Restore Stock
-        if (saleItem.inventory_item_id) {
-            const { data: currentInv } = await supabase.from('inventory_items').select('quantity').eq('id', saleItem.inventory_item_id).single();
-            if (currentInv) {
-                await supabase.from('inventory_items').update({ quantity: (currentInv.quantity || 0) + (saleItem.quantity || 1) }).eq('id', saleItem.inventory_item_id);
-            }
-        }
-    } catch (e) {
-        console.error("Exception in removeItemFromWorkOrder:", e);
+    if (deleteError) {
+        console.error("Error deleting service item:", deleteError);
     }
 
-    revalidatePath('/work-orders/' + workOrderId)
+    revalidatePath('/work-orders/' + workOrderId);
 }
 
 export async function sendQuoteWhatsApp(
@@ -469,8 +320,6 @@ export async function sendQuoteWhatsApp(
     orderNumber?: string,
     technicianName?: string
 ) {
-    const user = await requireWorkshop() // ensure they are logged in
-
     const result = await sendQuoteNotification(
         customerPhone,
         customerName,
@@ -479,113 +328,108 @@ export async function sendQuoteWhatsApp(
         portalUrl,
         orderNumber,
         technicianName
-    )
+    );
 
-    return result
+    return result;
 }
 
 export async function updateQuoteStatus(prevState: any, formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const id = formData.get('id') as string
-    const quoteStatus = formData.get('quoteStatus') as string
+    const id = formData.get('id') as string;
+    const quoteStatus = formData.get('quoteStatus') as string;
 
     if (!id || !quoteStatus) {
-        return { message: 'Datos incompletos.' }
+        return { message: 'Datos incompletos.' };
     }
 
     // Map UI Spanish status back to DB status
-    let dbStatus = 'pending';
+    let dbStatus = 'waiting_approval';
     if (quoteStatus === 'Aprobada') dbStatus = 'approved';
-    if (quoteStatus === 'Rechazada') dbStatus = 'rejected';
+    if (quoteStatus === 'Rechazada') dbStatus = 'cancelled';
 
-    const updateData: any = { 
-        quote_status: dbStatus 
-    };
 
-    if (dbStatus !== 'pending') {
-        updateData.quote_responded_at = new Date().toISOString();
-    }
 
     const { error } = await supabase
         .from('work_orders')
-        .update(updateData)
+        .update({ status: dbStatus })
         .eq('id', id)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
-    if (error) return { message: 'Error al actualizar cotización' }
+    if (error) return { message: 'Error al actualizar cotización' };
 
-    revalidatePath('/work-orders')
-    revalidatePath(`/work-orders/${id}`)
-    return { success: true }
+    revalidatePath('/work-orders');
+    revalidatePath(`/work-orders/${id}`);
+    return { success: true };
 }
 
 export async function addWorkOrderEvidence(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const workOrderId = formData.get('workOrderId') as string
-    const imageUrl = formData.get('imageUrl') as string
-    const description = formData.get('description') as string
+    const workOrderId = formData.get('workOrderId') as string;
+    const imageUrl = formData.get('imageUrl') as string;
+    const description = formData.get('description') as string;
 
     if (!workOrderId || !imageUrl) {
-        throw new Error('Datos incompletos.')
+        throw new Error('Datos incompletos.');
     }
-
+    
+    // Guardar referencia en la base de datos
     const { error } = await supabase
-        .from('work_order_images')
+        .from('work_order_evidences')
         .insert({
-            workshop_id: user.workshopId,
+            organization_id: user.workshopId,
             work_order_id: workOrderId,
             image_url: imageUrl,
-            description: description || null
-        })
+            description: description || null,
+            created_by: user.userId || null
+        });
 
     if (error) {
-        console.error('Error adding evidence:', error)
-        throw new Error('Error al guardar evidencia')
+        console.error('Error saving evidence to DB:', error);
+        throw new Error('Error al guardar la evidencia en base de datos.');
     }
 
-    revalidatePath('/work-orders/' + workOrderId)
-    return { success: true }
+    revalidatePath('/work-orders/' + workOrderId);
+    return { success: true };
 }
 
 export async function deleteWorkOrderEvidence(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const id = formData.get('id') as string
-    const workOrderId = formData.get('workOrderId') as string
-    const imageUrl = formData.get('imageUrl') as string
+    const id = formData.get('id') as string;
+    const imageUrl = formData.get('imageUrl') as string;
 
-    if (!id || !workOrderId) throw new Error('Datos incompletos')
+    if (!id || !imageUrl) return { message: 'ID o URL faltante' };
 
-    // Delete record from database
-    const { error: dbError } = await supabase
-        .from('work_order_images')
-        .delete()
-        .eq('id', id)
-        .eq('workshop_id', user.workshopId)
-
-    if (dbError) throw new Error('Error al eliminar registro de evidencia')
-
-    // Try to delete from storage if possible
-    if (imageUrl) {
-        try {
-            // Extract file path from URL
-            // Supabase URL format: .../storage/v1/object/public/evidences/folder/file.ext
-            const urlParts = imageUrl.split('/evidences/')
-            if (urlParts.length > 1) {
-                const path = urlParts[1]
-                await supabase.storage.from('evidences').remove([path])
-            }
-        } catch (e) {
-            console.error('Failed to delete file from storage:', e)
-            // Continue even if storage deletion fails
+    // 1. Eliminar archivo de Supabase Storage
+    try {
+        // Extraer el nombre del archivo de la URL pública.
+        // Asume formato: .../storage/v1/object/public/evidences/<organization_id>/<filename>
+        const urlParts = imageUrl.split('/evidences/');
+        if (urlParts.length > 1) {
+            const filePath = urlParts[1];
+            await supabase.storage.from('evidences').remove([filePath]);
         }
+    } catch (e) {
+        console.error('Error deleting file from storage:', e);
+        // Continuamos para borrar el registro de la BD de todos modos
     }
 
-    revalidatePath('/work-orders/' + workOrderId)
-    return { success: true }
+    // 2. Eliminar registro de la base de datos
+    const { error } = await supabase
+        .from('work_order_evidences')
+        .delete()
+        .eq('id', id)
+        .eq('organization_id', user.workshopId);
+
+    if (error) {
+        return { message: 'Error al eliminar evidencia' };
+    }
+
+    revalidatePath('/work-orders');
+    return { success: true };
 }

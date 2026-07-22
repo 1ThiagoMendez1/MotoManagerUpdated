@@ -1,8 +1,10 @@
-'use server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 
-import { createAdminClient } from '@/lib/supabase/server'
+
+
 import { revalidatePath } from 'next/cache'
-import { requireWorkshop } from '@/lib/auth-server'
+
 
 export async function getPendingReminders() {
   const user = await requireWorkshop();

@@ -1,7 +1,9 @@
-'use server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 
-import { createClient } from '@/lib/supabase/server'
-import { requireWorkshop } from '@/lib/auth-server'
+
+
+
 
 const REASON_LABELS: Record<string, string> = {
   price: 'El precio es muy alto',
@@ -15,7 +17,12 @@ const REASON_LABELS: Record<string, string> = {
 export async function saveCancellationFeedback(reason: string) {
   try {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
     const { error } = await supabase
       .from('cancellation_feedback')

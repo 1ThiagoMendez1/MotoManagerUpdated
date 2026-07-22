@@ -1,4 +1,5 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+
 import { notFound } from 'next/navigation'
 import { submitQuoteResponse } from './actions'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'

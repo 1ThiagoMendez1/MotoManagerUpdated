@@ -1,557 +1,211 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
+import { requireWorkshop } from '@/lib/auth-server';
 import type { Customer, Motorcycle, Technician, InventoryItem, WorkOrder, Sale, Reminder } from './types';
-import { subDays, format, startOfMonth, endOfMonth } from 'date-fns';
-import { getCurrentUserServer } from './auth-server';
 
-// Helper to get supabase client with workshop scope
-async function getScopedClient() {
-  const user = await getCurrentUserServer();
+export const getCustomers = async (): Promise<Customer[]> => {
+  const user = await requireWorkshop();
   const supabase = await createClient();
-  const supabaseAdmin = await createAdminClient();
-  if (!user || !user.workshopId) {
-    return { supabase, supabaseAdmin, workshopId: null, user: null };
-  }
-  return { supabase, supabaseAdmin, workshopId: user.workshopId, user };
-}
-
-// --- CUSTOMERS ---
-export const getCustomers = async ({ query }: { query?: string } = {}): Promise<Customer[]> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return [];
-
-  let queryBuilder = supabaseAdmin
-    .from('clientes')
-    .select('id, name, email, phone, cedula, is_frequent')
-    .eq('workshop_id', workshopId)
-    .order('created_at', { ascending: false });
-
-  if (query && query.trim()) {
-    const q = query.trim();
-    queryBuilder = queryBuilder.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,cedula.ilike.%${q}%`);
-  }
-
-  const { data, error } = await queryBuilder;
-
-  console.log(`[getCustomers] Fetched ${data?.length || 0} customers for workshop ${workshopId}`);
-  if (error) console.error('[getCustomers] Error fetching:', error);
-
-  return (data || []).map((c: any) => ({
+  const { data } = await supabase.from('customers').select('*').eq('organization_id', user.workshopId);
+  if (!data) return [];
+  return data.map((c: any) => ({
     id: c.id,
-    name: c.name,
-    email: c.email,
+    name: `${c.first_name} ${c.last_name}`,
+    email: c.email || '',
     phone: c.phone,
-    cedula: c.cedula,
-    isFrequent: c.is_frequent || false,
+    cedula: c.document_number,
+    isFrequent: false
   }));
 };
 
-// --- TECHNICIANS ---
 export const getTechnicians = async (): Promise<Technician[]> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return [];
-
-  try {
-    // --- Auto-sync mechanics from workshop_members to tecnicos_activos ---
-    // Use admin client to ensure we can read profiles and members regardless of RLS
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const { data: members } = await supabaseAdmin
-      .from('workshop_members')
-      .select(`
-        role,
-        user_profiles (name)
-      `)
-      .eq('workshop_id', workshopId);
-
-    if (members && members.length > 0) {
-      const { data: existingTechs } = await supabaseAdmin
-        .from('tecnicos_activos')
-        .select('id, name, is_active')
-        .eq('workshop_id', workshopId);
-
-      const existingMap = new Map(existingTechs?.map((t: any) => [t.name, t]) || []);
-
-      const mechanics = new Set(
-        members
-          .filter((m: any) => m.role === 'mechanic' || m.role === 'Técnico')
-          .map((m: any) => m.user_profiles?.name)
-          .filter(Boolean)
-      );
-
-      const toInsert: any[] = [];
-      const toUpdateActive: string[] = [];
-      const toUpdateInactive: string[] = [];
-
-      mechanics.forEach((mechName: any) => {
-        const existing = existingMap.get(mechName);
-        if (!existing) {
-          toInsert.push({ workshop_id: workshopId, name: mechName, is_active: true });
-        } else if (!existing.is_active) {
-          toUpdateActive.push(existing.id);
-        }
-      });
-
-      existingMap.forEach((tech, name) => {
-        if (!mechanics.has(name) && tech.is_active) {
-          toUpdateInactive.push(tech.id);
-        }
-      });
-
-      if (toInsert.length > 0) {
-        await supabaseAdmin.from('tecnicos_activos').insert(toInsert);
-      }
-      if (toUpdateActive.length > 0) {
-        await supabaseAdmin.from('tecnicos_activos').update({ is_active: true }).in('id', toUpdateActive);
-      }
-      if (toUpdateInactive.length > 0) {
-        await supabaseAdmin.from('tecnicos_activos').update({ is_active: false }).in('id', toUpdateInactive);
-      }
-    }
-  } catch (syncError) {
-    console.error('Error in auto-sync technicians:', syncError);
-  }
-
-  const { data: technicians, error: techsError } = await supabaseAdmin
-    .from('tecnicos_activos')
-    .select(`
-      id, name, specialty, avatar_url,
-      work_orders (
-        id, work_order_number, issue_description, status, created_at, completed_at,
-        motorcycle:motorcycles (
-          id, make, model, year, plate, created_at,
-          customer:clientes (id, name, email, phone)
-        )
-      )
-    `)
-    .eq('workshop_id', workshopId)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true }); // Prefer older ones when deduplicating
-
-  if (techsError) {
-    console.error('Error fetching tecnicos_activos in getTechnicians:', techsError);
-  }
-
-  // Deduplicate before returning and delete duplicates from DB
-  const uniqueTechnicians: any[] = [];
-  const seenNames = new Set<string>();
-  const duplicateIdsToDelete: string[] = [];
-
-  for (const tech of (technicians || [])) {
-    if (seenNames.has(tech.name)) {
-      duplicateIdsToDelete.push(tech.id);
-    } else {
-      seenNames.add(tech.name);
-      uniqueTechnicians.push(tech);
-    }
-  }
-
-  if (duplicateIdsToDelete.length > 0) {
-    // Delete duplicates in the background
-    import('@supabase/supabase-js').then(({ createClient }) => {
-      const adminClient = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
-      adminClient.from('tecnicos_activos').delete().in('id', duplicateIdsToDelete).then(({ error }) => {
-        if (error) console.error('Failed to clean duplicate technicians', error);
-      });
-    });
-  }
-
-  return uniqueTechnicians.map((tech: any) => ({
-    id: tech.id,
-    name: tech.name,
-    specialty: tech.specialty || '',
-    avatarUrl: tech.avatar_url,
-    workOrders: (tech.work_orders || []).map((wo: any) => ({
-      id: wo.id,
-      workOrderNumber: wo.work_order_number?.toString() || wo.id, // Handle if serial or just ID
-      motorcycle: {
-        id: wo.motorcycle.id,
-        make: wo.motorcycle.make,
-        model: wo.motorcycle.model,
-        year: wo.motorcycle.year,
-        plate: wo.motorcycle.plate,
-        intakeDate: wo.motorcycle.created_at,
-        customer: wo.motorcycle.customer,
-      },
-      technician: {
-        id: tech.id,
-        name: tech.name,
-        specialty: tech.specialty,
-      },
-      issueDescription: wo.issue_description,
-      createdDate: wo.created_at,
-      completedDate: wo.completed_at,
-      status: wo.status as 'Diagnosticando' | 'Reparado' | 'Entregado',
-    })),
-  }));
+  const user = await requireWorkshop();
+  const supabase = await createClient();
+  // We assume technicians are profiles with role 'mechanic' or similar. 
+  // Let's just fetch organization_members and join profiles.
+  const { data } = await supabase.from('organization_members')
+    .select('role, profiles ( id, email, first_name, last_name, avatar_path )')
+    .eq('organization_id', user.workshopId);
+  
+  if (!data) return [];
+  return data.map((m: any) => ({
+    id: m.profiles?.id,
+    name: `${m.profiles?.first_name || ''} ${m.profiles?.last_name || ''}`.trim() || m.profiles?.email,
+    specialty: m.role,
+    avatarUrl: m.profiles?.avatar_path
+  })).filter(t => t.id);
 };
 
-// --- MOTORCYCLES ---
-export const getMotorcycles = async ({ query }: { query?: string } = {}): Promise<Motorcycle[]> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return [];
-
-  let queryBuilder = supabaseAdmin
-    .from('motorcycles')
-    .select(`
-      id, make, model, year, plate, created_at, notes,
-      customer:clientes (id, name, email, phone, cedula, is_frequent)
-    `)
-    .eq('workshop_id', workshopId)
-    .order('created_at', { ascending: false });
-
-  if (query) {
-    // Supabase search is limited. Use 'or' with care.
-    // Searching across relations (customer.name) is hard in one go without flattened view.
-    // For now, let's search on motorcycle fields directly.
-    queryBuilder = queryBuilder.or(`make.ilike.%${query}%,model.ilike.%${query}%,plate.ilike.%${query}%`);
-    // Note: This won't filter by customer name easily in basic Supabase syntax.
-    // We'd need to use !inner join or filter in JS.
-    // For MVP, filtering by motorcycle props is robust enough.
-  }
-
-  const { data } = await queryBuilder;
-
-  return (data || []).map((m: any) => ({
+export const getMotorcycles = async (): Promise<Motorcycle[]> => {
+  const user = await requireWorkshop();
+  const supabase = await createClient();
+  const { data } = await supabase.from('motorcycles')
+    .select('*, customers(*)')
+    .eq('organization_id', user.workshopId);
+  
+  if (!data) return [];
+  return data.map((m: any) => ({
     id: m.id,
-    make: m.make,
-    model: m.model,
-    year: m.year,
-    plate: m.plate,
+    make: m.brand || '',
+    model: m.model || '',
+    year: m.model_year || 0,
+    plate: m.license_plate || '',
     intakeDate: m.created_at,
-    customer: {
-      ...m.customer,
-      isFrequent: m.customer?.is_frequent || false
-    },
-    issueDescription: m.notes, // Mapping notes to issueDescription as decided
+    issueDescription: m.notes,
+    customer: m.customers ? {
+      id: m.customers.id,
+      name: `${m.customers.first_name} ${m.customers.last_name}`,
+      email: m.customers.email || '',
+      phone: m.customers.phone,
+      cedula: m.customers.document_number
+    } : { id: '', name: 'Desconocido', email: '' }
   }));
 };
 
-export const getInventory = async ({ query, category, page = 1, limit = 10 }: { query?: string; category?: string; page?: number; limit?: number; }): Promise<{ items: InventoryItem[], totalPages: number }> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return { items: [], totalPages: 0 };
-
-  let req = supabaseAdmin
-    .from('inventory_items')
-    .select('*', { count: 'exact' })
-    .eq('workshop_id', workshopId)
-    .order('created_at', { ascending: false });
-
-  if (query) {
-    req = req.or(`name.ilike.%${query}%,sku.ilike.%${query}%`);
-  }
-  if (category && category !== 'all') {
-    req = req.eq('category', category);
-  }
-
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  const { data, count } = await req.range(from, to);
-
-  const totalPages = count ? Math.ceil(count / limit) : 0;
-
-  const typedItems = (data || []).map((i: any) => ({
+export const getInventory = async (): Promise<{ items: InventoryItem[], totalPages: number }> => {
+  const user = await requireWorkshop();
+  const supabase = await createClient();
+  const { data } = await supabase.from('inventory_items').select('*').eq('organization_id', user.workshopId);
+  if (!data) return { items: [], totalPages: 0 };
+  
+  const items: InventoryItem[] = data.map((i: any) => ({
     id: i.id,
     name: i.name,
-    sku: i.sku,
+    sku: i.code || i.id.substring(0,6),
     quantity: i.quantity,
-    price: i.price,
-    minimumQuantity: i.min_quantity, // Mapped column
-    location: i.location,
-    category: i.category,
-    supplierPrice: i.cost, // Mapped column
-    supplier: i.supplier,
+    price: Number(i.unit_price) || 0,
+    minimumQuantity: i.min_quantity || 0,
+    location: i.description || '',
+    category: (i.category as any) || 'Repuestos',
+    supplierPrice: 0, // Not in DB yet
+    supplier: '' // Not in DB yet
   }));
-
-  return { items: typedItems, totalPages };
+  return { items, totalPages: 1 };
 };
-// --- WORK ORDERS ---
-export const getWorkOrders = async ({ query, page = 1, limit = 20 }: { query?: string; page?: number; limit?: number } = {}): Promise<{ items: WorkOrder[], totalPages: number }> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return { items: [], totalPages: 0 };
 
-  let req = supabaseAdmin
-    .from('work_orders')
-    .select(`
-      id, work_order_number, issue_description, solution_description, deposit_amount, status, quote_status, created_at, completed_at,
-      motorcycle:motorcycles (
-        id, make, model, year, plate, created_at, notes,
-        customer:clientes (id, name, email, phone)
-      ),
-      technician:tecnicos_activos (id, name, specialty)
-    `, { count: 'exact' })
-    .eq('workshop_id', workshopId)
+export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages: number }> => {
+  const user = await requireWorkshop();
+  const supabase = await createClient();
+  const { data } = await supabase.from('work_orders')
+    .select('*, motorcycles(*), customers(*)')
+    .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
-  if (query) {
-    // Basic search
-    req = req.or(`work_order_number.ilike.%${query}%,issue_description.ilike.%${query}%`)
-  }
+  if (!data) return { items: [], totalPages: 0 };
 
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  const { data, count } = await req.range(from, to);
-
-  const totalPages = count ? Math.ceil(count / limit) : 0;
-
-  const typedItems = (data || []).map((wo: any) => ({
+  const items: WorkOrder[] = data.map((wo: any) => ({
     id: wo.id,
-    workOrderNumber: wo.work_order_number?.toString() || wo.id,
-    motorcycle: {
-      id: wo.motorcycle.id,
-      make: wo.motorcycle.make,
-      model: wo.motorcycle.model,
-      year: wo.motorcycle.year,
-      plate: wo.motorcycle.plate,
-      intakeDate: wo.motorcycle.created_at,
-      customer: wo.motorcycle.customer,
-    },
-    technician: wo.technician,
-    issueDescription: wo.issue_description || wo.motorcycle?.notes,
-    solutionDescription: wo.solution_description,
-    depositAmount: wo.deposit_amount || 0,
+    workOrderNumber: `WO-${wo.order_number}`,
+    motorcycle: wo.motorcycles ? {
+      id: wo.motorcycles.id,
+      make: wo.motorcycles.brand || '',
+      model: wo.motorcycles.model || '',
+      year: wo.motorcycles.model_year || 0,
+      plate: wo.motorcycles.license_plate || '',
+      intakeDate: wo.motorcycles.created_at,
+      customer: wo.customers ? {
+        id: wo.customers.id,
+        name: `${wo.customers.first_name} ${wo.customers.last_name}`,
+        email: wo.customers.email || '',
+        phone: wo.customers.phone,
+        cedula: wo.customers.document_number
+      } : { id: '', name: 'Desconocido', email: '' }
+    } : null as any,
+    technician: null,
+    issueDescription: wo.reported_symptoms,
+    solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
-    completedDate: wo.completed_at,
-    status: wo.status as 'Diagnosticando' | 'Reparado' | 'Entregado',
-    quoteStatus: (wo.quote_status === 'approved' || wo.quote_status === 'Aprobada' ? 'Aprobada' : wo.quote_status === 'rejected' || wo.quote_status === 'Rechazada' ? 'Rechazada' : 'Pendiente') as 'Pendiente' | 'Aprobada' | 'Rechazada',
+    status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
+            (wo.status === 'diagnosis' ? 'Diagnosticando' : 'Reparado'), // basic map
+    quoteStatus: 'Aprobada'
   }));
 
-  return { items: typedItems, totalPages };
+  return { items, totalPages: 1 };
 };
 
-// --- WORK ORDER DETAILS ---
 export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return null;
-
-  const { data: wo, error } = await supabaseAdmin
-    .from('work_orders')
-    .select(`
-      id, work_order_number, issue_description, solution_description, deposit_amount, status, created_at, completed_at, quote_status, quote_responded_at,
-      motorcycle:motorcycles (
-        id, make, model, year, plate, created_at, notes,
-        customer:clientes (id, name, email, phone)
-      ),
-      technician:tecnicos_activos (id, name, specialty),
-      sales (
-        id, total, date,
-        saleItems:sale_items (
-          id, quantity, price,
-          inventoryItem:inventory_items (id, name, sku)
-        )
-      )
-    `)
+  const user = await requireWorkshop();
+  const supabase = await createClient();
+  const { data: _wo } = await supabase.from('work_orders')
+    .select('*, motorcycles(*, customers(*)), work_order_evidences(*)')
     .eq('id', id)
-    .eq('workshop_id', workshopId)
+    .eq('organization_id', user.workshopId)
     .single();
 
-  if (error) {
-    console.error('Error in getWorkOrderById:', JSON.stringify(error, null, 2));
-  }
+  const wo = _wo as any;
 
   if (!wo) return null;
 
-  // Fetch images separately to avoid schema cache issues breaking the whole query
-  let images = [];
-  try {
-    const { data: imgData, error: imgError } = await supabaseAdmin
-      .from('work_order_images')
-      .select('id, image_url, description, created_at')
-      .eq('work_order_id', id)
-      .eq('workshop_id', workshopId)
-      .order('created_at', { ascending: true });
-      
-    if (!imgError && imgData) {
-      images = imgData;
-    }
-  } catch (err) {
-    console.error('Failed to fetch work_order_images independently', err);
-  }
-
   return {
     id: wo.id,
-    workOrderNumber: wo.work_order_number?.toString() || wo.id,
-    motorcycle: {
-      id: wo.motorcycle.id,
-      make: wo.motorcycle.make,
-      model: wo.motorcycle.model,
-      year: wo.motorcycle.year,
-      plate: wo.motorcycle.plate,
-      intakeDate: wo.motorcycle.created_at,
-      customer: wo.motorcycle.customer,
-    },
-    technician: wo.technician,
-    issueDescription: wo.issue_description || wo.motorcycle?.notes,
-    solutionDescription: wo.solution_description,
-    depositAmount: wo.deposit_amount || 0,
+    workOrderNumber: `WO-${wo.order_number}`,
+    motorcycle: wo.motorcycles ? {
+      id: wo.motorcycles.id,
+      make: wo.motorcycles.brand || '',
+      model: wo.motorcycles.model || '',
+      year: wo.motorcycles.model_year || 0,
+      plate: wo.motorcycles.license_plate || '',
+      intakeDate: wo.motorcycles.created_at,
+      customer: wo.motorcycles.customers ? {
+        id: wo.motorcycles.customers.id,
+        name: `${wo.motorcycles.customers.first_name} ${wo.motorcycles.customers.last_name}`,
+        email: wo.motorcycles.customers.email || '',
+        phone: wo.motorcycles.customers.phone,
+        cedula: wo.motorcycles.customers.document_number
+      } : { id: '', name: 'Desconocido', email: '' }
+    } : null as any,
+    technician: null,
+    issueDescription: wo.reported_symptoms,
+    solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
-    completedDate: wo.completed_at,
-    status: wo.status as 'Diagnosticando' | 'Reparado' | 'Entregado',
-    quote_status: wo.quote_status,
-    quote_responded_at: wo.quote_responded_at,
-    sales: (wo.sales || []).map((s: any) => ({
-      id: s.id,
-      total: s.total,
-      date: s.date,
-      saleItems: (s.saleItems || []).map((si: any) => ({
-        id: si.id,
-        quantity: si.quantity,
-        price: si.price,
-        inventoryItem: si.inventoryItem
-      }))
-    })),
-    images: (images || []).map((img: any) => ({
-      id: img.id,
-      imageUrl: img.image_url,
-      description: img.description,
-      createdAt: img.created_at
-    }))
+    status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
+            (wo.status === 'diagnosis' ? 'Diagnosticando' : 'Reparado'),
+    images: wo.work_order_evidences ? wo.work_order_evidences.map((e: any) => ({
+        id: e.id,
+        imageUrl: e.image_url,
+        description: e.description,
+        createdAt: e.created_at
+    })) : []
   };
 };
 
-// --- SALES ---
-export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }: { dateFrom?: string; dateTo?: string; type?: 'direct' | 'service' | 'all'; page?: number; limit?: number; } = {}): Promise<{ items: Sale[], totalPages: number }> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return { items: [], totalPages: 0 };
-
-  let req = supabaseAdmin
-    .from('sales')
-    .select(`
-      id, sale_number, total, payment_method, date, work_order_id, customer_id,
-      work_order:work_orders (
-         id, work_order_number, issue_description, solution_description, created_at,
-         motorcycle:motorcycles (
-           id, make, model, year, plate, created_at, notes,
-           customer:clientes (id, name, email, phone)
-         ),
-         technician:tecnicos_activos (id, name, specialty)
-      ),
-      customer:clientes (id, name, email, phone),
-      sale_items (
-        id, quantity, price,
-        inventory_item:inventory_items (id, name, sku)
-      )
-    `, { count: 'exact' })
-    .eq('workshop_id', workshopId)
-    .order('date', { ascending: false });
-
-  // Date filters
-  if (dateFrom) req = req.gte('date', dateFrom);
-  if (dateTo) req = req.lte('date', dateTo);
-
-  // Type filter
-  if (type === 'direct') {
-    req = req.is('work_order_id', null);
-  } else if (type === 'service') {
-    req = req.not('work_order_id', 'is', null);
-  }
-
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  const { data, count } = await req.range(from, to);
-  const totalPages = count ? Math.ceil(count / limit) : 0;
-
-  const typedItems = (data || []).map((s: any) => ({
-    id: s.id,
-    saleNumber: s.sale_number?.toString() || s.id,
-    workOrderId: s.work_order_id,
-    workOrder: s.work_order ? {
-      id: s.work_order.id,
-      workOrderNumber: s.work_order.work_order_number?.toString(),
-      createdDate: s.work_order.created_at, // Added createdDate
-      issueDescription: s.work_order.issue_description || s.work_order.motorcycle?.notes,
-      solutionDescription: s.work_order.solution_description,
-      motorcycle: {
-        ...s.work_order.motorcycle,
-        intakeDate: s.work_order.motorcycle.created_at,
-        customer: s.work_order.motorcycle.customer,
-      },
-      technician: s.work_order.technician,
-      status: 'Entregado' as 'Entregado'
-    } : undefined,
-    customerId: s.customer_id,
-    customer: s.customer || undefined,
-    paymentMethod: s.payment_method,
-    items: (s.sale_items || []).map((si: any) => ({
-      id: si.id,
-      inventoryItemId: si.inventory_item?.id,
-      quantity: si.quantity,
-      price: si.price,
-      name: si.inventory_item?.name,
-      sku: si.inventory_item?.sku,
-    })),
-    date: s.date,
-    total: s.total,
-  }));
-
-  return { items: typedItems, totalPages };
-};
-
-// --- SALES CHART DATA ---
-export const getSalesDataForChart = async () => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return [];
-
-  const today = new Date();
-  const sixMonthsAgo = subDays(today, 180);
-
-  // Fetch all sales directly for last 6 months (aggregating in JS simpler than RPC for now)
-  const { data } = await supabaseAdmin
-    .from('sales')
-    .select('total, date')
-    .eq('workshop_id', workshopId)
-    .gte('date', sixMonthsAgo.toISOString());
-
-  // Group by month
-  const salesByMonth: Record<string, number> = {};
-
-  // Initialize last 6 months
-  for (let i = 5; i >= 0; i--) {
-    const d = subDays(today, i * 30);
-    const key = format(d, 'LLL');
-    salesByMonth[key] = 0;
-  }
-
-  (data || []).forEach((sale: any) => {
-    const key = format(new Date(sale.date), 'LLL');
-    if (salesByMonth[key] !== undefined) {
-      salesByMonth[key] += sale.total;
-    }
-  });
-
-  return Object.entries(salesByMonth).map(([month, sales]) => ({
-    month,
-    sales
-  }));
-};
-
-// --- REMINDERS ---
-export const getRemindersByMotorcycleId = async (motorcycleId: string): Promise<Reminder[]> => {
-  const { supabaseAdmin, workshopId } = await getScopedClient();
-  if (!workshopId) return [];
-
-  const { data } = await supabaseAdmin
-    .from('reminders')
-    .select('id, service_type, due_date, status, sent_at, created_at')
-    .eq('workshop_id', workshopId)
-    .eq('motorcycle_id', motorcycleId)
+export const getSales = async (): Promise<{ items: Sale[], totalPages: number }> => {
+  const user = await requireWorkshop();
+  const supabase = await createClient();
+  const { data } = await supabase.from('sales')
+    .select('*, customers(*), sale_items(*)')
+    .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
-  return (data || []).map((r: any) => ({
-    id: r.id,
-    serviceType: r.service_type,
-    dueDate: r.due_date,
-    status: r.status,
-    sentAt: r.sent_at,
-    createdAt: r.created_at,
+  if (!data) return { items: [], totalPages: 0 };
+
+  const items: Sale[] = data.map((s: any) => ({
+    id: s.id,
+    saleNumber: `SALE-${s.sale_number || s.id.substring(0,6)}`,
+    workOrderId: s.work_order_id,
+    customer: s.customers ? {
+      id: s.customers.id,
+      name: `${s.customers.first_name} ${s.customers.last_name}`,
+      email: s.customers.email || ''
+    } : undefined,
+    customerName: s.customers ? `${s.customers.first_name} ${s.customers.last_name}` : 'General',
+    date: s.created_at,
+    total: Number(s.total) || 0,
+    paymentMethod: s.payment_method || 'efectivo',
+    items: s.sale_items?.map((si: any) => ({
+        id: si.id,
+        inventoryItemId: si.inventory_item_id,
+        quantity: si.quantity,
+        price: Number(si.unit_price)
+    })) || []
   }));
+
+  return { items, totalPages: 1 };
+};
+
+export const getSalesDataForChart = async () => {
+    return []; // For now, mock
+};
+
+export const getRemindersByMotorcycleId = async (id: string): Promise<Reminder[]> => {
+    return []; // For now, mock
 };

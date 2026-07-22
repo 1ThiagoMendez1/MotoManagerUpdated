@@ -1,5 +1,6 @@
-import { getMotorcycles, getCustomers, getTechnicians, getWorkOrders } from '@/lib/data';
 import { authorize } from '@/lib/auth-server';
+import { getMotorcycles, getCustomers, getTechnicians, getWorkOrders } from '@/lib/data';
+
 import type { Motorcycle, Customer, Technician } from '@/lib/types';
 import {
   Card,

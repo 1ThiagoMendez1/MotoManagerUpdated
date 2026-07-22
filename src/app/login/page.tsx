@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { createClient } from '@/lib/supabase/client';
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -77,7 +77,6 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Intentando iniciar sesión con:', email);
     setIsLoading(true);
     setError('');
 
@@ -88,49 +87,31 @@ export default function LoginPage() {
     }
 
     try {
-      console.log('Attempting login via API route...');
+      const { loginAction } = await import('@/lib/actions/auth');
+      const formData = new FormData();
+      formData.append('email', email);
+      formData.append('password', password);
+
+      const result = await loginAction(formData);
       
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (parseError) {
-        throw new Error(`La respuesta del servidor no es válida (Status: ${response.status}). Posible error de red o servidor caído.`);
+      if (result?.error) {
+        setError(result.error);
+        setIsLoading(false);
       }
-
-      if (!response.ok) {
-        console.error('Login error:', data.error);
-        setError(data.error === 'Invalid login credentials' || data.error === 'Invalid login credentials.'
-          ? 'Correo o contraseña incorrectos'
-          : `Error al iniciar sesión: ${data.error || 'Desconocido'}`);
-      } else {
-        console.log('Login successful', data);
-        // Force full reload to update RootLayout and Header
-        if (data.requires_password_change) {
-          window.location.href = '/change-password';
-        } else if (data.is_super_admin) {
-          window.location.href = '/admin';
-        } else {
-          window.location.href = '/';
-        }
-      }
+      // If successful, loginAction will call redirect('/') which throws NEXT_REDIRECT and handles navigation automatically.
     } catch (err: any) {
-      console.error('Unexpected error during login:', err);
-      setError(`Ocurrió un error inesperado al conectar con el servidor local: ${err.message || 'Desconocido'}`);
-    } finally {
-      setIsLoading(false);
+      if (err.message && err.message.includes('NEXT_REDIRECT')) {
+        // Redirection thrown by Next.js, do nothing
+      } else {
+        console.error('Unexpected error during login:', err);
+        setError(`Ocurrió un error inesperado al conectar con el servidor: ${err.message || 'Desconocido'}`);
+        setIsLoading(false);
+      }
     }
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center px-4 bg-background">
+    <div className="w-full flex items-center justify-center px-4">
       <Card className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-card border-border text-foreground shadow-md">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center gap-3 mb-4">

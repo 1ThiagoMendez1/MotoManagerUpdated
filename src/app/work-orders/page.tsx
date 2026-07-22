@@ -1,5 +1,6 @@
-import { getWorkOrders, getMotorcycles, getTechnicians } from '@/lib/data';
 import { authorize } from '@/lib/auth-server';
+import { getWorkOrders, getMotorcycles, getTechnicians } from '@/lib/data';
+
 
 // Force dynamic rendering to avoid database connection during build
 export const dynamic = 'force-dynamic';

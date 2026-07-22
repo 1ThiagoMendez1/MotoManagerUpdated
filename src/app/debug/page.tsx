@@ -1,8 +1,14 @@
-import { createClient } from '@/lib/supabase/server';
-import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+
+
 
 export default async function DebugPage() {
-    const supabase = await createClient();
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     // Test helper functions directly

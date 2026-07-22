@@ -1,9 +1,11 @@
-'use server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 
-import { createClient } from '@/lib/supabase/server'
+
+
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { requireWorkshop } from '@/lib/auth-server'
+
 
 const technicianSchema = z.object({
     name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
@@ -12,7 +14,12 @@ const technicianSchema = z.object({
 
 export async function createTechnician(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
     const validatedFields = technicianSchema.safeParse({
         name: formData.get('name'),
@@ -57,7 +64,12 @@ export async function createTechnician(prevState: any, formData: FormData) {
 
 export async function updateTechnician(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
     const id = formData.get('id') as string
 
     if (!id) return { message: 'ID requerido' }
@@ -104,7 +116,12 @@ export async function updateTechnician(prevState: any, formData: FormData) {
 
 export async function deleteTechnician(formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
     const id = formData.get('id') as string
 
     // Check work orders

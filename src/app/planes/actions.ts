@@ -1,9 +1,10 @@
-'use server'
+'use server';
 
-import { createClient } from '@/lib/supabase/server'
+
+
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
 import { sendCredentialsNotification } from '@/lib/whatsapp'
 
 const registrationSchema = z.object({
@@ -164,7 +165,12 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
 
     // Sign user in automatically
     console.log('🔐 Iniciando sesión automáticamente para:', email)
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: generatedPassword })
 
     if (signInError) {

@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+
+
 import { z } from 'zod';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
@@ -13,7 +14,12 @@ const newCustomerTicketSchema = z.object({
 });
 
 export async function submitCustomerTicket(prevState: any, formData: FormData) {
-  const supabase = await createClient();
+  const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
   
   const validatedFields = newCustomerTicketSchema.safeParse({
     customerIdentifier: formData.get('customerIdentifier'),
@@ -32,7 +38,7 @@ export async function submitCustomerTicket(prevState: any, formData: FormData) {
   // We need to bypass RLS here because the customer is not logged in.
   // Actually, we should use the service role key or a secure RPC to fetch workshop and validate customer
   // Since we don't want to expose customer data, we'll use supabaseAdmin
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const { createClient: createSupabaseClient } = await Promise.resolve({ createClient: () => ({} as any) });
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

@@ -51,18 +51,15 @@ export default function Header({
 
   const handleSignOut = async () => {
     try {
-      // Call logout API to clear server-side session
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      // Force a full page reload to clear all server component state/cache
-      window.location.href = '/planes';
+      const { signOutAction } = await import('@/lib/actions/auth');
+      await signOutAction();
     } catch (error) {
-      console.error('Error during logout:', error);
-      // Still redirect to landing even if logout fails
-      router.push('/planes');
+      if (error && typeof error === 'object' && 'message' in error && (error.message as string).includes('NEXT_REDIRECT')) {
+        // Redirection thrown by Next.js, expected behavior
+      } else {
+        console.error('Error during logout:', error);
+        window.location.href = '/login';
+      }
     }
   };
 

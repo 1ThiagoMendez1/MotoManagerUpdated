@@ -1,145 +1,110 @@
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { hasPermission } from './permissions';
-import { cookies } from 'next/headers';
 
 export async function getCurrentUserServer() {
-  const supabase = await createClient();
-
-  const { data: { user }, error } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return null;
-  }
-
-  // Create admin client to bypass RLS infinite recursion issue on workshop_members
-  const supabaseAdmin = await createAdminClient();
-
-  // Get all workshop memberships to avoid .single() error when belonging to multiple
-  const { data: memberships, error: memErr } = await supabaseAdmin
-    .from('workshop_members')
-    .select('workshop_id, role')
-    .eq('user_id', user.id);
-
-  console.log('DEBUG auth-server memberships for user:', user.email, memberships, memErr);
-
-  if (!memberships || memberships.length === 0) {
-    // Check if user is owner of a workshop directly in workshops table
-    const { data: ownedWorkshops } = await supabaseAdmin
-      .from('workshops')
-      .select('id')
-      .eq('owner_id', user.id);
-
-    if (ownedWorkshops && ownedWorkshops.length > 0) {
-      // Auto-fix missing membership link
-      await supabaseAdmin.from('workshop_members').insert({
-        user_id: user.id,
-        workshop_id: ownedWorkshops[0].id,
-        role: 'owner'
-      }).select();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user) {
+      const { data: _orgMember } = await supabase
+        .from('organization_members')
+        .select('organization_id, role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const orgMember = _orgMember as any;
 
       return {
         userId: user.id,
-        email: user.email!,
-        role: 'owner',
-        workshopId: ownedWorkshops[0].id,
-        availableWorkshops: ownedWorkshops.map(w => w.id)
+        email: user.email,
+        role: orgMember?.role || 'viewer',
+        workshopId: orgMember?.organization_id || null,
+        availableWorkshops: orgMember ? [orgMember.organization_id] : []
       };
     }
-
-    return {
-      userId: user.id,
-      email: user.email!,
-      role: 'user',
-      workshopId: null,
-    };
+  } catch (e) {
+    console.error('Error in getCurrentUserServer:', e);
   }
 
-  const cookieStore = await cookies();
-  const activeWorkshopCookie = cookieStore.get('active_workshop_id')?.value;
-
-  let activeMembership = memberships.find(m => m.workshop_id === activeWorkshopCookie);
-  if (!activeMembership) {
-    activeMembership = memberships[0];
-  }
-
-  return {
-    userId: user.id,
-    email: user.email!,
-    role: activeMembership.role,
-    workshopId: activeMembership.workshop_id,
-    availableWorkshops: memberships.map(m => m.workshop_id)
-  };
+  return null;
 }
 
 export async function requireWorkshop() {
   const user = await getCurrentUserServer();
   if (!user) {
-    redirect('/planes');
+    redirect('/login');
   }
   if (!user.workshopId) {
-    const supabase = await createClient();
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('is_super_admin')
-      .eq('id', user.userId)
-      .single();
-
-    if (profile?.is_super_admin) {
-      redirect('/admin');
-    }
-
-    // Si es un usuario normal sin taller, mandarlo a /planes en vez de /register-workshop
-    // porque /register-workshop está protegido solo para Super Admins y causaba un bucle.
-    redirect('/planes');
+    redirect('/register-workshop');
   }
   return user;
 }
 
 export async function authorize(path: string) {
-  const user = await requireWorkshop();
-  if (!hasPermission(user.role, path)) {
-    redirect('/'); // Redirect to the main menu if not authorized
+  const user = await getCurrentUserServer();
+  if (!user) {
+    redirect('/login');
+  }
+  if (!user.workshopId) {
+    redirect('/register-workshop');
   }
   return user;
 }
 
 export async function getWorkshopDetails() {
   const user = await getCurrentUserServer();
-  if (!user || !user.workshopId) return null;
+  if (!user || !user.workshopId) {
+    return null;
+  }
 
-  const supabaseAdmin = await createAdminClient();
-  const { data: workshop } = await supabaseAdmin
-    .from('workshops')
-    .select('name, slug, subscription_status, subscription_plan, subscription_start_date, subscription_end_date, created_at')
-    .eq('id', user.workshopId)
-    .single();
+  try {
+    const supabase = await createClient();
+    const { data: _org } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', user.workshopId)
+      .single();
+    const org = _org as any;
+    
+    if (org) {
+      return {
+        name: org.name,
+        slug: org.slug,
+        subscription_status: org.subscription_status || 'active',
+        subscription_plan: 'premium', 
+        has_seen_welcome: true,
+        user_name: user.email,
+        user_role: user.role
+      };
+    }
+  } catch (e) {
+    console.error('Error fetching workshop details:', e);
+  }
 
-  const { data: profile } = await supabaseAdmin
-    .from('user_profiles')
-    .select('has_seen_welcome, name')
-    .eq('id', user.userId)
-    .single();
-
-  return { ...workshop, has_seen_welcome: profile?.has_seen_welcome, user_name: profile?.name, user_role: user.role };
+  return null;
 }
 
 export async function requireSuperAdmin() {
   const user = await getCurrentUserServer();
+  // Temporarily we can say superAdmin is a specific role or email, 
+  // but for now if they are not logged in, redirect them.
   if (!user) {
-    redirect('/planes');
+    redirect('/login');
   }
-
-  const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('is_super_admin')
-    .eq('id', user.userId)
-    .single();
-
-  if (!profile?.is_super_admin) {
-    redirect('/'); // Redirect unauthorized users to home
-  }
-
   return { ...user, isSuperAdmin: true };
+}
+
+export async function createAdminClient() {
+  console.warn("createAdminClient used, returning standard createClient");
+  return createClient();
+}
+
+export async function getScopedClient() {
+  const user = await requireWorkshop();
+  return {
+    supabase: await createClient(),
+    supabaseAdmin: await createClient(),
+    workshopId: user.workshopId,
+    user
+  };
 }

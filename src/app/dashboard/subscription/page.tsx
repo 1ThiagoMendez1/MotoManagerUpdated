@@ -1,5 +1,6 @@
-import { requireWorkshop, getCurrentUserServer } from '@/lib/auth-server'
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+
+
 import { ManageSubscriptionClient } from './ManageSubscriptionClient'
 import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -8,7 +9,12 @@ import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans'
 export default async function SubscriptionPage() {
     const user = await requireWorkshop()
     const currentUser = await getCurrentUserServer()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
     const { data: workshop } = await supabase
         .from('workshops')

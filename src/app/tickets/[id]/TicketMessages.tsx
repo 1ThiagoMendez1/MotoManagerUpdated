@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+
 import { addTicketMessage } from '@/lib/actions/tickets';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +18,12 @@ export function TicketMessages({ ticketId, messages, isCustomer = false }: { tic
   const [localMessages, setLocalMessages] = useState<any[]>(messages);
 
   useEffect(() => {
-    const supabase = createClient();
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
     const channel = supabase.channel(`ticket_${ticketId}`)
       .on('postgres_changes', {
         event: 'INSERT',

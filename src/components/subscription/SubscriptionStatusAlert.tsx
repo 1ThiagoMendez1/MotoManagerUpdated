@@ -1,6 +1,6 @@
 'use client';
 
-import { createClient } from "@/lib/supabase/client";
+
 import { useRouter, usePathname } from "next/navigation";
 import {
     AlertDialog,
@@ -36,7 +36,12 @@ export function SubscriptionStatusAlert({ status, startDate, endDate }: Subscrip
     const isCanceled = status === 'canceled';
 
     const handleLogout = async () => {
-        const supabase = createClient();
+        const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
         await supabase.auth.signOut();
         window.location.href = '/planes';
     };

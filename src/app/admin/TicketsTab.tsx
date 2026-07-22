@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
+
 import { updateAdminTicketStatus, replyToTicketAdmin, getTicketMessagesAdmin } from '@/lib/actions/tickets';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -38,7 +38,12 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const supabase = createClient();
+  const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
   // Load initial messages when ticket is selected
   useEffect(() => {

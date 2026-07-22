@@ -1,8 +1,10 @@
 'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 import { sendCredentialsNotification } from '@/lib/whatsapp';
-import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+
 
 export async function inviteUser(data: {
   name: string;

@@ -1,16 +1,15 @@
-'use server'
+'use server';
 
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
 import { sendCredentialsNotification } from '@/lib/whatsapp'
 
 const registrationSchema = z.object({
     workshopName: z.string().min(3),
     slug: z.string().min(3).regex(/^[a-z0-9-]+$/, 'Solo letras minúsculas, números y guiones'),
     email: z.string().email(),
-    // password: z.string().min(6),
     fullName: z.string().min(2),
     phone: z.string().min(8, 'El teléfono debe tener al menos 8 dígitos'),
     subscriptionPlan: z.enum(['monthly', 'biannual', 'yearly', 'demo']),
@@ -18,18 +17,16 @@ const registrationSchema = z.object({
 })
 
 export async function registerWorkshop(prevState: any, formData: FormData) {
-    // 1. Validate Input
     const data = Object.fromEntries(formData)
 
-    // Auto-sanitize slug: lowercase, trim, replace spaces with -
     if (typeof data.slug === 'string') {
         data.slug = data
             .slug
             .toLowerCase()
             .trim()
-            .replace(/\s+/g, '-')     // Replace spaces with -
-            .replace(/[^\w-]+/g, '')  // Remove non-word chars (except -)
-            .replace(/--+/g, '-')     // Replace multiple - with single -
+            .replace(/\s+/g, '-')
+            .replace(/[^\w-]+/g, '')
+            .replace(/--+/g, '-')
     }
 
     const validation = registrationSchema.safeParse(data)
@@ -40,28 +37,8 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
 
     const { workshopName, slug, email, fullName, phone, subscriptionPlan, demoDays } = validation.data
 
-    let actualPlan = subscriptionPlan as string;
-    let actualStatus = 'active';
-    let endDate = null;
-
-    if (subscriptionPlan === 'demo') {
-        actualPlan = 'monthly';
-        actualStatus = 'trialing';
-        if (demoDays) {
-            const days = parseInt(demoDays, 10);
-            if (!isNaN(days) && days > 0) {
-                const date = new Date();
-                date.setDate(date.getDate() + days);
-                endDate = date.toISOString();
-            }
-        }
-    }
-
-    // Generate automatic password
     const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
 
-    // 2. Define Service Role Client (for Admin operations)
-    // This bypasses RLS and allows us to create users and records without session limitations
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -73,14 +50,14 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         }
     )
 
-    // 3. Create User (Admin API - Bypasses email confirmation if needed)
     console.log('Creating user with Admin API...');
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: generatedPassword,
-        email_confirm: true, // Auto-confirm for immediate access
+        email_confirm: true,
         user_metadata: {
-            full_name: fullName,
+            first_name: fullName.split(' ')[0],
+            last_name: fullName.split(' ').slice(1).join(' ') || '',
             phone: phone,
             temp_password: generatedPassword
         }
@@ -97,42 +74,35 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
 
     console.log('User created:', authData.user.id);
 
-    // 4. Create Workshop MANUAL INSERT (Avoids RPC complexity/bugs)
-    console.log('Creating Workshop manually...');
+    console.log('Signing in the new user to create organization...');
+    // Iniciar sesión con el nuevo usuario para obtener el contexto de RLS y auth.uid()
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: generatedPassword
+    });
 
-    // A. Insert Workshop
-    const { data: workshop, error: workshopError } = await supabaseAdmin
-        .from('workshops')
-        .insert({
-            name: workshopName,
-            slug: slug,
-            subscription_status: actualStatus,
-            subscription_plan: actualPlan,
-            ...(endDate ? { subscription_end_date: endDate } : {})
-        })
-        .select()
-        .single();
-
-    if (workshopError) {
-        console.error('Workshop Creation Error:', workshopError);
-        // Clean up user
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        return { error: 'Error al crear el taller: ' + workshopError.message }
+    if (signInError) {
+        console.error('Sign In Error:', signInError);
+        return { error: 'Error al iniciar sesión tras el registro: ' + signInError.message };
     }
 
-    // B. Assign Owner
-    const { error: memberError } = await supabaseAdmin
-        .from('workshop_members')
-        .insert({
-            user_id: authData.user.id,
-            workshop_id: workshop.id,
-            role: 'owner'
-        });
+    console.log('Calling create_organization_with_owner RPC...');
+    
+    // Llamar al RPC usando la sesión del usuario recién creado
+    const { data: orgId, error: rpcError } = await supabase.rpc('create_organization_with_owner', {
+        org_name: workshopName,
+        org_slug: slug
+    });
 
-    if (memberError) {
-        console.error('Member Assignment Error:', memberError);
-        // Clean up potentially
-        return { error: 'Error al asignar dueño: ' + memberError.message }
+    if (rpcError) {
+        console.error('RPC Error creating organization:', rpcError);
+        // Fallback: cleanup is hard here because they are logged in, but we can try
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        await supabase.auth.signOut();
+        return { error: 'Error al crear el taller: ' + rpcError.message };
     }
 
     if (phone) {
@@ -146,6 +116,6 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         ).catch(e => console.error('Failed to send WhatsApp credentials:', e));
     }
 
-    console.log('Workshop created successfully via Admin Direct Insert:', workshop.id);
-    redirect('/?firstLogin=true')
+    console.log('Workshop created successfully:', orgId);
+    redirect('/dashboard?firstLogin=true');
 }

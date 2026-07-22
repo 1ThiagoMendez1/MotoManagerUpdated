@@ -1,6 +1,7 @@
 'use server';
 
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+
+
 
 // Define the Workshop interface based on what we need for the public UI
 export interface PublicWorkshop {

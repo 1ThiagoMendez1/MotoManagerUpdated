@@ -36,7 +36,7 @@ export default function RegisterForm() {
     const [plan, setPlan] = useState('monthly')
 
     return (
-        <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 py-12 relative z-10">
+        <div className="w-full flex flex-col items-center justify-center p-4 py-12 relative z-10">
             <Card className="w-full max-w-md bg-background/80 backdrop-blur-xl border-primary/20 shadow-2xl text-foreground">
                 <CardHeader className="text-center pb-6">
                     <div className="flex justify-center items-center gap-3 mb-6">

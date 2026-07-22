@@ -6,8 +6,7 @@ interface TenantDashboardProps {
   };
 }
 
-export default function TenantDashboard({ params }: TenantDashboardProps) {
-  // For now, redirect to the main dashboard
-  // In a full implementation, this would show tenant-specific dashboard
-  redirect('/');
+export default async function TenantDashboard({ params }: TenantDashboardProps) {
+  const { tenant } = await params;
+  redirect(`/${tenant}`);
 }

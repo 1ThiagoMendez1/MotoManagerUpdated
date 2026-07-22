@@ -1,5 +1,6 @@
-import { getSales, getWorkOrders, getInventory, getCustomers } from '@/lib/data';
 import { authorize } from '@/lib/auth-server';
+import { getSales, getWorkOrders, getInventory, getCustomers } from '@/lib/data';
+
 
 // Force dynamic rendering to avoid database connection during build
 export const dynamic = 'force-dynamic';

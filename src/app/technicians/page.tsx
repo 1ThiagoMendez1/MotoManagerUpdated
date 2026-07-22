@@ -1,5 +1,7 @@
+import { authorize } from '@/lib/auth-server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 import { getTechnicians } from '@/lib/data';
-import { authorize, requireWorkshop } from '@/lib/auth-server';
+
 
 // Force dynamic rendering to avoid database connection during build
 export const dynamic = 'force-dynamic';

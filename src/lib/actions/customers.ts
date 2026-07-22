@@ -1,9 +1,8 @@
-'use server'
-
-import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-import { z } from 'zod'
-import { requireWorkshop } from '@/lib/auth-server'
+'use server';
+import { requireWorkshop } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 
 const customerSchema = z.object({
     name: z.string().min(1, "El nombre es requerido."),
@@ -19,200 +18,225 @@ const customerSchema = z.object({
       (val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()),
       z.string().optional()
     ),
-})
+});
+
+// Helper para separar nombres (ya que el schema pide first_name y last_name pero el form envía name)
+function splitName(fullName: string) {
+    const parts = fullName.trim().split(' ');
+    const firstName = parts[0];
+    const lastName = parts.length > 1 ? parts.slice(1).join(' ') : 'N/A';
+    return { firstName, lastName };
+}
 
 export async function createCustomer(prevState: any, formData: FormData) {
-    const user = await requireWorkshop()
-    // Use admin client to bypass RLS on all operations in this action
-    const supabaseAdmin = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient(); // Cliente real
 
     const validatedFields = customerSchema.safeParse({
         name: formData.get('name'),
         email: formData.get('email'),
         phone: formData.get('phone'),
         cedula: formData.get('cedula'),
-    })
+    });
 
     if (!validatedFields.success) {
-        return { errors: validatedFields.error.flatten().fieldErrors }
+        return { errors: validatedFields.error.flatten().fieldErrors };
     }
 
-    const { name, email, phone, cedula } = validatedFields.data
+    const { name, email, phone, cedula } = validatedFields.data;
+    const { firstName, lastName } = splitName(name);
 
     if (cedula) {
-        const { data: existingCedula, error: cedulaError } = await supabaseAdmin
-            .from('clientes')
+        const { data: existingCedula, error: cedulaError } = await supabase
+            .from('customers')
             .select('id')
-            .eq('workshop_id', user.workshopId)
-            .eq('cedula', cedula)
-            .maybeSingle()
+            .eq('organization_id', user.workshopId)
+            .eq('document_number', cedula)
+            .maybeSingle();
+            
         if (cedulaError) {
-            console.error('❌ [createCustomer] Error verificando cédula:', cedulaError)
-            return { message: 'Error al verificar la cédula: ' + cedulaError.message }
+            console.error('❌ [createCustomer] Error verificando cédula:', cedulaError);
+            return { message: 'Error al verificar la cédula: ' + cedulaError.message };
         }
-        if (existingCedula) return { message: 'Ya existe un cliente con esta cédula.' }
+        if (existingCedula) return { message: 'Ya existe un cliente con esta cédula.' };
     }
 
     if (email) {
-        const { data: existingEmail, error: emailError } = await supabaseAdmin
-            .from('clientes')
+        const { data: existingEmail, error: emailError } = await supabase
+            .from('customers')
             .select('id')
-            .eq('workshop_id', user.workshopId)
+            .eq('organization_id', user.workshopId)
             .eq('email', email)
-            .maybeSingle()
+            .maybeSingle();
+            
         if (emailError) {
-            console.error('❌ [createCustomer] Error verificando email:', emailError)
-            return { message: 'Error al verificar el correo electrónico: ' + emailError.message }
+            console.error('❌ [createCustomer] Error verificando email:', emailError);
+            return { message: 'Error al verificar el correo electrónico: ' + emailError.message };
         }
-        if (existingEmail) return { message: 'Ya existe un cliente con este correo electrónico.' }
+        if (existingEmail) return { message: 'Ya existe un cliente con este correo electrónico.' };
     }
 
-    const { error } = await supabaseAdmin
-        .from('clientes')
+    const { error } = await supabase
+        .from('customers')
         .insert({
-            workshop_id: user.workshopId,
-            name,
+            organization_id: user.workshopId,
+            first_name: firstName,
+            last_name: lastName,
+            document_number: cedula || null,
             email: email || null,
             phone: phone || null,
-            cedula: cedula || null,
-        })
+            created_by: user.userId || null
+        });
 
     if (error) {
-        console.error('❌ [createCustomer] Error insertando cliente:', error)
-        return { message: 'Error al crear el cliente: ' + error.message }
+        console.error('❌ [createCustomer] Error insertando cliente:', error);
+        return { message: 'Error al crear el cliente: ' + error.message };
     }
 
-    revalidatePath('/customers')
-    revalidatePath('/customers', 'page')
-    revalidatePath('/motorcycles')
-    revalidatePath('/sales')
-    revalidatePath('/work-orders')
-    revalidatePath('/', 'layout')
-    return { success: true }
+    revalidatePath('/customers');
+    revalidatePath('/customers', 'page');
+    revalidatePath('/motorcycles');
+    revalidatePath('/sales');
+    revalidatePath('/work-orders');
+    revalidatePath('/', 'layout');
+    return { success: true };
 }
 
 
 export async function updateCustomer(prevState: any, formData: FormData) {
-    const user = await requireWorkshop()
-    const supabaseAdmin = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const id = formData.get('id') as string
+    const id = formData.get('id') as string;
 
-    if (!id) return { message: 'ID requerido' }
+    if (!id) return { message: 'ID requerido' };
 
     const validatedFields = customerSchema.safeParse({
         name: formData.get('name'),
         email: formData.get('email'),
         phone: formData.get('phone'),
         cedula: formData.get('cedula'),
-    })
+    });
 
     if (!validatedFields.success) {
-        return { errors: validatedFields.error.flatten().fieldErrors }
+        return { errors: validatedFields.error.flatten().fieldErrors };
     }
 
-    const { name, email, phone, cedula } = validatedFields.data
+    const { name, email, phone, cedula } = validatedFields.data;
+    const { firstName, lastName } = splitName(name);
 
     if (cedula) {
-        const { data: existingCedula, error: cedulaError } = await supabaseAdmin
-            .from('clientes')
+        const { data: existingCedula, error: cedulaError } = await supabase
+            .from('customers')
             .select('id')
-            .eq('workshop_id', user.workshopId)
-            .eq('cedula', cedula)
+            .eq('organization_id', user.workshopId)
+            .eq('document_number', cedula)
             .neq('id', id)
-            .maybeSingle()
+            .maybeSingle();
+            
         if (cedulaError) {
-            console.error('❌ [updateCustomer] Error verificando cédula:', cedulaError)
-            return { message: 'Error al verificar la cédula: ' + cedulaError.message }
+            console.error('❌ [updateCustomer] Error verificando cédula:', cedulaError);
+            return { message: 'Error al verificar la cédula: ' + cedulaError.message };
         }
-        if (existingCedula) return { message: 'Ya existe otro cliente con esta cédula.' }
+        if (existingCedula) return { message: 'Ya existe otro cliente con esta cédula.' };
     }
 
     if (email) {
-        const { data: existingEmail, error: emailError } = await supabaseAdmin
-            .from('clientes')
+        const { data: existingEmail, error: emailError } = await supabase
+            .from('customers')
             .select('id')
-            .eq('workshop_id', user.workshopId)
+            .eq('organization_id', user.workshopId)
             .eq('email', email)
             .neq('id', id)
-            .maybeSingle()
+            .maybeSingle();
+            
         if (emailError) {
-            console.error('❌ [updateCustomer] Error verificando email:', emailError)
-            return { message: 'Error al verificar el correo electrónico: ' + emailError.message }
+            console.error('❌ [updateCustomer] Error verificando email:', emailError);
+            return { message: 'Error al verificar el correo electrónico: ' + emailError.message };
         }
-        if (existingEmail) return { message: 'Ya existe otro cliente con este correo electrónico.' }
+        if (existingEmail) return { message: 'Ya existe otro cliente con este correo electrónico.' };
     }
 
-    const { error } = await supabaseAdmin
-        .from('clientes')
+    const { error } = await supabase
+        .from('customers')
         .update({
-            name,
+            first_name: firstName,
+            last_name: lastName,
+            document_number: cedula || null,
             email: email || null,
-            phone: phone || null,
-            cedula: cedula || null
+            phone: phone || null
         })
         .eq('id', id)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
     if (error) {
-        console.error('❌ [updateCustomer] Error actualizando cliente:', error)
-        return { message: 'Error al actualizar: ' + error.message }
+        console.error('❌ [updateCustomer] Error actualizando cliente:', error);
+        return { message: 'Error al actualizar: ' + error.message };
     }
 
-    revalidatePath('/customers')
-    revalidatePath('/customers', 'page')
-    revalidatePath('/motorcycles')
-    revalidatePath('/sales')
-    revalidatePath('/work-orders')
-    revalidatePath('/', 'layout')
-    return { success: true }
+    revalidatePath('/customers');
+    revalidatePath('/customers', 'page');
+    revalidatePath('/motorcycles');
+    revalidatePath('/sales');
+    revalidatePath('/work-orders');
+    revalidatePath('/', 'layout');
+    return { success: true };
 }
 
 export async function deleteCustomer(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabaseAdmin = await createAdminClient()
-    const id = formData.get('id') as string
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+    const id = formData.get('id') as string;
 
-    const { count } = await supabaseAdmin
+    const { count } = await supabase
         .from('motorcycles')
         .select('*', { count: 'exact', head: true })
         .eq('customer_id', id)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
     if (count && count > 0) {
-        return { message: 'No se puede eliminar: Tiene motocicletas asociadas' }
+        return { message: 'No se puede eliminar: Tiene motocicletas asociadas' };
     }
 
-    const { error } = await supabaseAdmin
-        .from('clientes')
+    const { error } = await supabase
+        .from('customers')
         .delete()
         .eq('id', id)
-        .eq('workshop_id', user.workshopId)
+        .eq('organization_id', user.workshopId);
 
     if (error) {
-        console.error('❌ [deleteCustomer] Error eliminando cliente:', error)
-        return { message: 'Error al eliminar: ' + error.message }
+        console.error('❌ [deleteCustomer] Error eliminando cliente:', error);
+        return { message: 'Error al eliminar: ' + error.message };
     }
 
-    revalidatePath('/customers')
-    revalidatePath('/customers', 'page')
-    revalidatePath('/motorcycles')
-    revalidatePath('/sales')
-    revalidatePath('/work-orders')
-    revalidatePath('/', 'layout')
-    return { success: true }
+    revalidatePath('/customers');
+    revalidatePath('/customers', 'page');
+    revalidatePath('/motorcycles');
+    revalidatePath('/sales');
+    revalidatePath('/work-orders');
+    revalidatePath('/', 'layout');
+    return { success: true };
 }
 
 export async function getCustomerByCedula(cedula: string) {
-    const user = await requireWorkshop()
-    const supabaseAdmin = await createAdminClient()
+    const user = await requireWorkshop();
+    const supabase = await createClient();
 
-    const { data } = await supabaseAdmin
-        .from('clientes')
-        .select('id, name, email, phone, cedula')
-        .eq('cedula', cedula)
-        .eq('workshop_id', user.workshopId)
-        .maybeSingle()
+    const { data } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, email, phone, document_number')
+        .eq('document_number', cedula)
+        .eq('organization_id', user.workshopId)
+        .maybeSingle();
 
-    return data
+    if (!data) return null;
+
+    // Mapeo al frontend
+    return {
+        id: data.id,
+        name: `${data.first_name} ${data.last_name}`.trim(),
+        email: data.email,
+        phone: data.phone,
+        cedula: data.document_number
+    };
 }

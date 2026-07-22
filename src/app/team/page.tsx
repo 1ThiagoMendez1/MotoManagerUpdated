@@ -1,4 +1,5 @@
 import { authorize } from '@/lib/auth-server';
+
 import UsersAndPermissions from './TeamClient';
 
 export const dynamic = 'force-dynamic';

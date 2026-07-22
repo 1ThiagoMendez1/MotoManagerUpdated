@@ -1,8 +1,6 @@
-'use server'
-
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { requireWorkshop } from '@/lib/auth-server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -10,7 +8,7 @@ import { revalidatePath } from 'next/cache'
  */
 export async function getProfileData() {
   const user = await requireWorkshop()
-  const supabase = await createClient()
+  const supabase = await createClient();
 
   const [{ data: workshop }, { data: profile }] = await Promise.all([
     supabase
@@ -43,10 +41,7 @@ export async function getProfileData() {
  */
 export async function updateProfileData(formData: FormData) {
   const user = await requireWorkshop()
-  const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
+  const supabase = await createClient();
 
   const workshopName = (formData.get('workshopName') as string)?.trim()
   const workshopPhone = (formData.get('workshopPhone') as string)?.trim() || null
@@ -65,7 +60,7 @@ export async function updateProfileData(formData: FormData) {
 
   if (user.role === 'owner') {
     // Actualizar datos del taller
-    const { error: workshopError } = await supabaseAdmin
+    const { error: workshopError } = await supabase
       .from('workshops')
       .update({
         name: workshopName,
@@ -83,7 +78,7 @@ export async function updateProfileData(formData: FormData) {
   }
 
   // Actualizar datos del perfil de usuario
-  const { error: profileError } = await supabaseAdmin
+  const { error: profileError } = await supabase
     .from('user_profiles')
     .update({
       name: ownerName,

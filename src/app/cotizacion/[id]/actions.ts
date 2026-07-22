@@ -1,6 +1,8 @@
-'use server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 
-import { createAdminClient } from '@/lib/supabase/admin'
+
+
 import { revalidatePath } from 'next/cache'
 
 export async function submitQuoteResponse(workOrderId: string, response: 'approved' | 'rejected') {

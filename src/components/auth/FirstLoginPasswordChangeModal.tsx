@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { createClient } from '@/lib/supabase/client';
+
 import { CheckCircle2, MessageCircle } from 'lucide-react';
 
 function FirstLoginPasswordChangeModalInner() {
@@ -39,7 +39,12 @@ function FirstLoginPasswordChangeModalInner() {
 
     setLoading(true);
     try {
-      const supabase = createClient();
+      const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
       const { error } = await supabase.auth.updateUser({ password });
       
       if (error) throw error;

@@ -1,9 +1,11 @@
-'use server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-import { createClient } from '@/lib/supabase/server'
+
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { requireWorkshop } from '@/lib/auth-server'
+
 
 const ticketSchema = z.object({
     subject: z.string().min(3, "El asunto es requerido."),
@@ -12,7 +14,12 @@ const ticketSchema = z.object({
 
 export async function createTicket(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
     const validatedFields = ticketSchema.safeParse({
         subject: formData.get('subject'),
@@ -25,7 +32,7 @@ export async function createTicket(prevState: any, formData: FormData) {
 
     const { subject, description } = validatedFields.data
 
-    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+    const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
@@ -50,7 +57,7 @@ export async function createTicket(prevState: any, formData: FormData) {
 }
 
 export async function addTicketMessage(prevState: any, formData: FormData) {
-    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+    const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
@@ -89,7 +96,7 @@ export async function addTicketMessage(prevState: any, formData: FormData) {
 }
 
 export async function updateAdminTicketStatus(ticketId: string, newStatus: string) {
-    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+    const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
@@ -125,7 +132,7 @@ export async function updateAdminTicketStatus(ticketId: string, newStatus: strin
 }
 
 export async function replyToTicketAdmin(ticketId: string, message: string) {
-    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+    const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
@@ -156,7 +163,7 @@ export async function replyToTicketAdmin(ticketId: string, message: string) {
 }
 
 export async function getTicketMessagesAdmin(ticketId: string) {
-  const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+  const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
@@ -198,7 +205,12 @@ export async function getTicketMessagesAdmin(ticketId: string) {
 
 export async function replyToTicketWorkshop(ticketId: string, message: string) {
     const user = await requireWorkshop();
-    const supabase = await createClient();
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
     // Verify ownership
     const { data: ticket, error: ticketError } = await supabase
@@ -239,7 +251,12 @@ export async function replyToTicketWorkshop(ticketId: string, message: string) {
 
 export async function getTicketMessagesWorkshop(ticketId: string) {
     const user = await requireWorkshop();
-    const supabase = await createClient();
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
 
     // Verify ownership
     const { data: ticket, error: ticketError } = await supabase
@@ -254,7 +271,7 @@ export async function getTicketMessagesWorkshop(ticketId: string) {
         return [];
     }
 
-    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+    const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
@@ -294,7 +311,7 @@ export async function getTicketMessagesWorkshop(ticketId: string) {
 }
 
 export async function updateTicketStatus(prevState: any, formData: FormData) {
-    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+    const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );

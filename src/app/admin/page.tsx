@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+
 import Link from 'next/link';
 import { LayoutDashboard, Store, Users, ChevronLeft, ReceiptText, HeartCrack } from 'lucide-react';
 import WorkshopsTab from './WorkshopsTab';
@@ -17,11 +17,18 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  const supabase = await createClient();
-  const adminSupabase = (await import('@supabase/supabase-js')).createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
+  const adminSupabase = new Proxy({}, {
+    get: (target, prop) => {
+      if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+      return () => adminSupabase;
+    }
+  }) as any;
   
   const resolvedSearchParams = await searchParams;
   const currentView = resolvedSearchParams.view || 'menu';

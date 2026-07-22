@@ -1,5 +1,6 @@
-import { getWorkshopTickets } from '@/lib/data/tickets';
 import { authorize } from '@/lib/auth-server';
+import { getWorkshopTickets } from '@/lib/data/tickets';
+
 import { WorkshopTicketsClient } from './WorkshopTicketsClient';
 
 export const dynamic = 'force-dynamic';

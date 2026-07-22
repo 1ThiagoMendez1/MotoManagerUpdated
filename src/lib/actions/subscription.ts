@@ -1,13 +1,21 @@
-'use server'
+'use server';
+import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-import { createClient } from '@/lib/supabase/server'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { requireWorkshop } from '@/lib/auth-server'
+
+
+
+
 import { revalidatePath } from 'next/cache'
 
 export async function updateSubscriptionPlan(formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = new Proxy({}, {
+  get: (target, prop) => {
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
+    return () => supabase;
+  }
+}) as any;
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!

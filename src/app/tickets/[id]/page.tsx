@@ -1,6 +1,7 @@
+import { authorize } from '@/lib/auth-server';
 import { getTicketById } from '@/lib/data/tickets';
 import { getTechnicians } from '@/lib/data';
-import { authorize } from '@/lib/auth-server';
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Clock, AlertCircle } from 'lucide-react';

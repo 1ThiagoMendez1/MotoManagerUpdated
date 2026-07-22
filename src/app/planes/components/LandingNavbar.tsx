@@ -90,7 +90,7 @@ export function LandingNavbar({ user }: { user?: any }) {
                 {user.email}
               </span>
               <Link
-                href="/"
+                href="/tenant-select"
                 className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
               >
                 Ir al panel
@@ -176,7 +176,7 @@ export function LandingNavbar({ user }: { user?: any }) {
               <div className="px-4 py-3">
                 <p className="text-sm text-muted-foreground mb-2 truncate">{user.email}</p>
                 <Link
-                  href="/"
+                  href="/tenant-select"
                   className="block text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
                 >
                   Ir al panel
