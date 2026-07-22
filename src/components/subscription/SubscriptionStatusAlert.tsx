@@ -28,9 +28,11 @@ export function SubscriptionStatusAlert({ status, startDate, endDate }: Subscrip
     // Allow access to admin panel (for super admins) and login
     if (pathname?.startsWith('/admin') || pathname?.startsWith('/login')) return null;
 
-    if (status === 'active' || status === 'trialing') return null;
+    const isExpiredDemo = status === 'trialing' && endDate && new Date(endDate) < new Date();
 
-    const isPastDue = status === 'past_due';
+    if ((status === 'active' || status === 'trialing') && !isExpiredDemo) return null;
+
+    const isPastDue = status === 'past_due' || isExpiredDemo;
     const isCanceled = status === 'canceled';
 
     const handleLogout = async () => {

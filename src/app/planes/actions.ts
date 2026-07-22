@@ -25,6 +25,8 @@ const registrationSchema = z.object({
 
 export async function registerWorkshopPublic(prevState: any, formData: FormData) {
     const data = Object.fromEntries(formData)
+    console.log('\n🚀 ===== INICIO REGISTRO TALLER =====')
+    console.log('📋 Datos recibidos del formulario:', JSON.stringify(data, null, 2))
 
     // Auto-sanitize slug
     if (typeof data.slug === 'string') {
@@ -34,21 +36,25 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
             .replace(/\s+/g, '-')
             .replace(/[^\w-]+/g, '')
             .replace(/--+/g, '-')
+        console.log('🔤 Slug sanitizado:', data.slug)
     }
 
     const validation = registrationSchema.safeParse(data)
     if (!validation.success) {
+        console.error('❌ Error de validación:', JSON.stringify(validation.error.flatten().fieldErrors, null, 2))
         return {
             error: 'Datos inválidos. Revisa los campos marcados.',
             details: validation.error.flatten().fieldErrors,
             fields: data
         }
     }
+    console.log('✅ Validación OK')
 
     const { workshopName, slug, email, fullName, phone, workshopPhone, address, mapsLink, city, nit, subscriptionPlan } = validation.data
     
     // Generate automatic password
     const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
+    console.log('🔑 Contraseña generada (guardar!):', generatedPassword)
 
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,6 +63,7 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     )
 
     // Create auth user
+    console.log('👤 Creando usuario auth para:', email)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: generatedPassword,
@@ -64,11 +71,12 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
         user_metadata: { 
             full_name: fullName, 
             phone,
-            temp_password: generatedPassword // Store it temporarily to show it to the admin
+            temp_password: generatedPassword
         },
     })
 
     if (authError) {
+        console.error('❌ Error creando auth user:', authError.message, authError)
         const msg = authError.message.toLowerCase()
         if (msg.includes('already registered') || msg.includes('already exists')) {
             return { error: 'Ya existe una cuenta con ese correo electrónico.', fields: data }
@@ -77,8 +85,10 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     }
 
     if (!authData.user) {
+        console.error('❌ authData.user es null después de crear usuario')
         return { error: 'No se pudo crear el usuario.', fields: data }
     }
+    console.log('✅ Usuario auth creado. ID:', authData.user.id)
 
     // Calculate subscription dates
     const startDate = new Date();
@@ -91,8 +101,10 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     } else if (subscriptionPlan === 'yearly') {
         endDate.setFullYear(endDate.getFullYear() + 1);
     }
+    console.log('📅 Plan:', subscriptionPlan, '| Inicio:', startDate.toISOString(), '| Fin:', endDate.toISOString())
 
     // Create workshop
+    console.log('🏭 Creando taller:', workshopName, '| Slug:', slug)
     const { data: workshop, error: workshopError } = await supabaseAdmin
         .from('workshops')
         .insert({
@@ -113,14 +125,17 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
         .single()
 
     if (workshopError) {
+        console.error('❌ Error creando taller:', workshopError.message, workshopError)
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id).catch(() => {})
         if (workshopError.code === '23505') {
             return { error: 'Ese identificador de taller ya está en uso. Elige otro.', fields: data }
         }
         return { error: 'Error al crear el taller: ' + workshopError.message, fields: data }
     }
+    console.log('✅ Taller creado. ID:', workshop.id)
 
     // Assign owner
+    console.log('🔗 Asignando owner:', authData.user.id, '→ taller:', workshop.id)
     const { error: memberError } = await supabaseAdmin
         .from('workshop_members')
         .insert({
@@ -130,12 +145,13 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
         })
 
     if (memberError) {
+        console.error('❌ Error creando workshop_member:', memberError.message, memberError)
         return { error: 'Error al configurar el taller: ' + memberError.message, fields: data }
     }
+    console.log('✅ Owner asignado correctamente')
 
     // Try to send WhatsApp notification with credentials
     if (phone) {
-        // Not await-ing this to avoid blocking the registration process if WA API is slow
         sendCredentialsNotification(
             phone,
             fullName,
@@ -143,16 +159,20 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
             slug,
             email,
             generatedPassword
-        ).catch(e => console.error('Failed to send WhatsApp credentials:', e));
+        ).catch(e => console.error('⚠️ Failed to send WhatsApp credentials:', e));
     }
 
     // Sign user in automatically
+    console.log('🔐 Iniciando sesión automáticamente para:', email)
     const supabase = await createClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: generatedPassword })
 
     if (signInError) {
+        console.error('❌ Error en auto-login:', signInError.message)
         redirect('/login?registered=true')
     }
 
+    console.log('✅ ===== REGISTRO COMPLETADO → redirigiendo a / =====\n')
     redirect('/?firstLogin=true')
 }
+

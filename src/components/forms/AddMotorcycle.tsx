@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useRouter } from 'next/navigation';
 import { Loader2, PlusCircle, Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -77,9 +79,12 @@ const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: currentYear - 1989 + 2 }, (_, i) => currentYear + 1 - i);
 
 const formSchema = z.object({
-  customerCedula: z.string().min(1, "La cédula es requerida."),
+  customerCedula: z.string().optional(),
   customerName: z.string().min(1, "El nombre del cliente es requerido."),
-  customerEmail: z.string().email("Email válido requerido."),
+  customerEmail: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim().toLowerCase()),
+    z.string().email("Email válido requerido.").optional()
+  ),
   customerPhone: z.string().optional(),
   make: z.string().min(2, "La marca debe tener al menos 2 caracteres."),
   model: z.string().min(1, "El modelo es requerido."),
@@ -98,6 +103,8 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [openBrand, setOpenBrand] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -144,9 +151,9 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       const formData = new FormData();
-      formData.append('customerCedula', values.customerCedula);
+      if (values.customerCedula) formData.append('customerCedula', values.customerCedula);
       formData.append('customerName', values.customerName);
-      formData.append('customerEmail', values.customerEmail);
+      if (values.customerEmail) formData.append('customerEmail', values.customerEmail);
       if (values.customerPhone) formData.append('customerPhone', values.customerPhone);
       formData.append('make', values.make);
       formData.append('model', values.model);
@@ -158,12 +165,12 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
 
       const result = await createMotorcycle(null, formData);
 
-      console.log('Result from createMotorcycle:', result);
-
       if (result?.success) {
         setIsOpen(false);
         form.reset();
         setErrorMsg(null);
+        toast({ title: 'Motocicleta registrada', description: 'La motocicleta ha sido guardada exitosamente.' });
+        router.refresh();
       } else if (result?.message) {
         setErrorMsg(result.message);
       } else if (result?.errors) {
@@ -307,7 +314,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                               <CommandGroup>
                                 {MOTORCYCLE_BRANDS.map((brand) => (
                                   <CommandItem
-                                    value={brand}
+                                    value={brand.toLowerCase()}
                                     key={brand}
                                     onSelect={(currentValue) => {
                                       const selected = MOTORCYCLE_BRANDS.find(

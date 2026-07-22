@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { Loader2, Edit } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -35,14 +37,20 @@ interface EditTechnicianProps {
 
 export function EditTechnician({ technician }: EditTechnicianProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(updateTechnician, undefined);
 
   useEffect(() => {
     if (state?.success) {
       setIsOpen(false);
+      toast({ title: 'Éxito', description: 'Técnico actualizado correctamente.' });
+      router.refresh();
+    } else if (state?.message) {
+      toast({ title: 'Error', description: state.message, variant: 'destructive' });
     }
-  }, [state?.success]);
+  }, [state, toast, router]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

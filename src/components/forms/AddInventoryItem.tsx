@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { Loader2, PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -39,19 +41,21 @@ function SubmitButton() {
 
 export function AddInventoryItem() {
   const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(createInventoryItem, undefined);
 
   useEffect(() => {
     if (state?.success) {
+      console.log('Se agregó un nuevo artículo al inventario');
       setIsOpen(false);
-      console.log('✅ Inventory item created successfully in frontend');
+      toast({ title: 'Artículo agregado', description: 'El artículo ha sido guardado exitosamente.' });
+      router.refresh();
     } else if (state?.message) {
-      console.error('❌ Error creating inventory item:', state.message);
-    } else if (state?.errors) {
-      console.error('❌ Validation errors:', state.errors);
+      toast({ title: 'Error', description: state.message, variant: 'destructive' });
     }
-  }, [state]);
+  }, [state, toast, router]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

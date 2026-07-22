@@ -32,8 +32,7 @@ export async function updatePlan(id: string, formData: FormData) {
 
   const { error } = await supabaseAdmin
     .from('subscription_plans')
-    .update(updateData)
-    .eq('id', id);
+    .upsert({ ...updateData, id });
 
   if (error) {
     return { success: false, error: error.message };

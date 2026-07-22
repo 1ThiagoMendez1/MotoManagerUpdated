@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,8 +34,16 @@ interface DeleteCustomerProps {
 export function DeleteCustomer({ customer }: DeleteCustomerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(deleteCustomer, undefined);
+  const [handledSuccess, setHandledSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setHandledSuccess(false);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (state?.message) {
@@ -48,20 +57,16 @@ export function DeleteCustomer({ customer }: DeleteCustomerProps) {
   }, [state?.message, toast]);
 
   useEffect(() => {
-    if (state?.success) {
+    if (state?.success && !handledSuccess) {
+      setHandledSuccess(true);
       toast({
         title: "Éxito",
         description: "Cliente eliminado correctamente.",
       });
       setIsOpen(false);
+      router.refresh(); // Force re-render so deleted client disappears immediately
     }
-  }, [state?.success, toast]);
-
-  useEffect(() => {
-    if (state) {
-      console.log('DeleteCustomer state:', state);
-    }
-  }, [state]);
+  }, [state?.success, handledSuccess, toast, router]);
 
   return (
     <>

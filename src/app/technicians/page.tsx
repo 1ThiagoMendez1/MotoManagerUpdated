@@ -33,6 +33,7 @@ export default async function TechniciansPage() {
 
   try {
     technicians = await getTechnicians();
+    console.log('Technicians page loaded technicians:', technicians);
   } catch (err) {
     console.error('Error fetching technicians:', err);
     error = 'Error al cargar los técnicos';

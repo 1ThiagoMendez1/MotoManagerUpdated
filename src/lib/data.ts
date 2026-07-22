@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import type { Customer, Motorcycle, Technician, InventoryItem, WorkOrder, Sale, Reminder } from './types';
 import { subDays, format, startOfMonth, endOfMonth } from 'date-fns';
 import { getCurrentUserServer } from './auth-server';
@@ -7,22 +7,33 @@ import { getCurrentUserServer } from './auth-server';
 async function getScopedClient() {
   const user = await getCurrentUserServer();
   const supabase = await createClient();
+  const supabaseAdmin = await createAdminClient();
   if (!user || !user.workshopId) {
-    return { supabase, workshopId: null, user: null };
+    return { supabase, supabaseAdmin, workshopId: null, user: null };
   }
-  return { supabase, workshopId: user.workshopId, user };
+  return { supabase, supabaseAdmin, workshopId: user.workshopId, user };
 }
 
 // --- CUSTOMERS ---
-export const getCustomers = async (): Promise<Customer[]> => {
-  const { supabase, workshopId } = await getScopedClient();
+export const getCustomers = async ({ query }: { query?: string } = {}): Promise<Customer[]> => {
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return [];
 
-  const { data } = await supabase
+  let queryBuilder = supabaseAdmin
     .from('clientes')
     .select('id, name, email, phone, cedula, is_frequent')
     .eq('workshop_id', workshopId)
     .order('created_at', { ascending: false });
+
+  if (query && query.trim()) {
+    const q = query.trim();
+    queryBuilder = queryBuilder.or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,cedula.ilike.%${q}%`);
+  }
+
+  const { data, error } = await queryBuilder;
+
+  console.log(`[getCustomers] Fetched ${data?.length || 0} customers for workshop ${workshopId}`);
+  if (error) console.error('[getCustomers] Error fetching:', error);
 
   return (data || []).map((c: any) => ({
     id: c.id,
@@ -36,7 +47,7 @@ export const getCustomers = async (): Promise<Customer[]> => {
 
 // --- TECHNICIANS ---
 export const getTechnicians = async (): Promise<Technician[]> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return [];
 
   try {
@@ -104,7 +115,7 @@ export const getTechnicians = async (): Promise<Technician[]> => {
     console.error('Error in auto-sync technicians:', syncError);
   }
 
-  const { data: technicians } = await supabase
+  const { data: technicians, error: techsError } = await supabaseAdmin
     .from('tecnicos_activos')
     .select(`
       id, name, specialty, avatar_url,
@@ -119,6 +130,10 @@ export const getTechnicians = async (): Promise<Technician[]> => {
     .eq('workshop_id', workshopId)
     .eq('is_active', true)
     .order('created_at', { ascending: true }); // Prefer older ones when deduplicating
+
+  if (techsError) {
+    console.error('Error fetching tecnicos_activos in getTechnicians:', techsError);
+  }
 
   // Deduplicate before returning and delete duplicates from DB
   const uniqueTechnicians: any[] = [];
@@ -179,10 +194,10 @@ export const getTechnicians = async (): Promise<Technician[]> => {
 
 // --- MOTORCYCLES ---
 export const getMotorcycles = async ({ query }: { query?: string } = {}): Promise<Motorcycle[]> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return [];
 
-  let queryBuilder = supabase
+  let queryBuilder = supabaseAdmin
     .from('motorcycles')
     .select(`
       id, make, model, year, plate, created_at, notes,
@@ -218,15 +233,15 @@ export const getMotorcycles = async ({ query }: { query?: string } = {}): Promis
   }));
 };
 
-// --- INVENTORY ---
 export const getInventory = async ({ query, category, page = 1, limit = 10 }: { query?: string; category?: string; page?: number; limit?: number; }): Promise<{ items: InventoryItem[], totalPages: number }> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return { items: [], totalPages: 0 };
 
-  let req = supabase
+  let req = supabaseAdmin
     .from('inventory_items')
     .select('*', { count: 'exact' })
-    .eq('workshop_id', workshopId);
+    .eq('workshop_id', workshopId)
+    .order('created_at', { ascending: false });
 
   if (query) {
     req = req.or(`name.ilike.%${query}%,sku.ilike.%${query}%`);
@@ -259,15 +274,15 @@ export const getInventory = async ({ query, category, page = 1, limit = 10 }: { 
 };
 // --- WORK ORDERS ---
 export const getWorkOrders = async ({ query, page = 1, limit = 20 }: { query?: string; page?: number; limit?: number } = {}): Promise<{ items: WorkOrder[], totalPages: number }> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return { items: [], totalPages: 0 };
 
-  let req = supabase
+  let req = supabaseAdmin
     .from('work_orders')
     .select(`
-      id, work_order_number, issue_description, solution_description, deposit_amount, status, created_at, completed_at,
+      id, work_order_number, issue_description, solution_description, deposit_amount, status, quote_status, created_at, completed_at,
       motorcycle:motorcycles (
-        id, make, model, year, plate, created_at,
+        id, make, model, year, plate, created_at, notes,
         customer:clientes (id, name, email, phone)
       ),
       technician:tecnicos_activos (id, name, specialty)
@@ -300,13 +315,13 @@ export const getWorkOrders = async ({ query, page = 1, limit = 20 }: { query?: s
       customer: wo.motorcycle.customer,
     },
     technician: wo.technician,
-    issueDescription: wo.issue_description,
+    issueDescription: wo.issue_description || wo.motorcycle?.notes,
     solutionDescription: wo.solution_description,
     depositAmount: wo.deposit_amount || 0,
     createdDate: wo.created_at,
     completedDate: wo.completed_at,
     status: wo.status as 'Diagnosticando' | 'Reparado' | 'Entregado',
-    // Missing dates like diagnosticandoDate... relying on created/completed for now or status
+    quoteStatus: (wo.quote_status === 'approved' || wo.quote_status === 'Aprobada' ? 'Aprobada' : wo.quote_status === 'rejected' || wo.quote_status === 'Rechazada' ? 'Rechazada' : 'Pendiente') as 'Pendiente' | 'Aprobada' | 'Rechazada',
   }));
 
   return { items: typedItems, totalPages };
@@ -314,15 +329,15 @@ export const getWorkOrders = async ({ query, page = 1, limit = 20 }: { query?: s
 
 // --- WORK ORDER DETAILS ---
 export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return null;
 
-  const { data: wo } = await supabase
+  const { data: wo, error } = await supabaseAdmin
     .from('work_orders')
     .select(`
-      id, work_order_number, issue_description, solution_description, deposit_amount, status, created_at, completed_at,
+      id, work_order_number, issue_description, solution_description, deposit_amount, status, created_at, completed_at, quote_status, quote_responded_at,
       motorcycle:motorcycles (
-        id, make, model, year, plate, created_at,
+        id, make, model, year, plate, created_at, notes,
         customer:clientes (id, name, email, phone)
       ),
       technician:tecnicos_activos (id, name, specialty),
@@ -338,7 +353,28 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     .eq('workshop_id', workshopId)
     .single();
 
+  if (error) {
+    console.error('Error in getWorkOrderById:', JSON.stringify(error, null, 2));
+  }
+
   if (!wo) return null;
+
+  // Fetch images separately to avoid schema cache issues breaking the whole query
+  let images = [];
+  try {
+    const { data: imgData, error: imgError } = await supabaseAdmin
+      .from('work_order_images')
+      .select('id, image_url, description, created_at')
+      .eq('work_order_id', id)
+      .eq('workshop_id', workshopId)
+      .order('created_at', { ascending: true });
+      
+    if (!imgError && imgData) {
+      images = imgData;
+    }
+  } catch (err) {
+    console.error('Failed to fetch work_order_images independently', err);
+  }
 
   return {
     id: wo.id,
@@ -353,12 +389,14 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
       customer: wo.motorcycle.customer,
     },
     technician: wo.technician,
-    issueDescription: wo.issue_description,
+    issueDescription: wo.issue_description || wo.motorcycle?.notes,
     solutionDescription: wo.solution_description,
     depositAmount: wo.deposit_amount || 0,
     createdDate: wo.created_at,
     completedDate: wo.completed_at,
     status: wo.status as 'Diagnosticando' | 'Reparado' | 'Entregado',
+    quote_status: wo.quote_status,
+    quote_responded_at: wo.quote_responded_at,
     sales: (wo.sales || []).map((s: any) => ({
       id: s.id,
       total: s.total,
@@ -369,23 +407,29 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         price: si.price,
         inventoryItem: si.inventoryItem
       }))
+    })),
+    images: (images || []).map((img: any) => ({
+      id: img.id,
+      imageUrl: img.image_url,
+      description: img.description,
+      createdAt: img.created_at
     }))
   };
 };
 
 // --- SALES ---
 export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }: { dateFrom?: string; dateTo?: string; type?: 'direct' | 'service' | 'all'; page?: number; limit?: number; } = {}): Promise<{ items: Sale[], totalPages: number }> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return { items: [], totalPages: 0 };
 
-  let req = supabase
+  let req = supabaseAdmin
     .from('sales')
     .select(`
       id, sale_number, total, payment_method, date, work_order_id, customer_id,
       work_order:work_orders (
-         id, work_order_number, issue_description, created_at,
+         id, work_order_number, issue_description, solution_description, created_at,
          motorcycle:motorcycles (
-           id, make, model, year, plate, created_at,
+           id, make, model, year, plate, created_at, notes,
            customer:clientes (id, name, email, phone)
          ),
          technician:tecnicos_activos (id, name, specialty)
@@ -424,6 +468,8 @@ export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }:
       id: s.work_order.id,
       workOrderNumber: s.work_order.work_order_number?.toString(),
       createdDate: s.work_order.created_at, // Added createdDate
+      issueDescription: s.work_order.issue_description || s.work_order.motorcycle?.notes,
+      solutionDescription: s.work_order.solution_description,
       motorcycle: {
         ...s.work_order.motorcycle,
         intakeDate: s.work_order.motorcycle.created_at,
@@ -452,14 +498,14 @@ export const getSales = async ({ dateFrom, dateTo, type, page = 1, limit = 20 }:
 
 // --- SALES CHART DATA ---
 export const getSalesDataForChart = async () => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return [];
 
   const today = new Date();
   const sixMonthsAgo = subDays(today, 180);
 
   // Fetch all sales directly for last 6 months (aggregating in JS simpler than RPC for now)
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from('sales')
     .select('total, date')
     .eq('workshop_id', workshopId)
@@ -490,10 +536,10 @@ export const getSalesDataForChart = async () => {
 
 // --- REMINDERS ---
 export const getRemindersByMotorcycleId = async (motorcycleId: string): Promise<Reminder[]> => {
-  const { supabase, workshopId } = await getScopedClient();
+  const { supabaseAdmin, workshopId } = await getScopedClient();
   if (!workshopId) return [];
 
-  const { data } = await supabase
+  const { data } = await supabaseAdmin
     .from('reminders')
     .select('id, service_type, due_date, status, sent_at, created_at')
     .eq('workshop_id', workshopId)

@@ -232,6 +232,71 @@ Te mantendremos informado sobre cualquier actualización.
   }
 }
 
+export async function sendQuoteNotification(
+  customerPhone: string,
+  customerName: string,
+  workshopName: string,
+  workOrderId: string,
+  portalUrl: string,
+  orderNumber?: string,
+  technicianName?: string
+) {
+  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
+    console.log('Evolution API not configured, skipping WhatsApp notification');
+    return { success: false, error: 'Evolution API not configured' };
+  }
+
+  try {
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+
+    const orderText = orderNumber ? ` (Orden: *${orderNumber}*)` : '';
+    const techText = technicianName ? ` por el técnico ${technicianName}` : '';
+
+    const message = `👋 Hola, ${customerName}.
+Gracias por confiar en ${workshopName || 'nosotros'}
+Hemos revisado tu motocicleta y hemos preparado la cotización del servicio${orderText}.
+
+A continuación, podrás consultar:
+
+• 🛠️ El detalle de los repuestos.
+• 📋 La solución propuesta${techText}
+• ✅ La opción para aprobar o rechazar la cotización.
+
+🔗 Consulta tu cotización aquí:
+${portalUrl}
+
+Agradecemos que revises la información y nos indiques tu decisión cuando te sea posible.
+
+Quedamos atentos a cualquier consulta.
+
+Saludos cordiales,
+${workshopName || ''}
+
+🏍️ Equipo MotoManager`;
+
+    const response = await axios.post(
+      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+      {
+        number: formattedPhone,
+        text: message,
+        delay: 1000
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        }
+      }
+    );
+
+    console.log('✅ WhatsApp quote notification sent via Evolution API:', response.data);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp quote notification via Evolution API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
 export async function sendOrderItemAddedNotification(
   customerPhone: string,
   customerName: string,
@@ -712,5 +777,6 @@ export default {
   sendLowStockNotification,
   sendSuperAdminWelcomeNotification,
   sendSubscriptionRenewalReminder,
-  sendSubscriptionSuspendedNotification
+  sendSubscriptionSuspendedNotification,
+  sendQuoteNotification
 };

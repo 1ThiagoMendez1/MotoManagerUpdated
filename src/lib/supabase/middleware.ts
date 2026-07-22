@@ -49,7 +49,8 @@ export async function updateSession(request: NextRequest) {
         !request.nextUrl.pathname.startsWith('/register-workshop') &&
         !request.nextUrl.pathname.startsWith('/debug') &&
         !request.nextUrl.pathname.startsWith('/planes') &&
-        !request.nextUrl.pathname.startsWith('/api/wompi')
+        !request.nextUrl.pathname.startsWith('/api/wompi') &&
+        !request.nextUrl.pathname.startsWith('/cotizacion')
     ) {
         // no user, potentially respond by redirecting the user to the planes page
         const url = request.nextUrl.clone()

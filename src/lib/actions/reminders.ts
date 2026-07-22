@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { requireWorkshop } from '@/lib/auth-server'
 
@@ -9,7 +9,7 @@ export async function getPendingReminders() {
   if (!user || !user.workshopId) return { success: false, error: 'No workshop selected' };
   const workshopId = user.workshopId;
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { data, error } = await supabase
     .from('reminders')
@@ -44,7 +44,7 @@ export async function createReminder(data: {
   if (!user || !user.workshopId) return { success: false, error: 'No workshop selected' };
   const workshopId = user.workshopId;
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   // Aseguramos que la hora sea a las 10:00 AM (hora Colombia, UTC-5)
   // Si due_date viene como 'YYYY-MM-DD', agregamos la hora.
@@ -77,7 +77,7 @@ export async function markReminderAsSent(reminderId: string) {
   if (!user || !user.workshopId) return { success: false, error: 'No workshop selected' };
   const workshopId = user.workshopId;
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const { error } = await supabase
     .from('reminders')
@@ -102,7 +102,7 @@ export async function addReminderFromWorkOrder(formData: FormData) {
   if (!user || !user.workshopId) return { success: false, error: 'No workshop selected' };
   const workshopId = user.workshopId;
 
-  const supabase = await createClient();
+  const supabase = await createAdminClient();
 
   const workOrderId = formData.get('workOrderId') as string;
   const serviceType = formData.get('serviceType') as string;

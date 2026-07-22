@@ -98,7 +98,7 @@ function DashboardPreview() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function PlanesPage({ plans, features }: { plans?: any[], features?: any[] }) {
+export default function PlanesPage({ plans, features, user }: { plans?: any[], features?: any[], user?: any }) {
   const searchParams = useSearchParams();
   const paymentStatus = searchParams.get('payment');
   const urlPlan = searchParams.get('plan');
@@ -151,7 +151,9 @@ export default function PlanesPage({ plans, features }: { plans?: any[], feature
       </div>
 
       {/* Navbar */}
-      <LandingNavbar />
+      <LandingNavbar user={user} />
+
+
 
       {/* Sections */}
       <div className="relative z-10">

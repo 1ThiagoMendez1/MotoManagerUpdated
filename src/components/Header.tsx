@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   LogOut,
   ArrowLeft,
+  Home,
   Crown,
   CalendarDays,
   ArrowUpCircle,
@@ -109,13 +110,13 @@ export default function Header({
       <div className="flex items-center gap-2 sm:gap-4">
         {!isRoot && (
           <Button
-            onClick={() => router.back()}
+            onClick={() => router.push(pathname.startsWith('/admin') ? '/admin' : '/')}
             variant="ghost"
             size="icon"
-            className="text-foreground hover:bg-card/50 h-9 w-9 rounded-full transition-transform hover:-translate-x-1"
-            title="Volver atrás"
+            className="text-foreground hover:bg-card/50 h-9 w-9 rounded-full transition-transform hover:scale-110"
+            title="Ir a inicio"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <Home className="h-5 w-5" />
           </Button>
         )}
         <Link

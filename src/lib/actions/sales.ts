@@ -158,8 +158,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                 })
 
             if (itemError) {
-                console.error('Error creating sale item:', itemError)
-                continue
+                throw new Error('Error al registrar uno de los productos de la venta.');
             }
 
             // Decrement stock
@@ -167,12 +166,11 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                 item_id: item.inventoryItemId,
                 amount: item.quantity
             });
-            // Fallback
+            
             if (updateError) {
-                const { data: currentInv } = await supabase.from('inventory_items').select('quantity').eq('id', item.inventoryItemId).single();
-                if (currentInv) {
-                    await supabase.from('inventory_items').update({ quantity: currentInv.quantity - item.quantity }).eq('id', item.inventoryItemId);
-                }
+                // If this fails, we throw to abort the rest of the operation.
+                // Ideally this would be wrapped in a full SQL transaction RPC.
+                throw new Error(`Error al descontar inventario del producto (Posible falta de stock en tiempo real).`);
             }
         }
 
@@ -227,6 +225,10 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         }
 
         revalidatePath('/sales')
+        revalidatePath('/customers')
+        revalidatePath('/motorcycles')
+        revalidatePath('/work-orders')
+        revalidatePath('/', 'layout')
 
         // Return formatted sale object for the UI (ReceiptDialog)
         const { data: fullSale } = await supabase
@@ -415,10 +417,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                 amount: item.quantity
             });
             if (updateError) {
-                const { data: currentInv } = await supabase.from('inventory_items').select('quantity').eq('id', item.inventoryItemId).single();
-                if (currentInv) {
-                    await supabase.from('inventory_items').update({ quantity: currentInv.quantity - item.quantity }).eq('id', item.inventoryItemId);
-                }
+                throw new Error(`Error al descontar inventario del producto (Posible falta de stock en tiempo real).`);
             }
         }
 
@@ -459,6 +458,10 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         }
 
         revalidatePath('/sales')
+        revalidatePath('/customers')
+        revalidatePath('/motorcycles')
+        revalidatePath('/work-orders')
+        revalidatePath('/', 'layout')
 
         // Return formatted sale
         const { data: fullSale } = await supabase

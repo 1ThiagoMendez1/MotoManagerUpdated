@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -27,14 +29,21 @@ function SubmitButton() {
 
 export function AddTechnician() {
   const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(createTechnician, undefined);
 
   useEffect(() => {
     if (state?.success) {
+      console.log('Se agregó un nuevo técnico');
       setIsOpen(false);
+      toast({ title: 'Técnico agregado', description: 'El técnico ha sido registrado exitosamente.' });
+      router.refresh();
+    } else if (state?.message) {
+      toast({ title: 'Error', description: state.message, variant: 'destructive' });
     }
-  }, [state?.success]);
+  }, [state, toast, router]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

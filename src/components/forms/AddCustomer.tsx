@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,10 +20,20 @@ import { useToast } from '@/hooks/use-toast';
 import { createCustomer } from '@/lib/actions/customers';
 
 function SubmitButton() {
+  const { pending } = useFormStatus();
   return (
-    <Button type="submit">
-      <UserPlus className="mr-2 h-4 w-4" />
-      Agregar Cliente
+    <Button type="submit" disabled={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Guardando...
+        </>
+      ) : (
+        <>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Agregar Cliente
+        </>
+      )}
     </Button>
   );
 }
@@ -29,20 +41,36 @@ function SubmitButton() {
 export function AddCustomer() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(createCustomer, undefined);
+  const [handledSuccess, setHandledSuccess] = useState(false);
 
   useEffect(() => {
-    if (state?.success) {
-      setIsOpen(false);
+    if (isOpen) {
+      setHandledSuccess(false);
     }
-  }, [state?.success]);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (state?.success && !handledSuccess) {
+      setHandledSuccess(true);
+      toast({
+        title: "Cliente creado",
+        description: "El cliente ha sido guardado exitosamente.",
+      });
+      setIsOpen(false);
+      router.refresh(); // Force the server component to re-render with new data
+    } else if (state?.message) {
+      toast({
+        title: "Error",
+        description: state.message,
+        variant: "destructive",
+      });
+    }
+  }, [state, handledSuccess, toast, router]);
 
   const handleFormSubmit = (formData: FormData) => {
-    console.log('📝 Form data being sent from AddCustomer:');
-    for (const [key, value] of formData.entries()) {
-      console.log(`${key}: ${value}`);
-    }
     return formAction(formData);
   };
 
@@ -63,31 +91,40 @@ export function AddCustomer() {
         </DialogHeader>
         <form action={handleFormSubmit} className="space-y-4">
           {state?.message && (
-            <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-2 rounded text-sm">
+            <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-2.5 rounded-lg text-sm font-medium">
               {state.message}
             </div>
           )}
           <div>
-            <label className="text-sm font-medium text-foreground">Nombre</label>
+            <label className="text-sm font-medium text-foreground">Nombre *</label>
             <Input name="name" placeholder="p. ej., Juan Pérez" className="bg-card text-card-foreground border-border" required />
             {state?.errors?.name && (
-              <p className="text-red-500 text-xs mt-1">{state.errors.name[0]}</p>
+              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.name[0]}</p>
             )}
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground">Email</label>
-            <Input name="email" type="email" placeholder="p. ej., juan@email.com" className="bg-card text-card-foreground border-border" required />
+            <label className="text-sm font-medium text-foreground">Email (Opcional)</label>
+            <Input name="email" type="email" placeholder="p. ej., juan@email.com" className="bg-card text-card-foreground border-border" />
+            {state?.errors?.email && (
+              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.email[0]}</p>
+            )}
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground">Teléfono</label>
-            <Input name="phone" placeholder="p. ej., 555-0123" className="bg-card text-card-foreground border-border" />
+            <label className="text-sm font-medium text-foreground">Teléfono (Opcional)</label>
+            <Input name="phone" placeholder="p. ej., 3001234567" className="bg-card text-card-foreground border-border" />
+            {state?.errors?.phone && (
+              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.phone[0]}</p>
+            )}
           </div>
           <div>
-            <label className="text-sm font-medium text-foreground">Cédula</label>
+            <label className="text-sm font-medium text-foreground">Cédula / Documento (Opcional)</label>
             <Input name="cedula" placeholder="p. ej., 123456789" className="bg-card text-card-foreground border-border" />
+            {state?.errors?.cedula && (
+              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.cedula[0]}</p>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <SubmitButton />
           </DialogFooter>
         </form>

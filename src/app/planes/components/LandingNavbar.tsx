@@ -3,13 +3,23 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Menu, X, Sun, Moon } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 
-export function LandingNavbar() {
+export function LandingNavbar({ user }: { user?: any }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -46,7 +56,7 @@ export function LandingNavbar() {
     >
       <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/planes" className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
+        <Link href={user ? "/" : "/planes"} className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
           <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 drop-shadow-md">
             <Image 
               src="/logo.png" 
@@ -74,12 +84,32 @@ export function LandingNavbar() {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-2">
-          <Link
-            href="/login"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2"
-          >
-            Iniciar sesión
-          </Link>
+          {user ? (
+            <div className="flex items-center gap-4 px-4 py-2">
+              <span className="text-sm text-muted-foreground hidden lg:inline-block">
+                {user.email}
+              </span>
+              <Link
+                href="/"
+                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                Ir al panel
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-red-400 hover:text-red-300 transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2"
+            >
+              Iniciar sesión
+            </Link>
+          )}
 
           {/* Theme Toggle */}
           {mounted && (
@@ -142,9 +172,27 @@ export function LandingNavbar() {
             </button>
           ))}
           <div className="pt-2 border-t border-border/30 space-y-2">
-            <Link href="/login" className="block px-4 py-3 text-muted-foreground hover:text-foreground transition-colors">
-              Iniciar sesión
-            </Link>
+            {user ? (
+              <div className="px-4 py-3">
+                <p className="text-sm text-muted-foreground mb-2 truncate">{user.email}</p>
+                <Link
+                  href="/"
+                  className="block text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
+                >
+                  Ir al panel
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className="block px-4 py-3 text-muted-foreground hover:text-foreground transition-colors">
+                Iniciar sesión
+              </Link>
+            )}
             <button
               onClick={() => scrollTo('#planes')}
               className="w-full font-semibold bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-5 py-3 rounded-xl"

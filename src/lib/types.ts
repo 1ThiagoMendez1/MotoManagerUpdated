@@ -40,6 +40,13 @@ export type InventoryItem = {
   supplierPrice: number;
   supplier: string;
 };
+export type WorkOrderImage = {
+  id: string;
+  imageUrl: string;
+  description?: string | null;
+  createdAt: string;
+};
+
 export type WorkOrder = {
   id: string;
   workOrderNumber: string;
@@ -55,6 +62,11 @@ export type WorkOrder = {
   entregadoDate?: string;
   completedDate?: string;
   status: 'Diagnosticando' | 'Reparado' | 'Entregado';
+  quoteStatus?: 'Pendiente' | 'Aprobada' | 'Rechazada';
+  quote_status?: 'pending' | 'approved' | 'rejected' | null;
+  quote_responded_at?: string | null;
+  sales?: any[];
+  images?: WorkOrderImage[];
 };
 
 export type SaleItem = {

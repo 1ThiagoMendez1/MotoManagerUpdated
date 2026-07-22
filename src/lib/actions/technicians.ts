@@ -26,12 +26,14 @@ export async function createTechnician(prevState: any, formData: FormData) {
     const { name, specialty } = validatedFields.data
 
     // Verificar que no exista ya un técnico con el mismo nombre en este taller
-    const { data: existingTechnician } = await supabase
+    const { data: existingTechnician, error: techError } = await supabase
         .from('tecnicos_activos')
         .select('id')
         .eq('workshop_id', user.workshopId)
         .ilike('name', name)
         .maybeSingle()
+        
+    if (techError) return { message: 'Error al verificar la disponibilidad del nombre del técnico.' }
 
     if (existingTechnician) {
         return { message: 'Ya existe un técnico con este nombre en tu taller.' }
@@ -72,13 +74,15 @@ export async function updateTechnician(prevState: any, formData: FormData) {
     const { name, specialty } = validatedFields.data
 
     // Verificar que no exista ya otro técnico con el mismo nombre en este taller
-    const { data: existingTechnician } = await supabase
+    const { data: existingTechnician, error: techError } = await supabase
         .from('tecnicos_activos')
         .select('id')
         .eq('workshop_id', user.workshopId)
         .ilike('name', name)
         .neq('id', id)
         .maybeSingle()
+        
+    if (techError) return { message: 'Error al verificar la disponibilidad del nombre del técnico.' }
 
     if (existingTechnician) {
         return { message: 'Ya existe otro técnico con este nombre en tu taller.' }

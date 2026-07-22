@@ -1,0 +1,64 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+export function SearchCustomers() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('query') || '');
+
+  const handleSearch = (searchQuery: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (searchQuery.trim()) {
+      params.set('query', searchQuery.trim());
+    } else {
+      params.delete('query');
+    }
+
+    router.push(`/customers?${params.toString()}`);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('query');
+    router.push(`/customers?${params.toString()}`);
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      handleSearch(query);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          type="text"
+          placeholder="Buscar por nombre, cédula, tel..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="pl-10 pr-10 bg-card/50 border-border/50 text-foreground placeholder:text-muted-foreground w-64 sm:w-72"
+        />
+        {query && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClear}
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-card/50"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}

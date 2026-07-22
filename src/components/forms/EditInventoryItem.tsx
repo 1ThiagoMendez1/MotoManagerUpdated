@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,6 +45,7 @@ interface EditInventoryItemProps {
 export function EditInventoryItem({ item }: EditInventoryItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(updateInventoryItem, undefined);
 
@@ -72,8 +74,9 @@ export function EditInventoryItem({ item }: EditInventoryItemProps) {
         description: "Artículo actualizado correctamente.",
       });
       setIsOpen(false);
+      router.refresh();
     }
-  }, [state?.success, toast]);
+  }, [state?.success, toast, router]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

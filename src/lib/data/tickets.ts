@@ -12,17 +12,20 @@ async function getScopedClient() {
 
 // Para que el Taller vea sus propios tickets
 export const getWorkshopTickets = async () => {
-  const { supabase, workshopId } = await getScopedClient();
-  if (!workshopId) return [];
+  const user = await getCurrentUserServer();
+  if (!user || !user.workshopId) return [];
 
-  const { data, error } = await supabase
+  const { createAdminClient } = await import('@/lib/supabase/server');
+  const supabaseAdmin = await createAdminClient();
+
+  const { data, error } = await supabaseAdmin
     .from('tickets')
     .select(`
       id, subject, description, status, created_at,
       creator:user_profiles!created_by (name),
       workshop:workshops (name)
     `)
-    .eq('workshop_id', workshopId)
+    .eq('workshop_id', user.workshopId)
     .order('created_at', { ascending: false });
 
   if (error) {

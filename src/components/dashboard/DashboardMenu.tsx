@@ -72,6 +72,7 @@ export function DashboardMenu({
         
         {/* Header / Apertura Personalizada */}
         <motion.div 
+          id="tour-greeting"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
@@ -94,7 +95,7 @@ export function DashboardMenu({
         >
           {/* 1. Centro de Operaciones (Hero Card) - Órdenes de Trabajo */}
           {canAccessWorkOrders && (
-            <motion.div variants={itemVariants} className="md:col-span-8 lg:col-span-8 flex flex-col h-full group">
+            <motion.div id="tour-work-orders" variants={itemVariants} className="md:col-span-8 lg:col-span-8 flex flex-col h-full group">
               <div className="relative h-full min-h-[240px] flex flex-col justify-between p-6 sm:p-8 rounded-[32px] bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-xl overflow-hidden transition-all duration-300 hover:bg-foreground/[0.05] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2]">
                 {/* Glow effect inside */}
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none transition-colors duration-500" />
@@ -137,7 +138,7 @@ export function DashboardMenu({
 
           {/* 2. Resumen General / Dashboard */}
           {canAccessDashboard && (
-            <div className="md:col-span-4 lg:col-span-4">
+            <div id="tour-dashboard" className="md:col-span-4 lg:col-span-4">
               <AppleGlassCard 
                 href="/dashboard"
                 icon={LayoutDashboard}
@@ -151,28 +152,32 @@ export function DashboardMenu({
           {/* 3. Bloque Operativo Relacionado: Clientes y Motos */}
           <div className="md:col-span-8 lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-5">
             {canAccessCustomers && (
-              <AppleGlassCard 
-                href="/customers"
-                icon={UserPlus}
-                title="Clientes"
-                description="Directorio y contactos."
-                iconBg="bg-emerald-500"
-              />
+              <div id="tour-customers">
+                <AppleGlassCard 
+                  href="/customers"
+                  icon={UserPlus}
+                  title="Clientes"
+                  description="Directorio y contactos."
+                  iconBg="bg-emerald-500"
+                />
+              </div>
             )}
             {canAccessMotorcycles && (
-              <AppleGlassCard 
-                href="/motorcycles"
-                icon={Bike}
-                title="Motocicletas"
-                description="Historial vehicular."
-                iconBg="bg-orange-500"
-              />
+              <div id="tour-motorcycles">
+                <AppleGlassCard 
+                  href="/motorcycles"
+                  icon={Bike}
+                  title="Motocicletas"
+                  description="Historial vehicular."
+                  iconBg="bg-orange-500"
+                />
+              </div>
             )}
           </div>
 
           {/* 4. Inventario y Ventas */}
           {canAccessInventory && (
-            <div className="md:col-span-4 lg:col-span-3">
+            <div id="tour-inventory" className="md:col-span-4 lg:col-span-3">
               <AppleGlassCard 
                 href="/inventory"
                 icon={Warehouse}
@@ -184,7 +189,7 @@ export function DashboardMenu({
           )}
           
           {canAccessSales && (
-            <div className="md:col-span-4 lg:col-span-3">
+            <div id="tour-sales" className="md:col-span-4 lg:col-span-3">
               <AppleGlassCard 
                 href="/sales"
                 icon={DollarSign}
@@ -198,31 +203,37 @@ export function DashboardMenu({
           {/* 5. Administración y Equipo */}
           <div className="md:col-span-8 lg:col-span-12 grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-5">
             {canAccessTechnicians && (
-              <AppleGlassCardSmall 
-                href="/technicians"
-                icon={Users}
-                title="Técnicos"
-                description="Rendimiento del equipo."
-                iconBg="bg-cyan-500"
-              />
+              <div id="tour-technicians">
+                <AppleGlassCardSmall 
+                  href="/technicians"
+                  icon={Users}
+                  title="Técnicos"
+                  description="Rendimiento del equipo."
+                  iconBg="bg-cyan-500"
+                />
+              </div>
             )}
             {canAccessTeam && (
-              <AppleGlassCardSmall 
-                href="/team"
-                icon={UserCog}
-                title="Permisos"
-                description="Accesos al sistema."
-                iconBg="bg-purple-500"
-              />
+              <div id="tour-team">
+                <AppleGlassCardSmall 
+                  href="/team"
+                  icon={UserCog}
+                  title="Permisos"
+                  description="Accesos al sistema."
+                  iconBg="bg-purple-500"
+                />
+              </div>
             )}
             {canAccessTickets && (
-              <AppleGlassCardSmall 
-                href="/tickets"
-                icon={LifeBuoy}
-                title="Soporte"
-                description="Centro de ayuda y tickets."
-                iconBg="bg-rose-500"
-              />
+              <div id="tour-tickets">
+                <AppleGlassCardSmall 
+                  href="/tickets"
+                  icon={LifeBuoy}
+                  title="Soporte"
+                  description="Centro de ayuda y tickets."
+                  iconBg="bg-rose-500"
+                />
+              </div>
             )}
           </div>
 

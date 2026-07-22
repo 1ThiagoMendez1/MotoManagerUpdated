@@ -25,6 +25,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { WorkOrderStepper } from '@/components/WorkOrderStepper';
+import { QuoteStatusWidget } from '@/components/work-orders/QuoteStatusWidget';
+import { SaveAndSendButton } from '@/components/work-orders/SaveAndSendButton';
+import { EvidenceManager } from '@/components/work-orders/EvidenceManager';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +67,19 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-20" />
           <WorkOrderStepper currentStatus={workOrder.status} />
         </div>
+      </div>
+
+      {/* Quote Status & WhatsApp Widget */}
+      <div className="mb-8">
+        <QuoteStatusWidget 
+          workOrderId={workOrder.id} 
+          initialStatus={(workOrder as any).quote_status} 
+          customerPhone={workOrder.motorcycle.customer.phone}
+          customerName={workOrder.motorcycle.customer.name}
+          workshopName={(workOrder as any).workshop?.name}
+          orderNumber={workOrder.workOrderNumber?.toString()}
+          technicianName={workOrder.technician?.name}
+        />
       </div>
 
       {/* Info Grid */}
@@ -195,6 +211,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         </CardContent>
       </Card>
 
+      {/* Evidencias Section */}
+      <EvidenceManager workOrderId={workOrder.id} evidences={workOrder.images || []} />
+
       {/* Recordatorio Section */}
       <Card className="bg-card/40 border-border/50 backdrop-blur-md overflow-hidden shadow-lg mb-8 relative group transition-all duration-300 hover:border-border">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
@@ -306,12 +325,16 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
       {/* Floating Action Button / Bottom Nav */}
       <div className="flex justify-end mt-8 pb-12">
-        <Link href="/work-orders" className="w-full sm:w-auto">
-          <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-base md:text-lg px-8 py-6 h-auto rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2">
-            <Save className="w-5 h-5" />
-            Guardar cambios y volver
-          </Button>
-        </Link>
+        <div className="w-full sm:w-auto">
+          <SaveAndSendButton 
+            workOrderId={workOrder.id}
+            customerPhone={workOrder.motorcycle.customer.phone}
+            customerName={workOrder.motorcycle.customer.name}
+            workshopName={(workOrder as any).workshop?.name}
+            orderNumber={workOrder.workOrderNumber?.toString()}
+            technicianName={workOrder.technician?.name}
+          />
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2, PlusCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,18 +43,21 @@ function SubmitButton() {
 
 export function AddWorkOrder({ motorcycles, technicians, customTrigger }: AddWorkOrderProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(createWorkOrder, undefined);
 
   useEffect(() => {
     if (state?.success) {
+      console.log('Se agregó una nueva orden de trabajo');
       setIsOpen(false);
-      // Reset form by triggering a re-render
-      window.location.reload();
+      toast({ title: 'Orden creada', description: 'La orden de trabajo ha sido creada exitosamente.' });
+      router.refresh();
+    } else if (state?.message) {
+      toast({ title: 'Error', description: state.message, variant: 'destructive' });
     }
-  }, [state?.success]);
-
-  // console.log('Work order creation result:', state);
+  }, [state, toast, router]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

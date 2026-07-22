@@ -13,7 +13,8 @@ const registrationSchema = z.object({
     // password: z.string().min(6),
     fullName: z.string().min(2),
     phone: z.string().min(8, 'El teléfono debe tener al menos 8 dígitos'),
-    subscriptionPlan: z.enum(['monthly', 'biannual', 'yearly']),
+    subscriptionPlan: z.enum(['monthly', 'biannual', 'yearly', 'demo']),
+    demoDays: z.string().optional(),
 })
 
 export async function registerWorkshop(prevState: any, formData: FormData) {
@@ -37,7 +38,24 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         return { error: 'Datos inválidos', details: validation.error.flatten().fieldErrors }
     }
 
-    const { workshopName, slug, email, fullName, phone, subscriptionPlan } = validation.data
+    const { workshopName, slug, email, fullName, phone, subscriptionPlan, demoDays } = validation.data
+
+    let actualPlan = subscriptionPlan as string;
+    let actualStatus = 'active';
+    let endDate = null;
+
+    if (subscriptionPlan === 'demo') {
+        actualPlan = 'monthly';
+        actualStatus = 'trialing';
+        if (demoDays) {
+            const days = parseInt(demoDays, 10);
+            if (!isNaN(days) && days > 0) {
+                const date = new Date();
+                date.setDate(date.getDate() + days);
+                endDate = date.toISOString();
+            }
+        }
+    }
 
     // Generate automatic password
     const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
@@ -88,8 +106,9 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         .insert({
             name: workshopName,
             slug: slug,
-            subscription_status: 'active',
-            subscription_plan: subscriptionPlan
+            subscription_status: actualStatus,
+            subscription_plan: actualPlan,
+            ...(endDate ? { subscription_end_date: endDate } : {})
         })
         .select()
         .single();

@@ -167,6 +167,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button 
+              id="tour-reporte"
               className="bg-primary hover:bg-primary/90 text-primary-foreground print:hidden"
               onClick={generatePDFReport}
             >
@@ -182,9 +183,9 @@ export default function DashboardPage() {
           className="space-y-8"
         >
           {/* Top KPI Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" id="tour-kpis">
             <motion.div variants={itemVariants}>
-              <Card className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <Card id="tour-kpi-ingresos" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos del Mes</CardTitle>
@@ -202,7 +203,7 @@ export default function DashboardPage() {
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <Card className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <Card id="tour-kpi-motos" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Motos en Taller</CardTitle>
@@ -218,7 +219,7 @@ export default function DashboardPage() {
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <Card className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <Card id="tour-kpi-ordenes" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Órdenes Activas</CardTitle>
@@ -234,7 +235,7 @@ export default function DashboardPage() {
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <Card className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <Card id="tour-kpi-stock" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Stock Crítico</CardTitle>
@@ -259,7 +260,7 @@ export default function DashboardPage() {
             
             {/* Revenue Chart */}
             <motion.div variants={itemVariants} className="lg:col-span-4">
-              <Card className="bg-card border-border/50 h-full">
+              <Card id="tour-chart-flujo" className="bg-card border-border/50 h-full">
                 <CardHeader>
                   <CardTitle>Flujo de Caja (Semanal)</CardTitle>
                   <CardDescription>Ingresos vs Gastos en los últimos 7 días</CardDescription>
@@ -302,7 +303,7 @@ export default function DashboardPage() {
 
             {/* Top Selling Parts Chart */}
             <motion.div variants={itemVariants} className="lg:col-span-3">
-              <Card className="bg-card border-border/50 h-full">
+              <Card id="tour-chart-repuestos" className="bg-card border-border/50 h-full">
                 <CardHeader>
                   <CardTitle>Repuestos de Mayor Rotación</CardTitle>
                   <CardDescription>Top 5 repuestos más vendidos del mes</CardDescription>
@@ -335,7 +336,7 @@ export default function DashboardPage() {
           {/* Recent Activity / Alerts */}
           <div className="grid gap-4 md:grid-cols-2">
             <motion.div variants={itemVariants}>
-              <Card className="bg-card border-border/50">
+              <Card id="tour-alertas" className="bg-card border-border/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -364,7 +365,7 @@ export default function DashboardPage() {
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <Card className="bg-card border-border/50">
+              <Card id="tour-recordatorios" className="bg-card border-border/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-500" />

@@ -1,10 +1,9 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireWorkshop } from '@/lib/auth-server'
-import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { sendLowStockNotification } from '@/lib/whatsapp'
 
 const inventorySchema = z.object({
@@ -21,7 +20,7 @@ const inventorySchema = z.object({
 
 export async function createInventoryItem(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const validatedFields = inventorySchema.safeParse({
         name: formData.get('name'),
@@ -41,20 +40,22 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
 
     const data = validatedFields.data
 
-    const { data: existingSku } = await supabase
+    const { data: existingSku, error: skuError } = await supabase
         .from('inventory_items')
         .select('id')
         .eq('workshop_id', user.workshopId)
         .eq('sku', data.sku)
         .maybeSingle()
+    if (skuError) return { message: 'Error al verificar el SKU del producto.' }
     if (existingSku) return { message: 'Ya existe un producto con este SKU en el inventario.' }
 
-    const { data: existingName } = await supabase
+    const { data: existingName, error: nameError } = await supabase
         .from('inventory_items')
         .select('id')
         .eq('workshop_id', user.workshopId)
         .ilike('name', data.name)
         .maybeSingle()
+    if (nameError) return { message: 'Error al verificar el nombre del producto.' }
     if (existingName) return { message: 'Ya existe un producto con este nombre en el inventario.' }
 
     const { error } = await supabase
@@ -84,7 +85,7 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
 
 export async function updateInventoryItem(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
     const id = formData.get('id') as string
 
     if (!id) return { message: 'ID requerido' }
@@ -107,22 +108,24 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
 
     const data = validatedFields.data
 
-    const { data: existingSku } = await supabase
+    const { data: existingSku, error: skuError } = await supabase
         .from('inventory_items')
         .select('id')
         .eq('workshop_id', user.workshopId)
         .eq('sku', data.sku)
         .neq('id', id)
         .maybeSingle()
+    if (skuError) return { message: 'Error al verificar el SKU del producto.' }
     if (existingSku) return { message: 'Ya existe otro producto con este SKU en el inventario.' }
 
-    const { data: existingName } = await supabase
+    const { data: existingName, error: nameError } = await supabase
         .from('inventory_items')
         .select('id')
         .eq('workshop_id', user.workshopId)
         .ilike('name', data.name)
         .neq('id', id)
         .maybeSingle()
+    if (nameError) return { message: 'Error al verificar el nombre del producto.' }
     if (existingName) return { message: 'Ya existe otro producto con este nombre en el inventario.' }
 
     const { error } = await supabase
@@ -151,7 +154,7 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
 
 export async function deleteInventoryItem(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
     const id = formData.get('id') as string
 
     // Check usage in sales (sale_items)
@@ -181,7 +184,7 @@ export async function deleteInventoryItem(prevState: any, formData: FormData) {
 
 export async function notifyAdminLowStock() {
     const user = await requireWorkshop();
-    const supabase = await createClient();
+    const supabase = await createAdminClient();
 
     // Find the low stock items first
     const { data: inventoryItems } = await supabase
@@ -210,10 +213,7 @@ export async function notifyAdminLowStock() {
         return { message: 'No se encontró al dueño del taller.' };
     }
 
-    const supabaseAdmin = createSupabaseAdmin(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseAdmin = await createAdminClient();
 
     const { data: ownerAuth, error: authError } = await supabaseAdmin.auth.admin.getUserById(ownerMember.user_id);
     
@@ -232,11 +232,15 @@ export async function notifyAdminLowStock() {
     const { data: techAuth } = await supabaseAdmin.auth.admin.getUserById(user.userId);
     const techName = techAuth.user?.user_metadata?.full_name || 'Un técnico';
 
-    // Send the message
-    const result = await sendLowStockNotification(ownerPhone, ownerName, techName, lowStockItemsText);
-
-    if (!result.success) {
-        return { message: 'Hubo un error al enviar el mensaje de WhatsApp.' };
+    // Send the message safely
+    try {
+        const result = await sendLowStockNotification(ownerPhone, ownerName, techName, lowStockItemsText);
+        if (!result.success) {
+            return { message: 'Hubo un error al enviar el mensaje de WhatsApp.' };
+        }
+    } catch (notifyError) {
+        console.error('Error sending low stock notification:', notifyError);
+        return { message: 'Error de conexión al enviar WhatsApp.' };
     }
 
     return { success: true };

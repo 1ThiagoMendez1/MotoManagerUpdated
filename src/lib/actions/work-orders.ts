@@ -1,10 +1,10 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireWorkshop } from '@/lib/auth-server'
-import { sendOrderStatusUpdate } from '@/lib/whatsapp'
+import { sendOrderStatusUpdate, sendQuoteNotification } from '@/lib/whatsapp'
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -13,7 +13,7 @@ const workOrderSchema = z.object({
 
 export async function createWorkOrder(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const validatedFields = workOrderSchema.safeParse({
         motorcycleId: formData.get('motorcycleId'),
@@ -71,6 +71,20 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
     // Or I can change it to Text in migration later.
     // For now, I'll rely on DB constraints.
 
+    // Fetch motorcycle notes to use as issue description
+    const { data: mc, error: mcError } = await supabase
+        .from('motorcycles')
+        .select('notes')
+        .eq('id', motorcycleId)
+        .eq('workshop_id', user.workshopId)
+        .single()
+
+    if (mcError || !mc) {
+        return { message: 'Error: La motocicleta no existe o no pertenece a este taller.' }
+    }
+
+    const issueDescription = mc.notes || ''
+
     const { data: newOrder, error } = await supabase
         .from('work_orders')
         .insert({
@@ -78,7 +92,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
             motorcycle_id: motorcycleId,
             technician_id: technicianId,
             status: 'Diagnosticando',
-            issue_description: '', // Optional in form?
+            issue_description: issueDescription, // Pre-fill with the problem described when adding the motorcycle
         })
         .select()
         .single()
@@ -97,7 +111,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
 
 export async function updateWorkOrderStatus(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const id = formData.get('id') as string
     const status = formData.get('status') as string
@@ -217,7 +231,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
 
 export async function reassignWorkOrderTechnician(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const id = formData.get('id') as string
     const technicianId = formData.get('technicianId') as string
@@ -241,7 +255,7 @@ export async function reassignWorkOrderTechnician(prevState: any, formData: Form
 
 export async function addDepositToWorkOrder(formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const workOrderId = formData.get('workOrderId') as string
     const amount = parseFloat(formData.get('amount') as string)
@@ -275,7 +289,7 @@ export async function addDepositToWorkOrder(formData: FormData) {
 
 export async function updateWorkOrderSolution(formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const workOrderId = formData.get('workOrderId') as string
     const solutionDescription = formData.get('solutionDescription') as string
@@ -293,7 +307,7 @@ export async function updateWorkOrderSolution(formData: FormData) {
 
 export async function addItemToWorkOrder(formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const workOrderId = formData.get('workOrderId') as string
     const itemId = formData.get('inventoryItemId') as string
@@ -381,25 +395,14 @@ export async function addItemToWorkOrder(formData: FormData) {
     // 5. Decrement Inventory (Optional - usually done on checkout, but if we do it here...)
     // Previous logic didn't clearly show decrement, but `sales.ts` does.
     // Let's decrement usage.
-    /*
-    await supabase.rpc('decrement_inventory', {
-        item_id: itemId,
-        amount: quantity
-    })
-    */
     // For Work Order "items used", they are strictly used. So yes decrement.
     const { error: updateError } = await supabase.rpc('decrement_inventory', {
         item_id: itemId,
         amount: quantity
     });
+    
     if (updateError) {
-        // Fallback
-        await supabase.rpc('decrement_inventory', { item_id: itemId, amount: quantity }); // Retry? No.
-        // Manual update
-        const { data: currentInv } = await supabase.from('inventory_items').select('quantity').eq('id', itemId).single();
-        if (currentInv) {
-            await supabase.from('inventory_items').update({ quantity: currentInv.quantity - quantity }).eq('id', itemId);
-        }
+        throw new Error('Error al descontar inventario. Verifica que haya stock suficiente.');
     }
 
     revalidatePath('/work-orders/' + workOrderId)
@@ -407,7 +410,7 @@ export async function addItemToWorkOrder(formData: FormData) {
 
 export async function removeItemFromWorkOrder(formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabase = await createAdminClient()
 
     const workOrderId = formData.get('workOrderId') as string
     const saleItemId = formData.get('saleItemId') as string
@@ -455,4 +458,134 @@ export async function removeItemFromWorkOrder(formData: FormData) {
     }
 
     revalidatePath('/work-orders/' + workOrderId)
+}
+
+export async function sendQuoteWhatsApp(
+    workOrderId: string,
+    customerPhone: string,
+    customerName: string,
+    workshopName: string,
+    portalUrl: string,
+    orderNumber?: string,
+    technicianName?: string
+) {
+    const user = await requireWorkshop() // ensure they are logged in
+
+    const result = await sendQuoteNotification(
+        customerPhone,
+        customerName,
+        workshopName,
+        workOrderId,
+        portalUrl,
+        orderNumber,
+        technicianName
+    )
+
+    return result
+}
+
+export async function updateQuoteStatus(prevState: any, formData: FormData) {
+    const user = await requireWorkshop()
+    const supabase = await createAdminClient()
+
+    const id = formData.get('id') as string
+    const quoteStatus = formData.get('quoteStatus') as string
+
+    if (!id || !quoteStatus) {
+        return { message: 'Datos incompletos.' }
+    }
+
+    // Map UI Spanish status back to DB status
+    let dbStatus = 'pending';
+    if (quoteStatus === 'Aprobada') dbStatus = 'approved';
+    if (quoteStatus === 'Rechazada') dbStatus = 'rejected';
+
+    const updateData: any = { 
+        quote_status: dbStatus 
+    };
+
+    if (dbStatus !== 'pending') {
+        updateData.quote_responded_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+        .from('work_orders')
+        .update(updateData)
+        .eq('id', id)
+        .eq('workshop_id', user.workshopId)
+
+    if (error) return { message: 'Error al actualizar cotización' }
+
+    revalidatePath('/work-orders')
+    revalidatePath(`/work-orders/${id}`)
+    return { success: true }
+}
+
+export async function addWorkOrderEvidence(formData: FormData) {
+    const user = await requireWorkshop()
+    const supabase = await createAdminClient()
+
+    const workOrderId = formData.get('workOrderId') as string
+    const imageUrl = formData.get('imageUrl') as string
+    const description = formData.get('description') as string
+
+    if (!workOrderId || !imageUrl) {
+        throw new Error('Datos incompletos.')
+    }
+
+    const { error } = await supabase
+        .from('work_order_images')
+        .insert({
+            workshop_id: user.workshopId,
+            work_order_id: workOrderId,
+            image_url: imageUrl,
+            description: description || null
+        })
+
+    if (error) {
+        console.error('Error adding evidence:', error)
+        throw new Error('Error al guardar evidencia')
+    }
+
+    revalidatePath('/work-orders/' + workOrderId)
+    return { success: true }
+}
+
+export async function deleteWorkOrderEvidence(formData: FormData) {
+    const user = await requireWorkshop()
+    const supabase = await createAdminClient()
+
+    const id = formData.get('id') as string
+    const workOrderId = formData.get('workOrderId') as string
+    const imageUrl = formData.get('imageUrl') as string
+
+    if (!id || !workOrderId) throw new Error('Datos incompletos')
+
+    // Delete record from database
+    const { error: dbError } = await supabase
+        .from('work_order_images')
+        .delete()
+        .eq('id', id)
+        .eq('workshop_id', user.workshopId)
+
+    if (dbError) throw new Error('Error al eliminar registro de evidencia')
+
+    // Try to delete from storage if possible
+    if (imageUrl) {
+        try {
+            // Extract file path from URL
+            // Supabase URL format: .../storage/v1/object/public/evidences/folder/file.ext
+            const urlParts = imageUrl.split('/evidences/')
+            if (urlParts.length > 1) {
+                const path = urlParts[1]
+                await supabase.storage.from('evidences').remove([path])
+            }
+        } catch (e) {
+            console.error('Failed to delete file from storage:', e)
+            // Continue even if storage deletion fails
+        }
+    }
+
+    revalidatePath('/work-orders/' + workOrderId)
+    return { success: true }
 }

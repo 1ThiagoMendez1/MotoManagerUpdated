@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { AddWorkOrder } from '@/components/forms/AddWorkOrder';
 import { UpdateWorkOrderStatus } from '@/components/forms/UpdateWorkOrderStatus';
+import { UpdateQuoteStatus } from '@/components/forms/UpdateQuoteStatus';
 import { ReassignTechnician } from '@/components/forms/ReassignTechnician';
 import { SearchWorkOrders } from '@/components/forms/SearchWorkOrders';
 import { format } from 'date-fns';
@@ -93,6 +94,7 @@ export default async function WorkOrdersPage({
                   <TableHead className="text-foreground/90 font-semibold">Fecha de Ingreso</TableHead>
                   <TableHead className="text-foreground/90 font-semibold">Técnico</TableHead>
                   <TableHead className="text-center text-foreground/90 font-semibold">Estado</TableHead>
+                  <TableHead className="text-center text-foreground/90 font-semibold">Cotización</TableHead>
                   <TableHead className="text-center text-foreground/90 font-semibold">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -121,6 +123,9 @@ export default async function WorkOrdersPage({
                         </div>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <UpdateQuoteStatus workOrder={order} />
                   </TableCell>
                   <TableCell className="text-center space-x-2">
                     <Link href={`/work-orders/${order.id}`}>
@@ -216,6 +221,7 @@ export default async function WorkOrdersPage({
                     <TableHead className="text-foreground/90 font-semibold">Fecha de Ingreso</TableHead>
                     <TableHead className="text-foreground/90 font-semibold">Técnico</TableHead>
                     <TableHead className="text-center text-foreground/90 font-semibold">Estado</TableHead>
+                    <TableHead className="text-center text-foreground/90 font-semibold">Cotización</TableHead>
                     <TableHead className="text-center text-foreground/90 font-semibold">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -244,6 +250,9 @@ export default async function WorkOrdersPage({
                             </div>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <UpdateQuoteStatus workOrder={order} />
                       </TableCell>
                       <TableCell className="text-center space-x-2">
                         <Link href={`/work-orders/${order.id}`}>

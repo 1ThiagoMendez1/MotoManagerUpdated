@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireWorkshop } from '@/lib/auth-server'
@@ -10,16 +10,25 @@ const motorcycleSchema = z.object({
     model: z.string().min(1, "El modelo es requerido."),
     year: z.coerce.number().min(1900).max(new Date().getFullYear() + 1),
     plate: z.string().min(1, "La placa es requerida."),
-    customerCedula: z.string().min(1, "La cédula es requerida."),
+    customerCedula: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()),
+        z.string().optional()
+    ),
     customerName: z.string().min(1, "El nombre del cliente es requerido."),
-    customerEmail: z.string().email("Email válido requerido.").transform(val => val.toLowerCase()),
-    customerPhone: z.string().optional(),
+    customerEmail: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim().toLowerCase()),
+        z.string().email("Email válido requerido.").optional()
+    ),
+    customerPhone: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()),
+        z.string().optional()
+    ),
     issueDescription: z.string().min(10, "La descripción del problema debe tener al menos 10 caracteres."),
 })
 
 export async function createMotorcycle(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
-    const supabase = await createClient()
+    const supabaseAdmin = await createAdminClient()
 
     const formDataObj = {
         make: formData.get('make'),
@@ -41,7 +50,7 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
 
     const { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula, issueDescription } = validatedFields.data
 
-    const { data: existingPlate } = await supabase
+    const { data: existingPlate } = await supabaseAdmin
         .from('motorcycles')
         .select('id')
         .eq('workshop_id', user.workshopId)
@@ -49,69 +58,62 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
         .maybeSingle()
     if (existingPlate) return { message: 'Ya existe una motocicleta con esta placa en el taller.' }
 
-    // 1. Find or Create Customer (Upsert logic)
-    // Supabase upsert requires a unique constraint match.
-    // My schema has `unique(workshop_id, email)` and `unique(workshop_id, cedula)`.
-    // If I upsert by Email, I need to know the workshop_id.
+    // 1. Find or Create Customer
+    let customer: { id: string } | null = null;
 
-    // Let's try to find by Email first.
-    let { data: customer } = await supabase
-        .from('clientes')
-        .select('id')
-        .eq('workshop_id', user.workshopId)
-        .eq('email', customerEmail)
-        .single()
-
-    if (!customer) {
-        // If not by email, try by Cedula?
-        const { data: customerByCedula } = await supabase
+    if (customerCedula) {
+        const { data: customerByCedula } = await supabaseAdmin
             .from('clientes')
             .select('id')
             .eq('workshop_id', user.workshopId)
             .eq('cedula', customerCedula)
+            .maybeSingle()
+        if (customerByCedula) customer = customerByCedula;
+    }
+
+    if (!customer && customerEmail) {
+        const { data: customerByEmail } = await supabaseAdmin
+            .from('clientes')
+            .select('id')
+            .eq('workshop_id', user.workshopId)
+            .eq('email', customerEmail)
+            .maybeSingle()
+        if (customerByEmail) customer = customerByEmail;
+    }
+
+    if (customer) {
+        // Update existing customer info
+        await supabaseAdmin.from('clientes').update({
+            name: customerName,
+            ...(customerEmail ? { email: customerEmail } : {}),
+            ...(customerPhone ? { phone: customerPhone } : {}),
+            ...(customerCedula ? { cedula: customerCedula } : {}),
+        }).eq('id', customer.id)
+    } else {
+        // Create new customer
+        const { data: newCustomer, error: createError } = await supabaseAdmin
+            .from('clientes')
+            .insert({
+                workshop_id: user.workshopId,
+                name: customerName,
+                email: customerEmail || null,
+                cedula: customerCedula || null,
+                phone: customerPhone || null
+            })
+            .select('id')
             .single()
 
-        if (customerByCedula) {
-            customer = customerByCedula // Found by cedula
-            // Update info?
-            await supabase.from('clientes').update({
-                name: customerName,
-                email: customerEmail,
-                phone: customerPhone
-            }).eq('id', customer.id)
-        } else {
-            // Create new
-            const { data: newCustomer, error: createError } = await supabase
-                .from('clientes')
-                .insert({
-                    workshop_id: user.workshopId,
-                    name: customerName,
-                    email: customerEmail,
-                    cedula: customerCedula,
-                    phone: customerPhone
-                })
-                .select('id')
-                .single()
-
-            if (createError) {
-                console.error("Error creating customer for motorcycle:", createError)
-                return { message: "Error al crear cliente: " + createError.message }
-            }
-            customer = newCustomer
+        if (createError) {
+            console.error("Error creating customer for motorcycle:", createError)
+            return { message: "Error al crear cliente: " + createError.message }
         }
-    } else {
-        // Update existing
-        await supabase.from('clientes').update({
-            name: customerName,
-            cedula: customerCedula,
-            phone: customerPhone
-        }).eq('id', customer.id)
+        customer = newCustomer
     }
 
     if (!customer) return { message: 'No se pudo asignar el cliente' }
 
     // 2. Create Motorcycle
-    const { error: motoError } = await supabase
+    const { error: motoError } = await supabaseAdmin
         .from('motorcycles')
         .insert({
             workshop_id: user.workshopId,
@@ -120,14 +122,6 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
             model,
             year,
             plate,
-            // issueDescription is not in my motorcycles table in SQL schema? 
-            // Let me store it in `notes` or if I added `issue_description`?
-            // Re-reading schema... I did NOT add issue_description to Motorcycle directly in SQL?
-            // Let me check SQL again.
-            // SQL: `notes text`.
-            // Prisma: `issueDescription String?`
-            // I should map issueDescription to notes or add the column.
-            // I'll map to `notes` for now.
             notes: issueDescription
         })
 
@@ -137,5 +131,9 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
     }
 
     revalidatePath('/motorcycles')
+    revalidatePath('/customers')
+    revalidatePath('/sales')
+    revalidatePath('/work-orders')
+    revalidatePath('/', 'layout')
     return { success: true }
 }

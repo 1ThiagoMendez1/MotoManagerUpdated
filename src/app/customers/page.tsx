@@ -18,12 +18,20 @@ import { EditCustomer } from '@/components/forms/EditCustomer';
 import { DeleteCustomer } from '@/components/forms/DeleteCustomer';
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SearchCustomers } from '@/components/forms/SearchCustomers';
 
-export default async function CustomersPage() {
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ query?: string }>;
+}) {
   await authorize('/customers');
+  const resolvedSearchParams = await searchParams;
+  const query = resolvedSearchParams?.query || '';
+
   let customers: Customer[] = [];
   try {
-    customers = await getCustomers();
+    customers = await getCustomers({ query });
   } catch (error) {
     console.error('Error fetching customers:', error);
   }
@@ -43,7 +51,8 @@ export default async function CustomersPage() {
             Directorio y gestión de contactos.
           </p>
         </div>
-        <div className="shrink-0">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <SearchCustomers />
           <AddCustomer />
         </div>
       </div>
@@ -83,7 +92,7 @@ export default async function CustomersPage() {
                 {customers.map((customer) => (
                   <TableRow key={customer.id} className="border-foreground/[0.05] dark:border-white/[0.05] hover:bg-foreground/[0.04] dark:hover:bg-white/[0.04] transition-colors duration-200">
                     <TableCell className="font-semibold text-foreground text-xs sm:text-sm py-4">{customer.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs sm:text-sm py-4">{customer.email}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs sm:text-sm py-4">{customer.email || '—'}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-xs sm:text-sm py-4">{customer.phone || '—'}</TableCell>
                     <TableCell className="hidden lg:table-cell text-muted-foreground text-xs sm:text-sm py-4">{customer.cedula || '—'}</TableCell>
                     <TableCell className="text-center py-4">
@@ -96,6 +105,7 @@ export default async function CustomersPage() {
                     <TableCell className="text-right py-4">
                       <div className="flex gap-1 sm:gap-2 justify-end">
                         <EditCustomer customer={customer} />
+                        <DeleteCustomer customer={customer} />
                       </div>
                     </TableCell>
                   </TableRow>

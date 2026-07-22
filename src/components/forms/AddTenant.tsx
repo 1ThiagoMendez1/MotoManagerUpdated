@@ -111,6 +111,7 @@ export default function AddTenant() {
       }
 
       const tenant = await response.json();
+      console.log('Se creó un nuevo usuario / tenant:', tenant);
 
       // Redirect to tenant management page or show success message
       router.push('/admin/tenants');

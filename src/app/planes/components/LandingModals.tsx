@@ -8,6 +8,186 @@ import { Label } from '@/components/ui/label';
 import { WompiButton } from '@/components/payments/WompiButton';
 import { registerWorkshopPublic } from '../actions';
 
+// Separate inner component so useActionState resets when key changes
+function RegistrationForm({ plan, name, email, reference, info }: { plan: string; name: string; email: string; reference: string; info: { name: string; price: number; period: string } }) {
+  const [regState, regAction] = useActionState(registerWorkshopPublic, { error: '', details: {} });
+  const formatCOPInner = (n: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+
+  return (
+    <>
+      {/* Plan confirmation */}
+      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex justify-between items-center">
+        <div>
+          <p className="text-green-400/70 text-xs mb-0.5">Plan activado</p>
+          <p className="font-bold text-foreground">{info.name} · {formatCOPInner(info.price)}</p>
+          <p className="text-muted-foreground text-xs">{info.period}</p>
+        </div>
+        <CheckCircle2 className="h-6 w-6 text-green-400" />
+      </div>
+      {reference && (
+        <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>
+      )}
+
+      {/* Registration form */}
+      <form action={regAction} className="space-y-4">
+        <input type="hidden" name="subscriptionPlan" value={plan} />
+        <input type="hidden" name="paymentRef" value={reference} />
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reg-name" className="text-muted-foreground text-sm">Tu nombre completo</Label>
+          <Input
+            id="reg-name"
+            name="fullName"
+            defaultValue={name}
+            required
+            placeholder="Juan Pérez"
+            className="rounded-xl h-11"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-phone" className="text-muted-foreground text-sm">Teléfono / WhatsApp</Label>
+            <Input
+              id="reg-phone"
+              name="phone"
+              type="tel"
+              defaultValue=""
+              required
+              placeholder="+57 300 123 4567"
+              className="rounded-xl h-11"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-email" className="text-muted-foreground text-sm">Correo electrónico</Label>
+            <Input
+              id="reg-email"
+              name="email"
+              type="email"
+              defaultValue={email}
+              required
+              placeholder="juan@ejemplo.com"
+              className="rounded-xl h-11"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-workshop" className="text-muted-foreground text-sm">Nombre del taller *</Label>
+            <Input
+              id="reg-workshop"
+              name="workshopName"
+              defaultValue=""
+              required
+              placeholder="Taller El Rayo"
+              className="rounded-xl h-11"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-workshopPhone" className="text-muted-foreground text-sm">Teléfono del taller</Label>
+            <Input
+              id="reg-workshopPhone"
+              name="workshopPhone"
+              defaultValue=""
+              placeholder="Ej: 3001234567"
+              className="rounded-xl h-11"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-address" className="text-muted-foreground text-sm">Dirección exacta</Label>
+            <Input
+              id="reg-address"
+              name="address"
+              defaultValue=""
+              required
+              placeholder="Ej: Calle 10 # 5-32, Local 3"
+              className="rounded-xl h-11"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-mapsLink" className="text-muted-foreground text-sm">Link de Maps o Waze</Label>
+            <Input
+              id="reg-mapsLink"
+              name="mapsLink"
+              type="url"
+              defaultValue=""
+              placeholder="Ej: https://maps.app.goo.gl/..."
+              className="rounded-xl h-11"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-city" className="text-muted-foreground text-sm">Ciudad</Label>
+            <Input
+              id="reg-city"
+              name="city"
+              defaultValue=""
+              required
+              placeholder="Ej: Bogotá"
+              className="rounded-xl h-11"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-nit" className="text-muted-foreground text-sm"># NIT</Label>
+            <Input
+              id="reg-nit"
+              name="nit"
+              defaultValue=""
+              required
+              placeholder="Ej: 900.123.456-7"
+              className="rounded-xl h-11"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reg-slug" className="text-muted-foreground text-sm">Identificador único del taller</Label>
+          <Input
+            id="reg-slug"
+            name="slug"
+            defaultValue=""
+            required
+            placeholder="taller-el-rayo"
+            className="rounded-xl h-11"
+          />
+          <p className="text-xs text-muted-foreground">
+            Solo minúsculas, números y guiones. Ej: <span className="font-mono">taller-el-rayo</span>
+          </p>
+        </div>
+
+        {regState?.error && (
+          <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/25 text-red-400 text-sm">
+            {regState.error as string}
+            {regState.details && Object.keys(regState.details).length > 0 && (
+              <ul className="mt-2 list-disc list-inside text-xs text-red-300/70">
+                {Object.entries(regState.details).map(([field, errors]: [string, any]) => (
+                  <li key={field}>
+                    <span className="capitalize font-medium">{field}:</span>{' '}
+                    {Array.isArray(errors) ? errors.join(', ') : errors}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        <SubmitBtn />
+      </form>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Al registrarte aceptas nuestros términos de servicio y política de privacidad.
+      </p>
+    </>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Plan {
@@ -203,7 +383,6 @@ interface RegModalProps {
 }
 
 export function RegistrationModal({ open, plan, name, email, reference, onClose }: RegModalProps) {
-  const [regState, regAction] = useActionState(registerWorkshopPublic, { error: '', details: {} });
   const info = PLAN_LABELS[plan] ?? PLAN_LABELS.monthly;
 
   if (!open) return null;
@@ -224,176 +403,8 @@ export function RegistrationModal({ open, plan, name, email, reference, onClose 
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Plan confirmation */}
-          <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex justify-between items-center">
-            <div>
-              <p className="text-green-400/70 text-xs mb-0.5">Plan activado</p>
-              <p className="font-bold text-foreground">{info.name} · {formatCOP(info.price)}</p>
-              <p className="text-muted-foreground text-xs">{info.period}</p>
-            </div>
-            <CheckCircle2 className="h-6 w-6 text-green-400" />
-          </div>
-          {reference && (
-            <p className="text-xs text-muted-foreground font-mono">Ref: {reference}</p>
-          )}
-
-          {/* Registration form */}
-          <form action={regAction} className="space-y-4">
-            <input type="hidden" name="subscriptionPlan" value={plan} />
-            <input type="hidden" name="paymentRef" value={reference} />
-
-            <div className="space-y-1.5">
-              <Label htmlFor="reg-name" className="text-muted-foreground text-sm">Tu nombre completo</Label>
-              <Input
-                id="reg-name"
-                name="fullName"
-                defaultValue={regState?.fields?.fullName || name}
-                required
-                placeholder="Juan Pérez"
-                className="rounded-xl h-11"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-phone" className="text-muted-foreground text-sm">Teléfono / WhatsApp</Label>
-                <Input
-                  id="reg-phone"
-                  name="phone"
-                  type="tel"
-                  defaultValue={regState?.fields?.phone || ''}
-                  required
-                  placeholder="+57 300 123 4567"
-                  className="rounded-xl h-11"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-email" className="text-muted-foreground text-sm">Correo electrónico</Label>
-                <Input
-                  id="reg-email"
-                  name="email"
-                  type="email"
-                  defaultValue={regState?.fields?.email || email}
-                  required
-                  placeholder="juan@ejemplo.com"
-                  className="rounded-xl h-11"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-workshop" className="text-muted-foreground text-sm">Nombre del taller *</Label>
-                <Input
-                  id="reg-workshop"
-                  name="workshopName"
-                  defaultValue={regState?.fields?.workshopName || ''}
-                  required
-                  placeholder="Fucks News"
-                  className="rounded-xl h-11"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-workshopPhone" className="text-muted-foreground text-sm">Teléfono del taller</Label>
-                <Input
-                  id="reg-workshopPhone"
-                  name="workshopPhone"
-                  defaultValue={regState?.fields?.workshopPhone || ''}
-                  placeholder="Ej: 3001234567"
-                  className="rounded-xl h-11"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-address" className="text-muted-foreground text-sm">Dirección exacta</Label>
-                <Input
-                  id="reg-address"
-                  name="address"
-                  defaultValue={regState?.fields?.address || ''}
-                  required
-                  placeholder="Ej: Calle 10 # 5-32, Local 3"
-                  className="rounded-xl h-11"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-mapsLink" className="text-muted-foreground text-sm">Link de Maps o Waze</Label>
-                <Input
-                  id="reg-mapsLink"
-                  name="mapsLink"
-                  type="url"
-                  defaultValue={regState?.fields?.mapsLink || ''}
-                  placeholder="Ej: https://maps.app.goo.gl/..."
-                  className="rounded-xl h-11"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-city" className="text-muted-foreground text-sm">Ciudad</Label>
-                <Input
-                  id="reg-city"
-                  name="city"
-                  defaultValue={regState?.fields?.city || ''}
-                  required
-                  placeholder="Ej: Bogotá"
-                  className="rounded-xl h-11"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-nit" className="text-muted-foreground text-sm"># NIT</Label>
-                <Input
-                  id="reg-nit"
-                  name="nit"
-                  defaultValue={regState?.fields?.nit || ''}
-                  required
-                  placeholder="Ej: 900.123.456-7"
-                  className="rounded-xl h-11"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="reg-slug" className="text-muted-foreground text-sm">Identificador único del taller</Label>
-              <Input
-                id="reg-slug"
-                name="slug"
-                defaultValue={regState?.fields?.slug || ''}
-                required
-                placeholder="fucks-news"
-                className="rounded-xl h-11"
-              />
-              <p className="text-xs text-muted-foreground">
-                Solo minúsculas, números y guiones. Ej: <span className="font-mono">fucks-news</span>
-              </p>
-            </div>
-
-            {/* Password field removed - it will be generated automatically */}
-
-            {regState?.error && (
-              <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/25 text-red-400 text-sm">
-                {regState.error as string}
-                {regState.details && Object.keys(regState.details).length > 0 && (
-                  <ul className="mt-2 list-disc list-inside text-xs text-red-300/70">
-                    {Object.entries(regState.details).map(([field, errors]: [string, any]) => (
-                      <li key={field}>
-                        <span className="capitalize font-medium">{field}:</span>{' '}
-                        {Array.isArray(errors) ? errors.join(', ') : errors}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <SubmitBtn />
-          </form>
-
-          <p className="text-center text-xs text-muted-foreground">
-            Al registrarte aceptas nuestros términos de servicio y política de privacidad.
-          </p>
+          {/* key=reference forces full remount (and form reset) on each new payment */}
+          <RegistrationForm key={reference} plan={plan} name={name} email={email} reference={reference} info={info} />
         </div>
       </div>
     </div>

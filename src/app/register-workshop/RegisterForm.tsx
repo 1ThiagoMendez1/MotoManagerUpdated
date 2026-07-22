@@ -1,7 +1,7 @@
 'use client'
 
 import { registerWorkshop } from './actions'
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,6 +33,7 @@ function SubmitButton() {
 export default function RegisterForm() {
     // @ts-ignore - useFormState types might conflict in some setups but this is valid
     const [state, formAction] = useActionState(registerWorkshop, initialState)
+    const [plan, setPlan] = useState('monthly')
 
     return (
         <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 py-12 relative z-10">
@@ -85,7 +86,7 @@ export default function RegisterForm() {
 
                         <div className="space-y-2">
                             <Label htmlFor="subscriptionPlan">Plan de Suscripción</Label>
-                            <Select name="subscriptionPlan" defaultValue="monthly" required>
+                            <Select name="subscriptionPlan" value={plan} onValueChange={setPlan} required>
                                 <SelectTrigger className="bg-card/50 border-border/50 text-foreground">
                                     <SelectValue placeholder="Selecciona un plan" />
                                 </SelectTrigger>
@@ -93,9 +94,26 @@ export default function RegisterForm() {
                                     <SelectItem value="monthly">Mensual ($18.900/mes)</SelectItem>
                                     <SelectItem value="biannual">Semestral ($99.900/6 meses)</SelectItem>
                                     <SelectItem value="yearly">Anual ($199.900/año) - ¡Ahorra!</SelectItem>
+                                    <SelectItem value="demo">Demo (Solo Administradores)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {plan === 'demo' && (
+                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                <Label htmlFor="demoDays">Días de Vigencia (Demo)</Label>
+                                <Input
+                                    id="demoDays"
+                                    name="demoDays"
+                                    type="number"
+                                    min="1"
+                                    required
+                                    placeholder="Ej: 15"
+                                    className="bg-card/50 border-border/50 placeholder:text-muted-foreground"
+                                />
+                                <p className="text-xs text-muted-foreground">La cuenta se bloqueará automáticamente después de estos días.</p>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label htmlFor="fullName">Tu Nombre Completo</Label>

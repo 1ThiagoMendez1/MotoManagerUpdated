@@ -25,7 +25,12 @@ export async function createTicket(prevState: any, formData: FormData) {
 
     const { subject, description } = validatedFields.data
 
-    const { error } = await supabase
+    const supabaseAdmin = (await import('@supabase/supabase-js')).createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { error } = await supabaseAdmin
         .from('tickets')
         .insert({
             workshop_id: user.workshopId,
@@ -37,7 +42,7 @@ export async function createTicket(prevState: any, formData: FormData) {
 
     if (error) {
         console.error('Error creating ticket:', error)
-        return { message: 'Error al crear el ticket.' }
+        return { message: 'Error al crear el ticket: ' + error.message }
     }
 
     revalidatePath('/tickets')

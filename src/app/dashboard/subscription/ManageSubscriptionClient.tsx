@@ -10,54 +10,6 @@ import { saveCancellationFeedback } from '@/lib/actions/cancellation';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
-const PLANS = [
-  {
-    id: 'monthly' as const,
-    name: 'Mensual',
-    price: 18900,
-    amountInCents: 1890000,
-    period: '/ mes',
-    months: 1,
-    description: 'Para empezar sin compromiso',
-    badge: null as string | null,
-    savings: null as string | null,
-    gradient: 'from-primary/20 to-primary/10 dark:from-primary/40 dark:to-primary/20',
-    border: 'border-primary/25',
-    accentText: 'text-primary',
-    btn: 'from-primary to-primary/80 hover:opacity-90 text-primary-foreground shadow-primary/25',
-  },
-  {
-    id: 'biannual' as const,
-    name: 'Semestral',
-    price: 99900,
-    amountInCents: 9990000,
-    period: '/ 6 meses',
-    months: 6,
-    description: 'El más elegido por los talleres',
-    badge: 'MÁS POPULAR',
-    savings: 'Ahorra $13.500',
-    gradient: 'from-amber-100/80 to-orange-100/60 dark:from-amber-900/40 dark:to-orange-800/20',
-    border: 'border-amber-500/40',
-    accentText: 'text-amber-600 dark:text-amber-400',
-    btn: 'from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-500/25',
-  },
-  {
-    id: 'yearly' as const,
-    name: 'Anual',
-    price: 199900,
-    amountInCents: 19990000,
-    period: '/ año',
-    months: 12,
-    description: 'El mejor valor para tu negocio',
-    badge: 'MEJOR VALOR',
-    savings: 'Ahorra $26.900',
-    gradient: 'from-purple-100/80 to-purple-50/60 dark:from-purple-900/40 dark:to-purple-800/20',
-    border: 'border-purple-500/30',
-    accentText: 'text-purple-600 dark:text-purple-400',
-    btn: 'from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 shadow-purple-500/25',
-  },
-];
-
 const ALL_FEATURES = [
   'Clientes y motos ilimitados',
   'Órdenes de trabajo ilimitadas',
@@ -82,6 +34,8 @@ interface ManageSubscriptionProps {
   userId: string;
   workshopSlug: string;
   workshopId: string;
+  plans: any[];
+  features: any[];
 }
 
 export function ManageSubscriptionClient({ 
@@ -90,10 +44,12 @@ export function ManageSubscriptionClient({
   userEmail,
   userId,
   workshopSlug,
-  workshopId
+  workshopId,
+  plans,
+  features
 }: ManageSubscriptionProps) {
   const [activePlan, setActivePlan] = useState(currentPlan);
-  const [selectedPlan, setSelectedPlan] = useState<typeof PLANS[0] | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
   const [paymentMode, setPaymentMode] = useState<'automatic' | 'manual'>('manual'); // Nequi/PSE by default to avoid 404 errors with direct API while we fix tokenization
   const [isUpdating, setIsUpdating] = useState(false);
   const [cancelStep, setCancelStep] = useState<0 | 1 | 2 | 3>(0); // 0=closed, 1=reasons, 2=counter-offer, 3=final-confirm
@@ -150,8 +106,11 @@ export function ManageSubscriptionClient({
   };
 
   const getPlanLabel = (planId: string) => {
-    return PLANS.find(p => p.id === planId)?.name || planId;
+    return plans.find(p => p.id === planId)?.name || planId;
   };
+
+  const sortedPlans = [...plans].sort((a, b) => a.months - b.months);
+  const sortedFeatures = [...features].sort((a, b) => a.order_index - b.order_index);
 
   const modalContent = selectedPlan ? (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -268,7 +227,7 @@ export function ManageSubscriptionClient({
 
       {/* Pricing Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-        {PLANS.map(plan => {
+        {sortedPlans.map(plan => {
           const isCurrent = plan.id === activePlan;
           return (
             <div
@@ -313,10 +272,10 @@ export function ManageSubscriptionClient({
               </div>
 
               <ul className="space-y-2 flex-1">
-                {ALL_FEATURES.map(f => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-foreground/75">
+                {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).map(f => (
+                  <li key={f.id} className="flex items-center gap-2 text-sm text-foreground/75">
                     <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
-                    {f}
+                    {f.feature_name}
                   </li>
                 ))}
               </ul>
