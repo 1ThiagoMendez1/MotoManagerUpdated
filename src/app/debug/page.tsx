@@ -1,14 +1,10 @@
 import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
 
-
+export const dynamic = 'force-dynamic';
 
 export default async function DebugPage() {
-    const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+    const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     // Test helper functions directly
