@@ -155,19 +155,10 @@ export async function getTeamMembers() {
       };
     });
     
-    // DEBUG LOG
-    require('fs').writeFileSync('team_debug.log', JSON.stringify({
-      workshopId: currentUser.workshopId,
-      membersLength: members?.length,
-      resultLength: result.length,
-      firstMember: result[0]
-    }, null, 2));
-
     return result;
 
   } catch (error: any) {
     console.error('Failed to get team members:', error);
-    require('fs').writeFileSync('team_debug.error.log', error.toString());
     return [];
   }
 }
