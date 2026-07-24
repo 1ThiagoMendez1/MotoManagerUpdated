@@ -241,64 +241,101 @@ export async function sendQuoteNotification(
   orderNumber?: string,
   technicianName?: string
 ) {
-  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
-    console.log('Evolution API not configured, skipping WhatsApp notification');
-    return { success: false, error: 'Evolution API not configured' };
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  // Si no están configuradas las variables de Meta, intentamos usar Evolution API como fallback
+  if (!wpToken || !wpPhoneId) {
+    console.log('WhatsApp Cloud API no configurada, se requiere WHATSAPP_API_TOKEN y WHATSAPP_PHONE_NUMBER_ID.');
+    return { success: false, error: 'WhatsApp API no configurada' };
   }
 
   try {
     const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
 
-    const orderText = orderNumber ? ` (Orden: *${orderNumber}*)` : '';
-    const techText = technicianName ? ` por el técnico ${technicianName}` : '';
-
-    const message = `👋 Hola, ${customerName}.
-Gracias por confiar en ${workshopName || 'nosotros'}
-Hemos revisado tu motocicleta y hemos preparado la cotización del servicio${orderText}.
-
-A continuación, podrás consultar:
-
-• 🛠️ El detalle de los repuestos.
-• 📋 La solución propuesta${techText}
-• ✅ La opción para aprobar o rechazar la cotización.
-
-🔗 Consulta tu cotización aquí:
-${portalUrl}
-
-Agradecemos que revises la información y nos indiques tu decisión cuando te sea posible.
-
-Quedamos atentos a cualquier consulta.
-
-Saludos cordiales,
-${workshopName || ''}
-
-🏍️ Equipo MotoManager`;
-    /* Comentado temporalmente para pruebas locales
     const response = await axios.post(
-      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+      `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
       {
-        number: formattedPhone,
-        text: message,
-        delay: 1000
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: 'diagnostico_aprobacion_cliente',
+          language: {
+            code: 'es' // Asegúrate de que este código coincida con el de tu plantilla (ej. es_MX, es_CO, es)
+          },
+          components: [
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: customerName || 'Cliente' },
+                { type: 'text', text: workshopName || 'nuestro taller' },
+                { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
+              ]
+            },
+            {
+              type: 'button',
+              sub_type: 'url',
+              index: "0",
+              parameters: [
+                {
+                  type: 'text',
+                  text: workOrderId // Asumiendo que el botón tiene una variable dinámica para el ID al final de la URL
+                }
+              ]
+            }
+          ]
+        }
       },
       {
         headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey
+          'Authorization': `Bearer ${wpToken}`,
+          'Content-Type': 'application/json'
         }
       }
     );
-    */
 
-    console.log('✅ [MOCK] WhatsApp quote notification sent:');
-    console.log('--------------------------------------------------');
-    console.log(`To: ${formattedPhone}`);
-    console.log(`Message:\n${message}`);
-    console.log('--------------------------------------------------');
-    
-    return { success: true, data: 'Mensaje simulado', mockMessage: message, mockTo: formattedPhone };
+    console.log('✅ WhatsApp quote notification sent via Meta API:', response.data);
+    return { success: true, data: response.data };
   } catch (error: any) {
-    console.error('❌ Error sending WhatsApp quote notification via Evolution API:', error.response?.data || error.message);
+    console.error('❌ Error sending WhatsApp quote notification via Meta API:', error.response?.data || error.message);
+    
+    // Si el error es por el botón (a veces la plantilla no tiene variable en la URL configurada)
+    if (error.response?.data?.error?.message?.includes('button')) {
+      console.log('Reintentando sin el componente del botón...');
+      try {
+        const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+        const retryResponse = await axios.post(
+          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+              name: 'diagnostico_aprobacion_cliente',
+              language: { code: 'es' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: customerName || 'Cliente' },
+                    { type: 'text', text: workshopName || 'nuestro taller' },
+                    { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            headers: { 'Authorization': `Bearer ${wpToken}`, 'Content-Type': 'application/json' }
+          }
+        );
+        return { success: true, data: retryResponse.data };
+      } catch (retryError: any) {
+        return { success: false, error: retryError.response?.data || retryError.message };
+      }
+    }
+
     return { success: false, error: error.response?.data || error.message };
   }
 }

@@ -435,10 +435,9 @@ export async function sendQuoteWhatsApp(
     const user = await requireWorkshop();
     const supabase = await createClient();
 
-    // Actualizar estado de la orden a diagnosticado y cotización a pendiente/enviada
+    // Actualizar estado de la orden a 'esperando aprobación'
     const { error: updateError } = await supabase.from('work_orders').update({
-        status: 'diagnosis',
-        quote_status: 'pending'
+        status: 'waiting_approval'
     }).eq('id', workOrderId).eq('organization_id', user.workshopId);
 
     if (updateError) {

@@ -74,7 +74,7 @@ const permissionsInfo: Record<string, string> = {
   owner: 'Acceso total a reportes, finanzas y configuración.',
   admin: 'Acceso a gestión de taller y reportes básicos.',
   mechanic: 'Solo acceso a Órdenes de Trabajo e Inventario.',
-  service_advisor: 'Acceso a Clientes, Citas y Órdenes de Trabajo.'
+  service_advisor: 'Acceso a Ventas, Clientes y Órdenes de Trabajo.'
 };
 
 export default function TeamPage() {

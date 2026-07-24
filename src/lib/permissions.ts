@@ -1,4 +1,4 @@
-export type Role = 'owner' | 'admin' | 'mechanic' | 'receptionist' | 'user';
+export type Role = 'owner' | 'admin' | 'mechanic' | 'receptionist' | 'service_advisor' | 'user';
 
 export const rolePermissions: Record<Role, string[]> = {
   'owner': ['*'],
@@ -17,7 +17,13 @@ export const rolePermissions: Record<Role, string[]> = {
     '/motorcycles' // Often needed to view work order details
   ],
   'receptionist': [
-    '/dashboard',
+    '/sales',
+    '/customers',
+    '/work-orders',
+    '/motorcycles'
+  ],
+  'service_advisor': [
+    '/sales',
     '/customers',
     '/work-orders',
     '/motorcycles'

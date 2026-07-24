@@ -1,13 +1,13 @@
 {
-  "workshopId": "ec9ce390-91bf-4ecf-a893-00d39e2ebe34",
-  "membersLength": 7,
-  "resultLength": 7,
+  "workshopId": "32d75580-df2f-4e47-8b1d-c8544c5be844",
+  "membersLength": 2,
+  "resultLength": 2,
   "firstMember": {
-    "id": "4efd838e-378a-4449-b972-786bb4478c34",
-    "name": "Juan Urian",
-    "email": "juanurian31@gmail.com",
-    "phone": "",
-    "role": "owner",
+    "id": "04c19862-3c15-4fa2-8d8d-b7c4aee5cd48",
+    "name": "Santiago Mendez Prada",
+    "email": "santimendez12333r@gmail.com",
+    "phone": "3102957143",
+    "role": "mechanic",
     "avatar": "",
     "status": "active"
   }

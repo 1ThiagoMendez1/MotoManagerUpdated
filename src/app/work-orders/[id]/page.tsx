@@ -127,10 +127,20 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           <CardContent className="pt-5">
             <div className="space-y-4">
               <div>
-                <p className="text-xs text-muted-foreground mb-1.5 uppercase tracking-wider font-medium">Marca y Modelo</p>
-                <div className="p-4 bg-muted/50 rounded-xl border border-border/50">
-                  <p className="font-medium text-foreground text-lg">{workOrder.motorcycle.make}</p>
-                  <p className="text-muted-foreground">{workOrder.motorcycle.model}</p>
+                <p className="text-xs text-muted-foreground mb-1.5 uppercase tracking-wider font-medium">Información del Vehículo</p>
+                <div className="p-4 bg-muted/50 rounded-xl border border-border/50 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-foreground text-lg leading-none">{workOrder.motorcycle.make}</p>
+                    <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-bold rounded-lg border border-emerald-500/20 uppercase tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                      {workOrder.motorcycle.plate || 'S/N'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground text-sm border-t border-border/50 pt-2 mt-1">
+                    <p className="font-medium">{workOrder.motorcycle.model}</p>
+                    {workOrder.motorcycle.year > 0 ? (
+                      <p className="text-xs font-semibold bg-muted px-2 py-0.5 rounded-md">Modelo {workOrder.motorcycle.year}</p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </div>

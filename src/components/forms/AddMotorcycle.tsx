@@ -302,7 +302,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                   render={({ field }) => (
                     <FormItem className="flex flex-col pt-[0.4rem]">
                       <FormLabel className="text-foreground">Marca</FormLabel>
-                      <Popover open={openBrand} onOpenChange={setOpenBrand} modal={true}>
+                      <Popover open={openBrand} onOpenChange={setOpenBrand} modal={false}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { hasPermission } from '@/lib/permissions';
 
 export async function getCurrentUserServer() {
   try {
@@ -74,6 +75,16 @@ export async function authorize(path: string) {
     }
     redirect('/no-workshop');
   }
+  
+  if (!hasPermission(user.role, path)) {
+    const workshopDetails = await getWorkshopDetails(user);
+    if (workshopDetails) {
+       redirect(`/${workshopDetails.slug}`);
+    } else {
+       redirect('/');
+    }
+  }
+  
   return user;
 }
 

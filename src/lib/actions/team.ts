@@ -31,7 +31,10 @@ export async function inviteUser(data: {
     );
 
     // Generar contraseña temporal
-    const tempPassword = Math.random().toString(36).slice(-8);
+    const tempPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    console.log(`\n=============================================`);
+    console.log(`🔑 OTP Generado para nuevo usuario: ${tempPassword}`);
+    console.log(`=============================================\n`);
 
     const nameParts = data.name.trim().split(' ');
     const firstName = nameParts[0] || '';
@@ -46,6 +49,8 @@ export async function inviteUser(data: {
         first_name: firstName,
         last_name: lastName,
         full_name: data.name,
+        temp_password: tempPassword,
+        needs_password_change: true
       }
     });
 
@@ -78,6 +83,9 @@ export async function inviteUser(data: {
       throw new Error('Error al asignar usuario al taller: ' + memberError.message);
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const loginUrl = `${appUrl}/login`;
+
     // 4. Send WhatsApp Notification
     const result = await sendCredentialsNotification(
       data.phone,
@@ -85,6 +93,7 @@ export async function inviteUser(data: {
       workshopDetails.name,
       workshopDetails.slug || 'taller',
       data.email,
+      loginUrl,
       tempPassword
     );
 

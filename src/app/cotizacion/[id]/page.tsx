@@ -73,7 +73,17 @@ export default async function QuotePage({
   }
   (workOrder as any).deposit_amount = parsedDeposit;
 
-  if (providedAuth !== String(workOrder.order_number)) {
+  const mcData = workOrder.motorcycles as any;
+  const realLicensePlate = mcData?.license_plate || '';
+
+  // Función para normalizar placa (quitar espacios, guiones y convertir a mayúsculas)
+  const normalizePlate = (plate: string) => {
+    return plate ? plate.replace(/[\s-]/g, '').toUpperCase() : '';
+  };
+
+  const isAuthValid = providedAuth && normalizePlate(providedAuth) === normalizePlate(realLicensePlate);
+
+  if (!isAuthValid) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 font-sans">
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] pointer-events-none mix-blend-overlay" />
@@ -88,19 +98,19 @@ export default async function QuotePage({
           </CardHeader>
           <CardContent className="pt-8 pb-8">
             <p className="text-slate-400 text-base mb-8 text-center leading-relaxed">
-              Para proteger tu información, por favor ingresa el <strong className="text-slate-200">número de orden</strong> que recibiste por WhatsApp.
+              Para proteger tu información, por favor ingresa la <strong className="text-slate-200">placa de tu vehículo</strong>.
             </p>
-            {providedAuth && providedAuth !== String(workOrder.order_number) && (
+            {providedAuth && (
               <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
-                Número de orden incorrecto. Intenta de nuevo.
+                Placa incorrecta. Intenta de nuevo.
               </div>
             )}
             <form method="GET" className="space-y-6">
               <input 
                 type="text" 
                 name="auth" 
-                placeholder="Número de orden (Ej: 1234)" 
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-slate-200 text-lg placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-center tracking-widest"
+                placeholder="Placa del Vehículo (Ej: XYZ123)" 
+                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-slate-200 text-lg placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-center tracking-widest uppercase"
                 required
               />
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-6 text-lg shadow-lg shadow-blue-500/20 transition-all">
