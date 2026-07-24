@@ -20,6 +20,8 @@ export function DownloadTechniciansReportButton({ technicians }: { technicians: 
 
       return {
         "Técnico": tech.name,
+        "Correo": tech.email || "N/A",
+        "Teléfono": tech.phone || "N/A",
         "Especialidad": tech.specialty || "N/A",
         "Órdenes Totales": total,
         "En Diagnóstico (Pendiente)": diag,

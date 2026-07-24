@@ -3,7 +3,9 @@ import { DashboardMenu } from '@/components/dashboard/DashboardMenu';
 import { Suspense } from 'react';
 import { FirstLoginPasswordChangeModal } from '@/components/auth/FirstLoginPasswordChangeModal';
 import { TourHandler } from '@/components/dashboard/TourHandler';
-import { getMotorcycles, getTechnicians } from '@/lib/data';
+import { getMotorcycles, getTechnicians, getWorkOrders } from '@/lib/data';
+import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,21 +16,33 @@ interface TenantPageProps {
 }
 
 export default async function TenantPage({ params }: TenantPageProps) {
-  // En una app real podríamos extraer información del tenant con el parámetro "tenant"
-  const user = { role: 'owner' };
-  const workshopDetails = { name: 'Taller Demo', user_name: 'Admin' };
+  const user = await getCurrentUserServer();
+  
+  if (!user) {
+    redirect('/login');
+  }
+
+  const workshopDetails = await getWorkshopDetails();
   
   // Fetch data for the "Nueva Orden" modal
-  const motorcycles = await getMotorcycles();
-  const technicians = await getTechnicians();
+  const [motorcycles, technicians, workOrdersData] = await Promise.all([
+    getMotorcycles(),
+    getTechnicians(),
+    getWorkOrders()
+  ]);
+
+  const activeWorkOrders = workOrdersData.items.filter((wo) => wo.status !== 'Entregado');
+  const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
+    (moto) => !activeWorkOrders.some((wo) => wo.motorcycle?.id === moto.id)
+  );
 
   return (
     <>
       <DashboardMenu 
         role={user.role} 
         userName={workshopDetails?.user_name || 'Usuario'}
-        workshopName={workshopDetails?.name || 'Tu Taller'}
-        motorcycles={motorcycles}
+        workshopName={workshopDetails?.slug || 'tu-taller'}
+        motorcycles={motorcyclesWithoutActiveWorkOrders}
         technicians={technicians}
       />
       <Suspense fallback={null}>

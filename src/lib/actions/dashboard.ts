@@ -1,10 +1,6 @@
 'use server';
 import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 
-
-
-
-
 export async function getDashboardData() {
   const user = await requireWorkshop()
   const supabase = await createAdminClient()
@@ -15,8 +11,8 @@ export async function getDashboardData() {
   const { data: salesThisMonth, error: e1 } = await supabase
     .from('sales')
     .select('total')
-    .eq('workshop_id', user.workshopId)
-    .gte('date', startOfMonth)
+    .eq('organization_id', user.workshopId)
+    .gte('created_at', startOfMonth)
 
   if (e1) console.error('Dashboard Error (sales):', e1)
 
@@ -27,24 +23,27 @@ export async function getDashboardData() {
   const { count: activeWorkOrdersCount, error: e2 } = await supabase
     .from('work_orders')
     .select('*', { count: 'exact', head: true })
-    .eq('workshop_id', user.workshopId)
+    .eq('organization_id', user.workshopId)
     .neq('status', 'Entregado')
     
   if (e2) console.error('Dashboard Error (active WO):', e2)
 
-  const { count: motosEnTallerCount, error: e3 } = await supabase
+  const { data: motosEnTallerData, error: e3 } = await supabase
     .from('work_orders')
-    .select('*', { count: 'exact', head: true })
-    .eq('workshop_id', user.workshopId)
+    .select('motorcycle_id')
+    .eq('organization_id', user.workshopId)
     .neq('status', 'Entregado')
 
   if (e3) console.error('Dashboard Error (motos en taller):', e3)
+  
+  const motosEnTallerSet = new Set((motosEnTallerData || []).map(wo => wo.motorcycle_id).filter(Boolean));
+  const motosEnTallerCount = motosEnTallerSet.size;
 
   // 4. Stock Crítico
   const { data: inventory, error: e4 } = await supabase
     .from('inventory_items')
     .select('id, quantity, min_quantity')
-    .eq('workshop_id', user.workshopId)
+    .eq('organization_id', user.workshopId)
 
   if (e4) console.error('Dashboard Error (inventory):', e4)
 
@@ -63,9 +62,9 @@ export async function getDashboardData() {
     const { data: dailySales } = await supabase
       .from('sales')
       .select('total')
-      .eq('workshop_id', user.workshopId)
-      .gte('date', `${dateStr}T00:00:00.000Z`)
-      .lt('date', `${dateStr}T23:59:59.999Z`)
+      .eq('organization_id', user.workshopId)
+      .gte('created_at', `${dateStr}T00:00:00.000Z`)
+      .lt('created_at', `${dateStr}T23:59:59.999Z`)
       
     const dayTotal = (dailySales || []).reduce((sum, sale) => sum + Number(sale.total), 0)
     
@@ -77,21 +76,27 @@ export async function getDashboardData() {
   }
 
   // 6. Top Selling Parts
-  const { data: saleItems, error: e5 } = await supabase
-    .from('sale_items')
-    .select('inventory_item_id, quantity, inventory_items(name)')
-    .eq('workshop_id', user.workshopId)
+  const { data: salesWithItems, error: e5 } = await supabase
+    .from('sales')
+    .select('id, sale_items(inventory_item_id, quantity, inventory_items(name))')
+    .eq('organization_id', user.workshopId)
     
   if (e5) console.error('Dashboard Error (sale items):', e5)
     
   const partsMap: Record<string, { name: string, ventas: number }> = {}
-  if (saleItems) {
-    saleItems.forEach((item: any) => {
-      const name = item.inventory_items?.name || 'Desconocido'
-      if (!partsMap[item.inventory_item_id]) {
-        partsMap[item.inventory_item_id] = { name, ventas: 0 }
-      }
-      partsMap[item.inventory_item_id].ventas += item.quantity
+  if (salesWithItems) {
+    salesWithItems.forEach((sale: any) => {
+      if (!sale.sale_items) return;
+      // Depending on Supabase relations, sale_items might be an array
+      const items = Array.isArray(sale.sale_items) ? sale.sale_items : [sale.sale_items];
+      items.forEach((item: any) => {
+        if (!item.inventory_item_id) return;
+        const name = item.inventory_items?.name || 'Desconocido'
+        if (!partsMap[item.inventory_item_id]) {
+          partsMap[item.inventory_item_id] = { name, ventas: 0 }
+        }
+        partsMap[item.inventory_item_id].ventas += Number(item.quantity)
+      });
     })
   }
   

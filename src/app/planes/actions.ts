@@ -1,9 +1,8 @@
 'use server';
 
-
-
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 import { sendCredentialsNotification } from '@/lib/whatsapp'
 
@@ -34,20 +33,15 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
         data.slug = data.slug
             .toLowerCase()
             .trim()
-            .replace(/\s+/g, '-')
-            .replace(/[^\w-]+/g, '')
-            .replace(/--+/g, '-')
-        console.log('🔤 Slug sanitizado:', data.slug)
+            .replace(/[^a-z0-9-]+/g, '-')
+            .replace(/^-+|-+$/g, '')
     }
 
     const validation = registrationSchema.safeParse(data)
+
     if (!validation.success) {
-        console.error('❌ Error de validación:', JSON.stringify(validation.error.flatten().fieldErrors, null, 2))
-        return {
-            error: 'Datos inválidos. Revisa los campos marcados.',
-            details: validation.error.flatten().fieldErrors,
-            fields: data
-        }
+        console.error('❌ Error de validación:', validation.error.flatten().fieldErrors)
+        return { error: 'Por favor revisa los campos del formulario.', fields: data }
     }
     console.log('✅ Validación OK')
 
@@ -70,9 +64,11 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
         password: generatedPassword,
         email_confirm: true,
         user_metadata: { 
-            full_name: fullName, 
+            first_name: fullName.split(' ')[0],
+            last_name: fullName.split(' ').slice(1).join(' ') || '',
             phone,
-            temp_password: generatedPassword
+            temp_password: generatedPassword,
+            needs_password_change: true
         },
     })
 
@@ -104,52 +100,51 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     }
     console.log('📅 Plan:', subscriptionPlan, '| Inicio:', startDate.toISOString(), '| Fin:', endDate.toISOString())
 
-    // Create workshop
-    console.log('🏭 Creando taller:', workshopName, '| Slug:', slug)
-    const { data: workshop, error: workshopError } = await supabaseAdmin
-        .from('workshops')
-        .insert({
-            name: workshopName,
-            slug,
-            phone: workshopPhone || phone,
-            address,
-            maps_link: mapsLink || null,
-            city,
-            nit,
-            subscription_status: 'active',
-            subscription_plan: subscriptionPlan,
-            subscription_start_date: startDate.toISOString(),
-            subscription_end_date: endDate.toISOString(),
-            next_billing_date: endDate.toISOString(),
-        })
-        .select()
-        .single()
+    // Create organization using RPC via temp client
+    console.log('🏭 Creando taller via RPC:', workshopName, '| Slug:', slug)
+    const tempClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+            }
+        }
+    );
 
-    if (workshopError) {
-        console.error('❌ Error creando taller:', workshopError.message, workshopError)
+    const { error: signInError } = await tempClient.auth.signInWithPassword({
+        email,
+        password: generatedPassword
+    });
+
+    if (signInError) {
+        console.error('Sign In Error:', signInError);
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        return { error: 'Error de autenticación temporal: ' + signInError.message, fields: data };
+    }
+
+    const { data: orgId, error: rpcError } = await tempClient.rpc('create_organization_with_owner', {
+        org_name: workshopName,
+        org_slug: slug,
+        org_email: email,
+        org_phone: phone,
+        org_legal_name: null,
+        org_tax_identifier: nit || null,
+        sub_plan: subscriptionPlan,
+        demo_start: startDate.toISOString(),
+        demo_end: endDate.toISOString()
+    });
+
+    if (rpcError) {
+        console.error('❌ Error creando taller via RPC:', rpcError.message, rpcError)
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id).catch(() => {})
-        if (workshopError.code === '23505') {
+        if (rpcError.code === '23505') {
             return { error: 'Ese identificador de taller ya está en uso. Elige otro.', fields: data }
         }
-        return { error: 'Error al crear el taller: ' + workshopError.message, fields: data }
+        return { error: 'Error al crear el taller: ' + rpcError.message, fields: data }
     }
-    console.log('✅ Taller creado. ID:', workshop.id)
-
-    // Assign owner
-    console.log('🔗 Asignando owner:', authData.user.id, '→ taller:', workshop.id)
-    const { error: memberError } = await supabaseAdmin
-        .from('workshop_members')
-        .insert({
-            user_id: authData.user.id,
-            workshop_id: workshop.id,
-            role: 'owner',
-        })
-
-    if (memberError) {
-        console.error('❌ Error creando workshop_member:', memberError.message, memberError)
-        return { error: 'Error al configurar el taller: ' + memberError.message, fields: data }
-    }
-    console.log('✅ Owner asignado correctamente')
+    console.log('✅ Taller y owner creados. ID:', orgId)
 
     // Try to send WhatsApp notification with credentials
     if (phone) {
@@ -159,26 +154,11 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
             workshopName,
             slug,
             email,
+            'http://localhost:3000/login',
             generatedPassword
         ).catch(e => console.error('⚠️ Failed to send WhatsApp credentials:', e));
-    }
-
-    // Sign user in automatically
-    console.log('🔐 Iniciando sesión automáticamente para:', email)
-    const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: generatedPassword })
-
-    if (signInError) {
-        console.error('❌ Error en auto-login:', signInError.message)
-        redirect('/login?registered=true')
     }
 
     console.log('✅ ===== REGISTRO COMPLETADO → redirigiendo a / =====\n')
     redirect('/?firstLogin=true')
 }
-

@@ -39,7 +39,7 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
 
     const { workshopName, slug, email, fullName, phone, subscriptionPlan, demoStartDate, demoEndDate, legalName, taxIdentifier } = validation.data
 
-    const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
+    const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,7 +61,8 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
             first_name: fullName.split(' ')[0],
             last_name: fullName.split(' ').slice(1).join(' ') || '',
             phone: phone,
-            temp_password: generatedPassword
+            temp_password: generatedPassword,
+            needs_password_change: true
         }
     })
 
@@ -120,6 +121,27 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         return { error: 'Error al crear el taller en la base de datos: ' + rpcError.message };
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const loginUrl = `${appUrl}/login`;
+
+    console.log('\n=============================================');
+    console.log('📱 SIMULACIÓN DE ENVÍO DE WHATSAPP (API DE META)');
+    console.log('=============================================');
+    console.log(`Destinatario: ${phone}`);
+    console.log(`Mensaje:`);
+    console.log(`¡Hola ${fullName}! 🎉`);
+    console.log(`Tu registro para el taller *${workshopName}* ha sido exitoso.`);
+    console.log(`Hemos preparado todo para que comiences a gestionar tu negocio de inmediato.`);
+    console.log(`\n📋 *Tus Datos Importantes:*`);
+    console.log(`- Taller: ${workshopName}`);
+    console.log(`- Usuario (Email): ${email}`);
+    console.log(`\n🔑 *Código de Acceso Temporal:*`);
+    console.log(`Para ingresar, visita la página de login e ingresa con tu correo y este código de 6 dígitos:`);
+    console.log(`👉 *${generatedPassword}* 👈`);
+    console.log(`🔗 Ingresa aquí: ${loginUrl}`);
+    console.log(`(Por seguridad, el sistema te pedirá cambiar tu contraseña al ingresar).`);
+    console.log('=============================================\n');
+
     if (phone) {
         sendCredentialsNotification(
             phone,
@@ -127,6 +149,7 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
             workshopName,
             slug,
             email,
+            loginUrl,
             generatedPassword
         ).catch(e => console.error('Failed to send WhatsApp credentials:', e));
     }

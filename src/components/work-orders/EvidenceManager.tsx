@@ -180,7 +180,7 @@ export function EvidenceManager({ workOrderId, evidences }: { workOrderId: strin
                     ) : (
                         <div className="space-y-4">
                             <div className="relative aspect-video max-h-[300px] w-full rounded-xl overflow-hidden border border-border bg-black/5">
-                                <Image src={preview} alt="Preview" fill className="object-contain" />
+                                <Image src={preview} alt="Preview" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-contain" />
                                 <Button 
                                     variant="destructive" 
                                     size="icon" 

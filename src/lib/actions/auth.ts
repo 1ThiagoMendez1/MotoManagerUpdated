@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getWorkshopDetails } from '@/lib/auth-server';
 
 export async function loginAction(formData: FormData) {
   const email = formData.get('email') as string;
@@ -24,15 +25,43 @@ export async function loginAction(formData: FormData) {
     return { error: error.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos' : error.message };
   }
 
-  revalidatePath('/', 'layout');
-
   const user = data?.user;
+  
+  if (user) {
+    const deviceId = crypto.randomUUID();
+    
+    await supabase.auth.updateUser({
+      data: { active_device_id: deviceId }
+    });
+
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    cookieStore.set('device_id', deviceId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/'
+    });
+  }
+
+  revalidatePath('/', 'layout');
+  
+  if (user?.user_metadata?.needs_password_change === true) {
+    redirect('/change-password');
+  }
+
   const isSuperAdmin = user?.user_metadata?.is_super_admin === true || user?.email?.startsWith('admin@');
 
   if (isSuperAdmin) {
     redirect('/admin');
   } else {
-    redirect('/dashboard');
+    const workshop = await getWorkshopDetails(user);
+    if (workshop?.slug) {
+      redirect(`/${workshop.slug}`);
+    } else {
+      console.warn(`[loginAction] No workshop slug found for user ${user.email}, redirecting to /no-workshop`);
+      redirect('/no-workshop');
+    }
   }
 }
 
@@ -100,4 +129,37 @@ export async function signOutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect('/login');
+}
+
+export async function changePasswordAction(formData: FormData) {
+  const newPassword = formData.get('newPassword') as string;
+  
+  if (!newPassword || newPassword.length < 6) {
+    return { error: 'La contraseña debe tener al menos 6 caracteres.' };
+  }
+
+  const supabase = await createClient();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { error: 'No estás autenticado.' };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+    data: { needs_password_change: false }
+  });
+
+  if (error) {
+    console.error('Change password error:', error);
+    return { error: error.message };
+  }
+
+  revalidatePath('/', 'layout');
+  const workshop = await getWorkshopDetails();
+  if (workshop?.slug) {
+    redirect(`/${workshop.slug}`);
+  } else {
+    redirect('/no-workshop');
+  }
 }

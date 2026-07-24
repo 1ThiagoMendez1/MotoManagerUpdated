@@ -33,12 +33,18 @@ export async function inviteUser(data: {
     // Generar contraseña temporal
     const tempPassword = Math.random().toString(36).slice(-8);
 
-    // 1. Create user in auth.users
+    const nameParts = data.name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Create user in Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
       password: tempPassword,
       email_confirm: true,
       user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
         full_name: data.name,
       }
     });
@@ -48,36 +54,28 @@ export async function inviteUser(data: {
     }
 
     const newUserId = authData.user.id;
+    
+    // Update the profile phone number if provided (the trigger creates the profile without phone)
+    if (data.phone) {
+      await supabaseAdmin
+        .from('profiles')
+        .update({ phone: data.phone })
+        .eq('id', newUserId);
+    }
 
-    // 2. Assign user to the current workshop in workshop_members
+    // 2. Assign user to the current workshop in organization_members
     const { error: memberError } = await supabaseAdmin
-      .from('workshop_members')
+      .from('organization_members')
       .insert({
         user_id: newUserId,
-        workshop_id: currentUser.workshopId,
-        role: data.role
+        organization_id: currentUser.workshopId,
+        role: data.role === 'receptionist' ? 'service_advisor' : data.role
       });
 
     if (memberError) {
       // If assignment fails, we should ideally delete the auth user to keep consistency
       await supabaseAdmin.auth.admin.deleteUser(newUserId);
       throw new Error('Error al asignar usuario al taller: ' + memberError.message);
-    }
-
-    // 3. If role is mechanic, add to technicians table for work orders
-    if (data.role === 'mechanic' || data.role === 'Técnico') {
-      const { error: techError } = await supabaseAdmin
-        .from('tecnicos_activos')
-        .insert({
-          workshop_id: currentUser.workshopId,
-          name: data.name,
-          is_active: true
-        });
-      
-      if (techError) {
-        console.error('Error adding to technicians table:', techError);
-        // Not failing the whole process if this minor step fails, but logging it.
-      }
     }
 
     // 4. Send WhatsApp Notification
@@ -109,38 +107,58 @@ export async function getTeamMembers() {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data, error } = await supabaseAdmin
-      .from('workshop_members')
+    const { data: members, error } = await supabaseAdmin
+      .from('organization_members')
       .select(`
         role,
-        user_profiles (
+        user_id,
+        profiles (
           id,
-          name,
-          email,
-          avatar_url
+          first_name,
+          last_name,
+          avatar_path,
+          phone
         )
       `)
-      .eq('workshop_id', currentUser.workshopId);
+      .eq('organization_id', currentUser.workshopId);
 
     if (error) {
       console.error('Error fetching team members:', error);
       return [];
     }
 
-    return (data || []).map((member: any) => {
-      const profile = member.user_profiles || {};
+    const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
+    const usersMap = new Map();
+    if (authData && authData.users) {
+       authData.users.forEach(u => usersMap.set(u.id, u.email));
+    }
+
+    const result = (members || []).map((member: any) => {
+      const profile = member.profiles || {};
       return {
-        id: profile.id,
-        name: profile.name || 'Usuario',
-        email: profile.email || '',
+        id: member.user_id,
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || usersMap.get(member.user_id) || 'Usuario',
+        email: usersMap.get(member.user_id) || '',
+        phone: profile.phone || '',
         role: member.role,
-        avatar: profile.avatar_url || '',
-        status: 'active' // By default, if they are in the table, they are active
+        avatar: profile.avatar_path || '',
+        status: 'active'
       };
     });
+    
+    // DEBUG LOG
+    require('fs').writeFileSync('team_debug.log', JSON.stringify({
+      workshopId: currentUser.workshopId,
+      membersLength: members?.length,
+      resultLength: result.length,
+      firstMember: result[0]
+    }, null, 2));
 
-  } catch (error) {
+    return result;
+
+  } catch (error: any) {
     console.error('Failed to get team members:', error);
+    require('fs').writeFileSync('team_debug.error.log', error.toString());
     return [];
   }
 }
@@ -161,45 +179,16 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    const dbRole = newRole === 'receptionist' ? 'service_advisor' : newRole;
+
     const { error } = await supabaseAdmin
-      .from('workshop_members')
-      .update({ role: newRole })
+      .from('organization_members')
+      .update({ role: dbRole })
       .eq('user_id', userIdToUpdate)
-      .eq('workshop_id', currentUser.workshopId);
+      .eq('organization_id', currentUser.workshopId);
 
     if (error) {
       throw new Error('Error al actualizar el rol: ' + error.message);
-    }
-
-    // Si el nuevo rol es mecánico, asegurarnos de que esté en tecnicos_activos
-    if (newRole === 'mechanic' || newRole === 'Técnico') {
-      // 1. Obtener el nombre del usuario
-      const { data: profile } = await supabaseAdmin
-        .from('user_profiles')
-        .select('name')
-        .eq('id', userIdToUpdate)
-        .single();
-        
-      if (profile && profile.name) {
-        // 2. Verificar si ya existe en tecnicos_activos para este taller con ese nombre
-        const { data: existingTech } = await supabaseAdmin
-          .from('tecnicos_activos')
-          .select('id')
-          .eq('workshop_id', currentUser.workshopId)
-          .eq('name', profile.name)
-          .maybeSingle();
-          
-        // 3. Si no existe, lo agregamos
-        if (!existingTech) {
-          await supabaseAdmin
-            .from('tecnicos_activos')
-            .insert({
-              workshop_id: currentUser.workshopId,
-              name: profile.name,
-              is_active: true
-            });
-        }
-      }
     }
 
     return { success: true };

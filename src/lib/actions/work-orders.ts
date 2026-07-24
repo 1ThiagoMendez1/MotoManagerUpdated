@@ -16,6 +16,7 @@ function mapStatusToDb(uiStatus: string) {
     if (uiStatus === 'En proceso') return 'in_progress';
     if (uiStatus === 'Reparado') return 'completed';
     if (uiStatus === 'Entregado') return 'delivered';
+    if (uiStatus === 'Ingreso a taller') return 'received';
     return 'draft';
 }
 
@@ -24,7 +25,7 @@ function mapStatusToUi(dbStatus: string) {
     if (dbStatus === 'in_progress') return 'En proceso';
     if (dbStatus === 'completed') return 'Reparado';
     if (dbStatus === 'delivered') return 'Entregado';
-    if (dbStatus === 'received') return 'Ingresado';
+    if (dbStatus === 'received') return 'Ingreso a taller';
     return dbStatus;
 }
 
@@ -56,7 +57,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
 
     const { data: mc, error: mcError } = await supabase
         .from('motorcycles')
-        .select('notes')
+        .select('notes, customer_id')
         .eq('id', motorcycleId)
         .eq('organization_id', user.workshopId)
         .single();
@@ -71,20 +72,20 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
     const { data: newOrderId, error } = await supabase
         .rpc('create_work_order', {
             p_organization_id: user.workshopId,
-            p_customer_id: '00000000-0000-0000-0000-000000000000', // We need customer_id from mc...
+            p_customer_id: mc.customer_id,
             p_motorcycle_id: motorcycleId,
             p_reported_symptoms: issueDescription
         });
         
     if (error) {
-        // Fallback si el RPC falla por falta de customer_id exacto u otro motivo
+        // Fallback si el RPC falla por algún motivo
         const { error: insertError } = await supabase
             .from('work_orders')
             .insert({
                 organization_id: user.workshopId,
                 motorcycle_id: motorcycleId,
                 assigned_mechanic_id: technicianId,
-                status: 'diagnosis',
+                status: 'received',
                 reported_symptoms: issueDescription,
                 created_by: user.userId || null
             });
@@ -95,10 +96,16 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         }
     } else {
         // Asignar mecánico a la orden creada por RPC
-        await supabase
+        const { error: updateError } = await supabase
             .from('work_orders')
-            .update({ assigned_mechanic_id: technicianId, status: 'diagnosis' })
-            .eq('id', newOrderId);
+            .update({ assigned_mechanic_id: technicianId, status: 'received' })
+            .eq('id', newOrderId)
+            .eq('organization_id', user.workshopId);
+            
+        if (updateError) {
+            console.error('Error assigning technician:', updateError);
+            return { message: 'Error al asignar el técnico a la orden de trabajo.' };
+        }
     }
 
     revalidatePath('/work-orders');
@@ -141,7 +148,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                     phone
                 )
             ),
-            profiles (
+            profiles!work_orders_assigned_mechanic_id_fkey (
                 first_name,
                 last_name
             )

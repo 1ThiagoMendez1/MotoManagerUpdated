@@ -77,6 +77,7 @@ export default async function TechniciansPage() {
                   <TableHeader>
                     <TableRow className="border-border/50 hover:bg-transparent">
                       <TableHead className="text-foreground/90">Nombre</TableHead>
+                      <TableHead className="text-foreground/90">Contacto</TableHead>
                       <TableHead className="text-foreground/90">Especialidad</TableHead>
                       <TableHead className="text-foreground/90 text-center">Órdenes de Trabajo</TableHead>
                       <TableHead>

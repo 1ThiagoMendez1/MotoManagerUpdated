@@ -60,21 +60,21 @@ const roleLabels: Record<string, string> = {
   owner: 'Dueño',
   admin: 'Administrador',
   mechanic: 'Técnico',
-  receptionist: 'Recepcionista'
+  service_advisor: 'Recepcionista'
 };
 
 const roleColors: Record<string, string> = {
   owner: 'bg-primary/20 text-primary hover:bg-primary/30',
   admin: 'bg-blue-500/20 text-blue-500 hover:bg-blue-500/30',
   mechanic: 'bg-orange-500/20 text-orange-500 hover:bg-orange-500/30',
-  receptionist: 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+  service_advisor: 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
 };
 
 const permissionsInfo: Record<string, string> = {
   owner: 'Acceso total a reportes, finanzas y configuración.',
   admin: 'Acceso a gestión de taller y reportes básicos.',
   mechanic: 'Solo acceso a Órdenes de Trabajo e Inventario.',
-  receptionist: 'Acceso a Clientes, Citas y Órdenes de Trabajo.'
+  service_advisor: 'Acceso a Clientes, Citas y Órdenes de Trabajo.'
 };
 
 export default function TeamPage() {
@@ -109,7 +109,7 @@ export default function TeamPage() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'workshop_members',
+          table: 'organization_members',
         },
         (payload) => {
           const { user_id, role } = payload.new;
@@ -184,6 +184,7 @@ export default function TeamPage() {
             id: Date.now().toString(),
             name: formData.name,
             email: formData.email,
+            phone: formData.phone,
             role: formData.role,
             avatar: '',
             status: 'pending'

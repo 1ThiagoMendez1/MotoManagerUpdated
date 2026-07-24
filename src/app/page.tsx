@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import PlanesPage from './planes/PlanesPage';
 
 import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans';
-
+import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
@@ -33,12 +33,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+  const supabase = await createClient();
   let plans: any[] = [];
   let features: any[] = [];
   let user: any = null;

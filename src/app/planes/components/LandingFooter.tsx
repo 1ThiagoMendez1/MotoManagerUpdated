@@ -16,6 +16,7 @@ export function LandingFooter() {
                 src="/logo.png" 
                 alt="MotoManager Logo" 
                 fill
+                sizes="(max-width: 640px) 48px, 64px"
                 className="object-contain"
                 priority
               />

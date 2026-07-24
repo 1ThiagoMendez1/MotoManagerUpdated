@@ -32,6 +32,13 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
             <span>{technician.name}</span>
           </div>
         </TableCell>
+        <TableCell>
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            {technician.email && <span className="truncate">{technician.email}</span>}
+            {technician.phone && <span>{technician.phone}</span>}
+            {!technician.email && !technician.phone && <span>-</span>}
+          </div>
+        </TableCell>
         <TableCell>{technician.specialty}</TableCell>
         <TableCell className="text-center">
           {hasOrders ? (

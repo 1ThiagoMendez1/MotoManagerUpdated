@@ -27,6 +27,7 @@ import {
 
 interface HeaderProps {
   workshopName?: string | null;
+  workshopSlug?: string | null;
   userName?: string | null;
   subscriptionPlan?: string | null;
   subscriptionEndDate?: string | null;
@@ -37,6 +38,7 @@ interface HeaderProps {
 
 export default function Header({ 
   workshopName, 
+  workshopSlug,
   userName,
   subscriptionPlan,
   subscriptionEndDate,
@@ -47,7 +49,7 @@ export default function Header({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isRoot = pathname === '/' || pathname === '/login' || pathname === '/register-workshop' || pathname === '/admin';
+  const isRoot = pathname === '/' || pathname === '/login' || pathname === '/register-workshop' || pathname === '/admin' || (!!workshopSlug && pathname === `/${workshopSlug}`);
 
   const handleSignOut = async () => {
     try {
@@ -107,7 +109,7 @@ export default function Header({
       <div className="flex items-center gap-2 sm:gap-4">
         {!isRoot && (
           <Button
-            onClick={() => router.push(pathname.startsWith('/admin') ? '/admin' : '/')}
+            onClick={() => router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/'))}
             variant="ghost"
             size="icon"
             className="text-foreground hover:bg-card/50 h-9 w-9 rounded-full transition-transform hover:scale-110"
@@ -117,7 +119,7 @@ export default function Header({
           </Button>
         )}
         <Link
-          href={pathname.startsWith('/admin') ? '/admin' : '/'}
+          href={pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/')}
           className="flex items-center gap-3 font-semibold hover:opacity-80 transition-opacity"
         >
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 drop-shadow-md">
@@ -125,6 +127,7 @@ export default function Header({
               src="/logo.png" 
               alt="MotoManager Logo" 
               fill
+              sizes="(max-width: 768px) 100vw, 20vw"
               className="object-contain"
               priority
             />

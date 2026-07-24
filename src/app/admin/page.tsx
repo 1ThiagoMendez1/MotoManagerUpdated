@@ -11,53 +11,65 @@ import CancellationsTab from './CancellationsTab';
 import TicketsTab from './TicketsTab';
 import PlanesTab from './PlanesTab';
 import { getAllTicketsForAdmin } from '@/lib/data/tickets';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 export default async function AdminPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
-  const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
-  const adminSupabase = new Proxy({}, {
-    get: (target, prop) => {
-      if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
-      return () => adminSupabase;
-    }
-  }) as any;
+  const supabase = await createClient();
+  const adminSupabase = createAdminClient();
   
   const resolvedSearchParams = await searchParams;
   const currentView = resolvedSearchParams.view || 'menu';
 
-  // Fetch all workshops
-  const { data: workshops, error: workshopsError } = await adminSupabase
-    .from('workshops')
+  // Fetch all organizations
+  const { data: orgs, error: orgsError } = await adminSupabase
+    .from('organizations')
     .select(`
       *,
-      members:workshop_members(
+      members:organization_members(
         role,
         user_id,
-        profile:user_profiles(name, email, phone, avatar_url)
+        profile:profiles(first_name, last_name, phone, avatar_path)
       )
     `)
     .order('created_at', { ascending: false });
 
-  if (workshopsError) {
-    return <div className="text-red-500">Error cargando talleres: {workshopsError.message}</div>;
+  if (orgsError) {
+    return <div className="text-red-500">Error cargando talleres: {orgsError.message}</div>;
   }
 
+  const workshops = orgs?.map((org: any) => ({
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    subscription_status: org.settings?.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
+    subscription_plan: org.settings?.plan || 'monthly',
+    subscription_end_date: org.settings?.demoEndDate || null,
+    created_at: org.created_at,
+    members: org.members?.map((m: any) => ({
+      role: m.role,
+      user_id: m.user_id,
+      profile: {
+        name: `${m.profile?.first_name || ''} ${m.profile?.last_name || ''}`.trim() || 'Sin Nombre',
+        email: org.email || '',
+        phone: m.profile?.phone || '',
+        avatar_url: m.profile?.avatar_path || null
+      }
+    })) || []
+  })) || [];
+
   // Fetch all users
-  const { data: users, error: usersError } = await adminSupabase
-    .from('user_profiles')
+  const { data: rawUsers, error: usersError } = await adminSupabase
+    .from('profiles')
     .select(`
       *,
-      workshop_members(
+      workshop_members:organization_members(
         role,
-        workshops(name)
+        workshops:organizations(name)
       )
     `)
     .order('created_at', { ascending: false });
@@ -65,6 +77,16 @@ export default async function AdminPage({
   if (usersError) {
     console.error("Error loading users:", usersError);
   }
+
+  const users = rawUsers?.map((u: any) => ({
+    id: u.id,
+    name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Sin Nombre',
+    email: '',
+    phone: u.phone,
+    avatar_url: u.avatar_path,
+    created_at: u.created_at,
+    workshop_members: u.workshop_members
+  })) || [];
 
   // Fetch plans from DB (or fallback to defaults if table doesn't exist yet)
   let dbPlans: any[] = [];
@@ -111,7 +133,7 @@ export default async function AdminPage({
     .eq('status', 'APPROVED')
     .order('created_at', { ascending: true });
     
-  if (paymentsError) {
+  if (paymentsError && paymentsError.code !== 'PGRST205') {
     console.error("Error loading payments:", paymentsError);
   }
 
@@ -125,7 +147,7 @@ export default async function AdminPage({
     `)
     .order('created_at', { ascending: false });
 
-  if (cancellationsError) {
+  if (cancellationsError && cancellationsError.code !== 'PGRST205') {
     console.error("Error loading cancellations:", cancellationsError);
   }
 

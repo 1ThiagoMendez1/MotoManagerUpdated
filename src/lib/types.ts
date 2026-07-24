@@ -22,6 +22,8 @@ export type Technician = {
   id: string;
   name: string;
   specialty: string;
+  email?: string | null;
+  phone?: string | null;
   avatarUrl?: string | null;
   workOrders?: WorkOrder[];
 };
@@ -61,7 +63,7 @@ export type WorkOrder = {
   reparadoDate?: string;
   entregadoDate?: string;
   completedDate?: string;
-  status: 'Diagnosticando' | 'Reparado' | 'Entregado';
+  status: 'Ingreso a taller' | 'Diagnosticando' | 'Reparado' | 'Entregado';
   quoteStatus?: 'Pendiente' | 'Aprobada' | 'Rechazada';
   quote_status?: 'pending' | 'approved' | 'rejected' | null;
   quote_responded_at?: string | null;

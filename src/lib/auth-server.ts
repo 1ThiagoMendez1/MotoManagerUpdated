@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export async function getCurrentUserServer() {
   try {
@@ -7,23 +8,42 @@ export async function getCurrentUserServer() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      const { data: _orgMember } = await supabase
+      // Use admin client to bypass RLS issues (e.g. infinite recursion in policies)
+      // Safe because we explicitly filter by user.id
+      const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      const { data: _orgMembers, error: orgError } = await supabaseAdmin
         .from('organization_members')
         .select('organization_id, role')
         .eq('user_id', user.id)
-        .maybeSingle();
-      const orgMember = _orgMember as any;
+        .limit(1);
+      
+      console.log(`[auth-server] getCurrentUserServer - user_id: ${user.id}, email: ${user.email}`);
+      
+      if (orgError) {
+        console.error("[auth-server] Error fetching organization_members:", orgError);
+      } else {
+        console.log(`[auth-server] organization_members results:`, _orgMembers);
+      }
+      const orgMember = _orgMembers?.[0] as any;
+
+      if (!orgMember) {
+        console.warn(`[auth-server] User ${user.email} has no assigned organization_members.`);
+      }
 
       return {
         userId: user.id,
         email: user.email,
+        user_metadata: user.user_metadata,
         role: orgMember?.role || 'viewer',
         workshopId: orgMember?.organization_id || null,
         availableWorkshops: orgMember ? [orgMember.organization_id] : []
       };
     }
   } catch (e) {
-    console.error('Error in getCurrentUserServer:', e);
+    console.error('[auth-server] Error in getCurrentUserServer:', e);
   }
 
   return null;
@@ -40,7 +60,7 @@ export async function requireWorkshop() {
     if (isSuperAdmin) {
         redirect('/admin');
     }
-    redirect('/register-workshop');
+    redirect('/no-workshop');
   }
   return user;
 }
@@ -56,39 +76,72 @@ export async function authorize(path: string) {
     if (isSuperAdmin) {
         redirect('/admin');
     }
-    redirect('/register-workshop');
+    redirect('/no-workshop');
   }
   return user;
 }
 
-export async function getWorkshopDetails() {
-  const user = await getCurrentUserServer();
-  if (!user || !user.workshopId) {
+export async function getWorkshopDetails(knownUser?: any) {
+  const user = knownUser || await getCurrentUserServer();
+  if (!user || (!user.workshopId && !user.id)) {
+    console.warn(`[auth-server] getWorkshopDetails - User or user.workshopId is missing. user:`, user);
     return null;
   }
 
   try {
-    const supabase = await createClient();
-    const { data: _org } = await supabase
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    // If we only have knownUser from auth but not the workshopId, fetch it
+    let workshopId = user.workshopId;
+    let userRole = user.role;
+    if (!workshopId && user.id) {
+       const { data: _orgMembers } = await supabaseAdmin
+        .from('organization_members')
+        .select('organization_id, role')
+        .eq('user_id', user.id)
+        .limit(1);
+       if (_orgMembers && _orgMembers.length > 0) {
+           workshopId = _orgMembers[0].organization_id;
+           userRole = _orgMembers[0].role;
+       }
+    }
+
+    if (!workshopId) {
+        console.warn(`[auth-server] getWorkshopDetails - Could not resolve workshopId for user ${user.id}`);
+        return null;
+    }
+
+    const { data: _org, error } = await supabaseAdmin
       .from('organizations')
       .select('*')
-      .eq('id', user.workshopId)
+      .eq('id', workshopId)
       .single();
+      
+    if (error) {
+      console.error(`[auth-server] getWorkshopDetails - Error fetching org ${workshopId}:`, error);
+    }
+    
     const org = _org as any;
     
     if (org) {
+      console.log(`[auth-server] getWorkshopDetails - Found org:`, org.slug);
       return {
         name: org.name,
         slug: org.slug,
         subscription_status: org.subscription_status || 'active',
         subscription_plan: 'premium', 
         has_seen_welcome: true,
-        user_name: user.email,
-        user_role: user.role
+        user_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Usuario',
+        user_role: userRole
       };
+    } else {
+       console.warn(`[auth-server] getWorkshopDetails - No org found for id ${workshopId}`);
     }
   } catch (e) {
-    console.error('Error fetching workshop details:', e);
+    console.error('[auth-server] Error fetching workshop details:', e);
   }
 
   return null;

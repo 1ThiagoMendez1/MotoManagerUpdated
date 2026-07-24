@@ -1,0 +1,14 @@
+{
+  "workshopId": "ec9ce390-91bf-4ecf-a893-00d39e2ebe34",
+  "membersLength": 7,
+  "resultLength": 7,
+  "firstMember": {
+    "id": "4efd838e-378a-4449-b972-786bb4478c34",
+    "name": "Juan Urian",
+    "email": "juanurian31@gmail.com",
+    "phone": "",
+    "role": "owner",
+    "avatar": "",
+    "status": "active"
+  }
+}

@@ -51,6 +51,11 @@ export default async function WorkOrdersPage({
   const totalPages = workOrdersData.totalPages;
   const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
   const completedWorkOrders = workOrders.filter((wo) => wo.status === 'Entregado');
+
+  const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
+    (moto) => !activeWorkOrders.some((wo) => wo.motorcycle.id === moto.id)
+  );
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'Entregado':
@@ -75,7 +80,7 @@ export default async function WorkOrdersPage({
           <SearchWorkOrders />
         </div>
         <div className="flex gap-3">
-          <AddWorkOrder motorcycles={motorcycles} technicians={technicians} />
+          <AddWorkOrder motorcycles={motorcyclesWithoutActiveWorkOrders} technicians={technicians} />
         </div>
       </div>
       <Card className="bg-card/50 border-border/50 text-foreground backdrop-blur-sm overflow-hidden">

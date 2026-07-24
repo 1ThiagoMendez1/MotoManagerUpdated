@@ -2,18 +2,14 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 
 export default function AdminRealtime() {
     const router = useRouter();
 
     useEffect(() => {
-        const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+        const supabase = createClient();
         
         const channel = supabase.channel('admin-global-changes')
             .on(

@@ -73,6 +73,7 @@ export default function RegisterForm() {
                                 src="/logo.png" 
                                 alt="MotoManager Logo" 
                                 fill
+                                sizes="(max-width: 768px) 100vw, 20vw"
                                 className="object-contain hover:scale-105 transition-transform duration-300"
                                 priority
                             />

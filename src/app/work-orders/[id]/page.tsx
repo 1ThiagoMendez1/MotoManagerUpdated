@@ -291,7 +291,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               Items Actuales
             </h3>
             
-            {workOrder.sales.length === 0 || workOrder.sales.every(sale => sale.saleItems.length === 0) ? (
+            {!workOrder.sales || workOrder.sales.length === 0 || workOrder.sales.every(sale => !sale.saleItems || sale.saleItems.length === 0) ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 bg-muted/20 border border-dashed border-border/50 rounded-2xl">
                 <Package className="w-12 h-12 text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground font-medium">No hay insumos registrados</p>
@@ -299,8 +299,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {workOrder.sales.flatMap(sale =>
-                  sale.saleItems.map(item => (
+                {(workOrder.sales || []).flatMap(sale =>
+                  (sale.saleItems || []).map(item => (
                     <div key={item.id} className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-muted/30 hover:bg-muted/50 p-4 rounded-xl border border-border/50 transition-colors group">
                       <div className="flex-1">
                         <p className="font-medium text-foreground mb-1">{item.inventoryItem.name}</p>

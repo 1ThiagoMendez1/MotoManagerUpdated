@@ -452,7 +452,8 @@ export async function sendCredentialsNotification(
   workshopName: string,
   workshopSlug: string,
   email: string,
-  tempPassword: string
+  setupUrl: string,
+  tempPassword?: string
 ) {
   if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
     console.log('Evolution API not configured, skipping WhatsApp notification');
@@ -466,14 +467,17 @@ export async function sendCredentialsNotification(
 
 ¡Hola ${customerName}!
 
-Tu registro para el taller *${workshopName}* ha sido exitoso. Hemos generado tus credenciales de acceso automáticamente para que puedas comenzar a gestionar tu negocio.
+Tu registro para el taller *${workshopName}* ha sido exitoso. Hemos preparado todo para que puedas comenzar a gestionar tu negocio de inmediato.
 
-🔑 *Tus Credenciales de Acceso:*
-URL de acceso: https://${workshopSlug}.motomanager.com.co
+📋 *Tus Datos Importantes:*
+Taller: ${workshopName}
 Usuario (Email): ${email}
-Contraseña temporal: ${tempPassword}
 
-⚠️ *Importante:* Te recomendamos cambiar esta contraseña temporal una vez ingreses al sistema por primera vez.
+🔑 *Configura tu acceso:*
+Para ingresar por primera vez y crear tu contraseña segura, haz clic en el siguiente enlace único:
+🔗 ${setupUrl}
+
+${tempPassword ? `(Alternativamente, puedes ingresar en https://${workshopSlug}.motomanager.com.co con tu email y la contraseña temporal: ${tempPassword})` : ''}
 
 ¡Si tienes alguna duda, nuestro equipo de soporte está aquí para ayudarte!
 

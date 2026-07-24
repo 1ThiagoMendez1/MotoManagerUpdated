@@ -1,5 +1,5 @@
 'use client';
-import { CheckCircle2, CreditCard, Zap, Lock, Shield, ArrowRight, Phone } from 'lucide-react';
+import { CheckCircle2, CreditCard, Zap, Lock, Shield, ArrowRight, Phone, Gift, Star } from 'lucide-react';
 
 function formatCOP(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
@@ -19,202 +19,175 @@ export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes
   const sortedFeatures = [...features].sort((a, b) => a.order_index - b.order_index);
 
   return (
-    <section id="planes" className="py-24 px-4 scroll-mt-20">
+    <section id="planes" className="py-24 px-4 scroll-mt-20 relative">
+      {/* Background elements */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background -z-10" />
+      
       <div className="max-w-7xl mx-auto space-y-16">
         {/* Header */}
         <div className="text-center space-y-4">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-card/30 border border-border/30 text-muted-foreground text-sm font-medium">
-            Planes y precios
-          </span>
-          <h2 className="text-4xl md:text-5xl font-extrabold text-foreground">
-            Sin letras pequeñas ni costos ocultos
+          <div className="inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-bold uppercase tracking-widest animate-pulse">
+            <Zap className="h-4 w-4" />
+            Oferta Especial Activa
+          </div>
+          <h2 className="text-4xl md:text-6xl font-black text-foreground tracking-tight">
+            Un precio. <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Todo incluido.</span>
           </h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Todos los planes incluyen exactamente las mismas funcionalidades.
-            Solo elige la duración que más te convenga.
+          <p className="text-muted-foreground text-xl max-w-2xl mx-auto font-medium">
+            Deja de pagar extra por módulos adicionales. Con MotoManager tienes <strong className="text-foreground">acceso total</strong> desde el primer día.
           </p>
         </div>
 
-        {/* How it works — 3 steps */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {[
-            { step: '01', title: 'Elige tu plan', desc: 'Selecciona la suscripción que mejor se adapte a tu taller.', Icon: CreditCard, color: 'blue' },
-            { step: '02', title: 'Paga de forma segura', desc: 'Nequi, Daviplata, PSE o tarjeta — el método que prefieras.', Icon: Shield, color: 'green' },
-            { step: '03', title: 'Activa y empieza', desc: 'Registra tu taller y empieza a gestionar hoy mismo.', Icon: Zap, color: 'amber' },
-          ].map(s => {
-            const colors: Record<string, string> = {
-              blue: 'bg-primary/20 text-primary border-primary/30',
-              green: 'bg-green-500/20 text-green-400 border-green-500/30',
-              amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-            };
+        {/* Pricing cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-center">
+          {sortedPlans.map(plan => {
+            const isAnnual = plan.id === 'yearly';
+            const isMonthly = plan.id === 'monthly';
+            const pricePerMonth = plan.months > 0 ? plan.price / plan.months : plan.price;
+            
+            // Decoy calculation (making annual look super cheap compared to monthly x 12)
+            const monthlyPlan = sortedPlans.find(p => p.id === 'monthly');
+            const monthlyPrice = monthlyPlan ? monthlyPlan.price : 20000; // fallback
+            const normalAnnualPrice = monthlyPrice * plan.months; 
+
             return (
-              <div key={s.step} className={`flex items-start gap-4 p-5 rounded-2xl bg-card/30 border ${colors[s.color].split(' ')[2]}`}>
-                <div className={`p-2.5 rounded-xl ${colors[s.color].split(' ').slice(0,2).join(' ')} shrink-0`}>
-                  <s.Icon className="h-5 w-5" />
+              <div
+                key={plan.id}
+                className={`relative flex flex-col gap-6 rounded-3xl transition-all duration-300 ${
+                  isAnnual 
+                    ? 'bg-gradient-to-b from-gray-900 to-black border-2 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)] scale-105 z-10 p-8' 
+                    : 'bg-card/50 border border-border/50 p-7 hover:border-primary/30 hover:bg-card z-0'
+                }`}
+              >
+                {plan.badge && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <span className={`px-4 py-1.5 rounded-full text-xs font-black text-white whitespace-nowrap shadow-lg flex items-center gap-1 ${
+                      isAnnual ? 'bg-gradient-to-r from-red-600 to-orange-500 ring-4 ring-background animate-bounce' : 'bg-gradient-to-r from-blue-600 to-blue-500'
+                    }`}>
+                      {isAnnual && <Star className="w-3 h-3 fill-white" />}
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
+
+                <div className="space-y-2 text-center">
+                  <h3 className={`text-2xl font-black ${isAnnual ? 'text-white' : 'text-foreground'}`}>{plan.name}</h3>
+                  <p className={`text-sm font-medium ${isAnnual ? 'text-gray-400' : 'text-muted-foreground'}`}>{plan.description}</p>
                 </div>
-                <div>
-                  <p className="text-muted-foreground/70 text-xs font-mono mb-0.5">Paso {s.step}</p>
-                  <h3 className="font-bold text-foreground">{s.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{s.desc}</p>
+
+                <div className="text-center py-4 border-y border-white/10">
+                  {/* Price Anchoring for Annual */}
+                  {isAnnual && (
+                     <div className="flex justify-center items-center gap-2 mb-1 opacity-70">
+                        <span className="text-sm font-bold text-red-400 line-through">
+                          {formatCOP(normalAnnualPrice)}
+                        </span>
+                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">
+                          Ahorras {formatCOP(normalAnnualPrice - plan.price)}
+                        </span>
+                     </div>
+                  )}
+
+                  <div className="flex justify-center items-end gap-1">
+                    <span className={`text-5xl font-black tracking-tighter ${isAnnual ? 'text-white' : 'text-foreground'}`}>
+                      {formatCOP(plan.price)}
+                    </span>
+                  </div>
+                  <p className={`text-sm mt-1 font-bold ${plan.accent_text}`}>{plan.period}</p>
+                  
+                  {plan.months > 1 && (
+                    <p className={`text-sm mt-2 font-semibold ${isAnnual ? 'text-green-400' : 'text-muted-foreground'}`}>
+                      Equivale a solo {formatCOP(Math.round(pricePerMonth))}/mes
+                    </p>
+                  )}
                 </div>
+
+                {isAnnual && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-3 items-start">
+                    <Gift className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-200 leading-tight">
+                      <strong>BONO HOY:</strong> Soporte prioritario VIP por WhatsApp y migración de base de datos inicial GRATIS.
+                    </p>
+                  </div>
+                )}
+
+                <ul className="space-y-3 flex-1 mt-4">
+                  {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).map((f, i) => (
+                    <li key={f.id} className="flex items-start gap-3 text-sm">
+                      <CheckCircle2 className={`h-5 w-5 shrink-0 ${isAnnual ? 'text-red-500' : 'text-green-500'}`} />
+                      <span className={`font-medium ${isAnnual ? 'text-gray-300' : 'text-foreground/80'}`}>{f.feature_name}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  onClick={() => onSelectPlan(plan)}
+                  className={`w-full flex items-center justify-center gap-2 font-extrabold h-14 rounded-xl shadow-lg transition-all hover:scale-105 text-base mt-4 ${
+                    isAnnual 
+                      ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-red-500/25' 
+                      : `bg-gradient-to-r ${plan.btn} text-primary-foreground`
+                  }`}
+                >
+                  {isAnnual ? 'APROVECHAR OFERTA' : `Elegir ${plan.name}`}
+                  <ArrowRight className="h-5 w-5" />
+                </button>
+                
+                {isAnnual && (
+                  <p className="text-[10px] text-center text-gray-500 mt-2">
+                    Precio promocional válido únicamente por hoy.
+                  </p>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Pricing cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {sortedPlans.map(plan => (
-            <div
-              key={plan.id}
-              className={`relative flex flex-col gap-6 rounded-2xl bg-gradient-to-br ${plan.gradient} border ${plan.border} p-7 transition-all hover:scale-[1.02] hover:shadow-2xl ${plan.badge === 'MÁS POPULAR' ? 'ring-2 ring-amber-500/40 shadow-xl shadow-amber-500/10' : ''}`}
-            >
-              {plan.badge && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold text-foreground whitespace-nowrap bg-gradient-to-r ${plan.id === 'biannual' ? 'from-amber-500 to-orange-500' : plan.id === 'yearly' ? 'from-purple-600 to-purple-500' : 'from-blue-600 to-blue-500'}`}>
-                    {plan.badge}
-                  </span>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-                <p className="text-sm text-muted-foreground">{plan.description}</p>
-                {plan.savings && (
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 text-xs font-medium">
-                    ✓ {plan.savings}
-                  </span>
-                )}
-              </div>
-
+        {/* Guarantees & Trust */}
+        <div className="bg-card/40 border border-border/50 rounded-3xl p-8 md:p-12 max-w-5xl mx-auto">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
               <div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-foreground tracking-tight">{formatCOP(plan.price)}</span>
-                </div>
-                <p className={`text-sm mt-0.5 ${plan.accent_text}`}>{plan.period}</p>
-                {plan.months > 1 && (
-                  <p className="text-muted-foreground text-xs mt-1">
-                    ≈ {formatCOP(Math.round(plan.price / plan.months))}/mes
-                  </p>
-                )}
+                 <div className="mx-auto w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mb-4">
+                    <Shield className="w-6 h-6" />
+                 </div>
+                 <h4 className="font-bold text-foreground text-lg mb-2">Pago 100% Seguro</h4>
+                 <p className="text-sm text-muted-foreground">Transacciones protegidas y procesadas por Wompi Bancolombia.</p>
               </div>
-
-              <ul className="space-y-2 flex-1">
-                {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).map(f => (
-                  <li key={f.id} className="flex items-center gap-2 text-sm text-foreground/75">
-                    <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
-                    {f.feature_name}
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                onClick={() => onSelectPlan(plan)}
-                className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r ${plan.btn} text-foreground font-semibold h-12 rounded-xl shadow-lg transition-all hover:scale-105 text-sm`}
-              >
-                <CreditCard className="h-4 w-4" />
-                Contratar {plan.name}
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <p className="text-center text-muted-foreground/70 text-sm">
-          Todos los planes incluyen las mismas funcionalidades · Sin costos ocultos · Cancela cuando quieras
-        </p>
-
-        {/* Comparison table */}
-        <div className="max-w-3xl mx-auto rounded-2xl bg-card/30 border border-border/30 overflow-hidden">
-          <div className="p-5 border-b border-border/30">
-            <h3 className="text-lg font-semibold text-foreground">Comparativa detallada</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/30">
-                  <th className="text-left p-4 text-muted-foreground font-medium">Funcionalidad</th>
-                  {sortedPlans.map(plan => (
-                     <th key={plan.id} className={`text-center p-4 font-semibold ${plan.accent_text}`}>{plan.name}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedFeatures.map((f, i) => (
-                  <tr key={f.id} className={`border-b border-border/20 ${i % 2 === 0 ? 'bg-muted/30' : ''}`}>
-                    <td className="p-4 text-muted-foreground">{f.feature_name}</td>
-                    {sortedPlans.map(plan => (
-                      <td key={plan.id} className="p-4 text-center">
-                        {f[`included_in_${plan.id}`] ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-400 mx-auto" />
-                        ) : (
-                          <span className="text-muted-foreground/30">-</span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                <tr className="bg-muted/30">
-                  <td className="p-4 text-muted-foreground font-semibold">Precio total</td>
-                  {sortedPlans.map(plan => (
-                    <td key={plan.id} className={`p-4 text-center font-bold ${plan.id === 'monthly' ? 'text-foreground' : plan.accent_text}`}>
-                      ${plan.price.toLocaleString('es-CO')}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Payment methods */}
-        <div className="text-center space-y-5">
-          <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest">Métodos de pago aceptados</p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {[
-              { name: 'Tarjeta crédito', icon: '💳' },
-              { name: 'Tarjeta débito', icon: '💳' },
-              { name: 'Nequi', icon: '📱' },
-              { name: 'Daviplata', icon: '📱' },
-              { name: 'PSE', icon: '🏦' },
-              { name: 'Efectivo', icon: '💵' },
-            ].map(m => (
-              <div key={m.name} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card/30 border border-border/30 text-sm text-muted-foreground">
-                <span>{m.icon}</span> {m.name}
+              <div>
+                 <div className="mx-auto w-12 h-12 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                    <Zap className="w-6 h-6" />
+                 </div>
+                 <h4 className="font-bold text-foreground text-lg mb-2">Activación Inmediata</h4>
+                 <p className="text-sm text-muted-foreground">Tendrás acceso a tu sistema en segundos después del pago.</p>
               </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-center gap-4 text-muted-foreground/70 text-xs">
-            <span className="flex items-center gap-1"><Lock className="h-3 w-3" />Conexión cifrada SSL</span>
-            <span>·</span>
-            <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Datos protegidos</span>
-            <span>·</span>
-            <span>Powered by Wompi</span>
-          </div>
+              <div>
+                 <div className="mx-auto w-12 h-12 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4">
+                    <Lock className="w-6 h-6" />
+                 </div>
+                 <h4 className="font-bold text-foreground text-lg mb-2">Sin Contratos</h4>
+                 <p className="text-sm text-muted-foreground">Eres libre. Cancela o cambia de plan en cualquier momento.</p>
+              </div>
+           </div>
         </div>
 
         {/* Final CTA */}
-        <div className="rounded-2xl bg-gradient-to-br from-primary/25 via-primary/15 to-secondary/15 border border-primary/25 p-10 md:p-16 text-center space-y-6">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-foreground">¿Listo para modernizar tu taller?</h2>
-          <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
-            Únete a más de 500 talleres que ya gestionan su negocio con MotoManager.
-            Empieza hoy desde solo $18.900 al mes. Sin compromisos.
+        <div className="relative rounded-3xl bg-gradient-to-br from-red-600 via-orange-600 to-red-700 border border-red-500/50 p-10 md:p-16 text-center space-y-6 overflow-hidden">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+          <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/20 blur-3xl rounded-full pointer-events-none" />
+          
+          <h2 className="text-3xl md:text-5xl font-black text-white relative z-10">
+            ¿Vas a dejar que tu competencia te gane?
+          </h2>
+          <p className="text-red-100 max-w-2xl mx-auto leading-relaxed text-lg font-medium relative z-10">
+            Cada día que pasas sin MotoManager, estás perdiendo ventas y desorganizando tu inventario.
+            Da el paso hacia la modernización hoy mismo.
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
+          <div className="flex flex-wrap gap-4 justify-center relative z-10 pt-4">
             <button
               onClick={onScrollToPlanes}
-              className="group flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 text-primary-foreground font-semibold px-8 py-4 rounded-2xl shadow-2xl shadow-primary/30 transition-all hover:scale-105 text-base"
+              className="group flex items-center gap-2 bg-white text-red-600 hover:bg-gray-100 font-black px-10 py-5 rounded-2xl shadow-2xl transition-all hover:scale-105 text-lg"
             >
-              Elegir mi plan <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              QUIERO ORGANIZAR MI TALLER <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </button>
-            <a
-              href="https://wa.me/573001234567"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 border border-border/50 hover:border-border text-muted-foreground hover:text-foreground px-8 py-4 rounded-2xl transition-all hover:bg-accent/20 text-base"
-            >
-              <Phone className="h-4 w-4" />
-              Hablar con soporte
-            </a>
           </div>
         </div>
       </div>

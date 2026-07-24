@@ -81,7 +81,8 @@ export default async function RootLayout({
           <LayoutWrapper
             header={
               <Header 
-                workshopName={workshop?.name} 
+                workshopName={workshop?.name}
+                workshopSlug={workshop?.slug}
                 userName={userName} 
                 subscriptionPlan={workshop?.subscription_plan}
                 subscriptionEndDate={workshop?.subscription_end_date}

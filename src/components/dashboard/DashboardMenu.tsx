@@ -49,6 +49,15 @@ export function DashboardMenu({
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
   };
 
+  // Obtener saludo dinámico
+  const hour = new Date().getHours();
+  let greeting = 'Buenos días';
+  if (hour >= 12 && hour < 19) {
+    greeting = 'Buenas tardes';
+  } else if (hour >= 19 || hour < 5) {
+    greeting = 'Buenas noches';
+  }
+
   // Módulos (se mantienen los permisos)
   const canAccessWorkOrders = hasPermission(role, '/work-orders');
   const canAccessCustomers = hasPermission(role, '/customers');
@@ -76,12 +85,12 @@ export function DashboardMenu({
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="mb-8 lg:mb-10 mt-2"
+          className="mb-4 lg:mb-6 mt-1"
         >
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-2">
-            Buenos días, {userName}.
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-1">
+            {greeting}, {userName}.
           </h1>
-          <p className="text-base sm:text-lg text-foreground/70 flex items-center gap-2">
+          <p className="text-sm sm:text-base text-foreground/70 flex items-center gap-2">
             <span>Tu taller <span className="font-medium text-foreground">{workshopName}</span>, bajo control.</span>
           </p>
         </motion.div>
@@ -91,24 +100,24 @@ export function DashboardMenu({
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-4 lg:gap-5"
+          className="grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-3 lg:gap-4"
         >
           {/* 1. Centro de Operaciones (Hero Card) - Órdenes de Trabajo */}
           {canAccessWorkOrders && (
             <motion.div id="tour-work-orders" variants={itemVariants} className="md:col-span-8 lg:col-span-8 flex flex-col h-full group">
-              <div className="relative h-full min-h-[240px] flex flex-col justify-between p-6 sm:p-8 rounded-[32px] bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-xl overflow-hidden transition-all duration-300 hover:bg-foreground/[0.05] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2]">
+              <div className="relative h-full min-h-[180px] sm:min-h-[200px] flex flex-col justify-between p-5 sm:p-6 rounded-[24px] sm:rounded-[32px] bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-xl overflow-hidden transition-all duration-300 hover:bg-foreground/[0.05] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2]">
                 {/* Glow effect inside */}
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none transition-colors duration-500" />
                 
                 <div className="relative z-10 flex flex-col h-full">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2.5 rounded-2xl bg-blue-500 text-white shadow-md">
-                      <FileText className="w-7 h-7" />
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-2xl bg-blue-500 text-white shadow-md">
+                      <FileText className="w-6 h-6" />
                     </div>
-                    <h2 className="text-2xl font-bold text-foreground tracking-tight">Órdenes de Trabajo</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Órdenes de Trabajo</h2>
                   </div>
-                  <p className="text-muted-foreground max-w-md text-sm sm:text-base mb-8 font-medium">
-                    El corazón de tu taller. Gestiona reparaciones activas, estados de avance y entrega de vehículos desde un solo lugar.
+                  <p className="text-muted-foreground max-w-md text-xs sm:text-sm mb-5 font-medium line-clamp-2">
+                    El corazón de tu taller. Gestiona reparaciones activas y entregas.
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-4 mt-auto">
@@ -257,14 +266,14 @@ function AppleGlassCard({ href, icon: Icon, title, description, iconBg }: AppleG
   return (
     <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="h-full">
       <Link href={href} className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
-        <div className="relative h-full min-h-[160px] sm:min-h-[180px] p-5 sm:p-6 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0">
+        <div className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0">
           
           <div className="relative z-10 flex flex-col h-full min-w-0">
-            <div className={cn("p-2.5 rounded-2xl text-white w-fit mb-4 shadow-sm", iconBg)}>
-              <Icon className="w-6 h-6" />
+            <div className={cn("p-2 rounded-2xl text-white w-fit mb-3 shadow-sm", iconBg)}>
+              <Icon className="w-5 h-5" />
             </div>
-            <h3 className="text-xl font-bold text-foreground tracking-tight mb-1 truncate">{title}</h3>
-            <p className="text-muted-foreground text-sm font-medium mt-auto line-clamp-2">{description}</p>
+            <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">{title}</h3>
+            <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">{description}</p>
           </div>
           
         </div>

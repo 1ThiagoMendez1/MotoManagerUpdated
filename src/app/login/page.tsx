@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Wrench, Loader2, LogIn } from 'lucide-react';
@@ -12,12 +12,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const kicked = searchParams.get('kicked');
+  
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(kicked ? 'Tu sesión ha expirado porque se ha iniciado sesión desde otro dispositivo.' : '');
   
   const [isForgotOpen, setIsForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -120,6 +123,7 @@ export default function LoginPage() {
                 src="/logo.png" 
                 alt="MotoManager Logo" 
                 fill
+                sizes="(max-width: 768px) 100vw, 20vw"
                 className="object-contain"
                 priority
               />
@@ -226,5 +230,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="w-full flex items-center justify-center p-8"><Loader2 className="animate-spin h-8 w-8 text-muted-foreground" /></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

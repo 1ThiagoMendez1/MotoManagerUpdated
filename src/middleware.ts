@@ -34,6 +34,20 @@ export async function middleware(request: NextRequest) {
   const protectedPaths = ['/dashboard', '/inventory', '/work-orders', '/admin', '/sales', '/customers', '/motorcycles', '/appointments', '/team', '/settings']
   const isProtectedRoute = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
   
+  // Prevenir sesiones concurrentes
+  if (user) {
+    const currentDeviceId = request.cookies.get('device_id')?.value;
+    const activeDeviceId = user.user_metadata?.active_device_id;
+    
+    // Si hay un activeDeviceId y no coincide con el de la cookie actual,
+    // significa que inició sesión en otro dispositivo.
+    if (activeDeviceId && currentDeviceId !== activeDeviceId) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/api/auth/kick';
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

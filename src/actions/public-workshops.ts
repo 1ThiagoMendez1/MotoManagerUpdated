@@ -1,7 +1,6 @@
 'use server';
 
-
-
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // Define the Workshop interface based on what we need for the public UI
 export interface PublicWorkshop {
@@ -16,23 +15,18 @@ export interface PublicWorkshop {
 
 export async function getPublicWorkshops(searchQuery: string = ''): Promise<PublicWorkshop[]> {
   try {
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    );
+    const supabaseAdmin = createAdminClient();
 
     let query = supabaseAdmin
-      .from('workshops')
-      .select('id, name, slug, phone, address, city, maps_link')
-      .neq('subscription_status', 'canceled')
+      .from('organizations')
+      .select('id, name, slug, phone, settings')
+      .neq('status', 'suspended')
       .order('created_at', { ascending: false });
 
-    // If there is a search query, filter by city or address
+    // If there is a search query, filter by name
     if (searchQuery.trim() !== '') {
       const searchTerm = `%${searchQuery.trim()}%`;
-      // We use or() to search multiple columns
-      query = query.or(`city.ilike.${searchTerm},address.ilike.${searchTerm},name.ilike.${searchTerm}`);
+      query = query.or(`name.ilike.${searchTerm}`);
     }
 
     const { data, error } = await query.limit(50);
@@ -42,7 +36,15 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
       return [];
     }
 
-    return data as PublicWorkshop[];
+    return data.map((org: any) => ({
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      phone: org.phone,
+      address: org.settings?.address || null,
+      city: org.settings?.city || null,
+      maps_link: org.settings?.maps_link || null,
+    }));
   } catch (error) {
     console.error('Unexpected error fetching public workshops:', error);
     return [];

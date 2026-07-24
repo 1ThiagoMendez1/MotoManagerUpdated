@@ -34,29 +34,24 @@ export default function ChangePasswordPage() {
     }
 
     try {
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ newPassword: password }),
-      });
+      const { changePasswordAction } = await import('@/lib/actions/auth');
+      const formData = new FormData();
+      formData.append('newPassword', password);
 
-      const data = await response.json();
+      const result = await changePasswordAction(formData);
 
-      if (!response.ok) {
-        setError(data.error || 'Error al cambiar la contraseña');
-      } else {
-        setSuccess(true);
-        setTimeout(() => {
-          // Redirect to root which will evaluate if it's admin or regular user
-          window.location.href = '/';
-        }, 2000);
+      if (result?.error) {
+        setError(result.error);
+        setIsLoading(false);
       }
+      // If successful, changePasswordAction calls redirect() which throws NEXT_REDIRECT and handles navigation automatically.
     } catch (err: any) {
-      setError(`Ocurrió un error inesperado: ${err.message || 'Desconocido'}`);
-    } finally {
-      setIsLoading(false);
+      if (err.message && err.message.includes('NEXT_REDIRECT')) {
+        // Redirection thrown by Next.js, do nothing
+      } else {
+        setError(`Ocurrió un error inesperado: ${err.message || 'Desconocido'}`);
+        setIsLoading(false);
+      }
     }
   };
 

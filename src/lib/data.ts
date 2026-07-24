@@ -19,20 +19,32 @@ export const getCustomers = async (): Promise<Customer[]> => {
 
 export const getTechnicians = async (): Promise<Technician[]> => {
   const user = await requireWorkshop();
-  const supabase = await createClient();
-  // We assume technicians are profiles with role 'mechanic' or similar. 
-  // Let's just fetch organization_members and join profiles.
-  const { data } = await supabase.from('organization_members')
-    .select('role, profiles ( id, email, first_name, last_name, avatar_path )')
+  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data } = await supabaseAdmin.from('organization_members')
+    .select('role, user_id, profiles ( id, first_name, last_name, avatar_path, phone )')
     .eq('organization_id', user.workshopId);
   
   if (!data) return [];
+  
+  const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
+  const usersMap = new Map();
+  if (authData && authData.users) {
+     authData.users.forEach(u => usersMap.set(u.id, u.email));
+  }
+
   return data.map((m: any) => ({
-    id: m.profiles?.id,
-    name: `${m.profiles?.first_name || ''} ${m.profiles?.last_name || ''}`.trim() || m.profiles?.email,
-    specialty: m.role,
+    id: m.profiles?.id || m.user_id,
+    name: `${m.profiles?.first_name || ''} ${m.profiles?.last_name || ''}`.trim() || 'Técnico',
+    specialty: m.role === 'mechanic' ? 'Técnico' : (m.role === 'service_advisor' ? 'Recepcionista' : m.role),
+    email: usersMap.get(m.user_id) || '',
+    phone: m.profiles?.phone || '',
     avatarUrl: m.profiles?.avatar_path
-  })).filter(t => t.id);
+  })).filter(t => t.id && (t.specialty === 'Técnico' || t.specialty === 'mechanic'));
 };
 
 export const getMotorcycles = async (): Promise<Motorcycle[]> => {
@@ -92,6 +104,8 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
 
   if (!data) return { items: [], totalPages: 0 };
 
+  const technicians = await getTechnicians();
+
   const items: WorkOrder[] = data.map((wo: any) => ({
     id: wo.id,
     workOrderNumber: `WO-${wo.order_number}`,
@@ -110,13 +124,15 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
         cedula: wo.customers.document_number
       } : { id: '', name: 'Desconocido', email: '' }
     } : null as any,
-    technician: null,
+    technician: technicians.find(t => t.id === wo.assigned_mechanic_id) || null,
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
     status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
-            (wo.status === 'diagnosis' ? 'Diagnosticando' : 'Reparado'), // basic map
-    quoteStatus: 'Aprobada'
+            (wo.status === 'diagnosis' ? 'Diagnosticando' : 
+             (wo.status === 'received' ? 'Ingreso a taller' : 'Reparado')),
+    quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
+    quote_status: wo.quote_status
   }));
 
   return { items, totalPages: 1 };
@@ -134,6 +150,8 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   const wo = _wo as any;
 
   if (!wo) return null;
+
+  const technicians = await getTechnicians();
 
   return {
     id: wo.id,
@@ -153,12 +171,15 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         cedula: wo.motorcycles.customers.document_number
       } : { id: '', name: 'Desconocido', email: '' }
     } : null as any,
-    technician: null,
+    technician: technicians.find(t => t.id === wo.assigned_mechanic_id) || null,
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
     status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
-            (wo.status === 'diagnosis' ? 'Diagnosticando' : 'Reparado'),
+            (wo.status === 'diagnosis' ? 'Diagnosticando' : 
+             (wo.status === 'received' ? 'Ingreso a taller' : 'Reparado')),
+    quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
+    quote_status: wo.quote_status,
     images: wo.work_order_evidences ? wo.work_order_evidences.map((e: any) => ({
         id: e.id,
         imageUrl: e.image_url,

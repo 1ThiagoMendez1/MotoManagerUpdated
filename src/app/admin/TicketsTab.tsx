@@ -7,6 +7,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Filter, Send, Clock, CheckCircle2, AlertCircle, X, Store, User, Mail, PlusCircle, MoreVertical } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 interface Ticket {
   id: string;
@@ -38,12 +39,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+  const supabase = createClient();
 
   // Load initial messages when ticket is selected
   useEffect(() => {
