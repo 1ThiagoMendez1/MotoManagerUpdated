@@ -16,7 +16,7 @@ function mapStatusToDb(uiStatus: string) {
     if (uiStatus === 'En proceso') return 'in_progress';
     if (uiStatus === 'Reparado') return 'completed';
     if (uiStatus === 'Entregado') return 'delivered';
-    if (uiStatus === 'Ingreso a taller') return 'received';
+    if (uiStatus === 'Ingreso a revisión') return 'received';
     return 'draft';
 }
 
@@ -25,7 +25,7 @@ function mapStatusToUi(dbStatus: string) {
     if (dbStatus === 'in_progress') return 'En proceso';
     if (dbStatus === 'completed') return 'Reparado';
     if (dbStatus === 'delivered') return 'Entregado';
-    if (dbStatus === 'received') return 'Ingreso a taller';
+    if (dbStatus === 'received') return 'Ingreso a revisión';
     return dbStatus;
 }
 
@@ -236,16 +236,37 @@ export async function addDepositToWorkOrder(formData: FormData) {
 
     const workOrderId = formData.get('workOrderId') as string;
     const amount = parseFloat(formData.get('amount') as string);
+    const mode = formData.get('mode') as string || 'add';
 
-    if (!workOrderId || isNaN(amount) || amount <= 0) {
+    if (!workOrderId || isNaN(amount) || amount < 0) {
         throw new Error('Datos inválidos');
     }
 
-    // Por ahora, usamos el campo subtotal o creamos una nota (el esquema no tiene deposit_amount)
-    // Lo guardaremos temporalmente en customer_observations si no existe
+    // Obtener las observaciones actuales para sumar el abono
+    const { data: woData } = await supabase
+        .from('work_orders')
+        .select('customer_observations')
+        .eq('id', workOrderId)
+        .eq('organization_id', user.workshopId)
+        .single();
+
+    let currentObs = woData?.customer_observations || '';
+    let currentAbono = 0;
+    const match = currentObs.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
+    
+    if (match) {
+        currentAbono = parseFloat(match[1]);
+        currentObs = currentObs.replace(/Abono registrado:\s*(\d+(\.\d+)?)\s*/, '').trim();
+    }
+    
+    const totalAbono = mode === 'set' ? amount : (currentAbono + amount);
+    const newObs = totalAbono > 0 
+        ? `Abono registrado: ${totalAbono}${currentObs ? '\n' + currentObs : ''}` 
+        : currentObs; // Si es 0, simplemente lo quitamos
+
     const { error } = await supabase
         .from('work_orders')
-        .update({ customer_observations: `Abono registrado: ${amount}` })
+        .update({ customer_observations: newObs })
         .eq('id', workOrderId)
         .eq('organization_id', user.workshopId);
 
@@ -280,19 +301,72 @@ export async function addItemToWorkOrder(formData: FormData) {
     const itemId = formData.get('inventoryItemId') as string;
     const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
 
-    // TODO: En Fase 3 se integrará con Inventory real.
-    // Por ahora registramos el item directamente en work_order_services
+    // Obtener estado de la orden para saber si descontamos de una vez
+    const { data: orderData } = await supabase
+        .from('work_orders')
+        .select('status')
+        .eq('id', workOrderId)
+        .single();
+    
+    const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(orderData?.status);
+
+    // Obtener detalles del item
+    const { data: inventoryItem } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .eq('id', itemId)
+        .single();
+        
+    if (!inventoryItem) throw new Error('Item no encontrado');
+
+    // Buscar si ya existe una venta para esta orden
+    let { data: sale } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('work_order_id', workOrderId)
+        .maybeSingle();
+
+    if (!sale) {
+        const { data: newSale, error: saleError } = await supabase
+            .from('sales')
+            .insert({
+                organization_id: user.workshopId,
+                work_order_id: workOrderId,
+                status: 'pending',
+                total: 0
+            })
+            .select()
+            .single();
+            
+        if (saleError) throw new Error('Error al crear venta asociada');
+        sale = newSale;
+    }
+
     const { error: itemError } = await supabase
-        .from('work_order_services')
+        .from('sale_items')
         .insert({
-            work_order_id: workOrderId,
-            description: 'Item de Inventario: ' + itemId, // Mapeo simple temporal
+            sale_id: sale.id,
+            item_type: 'inventory',
+            inventory_item_id: itemId,
+            description: inventoryItem.name,
             quantity: quantity,
-            unit_price: 0, 
-            total: 0
+            unit_price: inventoryItem.unit_price,
+            total: quantity * inventoryItem.unit_price
         });
 
     if (itemError) throw new Error('Error agregando item a la orden');
+
+    // Descontar inventario inmediatamente si la cotización ya fue aprobada
+    if (isApproved) {
+        const { error: decrementError } = await supabase.rpc('decrement_inventory', {
+            item_id: itemId,
+            amount: quantity
+        });
+        if (decrementError) {
+            console.error('Error al descontar inventario en orden aprobada:', decrementError);
+            throw new Error('Error al descontar inventario de la orden aprobada.');
+        }
+    }
 
     revalidatePath('/work-orders/' + workOrderId);
 }
@@ -302,17 +376,48 @@ export async function removeItemFromWorkOrder(formData: FormData) {
     const supabase = await createClient();
 
     const workOrderId = formData.get('workOrderId') as string;
-    const saleItemId = formData.get('saleItemId') as string; // Equivalente a service_id
+    const saleItemId = formData.get('saleItemId') as string;
 
     if (!workOrderId || !saleItemId) return;
 
+    // Verificar si la orden estaba aprobada y necesitamos devolver stock
+    const { data: orderData } = await supabase
+        .from('work_orders')
+        .select('status')
+        .eq('id', workOrderId)
+        .single();
+        
+    const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(orderData?.status);
+
+    const { data: saleItem } = await supabase
+        .from('sale_items')
+        .select('*')
+        .eq('id', saleItemId)
+        .single();
+
+    if (isApproved && saleItem && saleItem.item_type === 'inventory' && saleItem.inventory_item_id) {
+        // Devolver el stock
+        const { data: invItem } = await supabase
+            .from('inventory_items')
+            .select('quantity')
+            .eq('id', saleItem.inventory_item_id)
+            .single();
+            
+        if (invItem) {
+            await supabase
+                .from('inventory_items')
+                .update({ quantity: Number(invItem.quantity) + Number(saleItem.quantity) })
+                .eq('id', saleItem.inventory_item_id);
+        }
+    }
+
     const { error: deleteError } = await supabase
-        .from('work_order_services')
+        .from('sale_items')
         .delete()
         .eq('id', saleItemId);
         
     if (deleteError) {
-        console.error("Error deleting service item:", deleteError);
+        console.error("Error deleting sale item:", deleteError);
     }
 
     revalidatePath('/work-orders/' + workOrderId);
@@ -327,15 +432,37 @@ export async function sendQuoteWhatsApp(
     orderNumber?: string,
     technicianName?: string
 ) {
-    const result = await sendQuoteNotification(
-        customerPhone,
-        customerName,
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+
+    // Actualizar estado de la orden a diagnosticado y cotización a pendiente/enviada
+    const { error: updateError } = await supabase.from('work_orders').update({
+        status: 'diagnosis',
+        quote_status: 'pending'
+    }).eq('id', workOrderId).eq('organization_id', user.workshopId);
+
+    if (updateError) {
+        console.error('Error al actualizar work_orders en sendQuoteWhatsApp:', updateError);
+        return { success: false, error: 'DB Error: ' + updateError.message + ' / ' + updateError.details + ' / ' + updateError.hint };
+    }
+
+    let result = null;
+    
+    // Si no hay teléfono, usamos uno de prueba para poder ver la cotización simulada en consola
+    const phoneToUse = (customerPhone && customerPhone.trim() !== '') ? customerPhone : '3000000000';
+    
+    result = await sendQuoteNotification(
+        phoneToUse,
+        customerName || 'Cliente',
         workshopName,
         workOrderId,
         portalUrl,
         orderNumber,
         technicianName
     );
+
+    revalidatePath('/work-orders/' + workOrderId);
+    revalidatePath('/work-orders');
 
     return result;
 }
@@ -356,7 +483,56 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
     if (quoteStatus === 'Aprobada') dbStatus = 'approved';
     if (quoteStatus === 'Rechazada') dbStatus = 'cancelled';
 
+    // Manejo inteligente e innovador del inventario según aprobación/rechazo
+    const { data: woData } = await supabase.from('work_orders').select('status, customer_observations').eq('id', id).single();
+    const wasApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(woData?.status);
 
+    const { data: sale } = await supabase.from('sales').select('id').eq('work_order_id', id).maybeSingle();
+    let quoteItems: any[] = [];
+    if (sale) {
+        const { data: items } = await supabase.from('sale_items').select('*').eq('sale_id', sale.id);
+        quoteItems = items || [];
+    }
+
+    if (dbStatus === 'approved' && !wasApproved) {
+        // Si recién se aprueba, descontamos el stock reservado
+        for (const item of quoteItems) {
+            if (item.item_type === 'inventory' && item.inventory_item_id) {
+                await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+            }
+        }
+    }
+
+    if (dbStatus === 'cancelled') {
+        // Si se rechaza la cotización, ya que no se aprobó, los ítems no se usarán.
+        // Innovación: 
+        // 1. Devolver el inventario si la orden estaba aprobada (por error y la rechazan después)
+        // 2. Limpiamos los sale_items de la cotización para no facturarlos
+        // 3. Dejamos un log permanente de "Venta perdida" en observaciones para registro
+        
+        if (wasApproved) {
+            for (const item of quoteItems) {
+                if (item.item_type === 'inventory' && item.inventory_item_id) {
+                    const { data: invItem } = await supabase.from('inventory_items').select('quantity').eq('id', item.inventory_item_id).single();
+                    if (invItem) {
+                        await supabase.from('inventory_items').update({ quantity: Number(invItem.quantity) + Number(item.quantity) }).eq('id', item.inventory_item_id);
+                    }
+                }
+            }
+        }
+
+        if (sale && quoteItems.length > 0) {
+            // Borrar los items cotizados para dejar la orden limpia
+            await supabase.from('sale_items').delete().eq('sale_id', sale.id);
+            
+            // Dejar historial
+            const itemsList = quoteItems.map(i => `${i.quantity}x ${i.description}`).join(', ');
+            const rejectMsg = `\n[Cotización Rechazada] Ítems retirados de la orden: ${itemsList}.`;
+            const newObs = (woData?.customer_observations || '') + rejectMsg;
+            
+            await supabase.from('work_orders').update({ customer_observations: newObs }).eq('id', id);
+        }
+    }
 
     const { error } = await supabase
         .from('work_orders')

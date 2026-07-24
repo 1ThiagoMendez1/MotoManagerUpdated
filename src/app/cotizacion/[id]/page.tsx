@@ -21,36 +21,38 @@ export default async function QuotePage({
   const resolvedParams = await params
   const resolvedSearchParams = await searchParams
   const providedAuth = resolvedSearchParams.auth
-  const supabase = createAdminClient()
+  const supabase = await createAdminClient()
 
   // Fetch work order data bypassing RLS
   const { data: workOrder, error } = await supabase
     .from('work_orders')
     .select(`
       id,
-      work_order_number,
-      issue_description,
-      solution_description,
+      order_number,
+      reported_symptoms,
+      technical_diagnosis,
       quote_status,
       quote_responded_at,
-      deposit_amount,
+      customer_observations,
       status,
       created_at,
       motorcycles (
-        make,
+        brand,
         model,
-        plate,
-        clientes (
-          name
+        license_plate,
+        customers (
+          first_name,
+          last_name
         )
       ),
-      workshops (
+      organizations (
         name
       ),
-      tecnicos_activos (
-        name
+      mechanic:profiles!work_orders_assigned_mechanic_id_fkey (
+        first_name,
+        last_name
       ),
-      images:work_order_images (
+      images:work_order_evidences (
         id, image_url, description
       )
     `)
@@ -58,10 +60,20 @@ export default async function QuotePage({
     .single()
 
   if (error || !workOrder) {
+    console.error('QuotePage fetch error:', error);
     notFound()
   }
 
-  if (providedAuth !== String(workOrder.work_order_number)) {
+  let parsedDeposit = 0;
+  if (workOrder.customer_observations) {
+      const match = workOrder.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
+      if (match) {
+          parsedDeposit = parseFloat(match[1]);
+      }
+  }
+  (workOrder as any).deposit_amount = parsedDeposit;
+
+  if (providedAuth !== String(workOrder.order_number)) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 font-sans">
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] pointer-events-none mix-blend-overlay" />
@@ -78,7 +90,7 @@ export default async function QuotePage({
             <p className="text-slate-400 text-base mb-8 text-center leading-relaxed">
               Para proteger tu información, por favor ingresa el <strong className="text-slate-200">número de orden</strong> que recibiste por WhatsApp.
             </p>
-            {providedAuth && providedAuth !== String(workOrder.work_order_number) && (
+            {providedAuth && providedAuth !== String(workOrder.order_number) && (
               <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
                 Número de orden incorrecto. Intenta de nuevo.
               </div>
@@ -110,9 +122,12 @@ export default async function QuotePage({
       sale_items (
         id,
         quantity,
-        price,
+        unit_price,
         inventory_items (
           name
+        ),
+        service_catalog (
+          description
         )
       )
     `)
@@ -120,12 +135,18 @@ export default async function QuotePage({
     .maybeSingle()
 
   const mc = workOrder.motorcycles as any
-  const customer = mc?.clientes
-  const workshop = workOrder.workshops as any
-  const tech = workOrder.tecnicos_activos as any
+  const customer = mc?.customers ? { name: `${mc.customers.first_name || ''} ${mc.customers.last_name || ''}`.trim() } : null;
+  const workshop = workOrder.organizations as any
+  const tech = workOrder.mechanic ? { name: `${(workOrder.mechanic as any).first_name || ''} ${(workOrder.mechanic as any).last_name || ''}`.trim() } : null;
   
   const saleItems = saleData?.sale_items || []
-  const totalCost = saleData?.total || 0
+  
+  // Calcular el total dinámicamente para asegurar precisión, ya que total en la base de datos podría estar desincronizado
+  const calculatedTotalCost = saleItems.reduce((acc: number, item: any) => {
+    return acc + ((Number(item.unit_price) || 0) * (Number(item.quantity) || 0));
+  }, 0);
+  
+  const totalCost = calculatedTotalCost > 0 ? calculatedTotalCost : (saleData?.total || 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500/30">
@@ -189,12 +210,12 @@ export default async function QuotePage({
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Motocicleta</p>
-                  <p className="text-slate-200 font-medium">{mc.make} {mc.model}</p>
+                  <p className="text-slate-200 font-medium">{mc.brand} {mc.model}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1">Placa</p>
                   <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-800/80 border border-slate-700/50 text-slate-300 font-mono text-sm">
-                    {mc.plate}
+                    {mc.license_plate}
                   </div>
                 </div>
                 <div>
@@ -221,13 +242,13 @@ export default async function QuotePage({
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-2">Problema Reportado</p>
                 <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800/50 text-slate-300 text-sm leading-relaxed">
-                  {workOrder.issue_description || 'No especificado.'}
+                  {workOrder.reported_symptoms || 'No especificado.'}
                 </div>
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-2">Solución Propuesta</p>
                 <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800/50 text-slate-300 text-sm leading-relaxed">
-                  {workOrder.solution_description || 'El técnico aún no ha redactado una solución.'}
+                  {workOrder.technical_diagnosis || 'El técnico aún no ha redactado una solución.'}
                 </div>
               </div>
             </CardContent>
@@ -283,12 +304,14 @@ export default async function QuotePage({
                   {saleItems.map((item: any) => (
                     <div key={item.id} className="flex items-center justify-between p-5 hover:bg-slate-800/30 transition-colors">
                       <div className="flex-1">
-                        <p className="font-medium text-slate-200 mb-1">{item.inventory_items?.name}</p>
+                        <p className="font-medium text-slate-200 mb-1">
+                          {item.inventory_items?.name || item.service_catalog?.description || 'Item desconocido'}
+                        </p>
                         <p className="text-xs text-slate-500">Cantidad: {item.quantity}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-slate-200">${(item.price * item.quantity).toLocaleString('es-CO')}</p>
-                        <p className="text-xs text-slate-500">${item.price.toLocaleString('es-CO')} c/u</p>
+                        <p className="font-medium text-slate-200">${(item.unit_price * item.quantity).toLocaleString('es-CO')}</p>
+                        <p className="text-xs text-slate-500">${item.unit_price.toLocaleString('es-CO')} c/u</p>
                       </div>
                     </div>
                   ))}

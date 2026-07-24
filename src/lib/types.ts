@@ -51,6 +51,7 @@ export type WorkOrderImage = {
 
 export type WorkOrder = {
   id: string;
+  organizationId?: string;
   workOrderNumber: string;
   motorcycle: Motorcycle;
   technician: Technician | null;
@@ -63,7 +64,7 @@ export type WorkOrder = {
   reparadoDate?: string;
   entregadoDate?: string;
   completedDate?: string;
-  status: 'Ingreso a taller' | 'Diagnosticando' | 'Reparado' | 'Entregado';
+  status: 'Ingreso a revisión' | 'Diagnosticando' | 'Reparado' | 'Entregado';
   quoteStatus?: 'Pendiente' | 'Aprobada' | 'Rechazada';
   quote_status?: 'pending' | 'approved' | 'rejected' | null;
   quote_responded_at?: string | null;

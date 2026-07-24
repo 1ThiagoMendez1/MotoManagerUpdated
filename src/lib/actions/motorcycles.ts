@@ -9,6 +9,12 @@ const motorcycleSchema = z.object({
     model: z.string().min(1, "El modelo es requerido."),
     year: z.coerce.number().min(1900).max(new Date().getFullYear() + 1),
     plate: z.string().min(1, "La placa es requerida."),
+    vin: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()), z.string().optional()),
+    engineDisplacementCc: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : Number(val)), z.number().optional()),
+    color: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()), z.string().optional()),
+    currentMileage: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : Number(val)), z.number().optional()),
+    engineNumber: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()), z.string().optional()),
+    chassisNumber: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()), z.string().optional()),
     customerCedula: z.preprocess(
         (val) => (val === '' || val === null || val === undefined ? undefined : String(val).trim()),
         z.string().optional()
@@ -42,6 +48,12 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
         model: formData.get('model'),
         year: formData.get('year'),
         plate: formData.get('plate'),
+        vin: formData.get('vin'),
+        engineDisplacementCc: formData.get('engineDisplacementCc'),
+        color: formData.get('color'),
+        currentMileage: formData.get('currentMileage'),
+        engineNumber: formData.get('engineNumber'),
+        chassisNumber: formData.get('chassisNumber'),
         customerEmail: formData.get('customerEmail'),
         customerName: formData.get('customerName'),
         customerPhone: formData.get('customerPhone'),
@@ -55,7 +67,7 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
         return { errors: validatedFields.error.flatten().fieldErrors };
     }
 
-    const { make, model, year, plate, customerEmail, customerName, customerPhone, customerCedula, issueDescription } = validatedFields.data;
+    const { make, model, year, plate, vin, engineDisplacementCc, color, currentMileage, engineNumber, chassisNumber, customerEmail, customerName, customerPhone, customerCedula, issueDescription } = validatedFields.data;
 
     const { data: existingPlate } = await supabase
         .from('motorcycles')
@@ -133,6 +145,12 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
             model,
             model_year: year,
             license_plate: plate,
+            vin: vin || null,
+            engine_displacement_cc: engineDisplacementCc || null,
+            color: color || null,
+            current_mileage: currentMileage || null,
+            engine_number: engineNumber || null,
+            chassis_number: chassisNumber || null,
             notes: issueDescription
         });
 

@@ -20,12 +20,8 @@ export async function getCurrentUserServer() {
         .eq('user_id', user.id)
         .limit(1);
       
-      console.log(`[auth-server] getCurrentUserServer - user_id: ${user.id}, email: ${user.email}`);
-      
       if (orgError) {
         console.error("[auth-server] Error fetching organization_members:", orgError);
-      } else {
-        console.log(`[auth-server] organization_members results:`, _orgMembers);
       }
       const orgMember = _orgMembers?.[0] as any;
 
@@ -127,7 +123,6 @@ export async function getWorkshopDetails(knownUser?: any) {
     const org = _org as any;
     
     if (org) {
-      console.log(`[auth-server] getWorkshopDetails - Found org:`, org.slug);
       return {
         name: org.name,
         slug: org.slug,
@@ -158,8 +153,10 @@ export async function requireSuperAdmin() {
 }
 
 export async function createAdminClient() {
-  console.warn("createAdminClient used, returning standard createClient");
-  return createClient();
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
 
 export async function getScopedClient() {

@@ -166,6 +166,24 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         </Card>
       </div>
 
+      {/* Diagnóstico Inicial Section */}
+      <Card className="bg-card/40 border-border/50 backdrop-blur-md overflow-hidden shadow-lg mb-8 relative group transition-all duration-300 hover:border-border">
+        <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+        <CardHeader className="border-b border-border/50 bg-muted/20">
+          <CardTitle className="text-xl font-medium flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
+            Motivo de Ingreso / Diagnóstico Inicial
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 relative z-10">
+          <div className="p-4 bg-muted/50 rounded-xl border border-border/50 shadow-inner">
+            <p className="text-foreground whitespace-pre-wrap">
+              {workOrder.issueDescription || 'No se registró diagnóstico inicial o motivo de ingreso.'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Solución Section */}
       <Card className="bg-card/40 border-border/50 backdrop-blur-md overflow-hidden shadow-lg mb-8 relative group transition-all duration-300 hover:border-border">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
@@ -212,7 +230,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
       </Card>
 
       {/* Evidencias Section */}
-      <EvidenceManager workOrderId={workOrder.id} evidences={workOrder.images || []} />
+      <EvidenceManager workOrderId={workOrder.id} organizationId={(workOrder as any).organizationId} evidences={workOrder.images || []} />
 
       {/* Recordatorio Section */}
       <Card className="bg-card/40 border-border/50 backdrop-blur-md overflow-hidden shadow-lg mb-8 relative group transition-all duration-300 hover:border-border">
@@ -242,7 +260,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
             {!isCompleted ? (
               <div className="w-full md:w-auto min-w-[300px]">
-                <AddDepositForm workOrderId={workOrder.id} />
+                <AddDepositForm workOrderId={workOrder.id} currentDeposit={(workOrder as any).depositAmount ?? 0} />
               </div>
             ) : (
               <div className="flex items-center gap-2 text-green-700 dark:text-green-400/90 bg-green-500/10 px-5 py-3 rounded-xl border border-green-500/20">

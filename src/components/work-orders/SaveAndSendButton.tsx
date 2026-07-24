@@ -27,32 +27,44 @@ export function SaveAndSendButton({
   const [isSending, setIsSending] = useState(false)
 
   const handleSaveAndSend = async () => {
-    if (customerPhone) {
-      setIsSending(true)
-      
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://192.168.200.100:3000' 
-        : process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-        
-      const portalUrl = `${baseUrl}/cotizacion/${workOrderId}`
-      
-      try {
-        await sendQuoteWhatsApp(
-          workOrderId,
-          customerPhone,
-          customerName || 'Cliente',
-          workshopName || 'tu taller',
-          portalUrl,
-          orderNumber,
-          technicianName
-        )
-      } catch (error) {
-        console.error('Failed to send WhatsApp message:', error)
-      } finally {
-        setIsSending(false)
-      }
-    }
+    setIsSending(true)
     
+    const baseUrl = process.env.NODE_ENV === 'development' 
+      ? 'http://192.168.200.100:3000' 
+      : process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      
+    const portalUrl = `${baseUrl}/cotizacion/${workOrderId}`
+    
+    try {
+      const result = await sendQuoteWhatsApp(
+        workOrderId,
+        customerPhone || '',
+        customerName || 'Cliente',
+        workshopName || 'tu taller',
+        portalUrl,
+        orderNumber,
+        technicianName
+      )
+      
+      if (result && result.success === false) {
+          console.error('Action error:', result.error)
+          const errorMsg = typeof result.error === 'object' ? JSON.stringify(result.error) : result.error;
+          alert('Error: ' + errorMsg) // Or toast if toast is imported
+          setIsSending(false)
+          return // Stop redirect
+      }
+
+      if (result && result.mockMessage) {
+          alert('¡MOCK DE WHATSAPP!\n\nDestinatario: ' + result.mockTo + '\n\n' + result.mockMessage);
+      }
+    } catch (error) {
+      console.error('Failed to save and send:', error)
+      alert('Error inesperado: ' + (error as any).message)
+      setIsSending(false)
+      return // Stop redirect
+    } finally {
+      setIsSending(false)
+    }
     // Redirect back to work orders list
     router.push('/work-orders')
   }

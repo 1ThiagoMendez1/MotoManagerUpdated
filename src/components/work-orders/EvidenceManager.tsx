@@ -10,19 +10,15 @@ import { addWorkOrderEvidence, deleteWorkOrderEvidence } from '@/lib/actions/wor
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { WorkOrderImage } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
 
-export function EvidenceManager({ workOrderId, evidences }: { workOrderId: string, evidences: WorkOrderImage[] }) {
+export function EvidenceManager({ workOrderId, organizationId, evidences }: { workOrderId: string, organizationId?: string, evidences: WorkOrderImage[] }) {
     const [isUploading, setIsUploading] = useState(false)
     const [file, setFile] = useState<File | null>(null)
     const [preview, setPreview] = useState<string | null>(null)
     const [description, setDescription] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+    const supabase = createClient();
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -50,9 +46,11 @@ export function EvidenceManager({ workOrderId, evidences }: { workOrderId: strin
         const toastId = toast.loading('Subiendo evidencia...')
 
         try {
+            if (!organizationId) throw new Error('No se pudo determinar la organización')
+            
             // Upload to Supabase Storage
             const fileExt = file.name.split('.').pop()
-            const fileName = `${workOrderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+            const fileName = `${organizationId}/${workOrderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
             
             const { error: uploadError, data } = await supabase.storage
                 .from('evidences')

@@ -9,7 +9,8 @@ export async function GET(request: Request) {
   await supabase.auth.signOut()
 
   // Eliminar la cookie del device_id
-  cookies().delete('device_id')
+  const cookieStore = await cookies()
+  cookieStore.delete('device_id')
 
   // Redirigir al login con el mensaje de que la sesión expiró por otro inicio de sesión
   const requestUrl = new URL(request.url)

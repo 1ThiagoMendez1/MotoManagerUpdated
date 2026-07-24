@@ -8,7 +8,7 @@ import { revalidatePath } from 'next/cache'
 export async function submitQuoteResponse(workOrderId: string, response: 'approved' | 'rejected') {
   if (!workOrderId) return { success: false, message: 'ID de orden inválido.' }
 
-  const supabase = createAdminClient()
+  const supabase = await createAdminClient()
 
   // First, verify the order exists and is pending
   const { data: order, error: fetchError } = await supabase

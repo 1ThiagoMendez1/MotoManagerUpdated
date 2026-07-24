@@ -90,6 +90,12 @@ const formSchema = z.object({
   model: z.string().min(1, "El modelo es requerido."),
   year: z.coerce.number().min(1900).max(new Date().getFullYear() + 1),
   plate: z.string().min(1, "La placa es requerida."),
+  vin: z.string().optional(),
+  engineDisplacementCc: z.coerce.number().optional(),
+  color: z.string().optional(),
+  currentMileage: z.coerce.number().optional(),
+  engineNumber: z.string().optional(),
+  chassisNumber: z.string().optional(),
   issueDescription: z.string().min(10, "La descripción del problema debe tener al menos 10 caracteres."),
 });
 
@@ -117,6 +123,12 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
       model: '',
       year: new Date().getFullYear(),
       plate: '',
+      vin: '',
+      engineDisplacementCc: undefined,
+      color: '',
+      currentMileage: undefined,
+      engineNumber: '',
+      chassisNumber: '',
       issueDescription: '',
     },
   });
@@ -159,6 +171,12 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
       formData.append('model', values.model);
       formData.append('year', values.year.toString());
       formData.append('plate', values.plate);
+      if (values.vin) formData.append('vin', values.vin);
+      if (values.engineDisplacementCc) formData.append('engineDisplacementCc', values.engineDisplacementCc.toString());
+      if (values.color) formData.append('color', values.color);
+      if (values.currentMileage) formData.append('currentMileage', values.currentMileage.toString());
+      if (values.engineNumber) formData.append('engineNumber', values.engineNumber);
+      if (values.chassisNumber) formData.append('chassisNumber', values.chassisNumber);
       formData.append('issueDescription', values.issueDescription);
 
       console.log('Submitting form with values:', values);
@@ -399,6 +417,118 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                       <FormControl>
                         <Input
                           placeholder="p. ej., ABC-123"
+                          className="bg-card text-card-foreground border-border"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Color (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="p. ej., Rojo"
+                          className="bg-card text-card-foreground border-border"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="currentMileage"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Kilometraje Actual (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="p. ej., 15000"
+                          className="bg-card text-card-foreground border-border"
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="engineDisplacementCc"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Cilindraje CC (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="p. ej., 250"
+                          className="bg-card text-card-foreground border-border"
+                          {...field}
+                          value={field.value || ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="vin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">VIN (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Número de identificación"
+                          className="bg-card text-card-foreground border-border"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="engineNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Número de Motor (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Número de motor"
+                          className="bg-card text-card-foreground border-border"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="chassisNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-foreground">Número de Chasis (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Número de chasis"
                           className="bg-card text-card-foreground border-border"
                           {...field}
                         />

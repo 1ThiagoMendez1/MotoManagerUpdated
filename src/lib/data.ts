@@ -130,7 +130,7 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
     createdDate: wo.created_at,
     status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
             (wo.status === 'diagnosis' ? 'Diagnosticando' : 
-             (wo.status === 'received' ? 'Ingreso a taller' : 'Reparado')),
+             (wo.status === 'received' ? 'Ingreso a revisión' : 'Reparado')),
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status
   }));
@@ -142,7 +142,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   const user = await requireWorkshop();
   const supabase = await createClient();
   const { data: _wo } = await supabase.from('work_orders')
-    .select('*, motorcycles(*, customers(*)), work_order_evidences(*)')
+    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*)))')
     .eq('id', id)
     .eq('organization_id', user.workshopId)
     .single();
@@ -153,8 +153,17 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
 
   const technicians = await getTechnicians();
 
+  let parsedDeposit = 0;
+  if (wo.customer_observations) {
+      const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
+      if (match) {
+          parsedDeposit = parseFloat(match[1]);
+      }
+  }
+
   return {
     id: wo.id,
+    organizationId: user.workshopId,
     workOrderNumber: `WO-${wo.order_number}`,
     motorcycle: wo.motorcycles ? {
       id: wo.motorcycles.id,
@@ -177,25 +186,49 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     createdDate: wo.created_at,
     status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
             (wo.status === 'diagnosis' ? 'Diagnosticando' : 
-             (wo.status === 'received' ? 'Ingreso a taller' : 'Reparado')),
+             (wo.status === 'received' ? 'Ingreso a revisión' : 'Reparado')),
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status,
+    depositAmount: parsedDeposit,
     images: wo.work_order_evidences ? wo.work_order_evidences.map((e: any) => ({
         id: e.id,
         imageUrl: e.image_url,
         description: e.description,
         createdAt: e.created_at
+    })) : [],
+    sales: wo.sales ? wo.sales.map((s: any) => ({
+        id: s.id,
+        saleItems: s.sale_items ? s.sale_items.map((si: any) => ({
+            id: si.id,
+            quantity: si.quantity,
+            price: si.unit_price,
+            inventoryItem: si.inventory_items ? {
+                id: si.inventory_items.id,
+                name: si.inventory_items.name
+            } : { id: '', name: 'Desconocido' }
+        })) : []
     })) : []
   };
 };
 
-export const getSales = async (): Promise<{ items: Sale[], totalPages: number }> => {
+export const getSales = async (params: any = {}): Promise<{ items: Sale[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
-  const { data } = await supabase.from('sales')
+  
+  let query = supabase.from('sales')
     .select('*, customers(*), sale_items(*)')
     .eq('organization_id', user.workshopId)
-    .order('created_at', { ascending: false });
+    .neq('status', 'pending');
+    
+  if (params.type === 'direct') {
+    query = query.is('work_order_id', null);
+  } else if (params.type === 'service') {
+    query = query.not('work_order_id', 'is', null);
+  }
+  
+  const { data } = await query
+    .order('created_at', { ascending: false })
+    .limit(params.limit || 1000);
 
   if (!data) return { items: [], totalPages: 0 };
 

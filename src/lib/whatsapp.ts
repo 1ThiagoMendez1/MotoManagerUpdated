@@ -273,7 +273,7 @@ Saludos cordiales,
 ${workshopName || ''}
 
 🏍️ Equipo MotoManager`;
-
+    /* Comentado temporalmente para pruebas locales
     const response = await axios.post(
       `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
       {
@@ -288,9 +288,15 @@ ${workshopName || ''}
         }
       }
     );
+    */
 
-    console.log('✅ WhatsApp quote notification sent via Evolution API:', response.data);
-    return { success: true, data: response.data };
+    console.log('✅ [MOCK] WhatsApp quote notification sent:');
+    console.log('--------------------------------------------------');
+    console.log(`To: ${formattedPhone}`);
+    console.log(`Message:\n${message}`);
+    console.log('--------------------------------------------------');
+    
+    return { success: true, data: 'Mensaje simulado', mockMessage: message, mockTo: formattedPhone };
   } catch (error: any) {
     console.error('❌ Error sending WhatsApp quote notification via Evolution API:', error.response?.data || error.message);
     return { success: false, error: error.response?.data || error.message };
