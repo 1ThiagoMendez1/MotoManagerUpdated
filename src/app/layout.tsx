@@ -21,7 +21,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'MotoManager CRM Premium',
   description: 'CRM de Alta Gama para talleres de motocicletas',
-  icons: [{ rel: 'icon', url: '/favicon.ico' }],
+  icons: [{ rel: 'icon', url: '/favicon-rounded.png' }],
 };
 
 export const viewport = {

@@ -20,6 +20,7 @@ const serviceSaleSchema = z.object({
         inventoryItemId: z.string().min(1, "Selecciona un producto"),
         quantity: z.coerce.number().int().min(1, "Mínimo 1"),
         price: z.coerce.number(),
+        fromWorkOrder: z.boolean().optional(),
     })).optional(),
     discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
 });
@@ -140,31 +141,70 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const discountAmount = itemsTotal * ((data.discountPercentage || 0) / 100);
         const total = subtotal - discountAmount;
 
-        // 4. Create Sale Record
-        const { data: sale, error: saleError } = await supabase
+        // 4. Create or Update Sale Record
+        let sale;
+        const { data: existingSale } = await supabase
             .from('sales')
-            .insert({
-                organization_id: user.workshopId,
-                sale_number: saleNumber,
-                work_order_id: data.workOrderId,
-                payment_method: dbPaymentMethod,
-                created_at: data.date, // Mapeamos date a created_at
-                subtotal: subtotal,
-                discount_total: discountAmount,
-                total: total,
-                status: 'paid',
-                created_by: user.userId || null
-            })
-            .select()
-            .single();
+            .select('id')
+            .eq('work_order_id', data.workOrderId)
+            .eq('organization_id', user.workshopId)
+            .eq('status', 'pending')
+            .maybeSingle();
 
-        if (saleError) {
-            console.error('Error creating sale record:', saleError);
-            return { message: 'Error al crear el registro de venta: ' + saleError.message };
+        if (existingSale) {
+            const { data: updatedSale, error: saleError } = await supabase
+                .from('sales')
+                .update({
+                    sale_number: saleNumber,
+                    payment_method: dbPaymentMethod,
+                    created_at: data.date,
+                    subtotal: subtotal,
+                    discount_total: discountAmount,
+                    total: total,
+                    status: 'paid',
+                    created_by: user.userId || null
+                })
+                .eq('id', existingSale.id)
+                .select()
+                .single();
+                
+            if (saleError) {
+                console.error('Error updating sale record:', saleError);
+                return { message: 'Error al actualizar el registro de venta: ' + saleError.message };
+            }
+            sale = updatedSale;
+        } else {
+            const { data: newSale, error: saleError } = await supabase
+                .from('sales')
+                .insert({
+                    organization_id: user.workshopId,
+                    sale_number: saleNumber,
+                    work_order_id: data.workOrderId,
+                    payment_method: dbPaymentMethod,
+                    created_at: data.date,
+                    subtotal: subtotal,
+                    discount_total: discountAmount,
+                    total: total,
+                    status: 'paid',
+                    created_by: user.userId || null
+                })
+                .select()
+                .single();
+
+            if (saleError) {
+                console.error('Error creating sale record:', saleError);
+                return { message: 'Error al crear el registro de venta: ' + saleError.message };
+            }
+            sale = newSale;
         }
 
         // 5. Create Sale Items & Update Inventory
         for (const item of data.items || []) {
+            if (item.fromWorkOrder) {
+                // El item ya fue insertado en sale_items y ya se le descontó el stock cuando se agregó a la orden.
+                continue;
+            }
+
             const { error: itemError } = await supabase
                 .from('sale_items')
                 .insert({
