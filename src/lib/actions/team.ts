@@ -97,7 +97,7 @@ export async function inviteUser(data: {
       tempPassword
     );
 
-    return { success: true, result };
+    return { success: true, result, tempPassword, loginUrl, email: data.email };
   } catch (error: any) {
     console.error('Error in inviteUser action:', error);
     return { success: false, error: error.message };

@@ -9,7 +9,11 @@ import {
   Shield, 
   MoreVertical,
   CheckCircle2,
-  Settings
+  Settings,
+  Copy,
+  Check,
+  KeyRound,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,6 +89,8 @@ export default function TeamPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [successCredentials, setSuccessCredentials] = useState<{ email: string, password: string, loginUrl: string } | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   React.useEffect(() => {
     const supabase = new Proxy({}, {
@@ -193,6 +199,13 @@ export default function TeamPage() {
         
         setIsInviteOpen(false);
         setFormData({ name: '', email: '', phone: '', role: 'mechanic' });
+        
+        // Show success alert with credentials
+        setSuccessCredentials({
+          email: response.email || formData.email,
+          password: response.tempPassword || '',
+          loginUrl: response.loginUrl || window.location.origin + '/login'
+        });
       } else {
         throw new Error(response.error);
       }
@@ -214,9 +227,7 @@ export default function TeamPage() {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.push('/')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Usuarios y Permisos</h1>
               <p className="text-muted-foreground">Gestiona quién tiene acceso a tu taller.</p>
@@ -298,6 +309,100 @@ export default function TeamPage() {
                   </Button>
                 </DialogFooter>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Premium Success Alert Dialog */}
+          <Dialog open={!!successCredentials} onOpenChange={(open) => !open && setSuccessCredentials(null)}>
+            <DialogContent className="sm:max-w-[500px] border-none bg-gradient-to-br from-zinc-900 to-zinc-950 text-white shadow-2xl p-0 overflow-hidden">
+              <div className="absolute inset-0 bg-primary/10 pointer-events-none" />
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 blur-3xl rounded-full" />
+              <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-blue-500/20 blur-3xl rounded-full" />
+              
+              <div className="p-8 relative z-10 flex flex-col items-center text-center space-y-6">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-primary to-blue-600 flex items-center justify-center shadow-lg shadow-primary/30 mb-2">
+                  <KeyRound className="h-8 w-8 text-white" />
+                </div>
+                
+                <div className="space-y-2">
+                  <DialogTitle className="text-2xl font-bold tracking-tight text-white">¡Usuario Creado con Éxito!</DialogTitle>
+                  <DialogDescription className="text-zinc-400 text-base">
+                    Las credenciales han sido enviadas por WhatsApp, pero también puedes copiarlas aquí para entregarlas manualmente.
+                  </DialogDescription>
+                </div>
+
+                {successCredentials && (
+                  <div className="w-full bg-black/40 border border-white/10 rounded-xl p-5 space-y-4 backdrop-blur-md">
+                    <div className="space-y-1 text-left">
+                      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Usuario / Email</p>
+                      <p className="font-mono text-zinc-200">{successCredentials.email}</p>
+                    </div>
+                    
+                    <div className="space-y-2 text-left">
+                      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Contraseña Temporal</p>
+                      <div className="flex items-center justify-between gap-3 bg-black/60 rounded-lg p-3 border border-white/5 group relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <code className="text-2xl font-bold tracking-widest text-primary relative z-10 font-mono">
+                          {successCredentials.password}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="relative z-10 h-9 bg-white/10 hover:bg-white/20 text-white border-none transition-all"
+                          onClick={(e) => {
+                            const textToCopy = successCredentials.password;
+                            
+                            const fallbackCopy = () => {
+                              const textArea = document.createElement("textarea");
+                              textArea.value = textToCopy;
+                              textArea.style.position = "fixed";
+                              textArea.style.opacity = "0";
+                              
+                              // Añadirlo dentro del contenedor actual para evitar problemas con el Focus Trap del Dialog modal
+                              e.currentTarget.appendChild(textArea);
+                              
+                              textArea.focus();
+                              textArea.select();
+                              
+                              try {
+                                document.execCommand('copy');
+                              } catch (err) {
+                                console.error("Error al copiar: ", err);
+                              }
+                              
+                              e.currentTarget.removeChild(textArea);
+                            };
+
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                              navigator.clipboard.writeText(textToCopy).catch(() => fallbackCopy());
+                            } else {
+                              fallbackCopy();
+                            }
+                            
+                            setIsCopied(true);
+                            toast({ title: "Código copiado", description: "La contraseña temporal ha sido copiada." });
+                            setTimeout(() => setIsCopied(false), 2000);
+                          }}
+                        >
+                          {isCopied ? (
+                            <><Check className="h-4 w-4 mr-2 text-emerald-400" /> Copiado</>
+                          ) : (
+                            <><Copy className="h-4 w-4 mr-2" /> Copiar</>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <Button 
+                  className="w-full h-12 text-md font-semibold bg-white text-black hover:bg-zinc-200 transition-colors mt-4" 
+                  onClick={() => setSuccessCredentials(null)}
+                >
+                  Entendido, cerrar ventana
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>

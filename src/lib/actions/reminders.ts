@@ -21,7 +21,7 @@ export async function getPendingReminders() {
       due_date,
       status,
       customers (first_name, last_name, phone),
-      motorcycles (make, model, plate)
+      motorcycles (brand, model, license_plate)
     `)
     .eq('organization_id', workshopId)
     .eq('status', 'pending')
