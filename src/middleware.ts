@@ -54,6 +54,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Proteger la ruta de admin solo para juanurian31@gmail.com
+  if (user && request.nextUrl.pathname.startsWith('/admin') && user.email?.toLowerCase() !== 'juanurian31@gmail.com') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
   // Redirigir de login a dashboard si ya está autenticado
   if (user && request.nextUrl.pathname === '/login') {
      const url = request.nextUrl.clone()

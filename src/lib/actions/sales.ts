@@ -66,26 +66,29 @@ function splitName(fullName: string) {
 }
 
 async function generateSaleNumber(supabase: any, organizationId: string, prefix: 'V' | 'VS') {
-    // Buscar la última venta para generar el correlativo
-    const { data: lastSale } = await supabase
+    // Obtener todas las ventas con este prefijo para encontrar el número máximo real.
+    // Ordernar por created_at falla si una orden antigua se completa después de una nueva.
+    const { data: sales } = await supabase
         .from('sales')
         .select('sale_number')
         .eq('organization_id', organizationId)
         .ilike('sale_number', `${prefix}%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(10000);
 
-    let nextNumber = 1;
-    if (lastSale && lastSale.sale_number) {
-        const lastNumStr = lastSale.sale_number.replace(prefix, '');
-        const lastNum = parseInt(lastNumStr);
-        if (!isNaN(lastNum)) {
-            nextNumber = lastNum + 1;
+    let maxNumber = 0;
+    if (sales && sales.length > 0) {
+        for (const sale of sales) {
+            if (sale.sale_number) {
+                const numStr = sale.sale_number.replace(prefix, '');
+                const num = parseInt(numStr);
+                if (!isNaN(num) && num > maxNumber) {
+                    maxNumber = num;
+                }
+            }
         }
     }
 
-    return `${prefix}${nextNumber}`;
+    return `${prefix}${maxNumber + 1}`;
 }
 
 // --- Actions ---
@@ -115,15 +118,22 @@ export async function createServiceSale(prevState: any, formData: FormData) {
 
         if (!validatedFields.success) {
             console.error('Validation failed:', validatedFields.error.flatten());
-            return { errors: validatedFields.error.flatten().fieldErrors };
+            const firstError = Object.values(validatedFields.error.flatten().fieldErrors).flat()[0] || 'Error de validación.';
+            return { 
+                success: false, 
+                message: `Error de validación: ${firstError}`, 
+                errors: validatedFields.error.flatten().fieldErrors 
+            };
         }
 
         const data = validatedFields.data;
         const dbPaymentMethod = mapPaymentMethodToDb(data.paymentMethod);
         const saleNumber = await generateSaleNumber(supabase, user.workshopId, 'VS');
 
-        // 2. Check Inventory
+        // 2. Check Inventory (skip items already deducted from approved quote)
         for (const item of data.items || []) {
+            if (item.fromWorkOrder) continue;
+
             const { data: invItem } = await supabase
                 .from('inventory_items')
                 .select('quantity, name')
@@ -243,28 +253,46 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         }
 
         // 6. Update Work Order Status
-        const { data: workOrder } = await supabase
+        const { data: workOrder, error: workOrderError } = await supabase
             .from('work_orders')
             .update({
                 status: 'delivered',
+                quote_status: 'approved',
                 completed_at: new Date().toISOString()
             })
             .eq('id', data.workOrderId)
+            .eq('organization_id', user.workshopId)
             .select(`
-                *,
-                motorcycle:motorcycles (
-                    brand, model, license_plate,
-                    customer:customers (first_name, last_name, phone)
+                motorcycle_id, 
+                order_number,
+                customer_observations,
+                motorcycles (
+                    customer_id,
+                    brand,
+                    model,
+                    license_plate,
+                    customers (
+                        first_name,
+                        last_name,
+                        phone
+                    )
                 ),
-                technician:profiles!assigned_mechanic_id (first_name, last_name)
+                profiles!work_orders_assigned_mechanic_id_fkey (
+                    first_name,
+                    last_name
+                )
             `)
             .single();
 
+        if (workOrderError) {
+            console.error('Error updating work order status:', workOrderError);
+        }
+
         // 7. Send Notification
         if (workOrder) {
-            const mc = Array.isArray(workOrder.motorcycle) ? workOrder.motorcycle[0] : workOrder.motorcycle;
-            const customer = mc?.customer;
-            const tech = Array.isArray(workOrder.technician) ? workOrder.technician[0] : workOrder.technician;
+            const mc = Array.isArray(workOrder.motorcycles) ? workOrder.motorcycles[0] : workOrder.motorcycles;
+            const customer = mc?.customers;
+            const tech = Array.isArray(workOrder.profiles) ? workOrder.profiles[0] : workOrder.profiles;
             
             if (customer?.phone) {
                 try {
@@ -295,43 +323,51 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         revalidatePath('/work-orders');
         revalidatePath('/', 'layout');
 
-        // Retornar objeto mapeado para el UI de recibos
-        const { data: fullSale } = await supabase
-            .from('sales')
-            .select(`
-                *,
-                sale_items (
-                    *,
-                    inventory_item:inventory_items (name, code)
-                ),
-                work_order:work_orders (
-                    *,
-                    motorcycle:motorcycles (
-                        brand, model, model_year, license_plate,
-                        customer:customers (first_name, last_name)
-                    ),
-                    technician:profiles!assigned_mechanic_id (first_name, last_name)
-                )
-            `)
-            .eq('id', sale.id)
-            .single();
+        // Obtener los items de la venta de forma segura
+        const { data: saleItems } = await supabase
+            .from('sale_items')
+            .select('*, inventory_items (name, code)')
+            .eq('sale_id', sale.id);
 
-        if (!fullSale) return { success: true };
+        const wo = workOrder;
+        const fomattedMotorcycle = wo?.motorcycles ? (Array.isArray(wo.motorcycles) ? wo.motorcycles[0] : wo.motorcycles) : undefined;
+        const formattedCustomer = fomattedMotorcycle?.customers ? (Array.isArray(fomattedMotorcycle.customers) ? fomattedMotorcycle.customers[0] : fomattedMotorcycle.customers) : undefined;
+        const formattedTech = wo?.profiles ? (Array.isArray(wo.profiles) ? wo.profiles[0] : wo.profiles) : undefined;
 
-        const wo = Array.isArray(fullSale.work_order) ? fullSale.work_order[0] : fullSale.work_order;
-        const fomattedMotorcycle = wo?.motorcycle;
-        const formattedCustomer = fomattedMotorcycle?.customer;
-        const formattedTech = wo?.technician;
+        // Parse deposit amount from work order customer_observations
+        let parsedDeposit = 0;
+        if (wo?.customer_observations) {
+            const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
+            if (match) {
+                parsedDeposit = parseFloat(match[1]);
+            }
+        }
+
+        const formattedItems = saleItems ? saleItems.filter((i:any) => i.item_type === 'inventory').map((item: any) => ({
+            name: item.inventory_items?.name || item.description || 'Producto',
+            sku: item.inventory_items?.code || '-',
+            quantity: item.quantity,
+            price: item.unit_price,
+            total: item.total || (item.quantity * item.unit_price),
+        })) : (data.items || []).map((item: any) => ({
+            name: item.name || 'Producto',
+            sku: item.sku || '-',
+            quantity: item.quantity,
+            price: item.price,
+            total: item.total || (item.quantity * item.price)
+        }));
 
         const formattedSale = {
-            id: fullSale.id,
-            saleNumber: fullSale.sale_number,
-            date: fullSale.created_at,
+            id: sale.id,
+            saleNumber: saleNumber,
+            date: new Date().toISOString(),
             subtotal: subtotal,
             discountPercentage: data.discountPercentage,
             discountAmount: discountAmount,
-            total: fullSale.total,
-            paymentMethod: mapPaymentMethodToUi(fullSale.payment_method),
+            depositAmount: parsedDeposit,
+            remainingBalance: parsedDeposit > 0 ? Math.max(0, total - parsedDeposit) : undefined,
+            total: total,
+            paymentMethod: mapPaymentMethodToUi(dbPaymentMethod),
             workOrderId: wo?.order_number,
             customerName: formattedCustomer ? `${formattedCustomer.first_name} ${formattedCustomer.last_name}`.trim() : undefined,
             motorcycleInfo: fomattedMotorcycle ? {
@@ -342,17 +378,10 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             } : undefined,
             technicianName: formattedTech ? `${formattedTech.first_name} ${formattedTech.last_name}` : undefined,
             laborCost: data.laborCost > 0 ? data.laborCost : undefined,
-            items: fullSale.sale_items?.filter((i:any) => i.item_type === 'inventory').map((item: any) => ({
-                name: item.inventory_item?.name || 'Producto',
-                sku: item.inventory_item?.code,
-                quantity: item.quantity,
-                price: item.unit_price,
-                total: item.total,
-            })) || []
+            items: formattedItems
         };
 
         return { success: true, sale: formattedSale };
-
     } catch (error: any) {
         console.error('Error creating service sale:', error);
         return { message: 'Error al crear la venta de servicio: ' + (error.message || error) };
@@ -363,6 +392,10 @@ export async function createDirectSale(prevState: any, formData: FormData) {
     console.log('createDirectSale started');
     const user = await requireWorkshop();
     const supabase = await createClient();
+
+    // Fetch workshop name for receipt
+    const { data: orgData } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
+    const workshopName = orgData?.name || 'MotoManager';
 
     try {
         const itemsRaw = formData.get('items') as string;
@@ -393,6 +426,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         let finalCustomerName = data.customerName;
 
         if (!finalCustomerId && data.cedula && data.customerName) {
+            // Customer with cedula: look up or create
             const { data: existing } = await supabase
                 .from('customers')
                 .select('id, phone, first_name, last_name')
@@ -420,6 +454,24 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                     .single();
 
                 if (createError) return { message: 'Error al crear el cliente: ' + createError.message };
+                finalCustomerId = newCustomer.id;
+            }
+        } else if (!finalCustomerId && !data.cedula && data.customerName) {
+            // Customer with name only (no cedula): create minimal record to preserve the name
+            const { firstName, lastName } = splitName(data.customerName);
+            const { data: newCustomer, error: createError } = await supabase
+                .from('customers')
+                .insert({
+                    organization_id: user.workshopId,
+                    first_name: firstName,
+                    last_name: lastName,
+                    phone: data.phone || null,
+                    created_by: user.userId || null
+                })
+                .select('id')
+                .single();
+
+            if (!createError && newCustomer) {
                 finalCustomerId = newCustomer.id;
             }
         }
@@ -511,20 +563,37 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         revalidatePath('/', 'layout');
 
         // Return formatted sale
-        const { data: fullSale } = await supabase
+        const { data: fullSale, error: fullSaleError } = await supabase
             .from('sales')
             .select(`
                 *,
                 sale_items (
                     *,
-                    inventory_item:inventory_items (name, code)
+                    inventory_items (name, code)
                 ),
-                customer:customers (first_name, last_name)
+                customers (first_name, last_name)
             `)
             .eq('id', sale.id)
             .single();
 
-        const customer = Array.isArray(fullSale.customer) ? fullSale.customer[0] : fullSale.customer;
+        if (fullSaleError || !fullSale) {
+            console.error('Error fetching full direct sale for receipt:', fullSaleError);
+            return { success: true, sale: {
+                id: sale.id,
+                saleNumber: sale.sale_number,
+                date: sale.created_at,
+                subtotal: subtotal,
+                discountPercentage: data.discountPercentage,
+                discountAmount: discountAmount,
+                total: sale.total,
+                paymentMethod: mapPaymentMethodToUi(sale.payment_method),
+                customerName: finalCustomerName || 'Cliente de Mostrador',
+                workshopName: workshopName,
+                items: data.items || []
+            }};
+        }
+
+        const customer = Array.isArray(fullSale.customers) ? fullSale.customers[0] : fullSale.customers;
 
         const formattedSale = {
             id: fullSale.id,
@@ -536,9 +605,10 @@ export async function createDirectSale(prevState: any, formData: FormData) {
             total: fullSale.total,
             paymentMethod: mapPaymentMethodToUi(fullSale.payment_method),
             customerName: customer ? `${customer.first_name} ${customer.last_name}`.trim() : 'Cliente de Mostrador',
+            workshopName: workshopName,
             items: fullSale.sale_items?.map((item: any) => ({
-                name: item.inventory_item?.name || 'Producto',
-                sku: item.inventory_item?.code,
+                name: item.inventory_items?.name || item.description || 'Producto',
+                sku: item.inventory_items?.code,
                 quantity: item.quantity,
                 price: item.unit_price,
                 total: item.total,

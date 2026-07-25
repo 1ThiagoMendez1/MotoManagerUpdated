@@ -68,6 +68,8 @@ export type WorkOrder = {
   quoteStatus?: 'Pendiente' | 'Aprobada' | 'Rechazada';
   quote_status?: 'pending' | 'approved' | 'rejected' | null;
   quote_responded_at?: string | null;
+  customerObservations?: string | null;
+  quote_responded_at?: string | null;
   sales?: any[];
   images?: WorkOrderImage[];
 };
@@ -93,6 +95,7 @@ export type Sale = {
   date: string;
   total: number;
   paymentMethod?: string;
+  depositAmount?: number;
 };
 
 export type Reminder = {

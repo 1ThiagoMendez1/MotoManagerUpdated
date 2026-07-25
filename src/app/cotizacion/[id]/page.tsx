@@ -60,8 +60,14 @@ export default async function QuotePage({
     .single()
 
   if (error || !workOrder) {
-    console.error('QuotePage fetch error:', error);
-    notFound()
+    return (
+      <div style={{ padding: 20, color: 'white', backgroundColor: 'black' }}>
+        <h1>Error loading QuotePage</h1>
+        <p><strong>ID Queried:</strong> {resolvedParams.id}</p>
+        <p><strong>Error:</strong> {JSON.stringify(error, null, 2)}</p>
+        <p><strong>workOrder:</strong> {JSON.stringify(workOrder, null, 2)}</p>
+      </div>
+    );
   }
 
   let parsedDeposit = 0;
@@ -355,22 +361,30 @@ export default async function QuotePage({
 
           {/* Actions */}
           {(workOrder.quote_status === 'pending' || workOrder.quote_status === null) && (
-            <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <form action={submitQuoteResponse.bind(null, workOrder.id, 'rejected')}>
-                <Button 
-                  type="submit" 
-                  variant="outline" 
-                  className="w-full py-6 text-lg bg-transparent border-slate-700 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all rounded-xl"
-                >
-                  Rechazar Cotización
-                </Button>
-              </form>
+            <div className="pt-6 space-y-4">
               <form action={submitQuoteResponse.bind(null, workOrder.id, 'approved')}>
                 <Button 
                   type="submit"
-                  className="w-full py-6 text-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all rounded-xl border border-emerald-500/50"
+                  className="w-full py-6 text-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all rounded-xl border border-emerald-500/50"
                 >
                   Aprobar Cotización
+                </Button>
+              </form>
+              
+              <form action={submitQuoteResponse.bind(null, workOrder.id, 'rejected')} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/50 flex flex-col gap-3">
+                <p className="text-sm text-slate-400 text-center">¿Deseas rechazar la oferta?</p>
+                <input 
+                  type="text" 
+                  name="rejectionReason"
+                  placeholder="Motivo del rechazo (opcional)..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-300 text-sm placeholder:text-slate-600 focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+                <Button 
+                  type="submit" 
+                  variant="outline" 
+                  className="w-full py-5 bg-transparent border-slate-700 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all rounded-lg"
+                >
+                  Rechazar Cotización
                 </Button>
               </form>
             </div>

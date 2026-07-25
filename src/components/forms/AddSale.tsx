@@ -41,6 +41,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { createServiceSale } from '@/lib/actions/sales';
 import { ReceiptDialog } from '@/components/ui/receipt-dialog';
+import { useRouter } from 'next/navigation';
 
 const saleItemSchema = z.object({
   inventoryItemId: z.string().min(1, "Selecciona un producto"),
@@ -74,7 +75,9 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [plateSearch, setPlateSearch] = useState('');
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,36 +105,44 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   // Cargar automáticamente los ítems ya usados en la orden de trabajo seleccionada
   useEffect(() => {
     async function loadWorkOrderItems(workOrderId: string) {
+      setIsLoadingItems(true);
       try {
         const res = await fetch(`/api/work-orders/${workOrderId}/items`);
         if (!res.ok) {
           console.error('Error fetching work order items for service sale:', await res.text());
+          form.setValue('items', [], { shouldValidate: true });
           return;
         }
         const data = await res.json();
         if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+          form.setValue('items', [], { shouldValidate: true });
           return;
         }
 
         const mappedItems = data.items.map((item: any) => ({
           inventoryItemId: item.inventoryItemId,
+          name: item.name,
           sku: item.sku,
           quantity: item.quantity,
           price: item.price,
+          total: item.total,
           fromWorkOrder: true,
         }));
 
         form.setValue('items', mappedItems, { shouldValidate: true });
       } catch (error) {
         console.error('Unexpected error loading work order items for service sale:', error);
+      } finally {
+        setIsLoadingItems(false);
       }
     }
 
-    // Solo cargar si hay una orden seleccionada y aún no hay ítems en el formulario
-    if (watchWorkOrderId && (!watchItems || watchItems.length === 0)) {
+    if (watchWorkOrderId) {
       loadWorkOrderItems(watchWorkOrderId);
+    } else {
+      form.setValue('items', [], { shouldValidate: true });
     }
-  }, [watchWorkOrderId, form, watchItems]);
+  }, [watchWorkOrderId, form]);
 
   const itemsTotal = watchItems?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
   const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
@@ -212,6 +223,8 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
       });
       setIsOpen(false);
       form.reset();
+      setPlateSearch('');
+      router.refresh();
 
       // Show receipt dialog
       setReceiptData(result.sale);
@@ -348,10 +361,18 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                 {/* Items */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <span className="w-6 h-px bg-border"></span>
-                      Repuestos y Productos
-                    </h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <span className="w-6 h-px bg-border"></span>
+                        Repuestos y Productos
+                      </h3>
+                      {isLoadingItems && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span className="text-xs">Cargando...</span>
+                        </div>
+                      )}
+                    </div>
                     <Button
                       type="button"
                       variant="outline"

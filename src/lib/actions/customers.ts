@@ -240,3 +240,31 @@ export async function getCustomerByCedula(cedula: string) {
         cedula: data.document_number
     };
 }
+
+export async function getCustomerByName(name: string) {
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+
+    // Remove extra spaces and split to try matching first_name and last_name
+    const parts = name.trim().split(' ');
+    const searchFirst = parts[0];
+    const searchLast = parts.length > 1 ? parts.slice(1).join(' ') : searchFirst;
+
+    const { data } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, email, phone, document_number')
+        .eq('organization_id', user.workshopId)
+        .or(`first_name.ilike.%${searchFirst}%,last_name.ilike.%${searchLast}%`)
+        .limit(1)
+        .maybeSingle();
+
+    if (!data) return null;
+
+    return {
+        id: data.id,
+        name: `${data.first_name} ${data.last_name}`.trim(),
+        email: data.email,
+        phone: data.phone,
+        cedula: data.document_number
+    };
+}

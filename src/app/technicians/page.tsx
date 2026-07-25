@@ -35,7 +35,15 @@ export default async function TechniciansPage() {
 
   try {
     technicians = await getTechnicians();
-    console.log('Technicians page loaded technicians:', technicians);
+    const { getWorkOrders } = await import('@/lib/data');
+    const { items: workOrders } = await getWorkOrders();
+    
+    technicians = technicians.map(tech => ({
+      ...tech,
+      workOrders: workOrders.filter(wo => wo.technician?.id === tech.id)
+    }));
+    
+    console.log('Technicians page loaded technicians:', technicians.length);
   } catch (err) {
     console.error('Error fetching technicians:', err);
     error = 'Error al cargar los técnicos';

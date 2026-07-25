@@ -157,9 +157,7 @@ export default function DashboardPage() {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={() => router.push('/')} className="print:hidden">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard General</h1>
               <p className="text-muted-foreground">Resumen financiero y operativo del taller.</p>
@@ -380,8 +378,8 @@ export default function DashboardPage() {
                       return (
                         <div key={rem.id || i} className="flex items-center justify-between border-b border-border/50 pb-4 last:border-0 last:pb-0">
                           <div className="space-y-1">
-                            <p className="text-sm font-medium leading-none text-foreground">{rem.customers?.name}</p>
-                            <p className="text-xs text-muted-foreground">{rem.motorcycles?.make} {rem.motorcycles?.model} - {rem.service_type}</p>
+                            <p className="text-sm font-medium leading-none text-foreground">{rem.customers ? `${rem.customers.first_name} ${rem.customers.last_name}` : 'Cliente'}</p>
+                            <p className="text-xs text-muted-foreground">{rem.motorcycles?.brand} {rem.motorcycles?.model} - {rem.service_type}</p>
                           </div>
                           <div className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-full">
                             {date}

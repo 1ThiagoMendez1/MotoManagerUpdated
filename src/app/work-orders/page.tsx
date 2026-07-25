@@ -50,7 +50,7 @@ export default async function WorkOrdersPage({
   const workOrders = workOrdersData.items;
   const totalPages = workOrdersData.totalPages;
   const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
-  const completedWorkOrders = workOrders.filter((wo) => wo.status === 'Entregado');
+  const completedWorkOrders = workOrders.filter((wo) => wo.status === 'Entregado' && wo.quoteStatus === 'Aprobada');
 
   const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
     (moto) => !activeWorkOrders.some((wo) => wo.motorcycle.id === moto.id)

@@ -6,6 +6,7 @@ export interface ReceiptData {
   date: string;
   customerName?: string;
   paymentMethod?: string;
+  workshopName?: string;
   items: Array<{
     name: string;
     sku?: string;
@@ -121,7 +122,7 @@ function generateReceiptHTML(data: ReceiptData): string {
     ">
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">
-        <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #333;">MotoManager</h1>
+        <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #333;">${data.workshopName || 'MotoManager'}</h1>
         <p style="margin: 5px 0; font-size: 14px; color: #666;">Taller de Motocicletas</p>
         <p style="margin: 5px 0; font-size: 12px; color: #666;">Comprobante de Pago</p>
       </div>
@@ -260,17 +261,17 @@ function generateReceiptHTML(data: ReceiptData): string {
         <p style="font-weight: bold; margin-bottom: 10px; font-size: 11px;">Gracias por su preferencia</p>
 
         <div style="text-align: left; max-width: 350px; margin: 0 auto 15px auto; line-height: 1.3;">
-          <p style="margin-bottom: 3px;"><strong>Este documento es un comprobante interno de venta generado por el sistema MotoManager para control administrativo del taller.</strong></p>
+          <p style="margin-bottom: 3px;"><strong>Este documento es un comprobante interno de venta generado por el sistema ${data.workshopName || 'MotoManager'} para control administrativo del taller.</strong></p>
           <p style="margin-bottom: 3px;">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
           <p style="margin-bottom: 3px;">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
           <p style="margin-bottom: 3px;">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
-          <p style="margin-bottom: 3px; font-style: italic;">"Documento generado automáticamente por MotoManager — Sin validez tributaria."</p>
+          <p style="margin-bottom: 3px; font-style: italic;">"Documento generado automáticamente por ${data.workshopName || 'MotoManager'} — Sin validez tributaria."</p>
         </div>
 
         <div style="border-top: 1px solid #666; padding-top: 8px; margin-top: 10px;">
-          <p style="font-weight: bold; font-size: 10px; margin-bottom: 2px;">MotoManager - Sistema de Gestión para Talleres</p>
-          <p style="font-size: 8px;">Created by - DevS&STech S.A.S</p>
-          <p style="font-size: 8px;">www.devsystech.com.co</p>
+          <p style="font-weight: bold; font-size: 10px; margin-bottom: 2px;">MotoManager - CRM</p>
+          <p style="font-size: 8px;">Created by - Mivra S.A.S</p>
+          <p style="font-size: 8px;">www.mivra.com.co</p>
           <p style="font-size: 8px; font-style: italic; margin-top: 3px;">MotoManager — Sin validez tributaria.</p>
         </div>
       </div>

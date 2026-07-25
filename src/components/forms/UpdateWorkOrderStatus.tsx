@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Loader2, CheckCircle } from 'lucide-react';
@@ -42,8 +42,27 @@ interface UpdateWorkOrderStatusProps {
 export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>(workOrder.status);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // @ts-ignore
   const [state, formAction] = useActionState(updateWorkOrderStatus, undefined);
+
+  // Reset selected status whenever the dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedStatus(workOrder.status);
+      setErrorMsg(null);
+    }
+  }, [isOpen, workOrder.status]);
+
+  // React to action result
+  useEffect(() => {
+    if (state?.success) {
+      setIsOpen(false);
+      setErrorMsg(null);
+    } else if (state?.message) {
+      setErrorMsg(state.message);
+    }
+  }, [state]);
 
   const statusOptions = [
     { value: 'Diagnosticando', label: 'Diagnosticando' },
@@ -51,6 +70,11 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
   ];
 
   const handleSubmit = (formData: FormData) => {
+    if (selectedStatus === workOrder.status) {
+      setErrorMsg('Seleccioná un estado diferente al actual.');
+      return;
+    }
+    setErrorMsg(null);
     formData.append('id', workOrder.id);
     formData.append('status', selectedStatus);
     // @ts-ignore
@@ -95,6 +119,12 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
             </Select>
           </div>
 
+          {errorMsg && (
+            <div className="text-sm text-red-500 font-medium bg-red-500/10 rounded-md px-3 py-2">
+              {errorMsg}
+            </div>
+          )}
+
           {workOrder.diagnosticandoDate && (
             <div className="space-y-1 text-xs text-gray-600">
               <div>Diagnosticando: {new Date(workOrder.diagnosticandoDate).toLocaleDateString('es-CO')}</div>
@@ -114,4 +144,4 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
       </DialogContent>
     </Dialog>
   );
-}
+}

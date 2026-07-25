@@ -88,6 +88,17 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
                 </div>
                 <div><span className="font-medium">Fecha:</span> {sale.date ? format(new Date(sale.date), 'dd/MM/yyyy HH:mm') : 'Fecha no disponible'}</div>
                 <div><span className="font-medium">Método de Pago:</span> {sale.paymentMethod || 'No especificado'}</div>
+                {(() => {
+                  const deposit = sale.depositAmount || sale.workOrder?.depositAmount || 0;
+                  if (!deposit) return null;
+                  const remaining = Math.max(0, sale.total - deposit);
+                  return (
+                    <>
+                      <div><span className="font-medium">Abono del cliente:</span> <span className="font-bold text-blue-600 dark:text-blue-400">- {formatCurrency(deposit)}</span></div>
+                      <div><span className="font-medium">Pagó al finalizar:</span> <span className="font-bold text-amber-600 dark:text-amber-400">{formatCurrency(remaining)}</span></div>
+                    </>
+                  );
+                })()}
                 <div><span className="font-medium">Total:</span> <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(sale.total)}</span></div>
               </div>
             </div>
