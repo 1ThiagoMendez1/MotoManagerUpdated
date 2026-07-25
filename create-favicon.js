@@ -3,13 +3,13 @@ const fs = require('fs');
 
 async function createFavicon() {
   const size = 512;
-  const padding = 64; // Padding around the logo
+  const padding = 48; // Aumentado para dar más margen a los costados
   const logoSize = size - padding * 2;
-  const borderRadius = 100; // Rounded corners similar to iOS icons
+  const borderRadius = 80; // Bordes bien definidos (redondeados)
 
-  // Create a black background with rounded corners using SVG
+  // Create a light gray background with rounded corners using SVG
   const svg = `<svg width="${size}" height="${size}">
-    <rect x="0" y="0" width="${size}" height="${size}" rx="${borderRadius}" ry="${borderRadius}" fill="black" />
+    <rect x="0" y="0" width="${size}" height="${size}" rx="${borderRadius}" ry="${borderRadius}" fill="#e5e5e5" />
   </svg>`;
 
   try {
