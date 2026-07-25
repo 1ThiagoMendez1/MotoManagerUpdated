@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { createMotorcycle } from '@/lib/actions/motorcycles';
-import { getCustomerByCedula } from '@/lib/actions/customers';
+import { getCustomerByCedula, getCustomerByName } from '@/lib/actions/customers';
 import type { Customer, Technician } from '@/lib/types';
 
 const MOTORCYCLE_BRANDS = [
@@ -135,6 +135,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
 
   const { isSubmitting } = form.formState;
   const watchCedula = form.watch('customerCedula');
+  const watchName = form.watch('customerName');
 
   // Auto-complete customer data when cedula changes
   useEffect(() => {
@@ -144,9 +145,15 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
         try {
           const customer = await getCustomerByCedula(watchCedula);
           if (customer) {
-            form.setValue('customerName', customer.name || '');
-            form.setValue('customerEmail', customer.email || '');
-            form.setValue('customerPhone', customer.phone || '');
+            if (form.getValues('customerName') !== customer.name) {
+              form.setValue('customerName', customer.name || '');
+            }
+            if (form.getValues('customerEmail') !== customer.email) {
+              form.setValue('customerEmail', customer.email || '');
+            }
+            if (form.getValues('customerPhone') !== customer.phone) {
+              form.setValue('customerPhone', customer.phone || '');
+            }
           }
         } catch (error) {
           console.error('Error looking up customer:', error);
@@ -159,6 +166,36 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
     const timeoutId = setTimeout(lookupCustomer, 500); // Debounce
     return () => clearTimeout(timeoutId);
   }, [watchCedula, form]);
+
+  // Auto-complete customer data when name changes
+  useEffect(() => {
+    const lookupCustomerName = async () => {
+      if (watchName && watchName.length > 3) {
+        setIsLoading(true);
+        try {
+          const customer = await getCustomerByName(watchName);
+          if (customer) {
+            if (form.getValues('customerCedula') !== customer.cedula) {
+              form.setValue('customerCedula', customer.cedula || '');
+            }
+            if (form.getValues('customerEmail') !== customer.email) {
+              form.setValue('customerEmail', customer.email || '');
+            }
+            if (form.getValues('customerPhone') !== customer.phone) {
+              form.setValue('customerPhone', customer.phone || '');
+            }
+          }
+        } catch (error) {
+          console.error('Error looking up customer by name:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(lookupCustomerName, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [watchName, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -302,7 +339,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                   render={({ field }) => (
                     <FormItem className="flex flex-col pt-[0.4rem]">
                       <FormLabel className="text-foreground">Marca</FormLabel>
-                      <Popover open={openBrand} onOpenChange={setOpenBrand} modal={false}>
+                      <Popover open={openBrand} onOpenChange={setOpenBrand} modal={true}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
@@ -323,22 +360,18 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                         <PopoverContent
                           className="w-[200px] p-0"
                           style={{ zIndex: 9999 }}
-                          onOpenAutoFocus={(e) => e.preventDefault()}
                         >
                           <Command>
-                            <CommandInput placeholder="Buscar marca..." />
+                            <CommandInput placeholder="Buscar marca..." autoFocus />
                             <CommandList className="max-h-[200px]">
                               <CommandEmpty>No se encontró la marca.</CommandEmpty>
                               <CommandGroup>
                                 {MOTORCYCLE_BRANDS.map((brand) => (
                                   <CommandItem
-                                    value={brand.toLowerCase()}
+                                    value={brand}
                                     key={brand}
                                     onSelect={(currentValue) => {
-                                      const selected = MOTORCYCLE_BRANDS.find(
-                                        (b) => b.toLowerCase() === currentValue.toLowerCase()
-                                      ) ?? currentValue
-                                      form.setValue("make", selected)
+                                      form.setValue("make", brand)
                                       setOpenBrand(false)
                                     }}
                                   >

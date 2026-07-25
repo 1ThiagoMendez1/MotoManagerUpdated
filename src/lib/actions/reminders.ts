@@ -20,10 +20,10 @@ export async function getPendingReminders() {
       service_type,
       due_date,
       status,
-      clientes (name, phone),
+      customers (first_name, last_name, phone),
       motorcycles (make, model, plate)
     `)
-    .eq('workshop_id', workshopId)
+    .eq('organization_id', workshopId)
     .eq('status', 'pending')
     .order('due_date', { ascending: true })
     .limit(10);
@@ -56,7 +56,7 @@ export async function createReminder(data: {
     .from('reminders')
     .insert([
       {
-        workshop_id: workshopId,
+        organization_id: workshopId,
         customer_id: data.customer_id,
         motorcycle_id: data.motorcycle_id,
         service_type: data.service_type,
@@ -88,7 +88,7 @@ export async function markReminderAsSent(reminderId: string) {
       sent_at: new Date().toISOString()
     })
     .eq('id', reminderId)
-    .eq('workshop_id', workshopId);
+    .eq('organization_id', workshopId);
 
   if (error) {
     console.error('Error marking reminder as sent:', error);
@@ -119,7 +119,7 @@ export async function addReminderFromWorkOrder(formData: FormData) {
     .from('work_orders')
     .select('motorcycle_id, motorcycles ( customer_id )')
     .eq('id', workOrderId)
-    .eq('workshop_id', workshopId)
+    .eq('organization_id', workshopId)
     .single();
 
   if (fetchError || !wo) {
@@ -141,7 +141,7 @@ export async function addReminderFromWorkOrder(formData: FormData) {
     .from('reminders')
     .insert([
       {
-        workshop_id: workshopId,
+        organization_id: workshopId,
         customer_id: customerId,
         motorcycle_id: motorcycleId,
         service_type: serviceType,

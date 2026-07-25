@@ -665,7 +665,7 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_status ON public.work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_appointments_organization_id ON public.appointments(organization_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_customer_id ON public.appointments(customer_id);
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON public.appointments(status);
-CREATE INDEX IF NOT EXISTS idx_appointments_date ON public.appointments(date);
+CREATE INDEX IF NOT EXISTS idx_appointments_scheduled_start ON public.appointments(scheduled_start);
 
 CREATE INDEX IF NOT EXISTS idx_inventory_items_organization_id ON public.inventory_items(organization_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_items_category ON public.inventory_items(category);

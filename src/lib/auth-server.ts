@@ -53,7 +53,7 @@ export async function requireWorkshop() {
   }
   if (!user.workshopId) {
     const { data: authData } = await (await createClient()).auth.getUser();
-    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.startsWith('admin@');
+    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.toLowerCase().startsWith('admin@') || authData?.user?.email?.toLowerCase() === 'juanurian31@gmail.com';
     if (isSuperAdmin) {
         redirect('/admin');
     }
@@ -69,7 +69,7 @@ export async function authorize(path: string) {
   }
   if (!user.workshopId) {
     const { data: authData } = await (await createClient()).auth.getUser();
-    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.startsWith('admin@');
+    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.toLowerCase().startsWith('admin@') || authData?.user?.email?.toLowerCase() === 'juanurian31@gmail.com';
     if (isSuperAdmin) {
         redirect('/admin');
     }

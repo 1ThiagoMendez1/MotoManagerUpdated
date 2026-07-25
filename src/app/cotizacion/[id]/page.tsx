@@ -60,8 +60,14 @@ export default async function QuotePage({
     .single()
 
   if (error || !workOrder) {
-    console.error('QuotePage fetch error:', error);
-    notFound()
+    return (
+      <div style={{ padding: 20, color: 'white', backgroundColor: 'black' }}>
+        <h1>Error loading QuotePage</h1>
+        <p><strong>ID Queried:</strong> {resolvedParams.id}</p>
+        <p><strong>Error:</strong> {JSON.stringify(error, null, 2)}</p>
+        <p><strong>workOrder:</strong> {JSON.stringify(workOrder, null, 2)}</p>
+      </div>
+    );
   }
 
   let parsedDeposit = 0;
