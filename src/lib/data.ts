@@ -128,11 +128,23 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
-    status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
-            (wo.status === 'diagnosis' ? 'Diagnosticando' : 
-             (wo.status === 'received' ? 'Ingreso a revisión' : 'Reparado')),
+    status: wo.status === 'delivered' ? 'Entregado' : 
+            wo.status === 'received' ? 'Ingreso a revisión' :
+            wo.status === 'diagnosis' ? 'Diagnosticando' : 
+            'Reparado',
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
-    quote_status: wo.quote_status
+    quote_status: wo.quote_status,
+    customerObservations: wo.customer_observations || '',
+    depositAmount: (() => {
+      let parsed = 0;
+      if (wo.customer_observations) {
+          const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
+          if (match) {
+              parsed = parseFloat(match[1]);
+          }
+      }
+      return parsed;
+    })()
   }));
 
   return { items, totalPages: 1 };
@@ -190,9 +202,10 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
-    status: (wo.status === 'completed' || wo.status === 'delivered') ? 'Entregado' : 
-            (wo.status === 'diagnosis' ? 'Diagnosticando' : 
-             (wo.status === 'received' ? 'Ingreso a revisión' : 'Reparado')),
+    status: wo.status === 'delivered' ? 'Entregado' : 
+            wo.status === 'received' ? 'Ingreso a revisión' :
+            wo.status === 'diagnosis' ? 'Diagnosticando' : 
+            'Reparado',
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status,
     customerObservations: wo.customer_observations || '',
@@ -223,7 +236,7 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
   const supabase = await createClient();
   
   let query = supabase.from('sales')
-    .select('*, customers(*), sale_items(*)')
+    .select('*, customers(*), sale_items(*), work_orders(customer_observations)')
     .eq('organization_id', user.workshopId)
     .neq('status', 'pending');
     
@@ -239,26 +252,39 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
 
   if (!data) return { items: [], totalPages: 0 };
 
-  const items: Sale[] = data.map((s: any) => ({
-    id: s.id,
-    saleNumber: `SALE-${s.sale_number || s.id.substring(0,6)}`,
-    workOrderId: s.work_order_id,
-    customer: s.customers ? {
-      id: s.customers.id,
-      name: `${s.customers.first_name} ${s.customers.last_name}`,
-      email: s.customers.email || ''
-    } : undefined,
-    customerName: s.customers ? `${s.customers.first_name} ${s.customers.last_name}` : 'General',
-    date: s.created_at,
-    total: Number(s.total) || 0,
-    paymentMethod: s.payment_method || 'efectivo',
-    items: s.sale_items?.map((si: any) => ({
-        id: si.id,
-        inventoryItemId: si.inventory_item_id,
-        quantity: si.quantity,
-        price: Number(si.unit_price)
-    })) || []
-  }));
+  const items: Sale[] = data.map((s: any) => {
+    // Parse deposit amount from work order's customer_observations
+    let depositAmount = 0;
+    const woData = s.work_orders;
+    if (woData?.customer_observations) {
+      const match = woData.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
+      if (match) {
+        depositAmount = parseFloat(match[1]);
+      }
+    }
+
+    return {
+      id: s.id,
+      saleNumber: `SALE-${s.sale_number || s.id.substring(0,6)}`,
+      workOrderId: s.work_order_id,
+      depositAmount,
+      customer: s.customers ? {
+        id: s.customers.id,
+        name: `${s.customers.first_name} ${s.customers.last_name}`,
+        email: s.customers.email || ''
+      } : undefined,
+      customerName: s.customers ? `${s.customers.first_name} ${s.customers.last_name}` : 'Cliente de Mostrador',
+      date: s.created_at,
+      total: Number(s.total) || 0,
+      paymentMethod: s.payment_method || 'efectivo',
+      items: s.sale_items?.map((si: any) => ({
+          id: si.id,
+          inventoryItemId: si.inventory_item_id,
+          quantity: si.quantity,
+          price: Number(si.unit_price)
+      })) || []
+    };
+  });
 
   return { items, totalPages: 1 };
 };

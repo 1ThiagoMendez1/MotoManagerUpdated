@@ -44,9 +44,11 @@ export async function GET(
       .filter((item: any) => item.item_type === 'inventory' && item.inventory_item_id)
       .map((item: any) => ({
         inventoryItemId: item.inventory_item_id,
+        name: item.inventory_items?.name || item.description || 'Producto',
         sku: item.inventory_items?.code || '',
         quantity: item.quantity,
-        price: item.unit_price
+        price: item.unit_price,
+        total: item.total || (item.quantity * item.unit_price)
       }));
       
     return NextResponse.json({ items: mappedItems });

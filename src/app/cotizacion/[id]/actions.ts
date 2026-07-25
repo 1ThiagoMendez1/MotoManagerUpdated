@@ -63,8 +63,8 @@ export async function submitQuoteResponse(workOrderId: string, response: 'approv
               await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
           }
       }
-      // Opcional: Actualizar el estado de la orden a 'approved' para mantener sincronía con el dashboard
-      await supabase.from('work_orders').update({ status: 'approved' }).eq('id', workOrderId);
+      // Opcional: Actualizar el estado de la orden a 'diagnosis' para mantener sincronía con el dashboard
+      await supabase.from('work_orders').update({ status: 'diagnosis' }).eq('id', workOrderId);
   } else if (response === 'rejected') {
       if (sale && quoteItems.length > 0) {
           // Dejar historial de rechazo sin borrar los items

@@ -95,6 +95,7 @@ export type Sale = {
   date: string;
   total: number;
   paymentMethod?: string;
+  depositAmount?: number;
 };
 
 export type Reminder = {

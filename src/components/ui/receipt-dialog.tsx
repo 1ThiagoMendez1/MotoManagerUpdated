@@ -115,8 +115,7 @@ function generateReceiptHTML(data: ReceiptData): string {
     });
   };
 
-  return `
-    <div style="
+  return `    <div style="
       width: 100%;
       max-width: 400px;
       margin: 0 auto;
@@ -124,17 +123,17 @@ function generateReceiptHTML(data: ReceiptData): string {
       font-family: Arial, sans-serif;
       background: white;
       color: black;
-      border: 2px solid #333;
+      border: 1px solid #ddd;
     ">
       <!-- Header -->
-      <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">
-        <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #333;">MotoManager</h1>
+      <div style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 15px;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: bold; color: #333;">${data.workshopName || 'MotoManager'}</h1>
         <p style="margin: 5px 0; font-size: 14px; color: #666;">Taller de Motocicletas</p>
-        <p style="margin: 5px 0; font-size: 12px; color: #666;">Comprobante de Pago</p>
+        <p style="margin: 5px 0; font-size: 14px; font-weight: bold; color: #333;">Comprobante de Pago</p>
       </div>
 
       <!-- Sale Info -->
-      <div style="margin-bottom: 20px;">
+      <div style="margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 15px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
           <span style="font-weight: bold;">Número de Venta:</span>
           <span>${data.saleNumber}</span>
@@ -142,6 +141,10 @@ function generateReceiptHTML(data: ReceiptData): string {
         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
           <span style="font-weight: bold;">Fecha:</span>
           <span>${formatDate(data.date)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span style="font-weight: bold;">Medio de Pago:</span>
+          <span>${data.paymentMethod || 'Efectivo'}</span>
         </div>
         ${data.workOrderId ? `
         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
@@ -158,7 +161,11 @@ function generateReceiptHTML(data: ReceiptData): string {
         ${data.motorcycleInfo ? `
         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
           <span style="font-weight: bold;">Vehículo:</span>
-          <span>${data.motorcycleInfo.make} ${data.motorcycleInfo.model} ${data.motorcycleInfo.year} - ${data.motorcycleInfo.plate}</span>
+          <span style="text-align: right;">
+            ${data.motorcycleInfo.make} ${data.motorcycleInfo.model}
+            <br />
+            <span style="font-size: 12px; color: #666;">${data.motorcycleInfo.plate}</span>
+          </span>
         </div>
         ` : ''}
         ${data.technicianName ? `
@@ -167,119 +174,94 @@ function generateReceiptHTML(data: ReceiptData): string {
           <span>${data.technicianName}</span>
         </div>
         ` : ''}
-        ${data.paymentMethod ? `
-        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-          <span style="font-weight: bold;">Medio de Pago:</span>
-          <span>${data.paymentMethod}</span>
-        </div>
-        ` : ''}
       </div>
 
-      <!-- Items Table -->
-      <div style="margin-bottom: 20px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-          <thead>
-            <tr style="border-bottom: 1px solid #333;">
-              <th style="text-align: left; padding: 5px 0; font-weight: bold;">Producto</th>
-              <th style="text-align: center; padding: 5px 0; font-weight: bold;">SKU</th>
-              <th style="text-align: center; padding: 5px 0; font-weight: bold;">Cant.</th>
-              <th style="text-align: right; padding: 5px 0; font-weight: bold;">Precio</th>
-              <th style="text-align: right; padding: 5px 0; font-weight: bold;">Total</th>
+      <!-- Items -->
+      ${data.items && data.items.length > 0 ? `
+      <table style="width: 100%; font-size: 12px; border-collapse: collapse; margin-bottom: 15px;">
+        <thead>
+          <tr style="border-bottom: 1px solid #333;">
+            <th style="text-align: left; padding: 5px 0;">Producto</th>
+            <th style="text-align: center; padding: 5px 0;">SKU</th>
+            <th style="text-align: center; padding: 5px 0;">Cant.</th>
+            <th style="text-align: right; padding: 5px 0;">Precio</th>
+            <th style="text-align: right; padding: 5px 0;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.items.map(item => `
+            <tr>
+              <td style="padding: 5px 0; text-align: left;">
+                <div style="font-weight: bold;">${item.name}</div>
+              </td>
+              <td style="padding: 5px 0; text-align: center; font-family: monospace;">${item.sku || '-'}</td>
+              <td style="padding: 5px 0; text-align: center;">${item.quantity}</td>
+              <td style="padding: 5px 0; text-align: right;">${formatCurrency(item.price)}</td>
+              <td style="padding: 5px 0; text-align: right;">${formatCurrency(item.total)}</td>
             </tr>
-          </thead>
-          <tbody>
-            ${data.items.map(item => `
-              <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 5px 0; text-align: left;">
-                  <div style="font-weight: bold;">${item.name}</div>
-                  ${item.category ? `<div style="font-size: 10px; color: #666;">${item.category}</div>` : ''}
-                </td>
-                <td style="padding: 5px 0; text-align: center; font-family: monospace; font-size: 10px;">${item.sku || '-'}</td>
-                <td style="padding: 5px 0; text-align: center;">${item.quantity}</td>
-                <td style="padding: 5px 0; text-align: right;">${formatCurrency(item.price)}</td>
-                <td style="padding: 5px 0; text-align: right;">${formatCurrency(item.total)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Subtotal -->
-      ${data.subtotal && data.subtotal !== data.total ? `
-      <div style="margin-bottom: 5px;">
-        <div style="display: flex; justify-content: space-between;">
-          <span style="font-weight: bold;">Subtotal:</span>
-          <span>${formatCurrency(data.subtotal)}</span>
-        </div>
-      </div>
+          `).join('')}
+        </tbody>
+      </table>
+      
+      <div style="border-bottom: 1px solid #333; margin-bottom: 15px;"></div>
       ` : ''}
 
-      <!-- Discount -->
-      ${data.discountAmount && data.discountAmount > 0 ? `
-      <div style="margin-bottom: 5px;">
-        <div style="display: flex; justify-content: space-between; color: #dc2626;">
-          <span style="font-weight: bold;">Descuento (${data.discountPercentage}%):</span>
-          <span>-${formatCurrency(data.discountAmount)}</span>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Labor Cost -->
-      ${data.laborCost && data.laborCost > 0 ? `
-      <div style="margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
-        <div style="display: flex; justify-content: space-between;">
-          <span style="font-weight: bold;">Mano de Obra:</span>
-          <span>${formatCurrency(data.laborCost)}</span>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Deposit (Abono) -->
-      ${data.depositAmount && data.depositAmount > 0 ? `
-      <div style="margin-bottom: 5px;">
-        <div style="display: flex; justify-content: space-between; color: #16a34a;">
-          <span style="font-weight: bold;">Abono recibido:</span>
-          <span>- ${formatCurrency(data.depositAmount)}</span>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Remaining Balance -->
-      ${data.remainingBalance && data.remainingBalance > 0 ? `
-      <div style="margin-bottom: 10px; padding: 8px; background: #fef9c3; border-radius: 4px;">
-        <div style="display: flex; justify-content: space-between;">
-          <span style="font-weight: bold;">Saldo pendiente:</span>
-          <span>${formatCurrency(data.remainingBalance)}</span>
-        </div>
-      </div>
-      ` : ''}
-
-      <!-- Total -->
-      <div style="border-top: 2px solid #333; padding-top: 10px; margin-top: 20px;">
-        <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold;">
+      <!-- Totals -->
+      <div style="margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 15px;">
+        ${(data.subtotal && data.subtotal !== data.total) ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span style="font-weight: bold;">Subtotal:</span>
+            <span>${formatCurrency(data.subtotal)}</span>
+          </div>
+        ` : ''}
+        ${(data.discountAmount && data.discountAmount > 0) ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: #d32f2f;">
+            <span style="font-weight: bold;">Descuento (${data.discountPercentage}%):</span>
+            <span>-${formatCurrency(data.discountAmount)}</span>
+          </div>
+        ` : ''}
+        ${(data.laborCost && data.laborCost > 0) ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <span style="font-weight: bold;">Mano de Obra:</span>
+            <span>${formatCurrency(data.laborCost)}</span>
+          </div>
+        ` : ''}
+        ${(data.depositAmount && data.depositAmount > 0) ? `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: #2e7d32;">
+            <span style="font-weight: bold;">Abono recibido:</span>
+            <span>-${formatCurrency(data.depositAmount)}</span>
+          </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 10px;">
           <span>TOTAL SERVICIO:</span>
           <span>${formatCurrency(data.total)}</span>
         </div>
+        ${(data.remainingBalance !== undefined && data.remainingBalance !== data.total) ? `
+          <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-top: 5px; color: #d32f2f;">
+            <span>Saldo a Pagar:</span>
+            <span>${formatCurrency(data.remainingBalance)}</span>
+          </div>
+        ` : ''}
       </div>
 
-      <!-- Footer -->
-      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; font-size: 9px; color: #333;">
-        <p style="font-weight: bold; margin-bottom: 10px; font-size: 11px;">Gracias por su preferencia</p>
+      <!-- Legal Text & Footer -->
+      <div style="text-align: center; margin-top: 20px; font-size: 11px; color: #444; line-height: 1.4; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 15px;">
+        <p style="font-weight: bold; font-size: 13px; margin-bottom: 15px;">Gracias por su preferencia</p>
+        <p style="margin-bottom: 5px;">Este documento es un comprobante interno de venta generado por el sistema ${data.workshopName || 'MotoManager'} para control administrativo del taller.</p>
+        <p style="margin-bottom: 5px;">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
+        <p style="margin-bottom: 5px;">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
+        <p style="margin-bottom: 10px;">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
+        <p style="font-style: italic;">"Documento generado automáticamente por ${data.workshopName || 'MotoManager'} — Sin validez tributaria."</p>
+      </div>
 
-        <div style="text-align: left; max-width: 350px; margin: 0 auto 15px auto; line-height: 1.3;">
-          <p style="margin-bottom: 3px;"><strong>Este documento es un comprobante interno de venta generado por el sistema MotoManager para control administrativo del taller.</strong></p>
-          <p style="margin-bottom: 3px;">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
-          <p style="margin-bottom: 3px;">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
-          <p style="margin-bottom: 3px;">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
-          <p style="margin-bottom: 3px; font-style: italic;">"Documento generado automáticamente por MotoManager — Sin validez tributaria."</p>
-        </div>
+      <div style="text-align: center; font-size: 11px; color: #444; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 10px;">
+        <p style="font-weight: bold; margin: 0 0 5px 0;">MotoManager - CRM</p>
+        <p style="margin: 0;">Created by - Mivra S.A.S</p>
+      </div>
 
-        <div style="border-top: 1px solid #666; padding-top: 8px; margin-top: 10px;">
-          <p style="font-weight: bold; font-size: 10px; margin-bottom: 2px;">MotoManager - Sistema de Gestión para Talleres</p>
-          <p style="font-size: 8px;">Created by - DevS&STech S.A.S</p>
-          <p style="font-size: 8px;">www.devsystech.com.co</p>
-          <p style="font-size: 8px; font-style: italic; margin-top: 3px;">MotoManager — Sin validez tributaria.</p>
-        </div>
+      <div style="text-align: center; font-size: 11px; color: #444;">
+        <p style="margin: 0 0 5px 0;">www.mivra.com.co</p>
+        <p style="margin: 0; font-style: italic;">MotoManager — Sin validez tributaria.</p>
       </div>
     </div>
   `;
@@ -305,6 +287,28 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
     }
   };
 
+  const printReceipt = (data: ReceiptData) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Comprobante de Pago - ${data.saleNumber}</title>
+        </head>
+        <body>
+          ${generateReceiptHTML(data)}
+          <script>
+            window.onload = () => {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -327,21 +331,21 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-card text-card-foreground">
         <DialogHeader>
-          <DialogTitle className="text-black">Comprobante de Pago</DialogTitle>
-          <DialogDescription className="text-black/80">
+          <DialogTitle>Comprobante de Pago</DialogTitle>
+          <DialogDescription>
             Venta #{receiptData.saleNumber} registrada exitosamente
           </DialogDescription>
         </DialogHeader>
 
         {/* Receipt Preview */}
-        <div className="border border-gray-300 rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
-          <div className="text-center mb-4 border-b-2 border-gray-800 pb-2">
-            <h2 className="text-xl font-bold text-gray-800">MotoManager</h2>
-            <p className="text-sm text-gray-600">Taller de Motocicletas</p>
-            <p className="text-xs text-gray-500">Comprobante de Pago</p>
+        <div className="bg-white text-black border border-gray-300 rounded-lg p-6 max-h-96 overflow-y-auto font-sans shadow-inner">
+          <div className="text-center mb-4 border-b border-gray-300 pb-4">
+            <h2 className="text-xl font-bold text-gray-800 m-0">{receiptData.workshopName || 'MotoManager'}</h2>
+            <p className="text-sm text-gray-600 m-1">Taller de Motocicletas</p>
+            <p className="text-sm font-bold text-gray-800 m-1">Comprobante de Pago</p>
           </div>
 
-          <div className="space-y-2 mb-4 text-sm">
+          <div className="space-y-2 mb-4 text-sm border-b border-gray-300 pb-4">
             <div className="flex justify-between">
               <span className="font-semibold">Número de Venta:</span>
               <span>{receiptData.saleNumber}</span>
@@ -349,6 +353,10 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
             <div className="flex justify-between">
               <span className="font-semibold">Fecha:</span>
               <span>{formatDate(receiptData.date)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-semibold">Medio de Pago:</span>
+              <span>{receiptData.paymentMethod || 'Efectivo'}</span>
             </div>
             {receiptData.workOrderId && (
               <div className="flex justify-between">
@@ -366,7 +374,7 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
               <div className="flex justify-between">
                 <span className="font-semibold">Vehículo:</span>
                 <span className="text-right">
-                  {receiptData.motorcycleInfo.make} {receiptData.motorcycleInfo.model} {receiptData.motorcycleInfo.year}
+                  {receiptData.motorcycleInfo.make} {receiptData.motorcycleInfo.model}
                   <br />
                   <span className="text-xs text-gray-500">{receiptData.motorcycleInfo.plate}</span>
                 </span>
@@ -378,110 +386,98 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
                 <span>{receiptData.technicianName}</span>
               </div>
             )}
-            {receiptData.paymentMethod && (
-              <div className="flex justify-between">
-                <span className="font-semibold">Medio de Pago:</span>
-                <span>{receiptData.paymentMethod}</span>
+          </div>
+
+          {receiptData.items && receiptData.items.length > 0 && (
+            <>
+              <table className="w-full text-xs mb-4 border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-300">
+                    <th className="text-left py-2 font-semibold">Producto</th>
+                    <th className="text-center py-2 font-semibold">SKU</th>
+                    <th className="text-center py-2 font-semibold">Cant.</th>
+                    <th className="text-right py-2 font-semibold">Precio</th>
+                    <th className="text-right py-2 font-semibold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receiptData.items.map((item, index) => (
+                    <tr key={index}>
+                      <td className="py-2 text-left">
+                        <div className="font-bold">{item.name}</div>
+                      </td>
+                      <td className="py-2 text-center font-mono text-xs">{item.sku || '-'}</td>
+                      <td className="py-2 text-center">{item.quantity}</td>
+                      <td className="py-2 text-right">{formatCurrency(item.price)}</td>
+                      <td className="py-2 text-right">{formatCurrency(item.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="border-b border-gray-300 mb-4"></div>
+            </>
+          )}
+
+          {/* Totals */}
+          <div className="space-y-2 mb-4 border-b border-gray-300 pb-4">
+            {Boolean(receiptData.subtotal && receiptData.subtotal !== receiptData.total) && (
+              <div className="flex justify-between text-sm">
+                <span className="font-semibold">Subtotal:</span>
+                <span>{formatCurrency(receiptData.subtotal!)}</span>
+              </div>
+            )}
+            {Boolean(receiptData.discountAmount && receiptData.discountAmount > 0) && (
+              <div className="flex justify-between text-sm text-red-600">
+                <span className="font-semibold">
+                  Descuento ({receiptData.discountPercentage}%):
+                </span>
+                <span>-{formatCurrency(receiptData.discountAmount!)}</span>
+              </div>
+            )}
+            {Boolean(receiptData.laborCost && receiptData.laborCost > 0) && (
+              <div className="flex justify-between text-sm">
+                <span className="font-semibold">Mano de Obra:</span>
+                <span>{formatCurrency(receiptData.laborCost!)}</span>
+              </div>
+            )}
+            {Boolean(receiptData.depositAmount && receiptData.depositAmount > 0) && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span className="font-semibold">Abono recibido:</span>
+                <span>-{formatCurrency(receiptData.depositAmount!)}</span>
+              </div>
+            )}
+            
+            <div className="flex justify-between items-center pt-2 mt-2 text-base font-bold">
+              <span>TOTAL SERVICIO:</span>
+              <span>{formatCurrency(receiptData.total)}</span>
+            </div>
+
+            {(receiptData.remainingBalance !== undefined && receiptData.remainingBalance !== receiptData.total) && (
+              <div className="flex justify-between text-sm font-bold text-red-600 mt-1">
+                <span>Saldo a Pagar:</span>
+                <span>{formatCurrency(receiptData.remainingBalance)}</span>
               </div>
             )}
           </div>
 
-          <table className="w-full text-xs mb-4 border-collapse">
-            <thead>
-              <tr className="border-b border-gray-400">
-                <th className="text-left py-1 font-semibold">Producto</th>
-                <th className="text-center py-1 font-semibold">SKU</th>
-                <th className="text-center py-1 font-semibold">Cant.</th>
-                <th className="text-right py-1 font-semibold">Precio</th>
-                <th className="text-right py-1 font-semibold">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receiptData.items.map((item, index) => (
-                <tr key={index} className="border-b border-gray-200">
-                  <td className="py-1 text-left">
-                    <div className="font-medium">{item.name}</div>
-                    {item.category && (
-                      <div className="text-xs text-gray-500">{item.category}</div>
-                    )}
-                  </td>
-                  <td className="py-1 text-center font-mono text-xs">{item.sku || '-'}</td>
-                  <td className="py-1 text-center">{item.quantity}</td>
-                  <td className="py-1 text-right">{formatCurrency(item.price)}</td>
-                  <td className="py-1 text-right">{formatCurrency(item.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Subtotal */}
-          {(receiptData.subtotal && receiptData.subtotal !== receiptData.total) && (
-            <div className="flex justify-between text-sm mb-1">
-              <span className="font-semibold">Subtotal:</span>
-              <span>{formatCurrency(receiptData.subtotal)}</span>
-            </div>
-          )}
-
-          {/* Discount */}
-          {receiptData.discountAmount && receiptData.discountAmount > 0 && (
-            <div className="flex justify-between text-sm mb-1 text-red-600">
-              <span className="font-semibold">
-                Descuento ({receiptData.discountPercentage}%):
-              </span>
-              <span>-{formatCurrency(receiptData.discountAmount)}</span>
-            </div>
-          )}
-
-          {/* Labor Cost */}
-          {receiptData.laborCost && receiptData.laborCost > 0 && (
-            <div className="bg-gray-100 p-2 rounded mb-2">
-              <div className="flex justify-between text-sm">
-                <span className="font-semibold">Mano de Obra:</span>
-                <span>{formatCurrency(receiptData.laborCost)}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Deposit (Abono) */}
-          {receiptData.depositAmount && receiptData.depositAmount > 0 && (
-            <div className="flex justify-between text-sm mb-1 text-emerald-600">
-              <span className="font-semibold">Abono recibido:</span>
-              <span>-{formatCurrency(receiptData.depositAmount)}</span>
-            </div>
-          )}
-
-          {/* Remaining Balance */}
-          {receiptData.remainingBalance && receiptData.remainingBalance > 0 && (
-            <div className="flex justify-between text-sm mb-2 bg-yellow-50 text-yellow-800 px-2 py-1 rounded">
-              <span className="font-semibold">Saldo pendiente:</span>
-              <span>{formatCurrency(receiptData.remainingBalance)}</span>
-            </div>
-          )}
-
-          <div className="border-t-2 border-gray-800 pt-2">
-            <div className="flex justify-between text-lg font-bold">
-              <span>TOTAL SERVICIO:</span>
-              <span>{formatCurrency(receiptData.total)}</span>
-            </div>
+          {/* Legal Text & Footer */}
+          <div className="text-center text-[10px] text-gray-600 leading-tight border-b border-gray-300 pb-4 mb-4">
+            <p className="font-bold text-xs text-gray-800 mb-3">Gracias por su preferencia</p>
+            <p className="mb-1">Este documento es un comprobante interno de venta generado por el sistema {receiptData.workshopName || 'MotoManager'} para control administrativo del taller.</p>
+            <p className="mb-1">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
+            <p className="mb-1">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
+            <p className="mb-2">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
+            <p className="italic">"Documento generado automáticamente por {receiptData.workshopName || 'MotoManager'} — Sin validez tributaria."</p>
           </div>
 
-          <div className="text-center mt-4 text-xs text-gray-500 border-t border-gray-300 pt-4">
-            <p className="font-semibold mb-2">Gracias por su preferencia</p>
+          <div className="text-center text-[10px] text-gray-500 border-b border-gray-300 pb-2 mb-2">
+            <p className="font-bold text-gray-700 m-0 mb-1">MotoManager - CRM</p>
+            <p className="m-0">Created by - Mivra S.A.S</p>
+          </div>
 
-            <div className="text-left text-xs leading-tight mb-3 max-w-md mx-auto">
-              <p className="mb-1"><strong>Este documento es un comprobante interno de venta generado por el sistema MotoManager para control administrativo del taller.</strong></p>
-              <p className="mb-1">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
-              <p className="mb-1">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
-              <p className="mb-1">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
-              <p className="mb-1 italic">"Documento generado automáticamente por MotoManager — Sin validez tributaria."</p>
-            </div>
-
-            <div className="border-t border-gray-200 pt-2 mt-3">
-              <p className="font-bold text-sm mb-1">MotoManager - Sistema de Gestión para Talleres</p>
-              <p className="text-xs">Created by - DevS&STech S.A.S</p>
-              <p className="text-xs">www.devsystech.com.co</p>
-              <p className="text-xs italic mt-1">MotoManager — Sin validez tributaria.</p>
-            </div>
+          <div className="text-center text-[10px] text-gray-500">
+            <p className="m-0 mb-1">www.mivra.com.co</p>
+            <p className="m-0 italic">MotoManager — Sin validez tributaria.</p>
           </div>
         </div>
 

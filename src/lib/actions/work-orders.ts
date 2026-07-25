@@ -114,7 +114,11 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
 
 export async function updateWorkOrderStatus(prevState: any, formData: FormData) {
     const user = await requireWorkshop();
-    const supabase = await createClient();
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     const id = formData.get('id') as string;
     const uiStatus = formData.get('status') as string;
@@ -158,7 +162,10 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
     const updatedWo = _updatedWo as any;
 
 
-    if (error) return { message: 'Error updating status' };
+    if (error) {
+        console.error('Error updating work order status:', error.message, error.code, error.details);
+        return { message: `Error al actualizar el estado: ${error.message}` };
+    }
 
     if (updatedWo) {
         const mc = Array.isArray(updatedWo.motorcycles) ? updatedWo.motorcycles[0] : updatedWo.motorcycles;
@@ -480,7 +487,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
 
     // Map UI Spanish status back to DB status
     let dbStatus = 'waiting_approval';
-    if (quoteStatus === 'Aprobada') dbStatus = 'approved';
+    if (quoteStatus === 'Aprobada') dbStatus = 'diagnosis'; // Entra a diagnosticado (diagnosis) cuando se aprueba
     if (quoteStatus === 'Rechazada') dbStatus = 'diagnosis';
 
     // Manejo inteligente e innovador del inventario según aprobación/rechazo
