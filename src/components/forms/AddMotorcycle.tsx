@@ -170,7 +170,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   // Auto-complete customer data when name changes
   useEffect(() => {
     const lookupCustomerName = async () => {
-      if (watchName && watchName.length > 3) {
+      if (watchName && watchName.trim().includes(' ')) {
         setIsLoading(true);
         try {
           const customer = await getCustomerByName(watchName);
@@ -339,58 +339,59 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                   render={({ field }) => (
                     <FormItem className="flex flex-col pt-[0.4rem]">
                       <FormLabel className="text-foreground">Marca</FormLabel>
-                      <Popover open={openBrand} onOpenChange={setOpenBrand} modal={true}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn(
-                                "w-full justify-between bg-card text-card-foreground border-border",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value
-                                ? field.value
-                                : "Selecciona una marca"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-[200px] p-0"
-                          style={{ zIndex: 9999 }}
-                        >
-                          <Command>
-                            <CommandInput placeholder="Buscar marca..." autoFocus />
-                            <CommandList className="max-h-[200px]">
-                              <CommandEmpty>No se encontró la marca.</CommandEmpty>
-                              <CommandGroup>
-                                {MOTORCYCLE_BRANDS.map((brand) => (
-                                  <CommandItem
-                                    value={brand}
-                                    key={brand}
-                                    onSelect={(currentValue) => {
-                                      form.setValue("make", brand)
-                                      setOpenBrand(false)
-                                    }}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        brand === field.value
-                                          ? "opacity-100"
-                                          : "opacity-0"
-                                      )}
-                                    />
-                                    {brand}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <div className="relative">
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between bg-card text-card-foreground border-border",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            onClick={() => setOpenBrand(!openBrand)}
+                          >
+                            {field.value
+                              ? field.value
+                              : "Selecciona una marca"}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                        {openBrand && (
+                          <div
+                            className="absolute top-[calc(100%+4px)] left-0 w-[200px] z-[9999] rounded-md border bg-popover shadow-md outline-none"
+                          >
+                            <Command filter={(value, search) => value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0}>
+                              <CommandInput placeholder="Buscar marca..." autoFocus />
+                              <CommandList className="max-h-[200px]">
+                                <CommandEmpty>No se encontró la marca.</CommandEmpty>
+                                <CommandGroup>
+                                  {MOTORCYCLE_BRANDS.map((brand) => (
+                                    <CommandItem
+                                      value={brand}
+                                      key={brand}
+                                      onSelect={(currentValue) => {
+                                        form.setValue("make", brand)
+                                        setOpenBrand(false)
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          brand === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                      {brand}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </div>
+                        )}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

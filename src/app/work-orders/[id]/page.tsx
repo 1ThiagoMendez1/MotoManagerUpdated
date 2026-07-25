@@ -80,6 +80,17 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           orderNumber={workOrder.workOrderNumber?.toString()}
           technicianName={workOrder.technician?.name}
         />
+        {workOrder.customerObservations && workOrder.customerObservations.includes('Rechazada') && (
+            <div className="mt-4 p-4 bg-red-500/5 border border-red-500/20 rounded-xl flex gap-3 text-sm">
+               <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+               <div>
+                 <h4 className="font-medium text-red-500 mb-1">Motivo del Rechazo (Cliente)</h4>
+                 <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                   {workOrder.customerObservations.split('\n').filter(line => line.includes('Rechazada') && !line.includes('retirados')).join('\n')}
+                 </p>
+               </div>
+            </div>
+        )}
       </div>
 
       {/* Info Grid */}

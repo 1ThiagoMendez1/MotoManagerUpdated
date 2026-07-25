@@ -437,7 +437,8 @@ export async function sendQuoteWhatsApp(
 
     // Actualizar estado de la orden a 'esperando aprobación'
     const { error: updateError } = await supabase.from('work_orders').update({
-        status: 'waiting_approval'
+        status: 'waiting_approval',
+        quote_status: 'pending'
     }).eq('id', workOrderId).eq('organization_id', user.workshopId);
 
     if (updateError) {
@@ -480,7 +481,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
     // Map UI Spanish status back to DB status
     let dbStatus = 'waiting_approval';
     if (quoteStatus === 'Aprobada') dbStatus = 'approved';
-    if (quoteStatus === 'Rechazada') dbStatus = 'cancelled';
+    if (quoteStatus === 'Rechazada') dbStatus = 'diagnosis';
 
     // Manejo inteligente e innovador del inventario según aprobación/rechazo
     const { data: woData } = await supabase.from('work_orders').select('status, customer_observations').eq('id', id).single();
@@ -502,12 +503,11 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
         }
     }
 
-    if (dbStatus === 'cancelled') {
-        // Si se rechaza la cotización, ya que no se aprobó, los ítems no se usarán.
-        // Innovación: 
+    if (dbStatus === 'diagnosis') {
+        // Si se rechaza la cotización, ya que no se aprobó, los ítems no se usarán y no se descontarán.
         // 1. Devolver el inventario si la orden estaba aprobada (por error y la rechazan después)
-        // 2. Limpiamos los sale_items de la cotización para no facturarlos
-        // 3. Dejamos un log permanente de "Venta perdida" en observaciones para registro
+        // 2. Mantenemos los sale_items de la cotización para el registro histórico
+        // 3. Dejamos un log permanente en observaciones
         
         if (wasApproved) {
             for (const item of quoteItems) {
@@ -521,12 +521,8 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
         }
 
         if (sale && quoteItems.length > 0) {
-            // Borrar los items cotizados para dejar la orden limpia
-            await supabase.from('sale_items').delete().eq('sale_id', sale.id);
-            
             // Dejar historial
-            const itemsList = quoteItems.map(i => `${i.quantity}x ${i.description}`).join(', ');
-            const rejectMsg = `\n[Cotización Rechazada] Ítems retirados de la orden: ${itemsList}.`;
+            const rejectMsg = `\n[Cotización Rechazada]`;
             const newObs = (woData?.customer_observations || '') + rejectMsg;
             
             await supabase.from('work_orders').update({ customer_observations: newObs }).eq('id', id);

@@ -5,15 +5,20 @@ import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminC
 
 import { revalidatePath } from 'next/cache'
 
-export async function submitQuoteResponse(workOrderId: string, response: 'approved' | 'rejected') {
+export async function submitQuoteResponse(workOrderId: string, response: 'approved' | 'rejected', formData?: FormData) {
   if (!workOrderId) return { success: false, message: 'ID de orden inválido.' }
+
+  let rejectionReason = '';
+  if (formData && response === 'rejected') {
+      rejectionReason = formData.get('rejectionReason') as string || '';
+  }
 
   const supabase = await createAdminClient()
 
   // First, verify the order exists and is pending
   const { data: order, error: fetchError } = await supabase
     .from('work_orders')
-    .select('quote_status, status')
+    .select('quote_status, status, customer_observations')
     .eq('id', workOrderId)
     .single()
 
@@ -42,6 +47,39 @@ export async function submitQuoteResponse(workOrderId: string, response: 'approv
 
   if (updateError) {
     return { success: false, message: 'Error al guardar la respuesta.' }
+  }
+
+  // Manage inventory based on response
+  const { data: sale } = await supabase.from('sales').select('id').eq('work_order_id', workOrderId).maybeSingle();
+  let quoteItems: any[] = [];
+  if (sale) {
+      const { data: items } = await supabase.from('sale_items').select('*').eq('sale_id', sale.id);
+      quoteItems = items || [];
+  }
+
+  if (response === 'approved') {
+      for (const item of quoteItems) {
+          if (item.item_type === 'inventory' && item.inventory_item_id) {
+              await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+          }
+      }
+      // Opcional: Actualizar el estado de la orden a 'approved' para mantener sincronía con el dashboard
+      await supabase.from('work_orders').update({ status: 'approved' }).eq('id', workOrderId);
+  } else if (response === 'rejected') {
+      if (sale && quoteItems.length > 0) {
+          // Dejar historial de rechazo sin borrar los items
+          const reasonText = rejectionReason.trim() ? ` - Motivo: ${rejectionReason.trim()}` : '';
+          const rejectMsg = `\n[Cotización Rechazada por Cliente${reasonText}]`;
+          const newObs = (order.customer_observations || '') + rejectMsg;
+          
+          await supabase.from('work_orders').update({ customer_observations: newObs, status: 'diagnosis' }).eq('id', workOrderId);
+      } else {
+          // Aún sin items, actualizamos el estado
+          const reasonText = rejectionReason.trim() ? ` - Motivo: ${rejectionReason.trim()}` : '';
+          const rejectMsg = `\n[Cotización Rechazada por Cliente${reasonText}]`;
+          const newObs = (order.customer_observations || '') + rejectMsg;
+          await supabase.from('work_orders').update({ status: 'diagnosis', customer_observations: newObs }).eq('id', workOrderId);
+      }
   }
 
   revalidatePath(`/cotizacion/${workOrderId}`)

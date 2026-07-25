@@ -140,8 +140,14 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
 
 export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
   const user = await requireWorkshop();
-  const supabase = await createClient();
-  const { data: _wo } = await supabase.from('work_orders')
+  
+  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: _wo } = await supabaseAdmin.from('work_orders')
     .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*)))')
     .eq('id', id)
     .eq('organization_id', user.workshopId)
@@ -189,6 +195,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
              (wo.status === 'received' ? 'Ingreso a revisión' : 'Reparado')),
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status,
+    customerObservations: wo.customer_observations || '',
     depositAmount: parsedDeposit,
     images: wo.work_order_evidences ? wo.work_order_evidences.map((e: any) => ({
         id: e.id,
