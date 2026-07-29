@@ -19,24 +19,21 @@ export async function getDashboardData() {
   const ingresosMes = (salesThisMonth || []).reduce((sum, sale) => sum + Number(sale.total), 0)
 
   // 2. Motos en Taller & 3. Órdenes Activas
-  // These are basically the same in this context (work orders not Entregado)
-  const { count: activeWorkOrdersCount, error: e2 } = await supabase
+  const { data: wosData, error: e2 } = await supabase
     .from('work_orders')
-    .select('*', { count: 'exact', head: true })
-    .eq('organization_id', user.workshopId)
-    .neq('status', 'Entregado')
+    .select('id, status, motorcycle_id, sales(id, status)')
+    .eq('organization_id', user.workshopId);
     
-  if (e2) console.error('Dashboard Error (active WO):', e2)
+  if (e2) console.error('Dashboard Error (WOs for stats):', e2)
 
-  const { data: motosEnTallerData, error: e3 } = await supabase
-    .from('work_orders')
-    .select('motorcycle_id')
-    .eq('organization_id', user.workshopId)
-    .neq('status', 'Entregado')
+  const activeWorkOrders = (wosData || []).filter(wo => {
+    const salesArr = wo.sales ? (Array.isArray(wo.sales) ? wo.sales : [wo.sales]) : [];
+    const hasCompletedSale = salesArr.some((s: any) => s.status === 'paid');
+    return !hasCompletedSale && wo.status !== 'delivered';
+  });
 
-  if (e3) console.error('Dashboard Error (motos en taller):', e3)
-  
-  const motosEnTallerSet = new Set((motosEnTallerData || []).map(wo => wo.motorcycle_id).filter(Boolean));
+  const activeWorkOrdersCount = activeWorkOrders.length;
+  const motosEnTallerSet = new Set(activeWorkOrders.map(wo => wo.motorcycle_id).filter(Boolean));
   const motosEnTallerCount = motosEnTallerSet.size;
 
   // 4. Stock Crítico

@@ -34,23 +34,34 @@ import { Eye } from 'lucide-react';
 export default async function WorkOrdersPage({
   searchParams,
 }: {
-  searchParams: { query?: string; page?: string };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await authorize('/work-orders');
   const resolvedSearchParams = await searchParams;
-  const query = resolvedSearchParams.query || '';
-  const currentPage = Number(resolvedSearchParams.page) || 1;
+  const query = (resolvedSearchParams.query as string) || '';
+  const activePage = Number(resolvedSearchParams.activePage) || 1;
+  const completedPage = Number(resolvedSearchParams.completedPage) || 1;
 
   const [workOrdersData, motorcycles, technicians] = await Promise.all([
-    getWorkOrders({ query, page: currentPage, limit: 20 }),
+    getWorkOrders(),
     getMotorcycles(),
     getTechnicians(),
   ]);
 
   const workOrders = workOrdersData.items;
-  const totalPages = workOrdersData.totalPages;
-  const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
-  const completedWorkOrders = workOrders.filter((wo) => wo.status === 'Entregado' && wo.quoteStatus === 'Aprobada');
+  
+  // Filter all work orders
+  const allActiveWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
+  const allCompletedWorkOrders = workOrders.filter((wo) => wo.status === 'Entregado');
+  
+  // Pagination logic
+  const itemsPerPage = 10;
+  
+  const totalActivePages = Math.ceil(allActiveWorkOrders.length / itemsPerPage) || 1;
+  const activeWorkOrders = allActiveWorkOrders.slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage);
+
+  const totalCompletedPages = Math.ceil(allCompletedWorkOrders.length / itemsPerPage) || 1;
+  const completedWorkOrders = allCompletedWorkOrders.slice((completedPage - 1) * itemsPerPage, completedPage * itemsPerPage);
 
   const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
     (moto) => !activeWorkOrders.some((wo) => wo.motorcycle.id === moto.id)
@@ -87,7 +98,7 @@ export default async function WorkOrdersPage({
         <CardHeader className="pb-3">
           <CardTitle className="text-2xl">Trabajos Activos</CardTitle>
           <CardDescription className="text-muted-foreground text-base">
-            Todas las órdenes de trabajo actuales y pasadas. Página {currentPage} de {totalPages}
+            Todas las órdenes de trabajo actuales y pasadas. Página {activePage} de {totalActivePages}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -149,18 +160,19 @@ export default async function WorkOrdersPage({
           </Table>
         </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Pagination for Active Work Orders */}
+          {totalActivePages > 1 && (
             <div className="mt-6 flex justify-center">
               <div className="flex items-center space-x-2">
                 {/* Previous Button */}
                 <a
                   href={`/work-orders?${new URLSearchParams({
                     ...(query && { query }),
-                    page: Math.max(1, currentPage - 1).toString(),
+                    ...(completedPage > 1 && { completedPage: completedPage.toString() }),
+                    activePage: Math.max(1, activePage - 1).toString(),
                   }).toString()}`}
                   className={`px-4 py-2 text-sm font-medium text-foreground bg-card/50 border border-border/50 rounded-lg hover:bg-card/80 transition-colors ${
-                    currentPage === 1 ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    activePage === 1 ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
                   }`}
                 >
                   ← Anterior
@@ -168,19 +180,20 @@ export default async function WorkOrdersPage({
 
                 {/* Page Numbers */}
                 <div className="flex items-center space-x-2">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                    if (pageNum > totalPages) return null;
+                  {Array.from({ length: Math.min(5, totalActivePages) }, (_, i) => {
+                    const pageNum = Math.max(1, Math.min(totalActivePages - 4, activePage - 2)) + i;
+                    if (pageNum > totalActivePages) return null;
 
                     return (
                       <a
                         key={pageNum}
                         href={`/work-orders?${new URLSearchParams({
                           ...(query && { query }),
-                          page: pageNum.toString(),
+                          ...(completedPage > 1 && { completedPage: completedPage.toString() }),
+                          activePage: pageNum.toString(),
                         }).toString()}`}
                         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          pageNum === currentPage
+                          pageNum === activePage
                             ? 'bg-blue-600 text-foreground'
                             : 'text-foreground bg-card/50 border border-border/50 hover:bg-card/80'
                         }`}
@@ -195,10 +208,11 @@ export default async function WorkOrdersPage({
                 <a
                   href={`/work-orders?${new URLSearchParams({
                     ...(query && { query }),
-                    page: Math.min(totalPages, currentPage + 1).toString(),
+                    ...(completedPage > 1 && { completedPage: completedPage.toString() }),
+                    activePage: Math.min(totalActivePages, activePage + 1).toString(),
                   }).toString()}`}
                   className={`px-4 py-2 text-sm font-medium text-foreground bg-card/50 border border-border/50 rounded-lg hover:bg-card/80 transition-colors ${
-                    currentPage === totalPages ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    activePage === totalActivePages ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
                   }`}
                 >
                   Siguiente →
@@ -214,7 +228,7 @@ export default async function WorkOrdersPage({
           <CardHeader className="pb-3">
             <CardTitle className="text-2xl">Trabajos Finalizados</CardTitle>
             <CardDescription className="text-muted-foreground text-base">
-              Órdenes de trabajo que ya han sido entregadas al cliente.
+              Órdenes de trabajo que ya han sido entregadas al cliente. Página {completedPage} de {totalCompletedPages}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -273,6 +287,67 @@ export default async function WorkOrdersPage({
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination for Completed Work Orders */}
+            {totalCompletedPages > 1 && (
+              <div className="mt-6 flex justify-center">
+                <div className="flex items-center space-x-2">
+                  {/* Previous Button */}
+                  <a
+                    href={`/work-orders?${new URLSearchParams({
+                      ...(query && { query }),
+                      ...(activePage > 1 && { activePage: activePage.toString() }),
+                      completedPage: Math.max(1, completedPage - 1).toString(),
+                    }).toString()}`}
+                    className={`px-4 py-2 text-sm font-medium text-foreground bg-card/50 border border-border/50 rounded-lg hover:bg-card/80 transition-colors ${
+                      completedPage === 1 ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    }`}
+                  >
+                    ← Anterior
+                  </a>
+
+                  {/* Page Numbers */}
+                  <div className="flex items-center space-x-2">
+                    {Array.from({ length: Math.min(5, totalCompletedPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalCompletedPages - 4, completedPage - 2)) + i;
+                      if (pageNum > totalCompletedPages) return null;
+
+                      return (
+                        <a
+                          key={pageNum}
+                          href={`/work-orders?${new URLSearchParams({
+                            ...(query && { query }),
+                            ...(activePage > 1 && { activePage: activePage.toString() }),
+                            completedPage: pageNum.toString(),
+                          }).toString()}`}
+                          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            pageNum === completedPage
+                              ? 'bg-blue-600 text-foreground'
+                              : 'text-foreground bg-card/50 border border-border/50 hover:bg-card/80'
+                          }`}
+                        >
+                          {pageNum}
+                        </a>
+                      );
+                    })}
+                  </div>
+
+                  {/* Next Button */}
+                  <a
+                    href={`/work-orders?${new URLSearchParams({
+                      ...(query && { query }),
+                      ...(activePage > 1 && { activePage: activePage.toString() }),
+                      completedPage: Math.min(totalCompletedPages, completedPage + 1).toString(),
+                    }).toString()}`}
+                    className={`px-4 py-2 text-sm font-medium text-foreground bg-card/50 border border-border/50 rounded-lg hover:bg-card/80 transition-colors ${
+                      completedPage === totalCompletedPages ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    }`}
+                  >
+                    Siguiente →
+                  </a>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

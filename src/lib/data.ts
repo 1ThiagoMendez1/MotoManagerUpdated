@@ -98,7 +98,7 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
   const user = await requireWorkshop();
   const supabase = await createClient();
   const { data } = await supabase.from('work_orders')
-    .select('*, motorcycles(*), customers(*)')
+    .select('*, motorcycles(*), customers(*), sales(id, status)')
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
@@ -106,7 +106,10 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
 
   const technicians = await getTechnicians();
 
-  const items: WorkOrder[] = data.map((wo: any) => ({
+  const items: WorkOrder[] = data.map((wo: any) => {
+    const hasCompletedSale = wo.sales && wo.sales.some((s: any) => s.status === 'paid');
+    
+    return {
     id: wo.id,
     workOrderNumber: `WO-${wo.order_number}`,
     motorcycle: wo.motorcycles ? {
@@ -128,7 +131,7 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
-    status: wo.status === 'delivered' ? 'Entregado' : 
+    status: hasCompletedSale || wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'received' ? 'Ingreso a revisión' :
             wo.status === 'diagnosis' ? 'Diagnosticando' : 
             'Reparado',
@@ -145,7 +148,8 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
       }
       return parsed;
     })()
-  }));
+    };
+  });
 
   return { items, totalPages: 1 };
 };
