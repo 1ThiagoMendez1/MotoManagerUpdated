@@ -260,11 +260,17 @@ export async function sendQuoteNotification(
         to: formattedPhone,
         type: 'template',
         template: {
-          name: 'diagnostico_aprobacion_cliente',
+          name: 'resultado_de_diagnostico',
           language: {
-            code: 'es' // Asegúrate de que este código coincida con el de tu plantilla (ej. es_MX, es_CO, es)
+            code: 'es_CO' // Asegúrate de que este código coincida con el de tu plantilla (ej. es_MX, es_CO, es)
           },
           components: [
+            {
+              type: 'header',
+              parameters: [
+                { type: 'text', text: '¡Resultado listo!' }
+              ]
+            },
             {
               type: 'body',
               parameters: [
@@ -312,9 +318,15 @@ export async function sendQuoteNotification(
             to: formattedPhone,
             type: 'template',
             template: {
-              name: 'diagnostico_aprobacion_cliente',
-              language: { code: 'es' },
+              name: 'resultado_de_diagnostico',
+              language: { code: 'es_CO' },
               components: [
+                {
+                  type: 'header',
+                  parameters: [
+                    { type: 'text', text: '¡Resultado listo!' }
+                  ]
+                },
                 {
                   type: 'body',
                   parameters: [
