@@ -22,6 +22,7 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
   const [selectedItem, setSelectedItem] = useState('');
   const [quantity, setQuantity] = useState<number | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isPending, setIsPending] = useState(false);
   const { toast } = useToast();
 
   // Filter inventory based on search term
@@ -32,10 +33,62 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
     )
     : inventory;
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedItem) {
+      toast({
+        title: "Error",
+        description: "Por favor, selecciona un artículo del inventario.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!quantity || Number(quantity) <= 0) {
+      toast({
+        title: "Error",
+        description: "Por favor, ingresa una cantidad válida mayor a 0.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsPending(true);
+    try {
+      const formData = new FormData();
+      formData.append('workOrderId', workOrderId);
+      formData.append('inventoryItemId', selectedItem);
+      formData.append('quantity', quantity.toString());
+
+      const result = await addItemToWorkOrder(formData);
+      if (result && !result.success) {
+        toast({
+          title: "Error al agregar artículo",
+          description: result.error || "No se pudo agregar el repuesto a la orden.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Artículo agregado",
+          description: "El repuesto se agregó correctamente a la orden.",
+        });
+        setSelectedItem('');
+        setQuantity('');
+        setSearchTerm('');
+      }
+    } catch (error: any) {
+      console.error("Error al agregar repuesto:", error);
+      toast({
+        title: "Error de red",
+        description: "No se pudo conectar con el servidor para agregar el repuesto.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPending(false);
+    }
+  };
+
   return (
-    <form action={addItemToWorkOrder} className="flex flex-col gap-4 mb-4">
-      <input type="hidden" name="workOrderId" value={workOrderId} />
-      <input type="hidden" name="inventoryItemId" value={selectedItem} />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 mb-4">
       <div className="flex flex-col sm:flex-row gap-2">
         <Input
           type="text"
@@ -47,6 +100,7 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
         <Select
           value={selectedItem}
           onValueChange={setSelectedItem}
+          disabled={isPending}
         >
           <SelectTrigger className="bg-background text-foreground border border-border/50 rounded-md flex-1 min-w-[200px]">
             <SelectValue placeholder="Seleccionar artículo" />
@@ -67,6 +121,7 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
           type="number"
           name="quantity"
           value={quantity}
+          disabled={isPending}
           onChange={(e) => {
             const val = e.target.value;
             if (val === '') {
@@ -93,8 +148,12 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
         />
       </div>
       <div className="flex justify-end mt-2">
-        <Button type="submit" className="bg-green-600 hover:bg-green-700">
-          Agregar
+        <Button 
+          type="submit" 
+          className="bg-green-600 hover:bg-green-700"
+          disabled={isPending || !selectedItem || !quantity}
+        >
+          {isPending ? "Agregando..." : "Agregar"}
         </Button>
       </div>
     </form>

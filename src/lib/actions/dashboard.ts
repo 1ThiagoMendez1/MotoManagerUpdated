@@ -4,6 +4,7 @@ import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminC
 export async function getDashboardData() {
   const user = await requireWorkshop()
   const supabase = await createAdminClient()
+  const workshop = await getWorkshopDetails(user)
 
   // 1. Ingresos del Mes (Revenue this month)
   const now = new Date()
@@ -113,7 +114,7 @@ export async function getDashboardData() {
     alerts.push({ text: "Todo está al día en tu taller.", time: "Ahora", urgent: false })
   }
 
-  console.log('DEBUG DASHBOARD:', { ingresosMes, motosEnTallerCount, activeWorkOrdersCount, stockCriticoCount, workshopId: user.workshopId });
+  console.log('DEBUG DASHBOARD:', { ingresosMes, motosEnTallerCount, activeWorkOrdersCount, stockCriticoCount, workshopId: user.workshopId, workshopName: workshop?.name });
 
   return {
     success: true,
@@ -124,7 +125,8 @@ export async function getDashboardData() {
       stockCriticoCount,
       revenueData,
       topPartsData,
-      alerts
+      alerts,
+      workshopName: workshop?.name || 'Mi Taller'
     }
   }
 }

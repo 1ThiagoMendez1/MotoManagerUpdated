@@ -17,7 +17,7 @@ export function ExportServiceSalesButton({ sales }: ExportServiceSalesButtonProp
       'Fecha': new Date(sale.date).toLocaleDateString('es-CO'),
       'Cliente': sale.workOrder?.motorcycle.customer.name || 'N/A',
       'Vehículo': sale.workOrder ? `${sale.workOrder.motorcycle.make} ${sale.workOrder.motorcycle.model} (${sale.workOrder.motorcycle.plate})` : 'N/A',
-      'Técnico': sale.workOrder?.technician.name || 'N/A',
+      'Técnico': sale.workOrder?.technician?.name || 'N/A',
       'Orden de Trabajo': sale.workOrder?.workOrderNumber || 'N/A',
       'Método de Pago': sale.paymentMethod || 'N/A',
       'Total': sale.total,

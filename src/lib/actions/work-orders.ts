@@ -301,81 +301,105 @@ export async function updateWorkOrderSolution(formData: FormData) {
 }
 
 export async function addItemToWorkOrder(formData: FormData) {
-    const user = await requireWorkshop();
-    const supabase = await createClient();
+    try {
+        const user = await requireWorkshop();
+        const supabase = await createClient();
 
-    const workOrderId = formData.get('workOrderId') as string;
-    const itemId = formData.get('inventoryItemId') as string;
-    const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
+        const workOrderId = formData.get('workOrderId') as string;
+        const itemId = formData.get('inventoryItemId') as string;
+        const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
 
-    // Obtener estado de la orden para saber si descontamos de una vez
-    const { data: orderData } = await supabase
-        .from('work_orders')
-        .select('status')
-        .eq('id', workOrderId)
-        .single();
-    
-    const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(orderData?.status);
+        if (!workOrderId) {
+            return { success: false, error: 'ID de la orden de trabajo no proporcionado.' };
+        }
 
-    // Obtener detalles del item
-    const { data: inventoryItem } = await supabase
-        .from('inventory_items')
-        .select('*')
-        .eq('id', itemId)
-        .single();
+        if (!itemId) {
+            return { success: false, error: 'Por favor, selecciona un artículo del inventario.' };
+        }
+
+        // Obtener estado de la orden para saber si descontamos de una vez
+        const { data: orderData } = await supabase
+            .from('work_orders')
+            .select('status')
+            .eq('id', workOrderId)
+            .single();
         
-    if (!inventoryItem) throw new Error('Item no encontrado');
+        const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(orderData?.status);
 
-    // Buscar si ya existe una venta para esta orden
-    let { data: sale } = await supabase
-        .from('sales')
-        .select('id')
-        .eq('work_order_id', workOrderId)
-        .maybeSingle();
-
-    if (!sale) {
-        const { data: newSale, error: saleError } = await supabase
-            .from('sales')
-            .insert({
-                organization_id: user.workshopId,
-                work_order_id: workOrderId,
-                status: 'pending',
-                total: 0
-            })
-            .select()
+        // Obtener detalles del item
+        const { data: inventoryItem } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('id', itemId)
             .single();
             
-        if (saleError) throw new Error('Error al crear venta asociada');
-        sale = newSale;
-    }
-
-    const { error: itemError } = await supabase
-        .from('sale_items')
-        .insert({
-            sale_id: sale.id,
-            item_type: 'inventory',
-            inventory_item_id: itemId,
-            description: inventoryItem.name,
-            quantity: quantity,
-            unit_price: inventoryItem.unit_price,
-            total: quantity * inventoryItem.unit_price
-        });
-
-    if (itemError) throw new Error('Error agregando item a la orden');
-
-    // Descontar inventario inmediatamente si la cotización ya fue aprobada
-    if (isApproved) {
-        const { error: decrementError } = await supabase.rpc('decrement_inventory', {
-            item_id: itemId,
-            amount: quantity
-        });
-        if (decrementError) {
-            console.error('Error al descontar inventario en orden aprobada:', decrementError);
-            throw new Error('Error al descontar inventario de la orden aprobada.');
+        if (!inventoryItem) {
+            return { success: false, error: 'El repuesto seleccionado no existe o no fue encontrado.' };
         }
-    }
 
-    revalidatePath('/work-orders/' + workOrderId);
+        // Buscar si ya existe una venta para esta orden
+        let { data: sale } = await supabase
+            .from('sales')
+            .select('id')
+            .eq('work_order_id', workOrderId)
+            .maybeSingle();
+
+        if (!sale) {
+            const { data: newSale, error: saleError } = await supabase
+                .from('sales')
+                .insert({
+                    organization_id: user.workshopId,
+                    work_order_id: workOrderId,
+                    status: 'pending',
+                    total: 0
+                })
+                .select()
+                .single();
+                
+            if (saleError || !newSale) {
+                return { success: false, error: 'Error al crear la venta asociada a la orden.' };
+            }
+            sale = newSale;
+        }
+
+        if (!sale) {
+            return { success: false, error: 'No se pudo obtener la venta asociada.' };
+        }
+
+        const { error: itemError } = await supabase
+            .from('sale_items')
+            .insert({
+                sale_id: sale.id,
+                item_type: 'inventory',
+                inventory_item_id: itemId,
+                description: inventoryItem.name,
+                quantity: quantity,
+                unit_price: inventoryItem.unit_price,
+                total: quantity * inventoryItem.unit_price
+            });
+
+        if (itemError) {
+            return { success: false, error: 'Error al agregar el repuesto a la orden.' };
+        }
+
+        // Descontar inventario inmediatamente si la cotización ya fue aprobada
+        if (isApproved) {
+            const { error: decrementError } = await supabase.rpc('decrement_inventory', {
+                item_id: itemId,
+                amount: quantity
+            });
+            if (decrementError) {
+                console.error('Error al descontar inventario en orden aprobada:', decrementError);
+                return { success: false, error: 'Stock insuficiente o error al descontar del inventario.' };
+            }
+        }
+
+        revalidatePath('/work-orders/' + workOrderId);
+        return { success: true };
+    } catch (e: any) {
+        console.error('Error in addItemToWorkOrder server action:', e);
+        return { success: false, error: e.message || 'Ocurrió un error inesperado al agregar el artículo.' };
+    }
 }
 
 export async function removeItemFromWorkOrder(formData: FormData) {

@@ -99,6 +99,10 @@ export async function createServiceSale(prevState: any, formData: FormData) {
     const user = await requireWorkshop();
     const supabase = await createClient(); // Cliente real
 
+    // Fetch workshop name for receipt
+    const { data: orgData } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
+    const workshopName = orgData?.name || 'MotoManager';
+
     try {
         const itemsRaw = formData.get('items') as string;
         const items = JSON.parse(itemsRaw || '[]');
@@ -373,6 +377,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             paymentMethod: mapPaymentMethodToUi(dbPaymentMethod),
             workOrderId: wo?.order_number,
             customerName: formattedCustomer ? `${formattedCustomer.first_name} ${formattedCustomer.last_name}`.trim() : undefined,
+            workshopName: workshopName,
             motorcycleInfo: fomattedMotorcycle ? {
                 make: fomattedMotorcycle.brand,
                 model: fomattedMotorcycle.model,

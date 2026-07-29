@@ -69,7 +69,7 @@ export type WorkOrder = {
   quote_status?: 'pending' | 'approved' | 'rejected' | null;
   quote_responded_at?: string | null;
   customerObservations?: string | null;
-  quote_responded_at?: string | null;
+  workshop?: { name: string } | null;
   sales?: any[];
   images?: WorkOrderImage[];
 };
@@ -91,11 +91,16 @@ export type Sale = {
   customerId?: string | null;
   customer?: Customer;
   customerName?: string;
+  workshopName?: string;
   items?: SaleItem[];
   date: string;
   total: number;
   paymentMethod?: string;
   depositAmount?: number;
+  subtotal?: number;
+  discountPercentage?: number;
+  discountTotal?: number;
+  laborCost?: number;
 };
 
 export type Reminder = {

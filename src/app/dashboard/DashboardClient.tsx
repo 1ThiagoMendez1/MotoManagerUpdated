@@ -63,66 +63,214 @@ export default function DashboardPage() {
     stockCriticoCount: 0,
     revenueData: [] as any[],
     topPartsData: [] as any[],
-    alerts: [] as any[]
+    alerts: [] as any[],
+    workshopName: ''
   });
 
-  const generatePDFReport = () => {
+  const generatePDFReport = (currentStats: typeof stats) => {
     const doc = new jsPDF();
     
     // Función para dibujar el reporte cuando la imagen cargue (o si falla)
     const renderReport = (imgData: HTMLImageElement | null) => {
-      let startY = 20;
-
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      // 1. HEADER LOGO & TITLE
       if (imgData) {
         try {
-          doc.addImage(imgData, 'PNG', 14, 10, 40, 15);
+          doc.addImage(imgData, 'PNG', 14, 12, 36, 12);
         } catch (e) {
           console.error('Error al agregar el logo', e);
         }
       }
       
-      doc.setFontSize(22);
-      doc.setTextColor(40);
-      doc.text("Reporte General del Taller", imgData ? 60 : 14, 22);
+      // Título Principal con Nombre del Taller
+      const workshopLabel = currentStats.workshopName ? ` "${currentStats.workshopName}"` : '';
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(15, 23, 42); // Slate 900
+      doc.text(`Reporte General del Taller${workshopLabel}`, imgData ? 54 : 14, 20);
       
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString('es-CO')}`, 14, 40);
+      // Fecha y hora
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139); // Slate 500
+      const formattedDate = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+      const formattedTime = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+      doc.text(`Generado el ${formattedDate} a las ${formattedTime}`, imgData ? 54 : 14, 25);
 
-      // Línea separadora
-      doc.setDrawColor(200);
-      doc.line(14, 45, doc.internal.pageSize.getWidth() - 14, 45);
+      // Línea divisora superior gruesa
+      doc.setDrawColor(226, 232, 240); // Slate 200
+      doc.setLineWidth(0.5);
+      doc.line(14, 32, pageWidth - 14, 32);
 
-      // Tabla de Resumen
-      doc.setFontSize(14);
-      doc.setTextColor(40);
-      doc.text("Resumen de Operaciones", 14, 55);
+      // 2. TARJETAS DE KPI (Grid Horizontal de 4 columnas)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Resumen de Operaciones", 14, 40);
 
       const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-      const tableData = [
-        ["Ingresos del Mes", formatCurrency(stats.ingresosMes)],
-        ["Motos en Taller", stats.motosEnTallerCount.toString()],
-        ["Órdenes Activas", stats.activeWorkOrdersCount.toString()],
-        ["Stock Crítico", stats.stockCriticoCount.toString()]
+      const kpis = [
+        { label: "Ingresos del Mes", value: formatCurrency(currentStats.ingresosMes), color: [59, 130, 246] }, // Azul
+        { label: "Motos en Taller", value: currentStats.motosEnTallerCount.toString(), color: [16, 185, 129] }, // Verde
+        { label: "Órdenes Activas", value: currentStats.activeWorkOrdersCount.toString(), color: [245, 158, 11] }, // Naranja
+        { label: "Stock Crítico", value: currentStats.stockCriticoCount.toString(), color: [239, 68, 68] } // Rojo
       ];
 
-      autoTable(doc, {
-        startY: 60,
-        head: [['Métrica', 'Valor']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] },
-        styles: { fontSize: 11, cellPadding: 4 },
-        margin: { left: 14 }
+      const startX = 14;
+      const startY = 45;
+      const cardGap = 4;
+      const usableWidth = pageWidth - 28; // 182
+      const cardWidth = (usableWidth - (cardGap * 3)) / 4; // ~42.5
+      const cardHeight = 22;
+
+      kpis.forEach((kpi, idx) => {
+        const x = startX + idx * (cardWidth + cardGap);
+        // Dibujar fondo de tarjeta
+        doc.setFillColor(248, 250, 252); // Slate 50
+        doc.roundedRect(x, startY, cardWidth, cardHeight, 1.5, 1.5, 'F');
+        
+        // Dibujar barra de color acento a la izquierda
+        doc.setFillColor(kpi.color[0], kpi.color[1], kpi.color[2]);
+        doc.rect(x, startY, 2.5, cardHeight, 'F');
+
+        // Label
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139); // Slate 500
+        doc.text(kpi.label.toUpperCase(), x + 5, startY + 7);
+
+        // Valor
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42); // Slate 900
+        doc.text(kpi.value, x + 5, startY + 16);
       });
 
-      // Footer
-      doc.setFontSize(10);
-      doc.setTextColor(150);
-      doc.text("Generado por MotoManager - Software de Gestión de Talleres", 14, doc.internal.pageSize.getHeight() - 10);
+      // 3. TABLAS DE RENDIMIENTO Y ROTACIÓN (Paralelo)
+      const tableStartY = 76;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Flujo de Caja Semanal", 14, tableStartY);
+      doc.text("Repuestos de Mayor Rotación", 112, tableStartY);
 
-      doc.save("Reporte_Taller.pdf");
+      const revenueTableData = currentStats.revenueData.map(item => [item.name, formatCurrency(item.ingresos)]);
+      const partsTableData = currentStats.topPartsData.map(item => [item.name, item.ventas.toString()]);
+
+      // Tabla 1: Flujo de Caja
+      autoTable(doc, {
+        startY: tableStartY + 4,
+        head: [['Día', 'Ingresos']],
+        body: revenueTableData.length > 0 ? revenueTableData : [['Sin datos', '$ 0']],
+        theme: 'striped',
+        tableWidth: 83,
+        margin: { left: 14 },
+        headStyles: { fillColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', halign: 'left' },
+        styles: { fontSize: 8.5, cellPadding: 3, textColor: [51, 65, 85] },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          1: { cellWidth: 43, halign: 'right' }
+        }
+      });
+
+      // Tabla 2: Repuestos más vendidos
+      autoTable(doc, {
+        startY: tableStartY + 4,
+        head: [['Repuesto', 'Ventas']],
+        body: partsTableData.length > 0 ? partsTableData : [['Sin datos', '0']],
+        theme: 'striped',
+        tableWidth: 83,
+        margin: { left: 112 },
+        headStyles: { fillColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', halign: 'left' },
+        styles: { fontSize: 8.5, cellPadding: 3, textColor: [51, 65, 85] },
+        columnStyles: {
+          0: { cellWidth: 55 },
+          1: { cellWidth: 28, halign: 'right' }
+        }
+      });
+
+      // Obtener el final Y de las tablas
+      const finalY = Math.max(
+        (doc as any).lastAutoTable?.finalY || 140,
+        140
+      );
+
+      // 4. SECCIÓN DE ALERTAS Y NOTIFICACIONES
+      const alertsStartY = finalY + 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Alertas y Estado Operativo", 14, alertsStartY);
+
+      let currentAlertY = alertsStartY + 4;
+      if (currentStats.alerts && currentStats.alerts.length > 0) {
+        currentStats.alerts.forEach((alert: any) => {
+          const isUrgent = alert.urgent;
+          const bgR = isUrgent ? 254 : 239;
+          const bgG = isUrgent ? 242 : 246;
+          const bgB = isUrgent ? 242 : 255;
+          const borderR = isUrgent ? 252 : 191;
+          const borderG = isUrgent ? 165 : 219;
+          const borderB = isUrgent ? 165 : 254;
+          const textR = isUrgent ? 153 : 30;
+          const textG = isUrgent ? 27 : 64;
+          const textB = isUrgent ? 27 : 175;
+
+          // Dibujar caja de alerta
+          doc.setFillColor(bgR, bgG, bgB);
+          doc.setDrawColor(borderR, borderG, borderB);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(14, currentAlertY, pageWidth - 28, 10, 1, 1, 'FD');
+
+          // Dibujar punto indicador
+          doc.setFillColor(textR, textG, textB);
+          doc.circle(18, currentAlertY + 5, 1.2, 'F');
+
+          // Texto
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8.5);
+          doc.setTextColor(textR, textG, textB);
+          doc.text(alert.text, 22, currentAlertY + 6.2);
+
+          // Link o etiqueta de tiempo a la derecha
+          doc.setFontSize(7.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(alert.time || "Reciente", pageWidth - 25, currentAlertY + 6, { align: 'right' });
+
+          currentAlertY += 13;
+        });
+      } else {
+        // Caja de estado ok
+        doc.setFillColor(240, 253, 244); // Verde 50
+        doc.setDrawColor(187, 247, 208); // Verde 200
+        doc.setLineWidth(0.3);
+        doc.roundedRect(14, currentAlertY, pageWidth - 28, 10, 1, 1, 'FD');
+
+        doc.setFillColor(22, 163, 74); // Verde 600
+        doc.circle(18, currentAlertY + 5, 1.2, 'F');
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(21, 128, 61); // Verde 700
+        doc.text("El taller no registra alertas críticas en este momento. Operaciones normales.", 22, currentAlertY + 6.2);
+      }
+
+      // 5. FOOTER
+      // Línea divisora footer
+      doc.setDrawColor(226, 232, 240); // Slate 200
+      doc.setLineWidth(0.5);
+      doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(148, 163, 184); // Slate 400
+      doc.text("Generado por MotoManager - CRM", 14, pageHeight - 10);
+      doc.text("Software de gestión y optimización de talleres mecánicos", pageWidth - 14, pageHeight - 10, { align: 'right' });
+
+      doc.save(`Reporte_Taller_${currentStats.workshopName ? currentStats.workshopName.replace(/\s+/g, '_') : 'General'}.pdf`);
     };
 
     const img = new Image();
@@ -167,7 +315,7 @@ export default function DashboardPage() {
             <Button 
               id="tour-reporte"
               className="bg-primary hover:bg-primary/90 text-primary-foreground print:hidden"
-              onClick={generatePDFReport}
+              onClick={() => generatePDFReport(stats)}
             >
               Generar Reporte
             </Button>

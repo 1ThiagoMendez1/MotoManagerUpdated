@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Eye, X } from 'lucide-react';
+import { Eye, X, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,6 +31,56 @@ function formatCurrency(amount: number) {
 
 export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrintReceipt = async () => {
+    setIsPrinting(true);
+    try {
+      const { printReceipt } = await import('@/lib/pdfGenerator');
+      
+      const formattedItems = sale.items?.map(item => {
+        const inventoryItem = inventoryItems.find(inv => inv.id === item.inventoryItemId);
+        return {
+          name: item.name || inventoryItem?.name || 'Producto',
+          sku: item.sku || inventoryItem?.sku || '-',
+          category: inventoryItem?.category,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity
+        };
+      }) || [];
+
+      const receiptData = {
+        saleNumber: sale.saleNumber.replace('SALE-', ''),
+        date: sale.date,
+        customerName: sale.customerName || sale.customer?.name || 'Cliente de Mostrador',
+        paymentMethod: sale.paymentMethod,
+        workshopName: sale.workshopName || 'MotoManager',
+        items: formattedItems,
+        laborCost: sale.laborCost || 0,
+        subtotal: sale.subtotal || sale.total,
+        discountPercentage: sale.discountPercentage || 0,
+        discountAmount: sale.discountTotal || 0,
+        depositAmount: sale.depositAmount || 0,
+        remainingBalance: sale.depositAmount && sale.depositAmount > 0 ? Math.max(0, sale.total - sale.depositAmount) : undefined,
+        total: sale.total,
+        workOrderId: sale.workOrder?.workOrderNumber?.replace('WO-', '') || sale.workOrderId || undefined,
+        motorcycleInfo: sale.workOrder?.motorcycle ? {
+          make: sale.workOrder.motorcycle.make,
+          model: sale.workOrder.motorcycle.model,
+          year: sale.workOrder.motorcycle.year,
+          plate: sale.workOrder.motorcycle.plate
+        } : undefined,
+        technicianName: sale.workOrder?.technician?.name || undefined
+      };
+
+      printReceipt(receiptData);
+    } catch (error) {
+      console.error('Error al imprimir comprobante:', error);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   const getSaleDetails = (sale: Sale) => {
     if (sale.workOrderId && sale.workOrder) {
@@ -212,6 +262,31 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
             <div className="text-sm text-muted-foreground">
               {getSaleDetails(sale)}
             </div>
+          </div>
+
+          {/* Botones de acción */}
+          <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
+              Cerrar
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={handlePrintReceipt} 
+              disabled={isPrinting}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isPrinting ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                  Imprimiendo...
+                </>
+              ) : (
+                <>
+                  <Printer className="h-3.5 w-3.5 mr-1.5" />
+                  Imprimir Comprobante
+                </>
+              )}
+            </Button>
           </div>
         </div>
       </DialogContent>

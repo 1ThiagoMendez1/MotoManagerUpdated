@@ -2,6 +2,15 @@ import { createClient } from '@/lib/supabase/server';
 import { requireWorkshop } from '@/lib/auth-server';
 import type { Customer, Motorcycle, Technician, InventoryItem, WorkOrder, Sale, Reminder } from './types';
 
+const mapPaymentMethodToUi = (dbMethod: string | null | undefined): string => {
+  if (!dbMethod) return 'Efectivo';
+  const method = dbMethod.toLowerCase();
+  if (method === 'cash') return 'Efectivo';
+  if (method === 'credit_card' || method === 'debit_card') return 'Tarjeta';
+  if (method === 'transfer') return 'Transferencia';
+  return dbMethod.charAt(0).toUpperCase() + dbMethod.slice(1);
+};
+
 export const getCustomers = async (): Promise<Customer[]> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
@@ -241,7 +250,7 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
   const supabase = await createClient();
   
   let query = supabase.from('sales')
-    .select('*, customers(*), sale_items(*), work_orders(customer_observations)')
+    .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, motorcycles(*, customers(*)))')
     .eq('organization_id', user.workshopId)
     .neq('status', 'pending');
     
@@ -251,42 +260,111 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
     query = query.not('work_order_id', 'is', null);
   }
   
-  const { data } = await query
-    .order('created_at', { ascending: false })
-    .limit(params.limit || 1000);
+  const [technicians, { data }, orgResult] = await Promise.all([
+    getTechnicians(),
+    query.order('created_at', { ascending: false }).limit(params.limit || 1000),
+    supabase.from('organizations').select('name').eq('id', user.workshopId).single()
+  ]);
+
+  const workshopName = orgResult.data?.name || 'MotoManager';
 
   if (!data) return { items: [], totalPages: 0 };
 
   const items: Sale[] = data.map((s: any) => {
-    // Parse deposit amount from work order's customer_observations
-    let depositAmount = 0;
-    const woData = s.work_orders;
-    if (woData?.customer_observations) {
+    // Buscar mano de obra entre los sale_items
+    const laborItem = s.sale_items?.find((si: any) => si.item_type === 'service');
+    const laborCost = laborItem ? Number(laborItem.unit_price) : 0;
+
+    // Parse deposit amount from work order's customer_observations o de la venta
+    let depositAmount = Number(s.deposit_amount) || 0;
+    const woRaw = s.work_orders;
+    const woData = Array.isArray(woRaw) ? woRaw[0] : woRaw;
+    
+    if (depositAmount === 0 && woData?.customer_observations) {
       const match = woData.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
       if (match) {
         depositAmount = parseFloat(match[1]);
       }
     }
 
+    let workOrder = undefined;
+    if (woData) {
+      const mcRaw = woData.motorcycles;
+      const mc = Array.isArray(mcRaw) ? mcRaw[0] : mcRaw;
+      const custRaw = mc?.customers;
+      const cust = Array.isArray(custRaw) ? custRaw[0] : custRaw;
+
+      workOrder = {
+        id: woData.id,
+        workOrderNumber: `WO-${woData.order_number}`,
+        issueDescription: woData.reported_symptoms,
+        solutionDescription: woData.technical_diagnosis,
+        status: woData.status === 'delivered' ? 'Entregado' : 
+                woData.status === 'received' ? 'Ingreso a revisión' :
+                woData.status === 'diagnosis' ? 'Diagnosticando' : 
+                'Reparado',
+        technician: technicians.find(t => t.id === woData.assigned_mechanic_id) || null,
+        motorcycle: mc ? {
+          id: mc.id,
+          make: mc.brand || '',
+          model: mc.model || '',
+          year: mc.model_year || 0,
+          plate: mc.license_plate || '',
+          intakeDate: mc.created_at,
+          customer: cust ? {
+            id: cust.id,
+            name: `${cust.first_name} ${cust.last_name}`,
+            email: cust.email || '',
+            phone: cust.phone,
+            cedula: cust.document_number
+          } : { id: '', name: 'Desconocido', email: '' }
+        } : undefined
+      } as any;
+    }
+
+    // Calcular porcentaje de descuento si existe
+    const subtotal = Number(s.subtotal) || (Number(s.total) + (Number(s.discount_total) || 0));
+    const totalItemsPrice = subtotal - laborCost;
+    const discountTotal = Number(s.discount_total) || 0;
+    let discountPercentage = 0;
+    if (discountTotal > 0 && totalItemsPrice > 0) {
+      discountPercentage = Math.round((discountTotal / totalItemsPrice) * 100);
+    }
+
+    const customerRaw = s.customers;
+    const customerObj = Array.isArray(customerRaw) ? customerRaw[0] : customerRaw;
+
     return {
       id: s.id,
       saleNumber: `SALE-${s.sale_number || s.id.substring(0,6)}`,
       workOrderId: s.work_order_id,
+      workOrder,
       depositAmount,
-      customer: s.customers ? {
-        id: s.customers.id,
-        name: `${s.customers.first_name} ${s.customers.last_name}`,
-        email: s.customers.email || ''
-      } : undefined,
-      customerName: s.customers ? `${s.customers.first_name} ${s.customers.last_name}` : 'Cliente de Mostrador',
+      customer: customerObj ? {
+        id: customerObj.id,
+        name: `${customerObj.first_name} ${customerObj.last_name}`,
+        email: customerObj.email || '',
+        phone: customerObj.phone,
+        cedula: customerObj.document_number
+      } : (workOrder?.motorcycle?.customer || undefined),
+      customerName: customerObj 
+        ? `${customerObj.first_name} ${customerObj.last_name}` 
+        : (workOrder?.motorcycle?.customer?.name || 'Cliente de Mostrador'),
+      workshopName,
       date: s.created_at,
       total: Number(s.total) || 0,
-      paymentMethod: s.payment_method || 'efectivo',
-      items: s.sale_items?.map((si: any) => ({
+      subtotal,
+      discountPercentage,
+      discountTotal,
+      laborCost,
+      paymentMethod: mapPaymentMethodToUi(s.payment_method),
+      items: s.sale_items?.filter((si: any) => si.item_type === 'inventory').map((si: any) => ({
           id: si.id,
           inventoryItemId: si.inventory_item_id,
           quantity: si.quantity,
-          price: Number(si.unit_price)
+          price: Number(si.unit_price),
+          name: si.inventory_items?.name || si.description || 'Producto',
+          sku: si.inventory_items?.code || '-'
       })) || []
     };
   });

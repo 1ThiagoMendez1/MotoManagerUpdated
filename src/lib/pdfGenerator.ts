@@ -90,6 +90,39 @@ export async function generateReceiptPDF(receiptData: ReceiptData): Promise<void
   }
 }
 
+export function printReceipt(data: ReceiptData): void {
+  if (typeof window === 'undefined') return;
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Comprobante de Pago - ${data.saleNumber}</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 20px;
+            background: #fff;
+          }
+        </style>
+      </head>
+      <body>
+        ${generateReceiptHTML(data)}
+        <script>
+          window.onload = () => {
+            window.print();
+            setTimeout(() => {
+              window.close();
+            }, 500);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
 function generateReceiptHTML(data: ReceiptData): string {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
