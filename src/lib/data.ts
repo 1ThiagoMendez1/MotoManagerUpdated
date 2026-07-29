@@ -160,7 +160,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   );
 
   const { data: _wo } = await supabaseAdmin.from('work_orders')
-    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*)))')
+    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*))), organizations(name)')
     .eq('id', id)
     .eq('organization_id', user.workshopId)
     .single();
@@ -182,6 +182,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   return {
     id: wo.id,
     organizationId: user.workshopId,
+    workshop: wo.organizations ? { name: wo.organizations.name } : null,
     workOrderNumber: `WO-${wo.order_number}`,
     motorcycle: wo.motorcycles ? {
       id: wo.motorcycles.id,

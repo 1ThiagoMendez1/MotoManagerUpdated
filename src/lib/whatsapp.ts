@@ -268,7 +268,7 @@ export async function sendQuoteNotification(
             {
               type: 'header',
               parameters: [
-                { type: 'text', text: '¡Resultado listo!' }
+                { type: 'text', text: '🎉' }
               ]
             },
             {
@@ -286,7 +286,7 @@ export async function sendQuoteNotification(
               parameters: [
                 {
                   type: 'text',
-                  text: workOrderId // Asumiendo que el botón tiene una variable dinámica para el ID al final de la URL
+                  text: `cotizacion/${workOrderId}`
                 }
               ]
             }
@@ -324,7 +324,7 @@ export async function sendQuoteNotification(
                 {
                   type: 'header',
                   parameters: [
-                    { type: 'text', text: '¡Resultado listo!' }
+                    { type: 'text', text: '🎉' }
                   ]
                 },
                 {
