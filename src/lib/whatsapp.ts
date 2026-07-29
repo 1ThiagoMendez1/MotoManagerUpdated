@@ -276,7 +276,7 @@ export async function sendQuoteNotification(
               parameters: [
                 { type: 'text', text: customerName || 'Cliente' },
                 { type: 'text', text: workshopName || 'nuestro taller' },
-                { type: 'text', text: `${orderNumber || workOrderId.substring(0, 8)}\n\n🔗 *Enlace para ver cotización:*\n${portalUrl}` }
+                { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
               ]
             },
             {
@@ -332,7 +332,7 @@ export async function sendQuoteNotification(
                   parameters: [
                     { type: 'text', text: customerName || 'Cliente' },
                     { type: 'text', text: workshopName || 'nuestro taller' },
-                    { type: 'text', text: `${orderNumber || workOrderId.substring(0, 8)}\n\n🔗 *Enlace para ver cotización:*\n${portalUrl}` }
+                    { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
                   ]
                 }
               ]
