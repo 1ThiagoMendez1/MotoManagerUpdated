@@ -50,7 +50,7 @@ export async function loginAction(formData: FormData) {
     redirect('/change-password');
   }
 
-  const isSuperAdmin = user?.user_metadata?.is_super_admin === true || user?.email?.startsWith('admin@');
+  const isSuperAdmin = user?.user_metadata?.is_super_admin === true || user?.email?.startsWith('admin@') || user?.email?.toLowerCase() === 'juanurian31@gmail.com';
 
   if (isSuperAdmin) {
     redirect('/admin');

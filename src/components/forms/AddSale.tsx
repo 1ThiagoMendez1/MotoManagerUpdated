@@ -63,6 +63,7 @@ const formSchema = z.object({
   }),
   items: z.array(saleItemSchema).optional(),
   discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
+  depositAmount: z.coerce.number().min(0, "El abono no puede ser negativo.").optional(),
 });
 
 type AddSaleProps = {
@@ -88,6 +89,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
       date: new Date(),
       items: [],
       discountPercentage: 0,
+      depositAmount: undefined,
     },
   });
 
@@ -101,6 +103,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const watchLaborCost = form.watch("laborCost");
   const watchDiscount = form.watch("discountPercentage");
   const watchWorkOrderId = form.watch("workOrderId");
+  const watchDepositAmount = form.watch("depositAmount");
 
   // Cargar automáticamente los ítems ya usados en la orden de trabajo seleccionada
   useEffect(() => {
@@ -139,10 +142,18 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
 
     if (watchWorkOrderId) {
       loadWorkOrderItems(watchWorkOrderId);
+      
+      const selectedWO = workOrders.find(o => o.id === watchWorkOrderId);
+      if (selectedWO?.depositAmount) {
+        form.setValue('depositAmount', selectedWO.depositAmount);
+      } else {
+        form.setValue('depositAmount', undefined as any);
+      }
     } else {
       form.setValue('items', [], { shouldValidate: true });
+      form.setValue('depositAmount', undefined as any);
     }
-  }, [watchWorkOrderId, form]);
+  }, [watchWorkOrderId, form, workOrders]);
 
   const itemsTotal = watchItems?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
   const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
@@ -152,10 +163,8 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const discountAmount = itemsTotal * ((watchDiscount || 0) / 100);
   const total = subtotal - discountAmount;
 
-  // Información de abonos desde la orden de trabajo seleccionada
-  const selectedWorkOrder = workOrders.find(order => order.id === watchWorkOrderId);
-  const depositAmountFromWorkOrder = selectedWorkOrder?.depositAmount ?? 0;
-  const remainingBalanceTotal = Math.max(0, total - depositAmountFromWorkOrder);
+  const depositAmountValue = watchDepositAmount ? parseFloat(String(watchDepositAmount)) : 0;
+  const remainingBalanceTotal = Math.max(0, total - depositAmountValue);
 
   // Solo considerar órdenes de trabajo en estado Reparado para facturación
   const activeWorkOrders = workOrders.filter(order => order.status === 'Reparado');
@@ -213,6 +222,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
     formData.append('date', values.date.toISOString());
     formData.append('items', JSON.stringify(values.items || []));
     formData.append('discountPercentage', (values.discountPercentage || 0).toString());
+    formData.append('depositAmount', (values.depositAmount || 0).toString());
 
     const result = await createServiceSale(null, formData);
 
@@ -329,6 +339,26 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="depositAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Abono Recibido (COP)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              placeholder="Ej: 50000"
+                              value={field.value ?? ''}
+                              onChange={(val) => field.onChange(val === '' ? undefined : val)}
+                              className="bg-background border-input focus:ring-primary/20 transition-all"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="date"
@@ -577,14 +607,14 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                       </div>
                     )}
                     
-                    {depositAmountFromWorkOrder > 0 && (
+                    {depositAmountValue > 0 && (
                       <div className="flex justify-between items-center text-sm text-emerald-700 font-medium bg-emerald-500/10 p-2 rounded-md">
-                        <span>Abono registrado en la orden:</span>
-                        <span>-{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(depositAmountFromWorkOrder)}</span>
+                        <span>Abono registrado:</span>
+                        <span>-{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(depositAmountValue)}</span>
                       </div>
                     )}
 
-                    {depositAmountFromWorkOrder > 0 && remainingBalanceTotal > 0 && (
+                    {depositAmountValue > 0 && remainingBalanceTotal > 0 && (
                       <div className="flex justify-between items-center text-sm text-amber-700 font-medium bg-amber-500/10 p-2 rounded-md">
                         <span>Saldo pendiente (Total - Abono):</span>
                         <span>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(remainingBalanceTotal)}</span>

@@ -23,6 +23,7 @@ const serviceSaleSchema = z.object({
         fromWorkOrder: z.boolean().optional(),
     })).optional(),
     discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
+    depositAmount: z.coerce.number().min(0).optional(),
 });
 
 const directSaleSchema = z.object({
@@ -106,6 +107,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const paymentMethod = formData.get('paymentMethod') as string;
         const date = formData.get('date') as string;
         const discountPercentage = parseFloat(formData.get('discountPercentage') as string) || 0;
+        const depositAmount = parseFloat(formData.get('depositAmount') as string) || 0;
 
         const validatedFields = serviceSaleSchema.safeParse({
             workOrderId,
@@ -114,6 +116,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             date,
             items,
             discountPercentage,
+            depositAmount,
         });
 
         if (!validatedFields.success) {
@@ -334,9 +337,9 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const formattedCustomer = fomattedMotorcycle?.customers ? (Array.isArray(fomattedMotorcycle.customers) ? fomattedMotorcycle.customers[0] : fomattedMotorcycle.customers) : undefined;
         const formattedTech = wo?.profiles ? (Array.isArray(wo.profiles) ? wo.profiles[0] : wo.profiles) : undefined;
 
-        // Parse deposit amount from work order customer_observations
-        let parsedDeposit = 0;
-        if (wo?.customer_observations) {
+        // Check for manual depositAmount first, then fallback to parse
+        let parsedDeposit = data.depositAmount || 0;
+        if (parsedDeposit === 0 && wo?.customer_observations) {
             const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
             if (match) {
                 parsedDeposit = parseFloat(match[1]);
