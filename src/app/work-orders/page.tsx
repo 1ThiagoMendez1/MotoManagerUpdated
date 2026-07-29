@@ -64,7 +64,7 @@ export default async function WorkOrdersPage({
   const completedWorkOrders = allCompletedWorkOrders.slice((completedPage - 1) * itemsPerPage, completedPage * itemsPerPage);
 
   const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
-    (moto) => !activeWorkOrders.some((wo) => wo.motorcycle.id === moto.id)
+    (moto) => !allActiveWorkOrders.some((wo) => wo.motorcycle?.id === moto.id)
   );
 
   const getStatusVariant = (status: string) => {

@@ -44,33 +44,33 @@ export default async function MotorcyclesPage({
 
   const workOrders = workOrdersData.items;
 
-  // Filtrar motocicletas que no tengan una orden de trabajo activa (estado distinto de "Entregado")
+  // Filtrar motocicletas que tengan una orden de trabajo activa (estado distinto de "Entregado", es decir, que están en el taller)
   const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
-  const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
-    (moto) => !activeWorkOrders.some((wo) => wo.motorcycle.id === moto.id)
+  const motorcyclesInWorkshop = motorcycles.filter(
+    (moto) => activeWorkOrders.some((wo) => wo.motorcycle && wo.motorcycle.id === moto.id)
   );
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Recepción de Motocicletas</h1>
-          <p className="text-muted-foreground text-muted-foreground">Gestiona todos los registros de motocicletas.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Motos en Taller</h1>
+          <p className="text-muted-foreground">Gestiona las motocicletas que se encuentran físicamente en el taller.</p>
         </div>
         <div className="flex gap-2 flex-grow sm:flex-grow-0">
           <SearchMotorcycles />
         </div>
         <div className="flex gap-2">
-          <ExportMotorcyclesButton motorcycles={motorcyclesWithoutActiveWorkOrders} />
+          <ExportMotorcyclesButton motorcycles={motorcyclesInWorkshop} />
           <AddMotorcycle />
         </div>
       </div>
       <Card className="glass-card relative overflow-hidden group text-foreground">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         <CardHeader className="relative z-10">
-          <CardTitle>Motocicletas Registradas</CardTitle>
+          <CardTitle>Motocicletas en el Taller</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Una lista de todas las motocicletas registradas en el sistema.
+            Una lista de todas las motocicletas que se encuentran en el taller en proceso de revisión o reparación.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -88,7 +88,7 @@ export default async function MotorcyclesPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {motorcyclesWithoutActiveWorkOrders.map((moto) => (
+              {motorcyclesInWorkshop.map((moto) => (
                 <TableRow key={moto.id} className="border-border/50 hover:bg-primary/5 transition-colors">
                   <TableCell className="font-medium">
                     <div>{moto.make} {moto.model}</div>
@@ -108,7 +108,7 @@ export default async function MotorcyclesPage({
                   <TableCell>
                     <MotorcycleDetails
                       motorcycle={moto}
-                      workOrders={workOrders.filter(wo => wo.motorcycle.id === moto.id)}
+                      workOrders={workOrders.filter(wo => wo.motorcycle && wo.motorcycle.id === moto.id)}
                     />
                   </TableCell>
                 </TableRow>

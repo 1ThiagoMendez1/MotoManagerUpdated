@@ -55,6 +55,16 @@ const nextConfig: NextConfig = {
       tls: { browser: './empty.js' },
     },
   },
+  // Configuración de redirects para compatibilidad con enlaces viejos con errores
+  async redirects() {
+    return [
+      {
+        source: '/cotizacioncotizacion/:id',
+        destination: '/cotizacion/:id',
+        permanent: true,
+      },
+    ];
+  },
   // Configuración de headers de seguridad
   async headers() {
     return [

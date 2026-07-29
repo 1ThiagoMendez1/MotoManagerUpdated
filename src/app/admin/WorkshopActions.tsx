@@ -22,7 +22,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { KeyRound, Mail, MessageCircle, Copy, Check, MoreHorizontal, Loader2, Zap, ShieldAlert, CreditCard } from 'lucide-react';
-import { updateWorkshopPlan, updateWorkshopStatus, getWorkshopCredentials } from './actions';
+import { updateWorkshopPlan, updateWorkshopStatus, getWorkshopCredentials, resetUserPasswordAndNotify } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { WompiButton } from '@/components/payments/WompiButton';
 
@@ -114,6 +114,34 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
         }
     };
 
+    const handleGenerateNewCode = async () => {
+        const ownerMember = workshop.members?.find((m: any) => m.role === 'owner');
+        if (!ownerMember?.user_id) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo identificar al propietario del taller' });
+            return;
+        }
+
+        try {
+            setIsLoadingCreds(true);
+            const data = await resetUserPasswordAndNotify(
+                ownerMember.user_id,
+                credentials?.email || ownerEmail || '',
+                credentials?.phone || owner?.phone || '',
+                owner?.name || 'Propietario'
+            );
+            if (data.success && data.tempPassword) {
+                setCredentials(prev => prev ? { ...prev, password: data.tempPassword } : { email: credentials?.email || ownerEmail || '', password: data.tempPassword, phone: credentials?.phone || owner?.phone || '' });
+                toast({ title: 'Éxito', description: 'Se generó un nuevo código y se envió por WhatsApp.' });
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: data.error || 'No se pudo regenerar el código' });
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
+        } finally {
+            setIsLoadingCreds(false);
+        }
+    };
+
     const handleCopyCreds = () => {
         if (!credentials) return;
         const text = `Hola! Aquí tienes tus credenciales de acceso a MotoManager:\nURL: https://${workshop.slug}.motomanager.com.co\nUsuario: ${credentials.email}\nContraseña: ${credentials.password}`;
@@ -148,6 +176,10 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                     <DropdownMenuItem onClick={handleViewCredentials} className="text-blue-400 focus:text-blue-300">
                         <KeyRound className="mr-2 h-4 w-4" />
                         Ver Credenciales
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleGenerateNewCode} className="text-amber-400 focus:text-amber-300 focus:bg-amber-500/10">
+                        <Zap className="mr-2 h-4 w-4" />
+                        Generar Nuevo Código
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
 
@@ -337,6 +369,15 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                                             <Mail className="mr-2 h-4 w-4" />
                                             Enviar por Correo
                                         </a>
+                                    </Button>
+
+                                    <Button 
+                                        className="w-full col-span-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold"
+                                        onClick={handleGenerateNewCode}
+                                        disabled={isLoadingCreds}
+                                    >
+                                        <Zap className="mr-2 h-4 w-4" />
+                                        Generar Nuevo Código de Acceso
                                     </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground text-center mt-2">

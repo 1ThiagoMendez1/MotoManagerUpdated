@@ -159,7 +159,7 @@ export default async function AdminPage({
     .select(`
       *,
       workshop:organizations(name, slug),
-      owner:profiles(name, email, phone)
+      owner:profiles(first_name, last_name, phone)
     `)
     .order('created_at', { ascending: false });
 
@@ -177,7 +177,11 @@ export default async function AdminPage({
     admin_notes: r.admin_notes || null,
     created_at: r.created_at,
     workshop: r.workshop ? { name: r.workshop.name, slug: r.workshop.slug } : null,
-    owner: r.owner ? { name: r.owner.name, email: r.owner.email, phone: r.owner.phone } : null,
+    owner: r.owner ? {
+      name: `${r.owner.first_name || ''} ${r.owner.last_name || ''}`.trim() || 'Sin Nombre',
+      email: authUsersMap.get(r.user_id)?.email || '',
+      phone: r.owner.phone
+    } : null,
   }));
 
   // Fetch admin tickets

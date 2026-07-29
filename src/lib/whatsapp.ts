@@ -286,7 +286,7 @@ export async function sendQuoteNotification(
               parameters: [
                 {
                   type: 'text',
-                  text: `cotizacion/${workOrderId}`
+                  text: `/${workOrderId}`
                 }
               ]
             }
@@ -825,6 +825,560 @@ Si necesitas ayuda, responde a este mensaje.
   }
 }
 
+export async function sendOwnerWelcomeNotification(
+  phone: string,
+  fullName: string,
+  workshopName: string,
+  planName: string,
+  startDate: Date,
+  endDate: Date,
+  tempPassword?: string
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!wpToken || !wpPhoneId) {
+    console.log('WhatsApp Cloud API no configurada para bienvenida del dueño.');
+    return { success: false, error: 'WhatsApp API no configurada' };
+  }
+
+  try {
+    const formattedPhone = phone.replace('+', '').startsWith('57') ? phone.replace('+', '') : `57${phone.replace('+', '')}`;
+
+    // Format dates as DD-MM-YYYY
+    const formatDate = (date: Date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    };
+
+    const startStr = formatDate(startDate);
+    const endStr = formatDate(endDate);
+
+    // Map plan key to user friendly name
+    const planFriendlyMap: Record<string, string> = {
+      'monthly': 'basico',
+      'demo': 'demo',
+      'biannual': 'semestral',
+      'yearly': 'anual'
+    };
+    const planFriendlyName = planFriendlyMap[planName] || planName;
+
+    // Payload helper for bienvenida_motomanager
+    const postPayload = (includeButton: boolean, includeHeader: boolean) => {
+      const components: any[] = [];
+
+      if (includeHeader) {
+        components.push({
+          type: 'header',
+          parameters: [
+            { type: 'text', text: fullName }
+          ]
+        });
+      }
+
+      components.push({
+        type: 'body',
+        parameters: [
+          { type: 'text', text: workshopName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: startStr },
+          { type: 'text', text: endStr },
+          { type: 'text', text: planFriendlyName }
+        ]
+      });
+
+      if (includeButton) {
+        components.push({
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [
+            {
+              type: 'text',
+              text: 'login'
+            }
+          ]
+        });
+      }
+
+      return {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: 'bienvenida_motomanager',
+          language: {
+            code: 'es_CO'
+          },
+          components
+        }
+      };
+    };
+
+    console.log(`Sending template 'bienvenida_motomanager' to ${formattedPhone}...`);
+
+    const payloadsToTry = [
+      { includeHeader: true, includeButton: false },
+      { includeHeader: true, includeButton: true },
+      { includeHeader: false, includeButton: false },
+      { includeHeader: false, includeButton: true }
+    ];
+
+    let responseWelcome = null;
+    let lastError = null;
+
+    for (const config of payloadsToTry) {
+      try {
+        console.log(`Trying to send welcome template with config: header=${config.includeHeader}, button=${config.includeButton}`);
+        responseWelcome = await axios.post(
+          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+          postPayload(config.includeButton, config.includeHeader),
+          {
+            headers: {
+              'Authorization': `Bearer ${wpToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        console.log(`✅ Welcome template sent successfully with config: header=${config.includeHeader}, button=${config.includeButton}`);
+        break; // Success! Exit loop.
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = err.response?.data?.error?.message || err.message;
+        console.log(`Config failed (header=${config.includeHeader}, button=${config.includeButton}):`, errMsg);
+        // Continue to the next configuration...
+      }
+    }
+
+    if (!responseWelcome) {
+      throw lastError || new Error("Failed to send welcome template with all payload variations");
+    }
+
+    console.log('✅ WhatsApp welcome template sent successfully.');
+
+    // 2. If temporary password exists, send "codigo_de_acceso"
+    if (tempPassword) {
+      // Delay slightly to ensure welcome message arrives first
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const resCode = await sendAccessCodeNotification(phone, tempPassword);
+      return { success: true, data: { welcome: responseWelcome.data, code: resCode.data } };
+    }
+
+    return { success: true, data: { welcome: responseWelcome.data } };
+
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp owner welcome notifications via Meta API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
+export async function sendAccessCodeNotification(
+  phone: string,
+  tempPassword: string
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!wpToken || !wpPhoneId) {
+    console.log('WhatsApp Cloud API no configurada para código de acceso.');
+    return { success: false, error: 'WhatsApp API no configurada' };
+  }
+
+  try {
+    const formattedPhone = phone.replace('+', '').startsWith('57') ? phone.replace('+', '') : `57${phone.replace('+', '')}`;
+
+    const postCodePayload = (includeButtonParam: boolean, buttonType: string) => {
+      const components: any[] = [
+        {
+          type: 'body',
+          parameters: [
+            {
+              type: 'text',
+              text: tempPassword
+            }
+          ]
+        }
+      ];
+
+      if (includeButtonParam) {
+        if (buttonType === 'url') {
+          components.push({
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [
+              {
+                type: 'text',
+                text: tempPassword
+              }
+            ]
+          });
+        } else if (buttonType === 'otp') {
+          components.push({
+            type: 'button',
+            sub_type: 'copy_code',
+            index: '0',
+            parameters: [
+              {
+                type: 'coupon_code',
+                coupon_code: tempPassword
+              }
+            ]
+          });
+        }
+      }
+
+      return {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: 'codigo_de_acceso',
+          language: {
+            code: 'es_CO'
+          },
+          components
+        }
+      };
+    };
+
+    const codePayloadsToTry = [
+      { includeButtonParam: true, buttonType: 'url' },
+      { includeButtonParam: false, buttonType: 'none' },
+      { includeButtonParam: true, buttonType: 'otp' }
+    ];
+
+    let responseCode = null;
+    let lastCodeError = null;
+
+    for (const config of codePayloadsToTry) {
+      try {
+        console.log(`Trying to send code template with config: buttonParam=${config.includeButtonParam}, type=${config.buttonType}`);
+        responseCode = await axios.post(
+          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+          postCodePayload(config.includeButtonParam, config.buttonType),
+          {
+            headers: {
+              'Authorization': `Bearer ${wpToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        console.log(`✅ Code template sent successfully with config: buttonParam=${config.includeButtonParam}, type=${config.buttonType}`);
+        break; // Success! Exit loop.
+      } catch (err: any) {
+        lastCodeError = err;
+        const errMsg = err.response?.data?.error?.message || err.message;
+        console.log(`Code config failed (buttonParam=${config.includeButtonParam}, type=${config.buttonType}):`, errMsg);
+      }
+    }
+
+    if (!responseCode) {
+      throw lastCodeError || new Error("Failed to send code template with all payload variations");
+    }
+
+    console.log('✅ WhatsApp access code template sent successfully.');
+    return { success: true, data: responseCode.data };
+
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp access code notification via Meta API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
+export async function sendMotoIngresoNotification(
+  customerPhone: string,
+  customerName: string,
+  workshopName: string,
+  brand: string,
+  model: string,
+  plate: string,
+  intakeDate: Date | string,
+  orderNumber: string,
+  workshopBrand: string = 'Motomanager'
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!wpToken || !wpPhoneId) {
+    console.log('WhatsApp Cloud API no configurada para ingreso de moto.');
+    return { success: false, error: 'WhatsApp API no configurada' };
+  }
+
+  try {
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+
+    let dateStr = '';
+    if (intakeDate instanceof Date) {
+      const day = String(intakeDate.getDate()).padStart(2, '0');
+      const month = String(intakeDate.getMonth() + 1).padStart(2, '0');
+      const year = intakeDate.getFullYear();
+      const hours = String(intakeDate.getHours()).padStart(2, '0');
+      const minutes = String(intakeDate.getMinutes()).padStart(2, '0');
+      dateStr = `${day}-${month}-${year} ${hours}:${minutes}`;
+    } else {
+      try {
+        const dateObj = new Date(intakeDate);
+        if (!isNaN(dateObj.getTime())) {
+          const day = String(dateObj.getDate()).padStart(2, '0');
+          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const year = dateObj.getFullYear();
+          const hours = String(dateObj.getHours()).padStart(2, '0');
+          const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+          dateStr = `${day}-${month}-${year} ${hours}:${minutes}`;
+        } else {
+          dateStr = intakeDate;
+        }
+      } catch {
+        dateStr = intakeDate;
+      }
+    }
+
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: 'plantilla_ingreso_moto',
+          language: {
+            code: 'es_CO'
+          },
+          components: [
+            {
+              type: 'header',
+              parameters: [
+                { type: 'text', text: `${brand} ${model}`.trim() }  // {{1}} of header (e.g. brand + model)
+              ]
+            },
+            {
+              type: 'body',
+              parameters: [
+                { type: 'text', text: customerName }, // {{1}}
+                { type: 'text', text: workshopName }, // {{2}}
+                { type: 'text', text: brand },        // {{3}}
+                { type: 'text', text: model },        // {{4}}
+                { type: 'text', text: plate },        // {{5}}
+                { type: 'text', text: dateStr },      // {{6}}
+                { type: 'text', text: orderNumber },  // {{7}}
+                { type: 'text', text: workshopName }  // {{8}}
+              ]
+            }
+          ]
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${wpToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('✅ WhatsApp moto ingreso template sent successfully:', response.data);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp moto ingreso notification via Meta API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
+export async function sendDiagnosticadoReparadoNotification(
+  customerPhone: string,
+  customerName: string,
+  workshopName: string,
+  motorcycleInfo: string,
+  plate: string,
+  orderNumber: string,
+  workshopAddress: string,
+  weekdaysSchedule: string = '09:00 a.m. a 13:00 p.m. y 15:00 a.m. a 19:00 p.m.',
+  saturdaySchedule: string = '09:00 a.m. a 14:00 p.m.'
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!wpToken || !wpPhoneId) {
+    console.log('WhatsApp Cloud API no configurada para diagnosticado_reparado.');
+    return { success: false, error: 'WhatsApp API no configurada' };
+  }
+
+  try {
+    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+    const addressText = workshopAddress || 'Dirección del taller';
+
+    const payloadsToTry = [
+      // 1. Header (1 param) + Body (7 params with repeating workshopName)
+      {
+        header: [{ type: 'text', text: motorcycleInfo }],
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: addressText },
+          { type: 'text', text: workshopName }
+        ]
+      },
+      // 2. Header (1 param) + Body (7 params with schedule)
+      {
+        header: [{ type: 'text', text: motorcycleInfo }],
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: weekdaysSchedule },
+          { type: 'text', text: saturdaySchedule }
+        ]
+      },
+      // 3. Just Body (7 params with repeating workshopName)
+      {
+        header: null,
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: addressText },
+          { type: 'text', text: workshopName }
+        ]
+      },
+      // 4. Just Body (7 params with schedule)
+      {
+        header: null,
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: weekdaysSchedule },
+          { type: 'text', text: saturdaySchedule }
+        ]
+      },
+      // 5. Header (1 param) + Body (6 params)
+      {
+        header: [{ type: 'text', text: motorcycleInfo }],
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: addressText }
+        ]
+      },
+      // 6. Just Body (6 params)
+      {
+        header: null,
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: addressText }
+        ]
+      },
+      // 7. Header (1 param) + Body (8 params)
+      {
+        header: [{ type: 'text', text: motorcycleInfo }],
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: addressText },
+          { type: 'text', text: weekdaysSchedule },
+          { type: 'text', text: saturdaySchedule }
+        ]
+      },
+      // 8. Header (1 param) + Body (9 params)
+      {
+        header: [{ type: 'text', text: motorcycleInfo }],
+        body: [
+          { type: 'text', text: customerName },
+          { type: 'text', text: workshopName },
+          { type: 'text', text: motorcycleInfo },
+          { type: 'text', text: plate },
+          { type: 'text', text: orderNumber },
+          { type: 'text', text: addressText },
+          { type: 'text', text: weekdaysSchedule },
+          { type: 'text', text: saturdaySchedule },
+          { type: 'text', text: workshopName }
+        ]
+      }
+    ];
+
+    console.log(`Sending template 'diagnosticado_reparado' to ${formattedPhone}...`);
+
+    let lastError = null;
+    let successResponse = null;
+
+    for (let i = 0; i < payloadsToTry.length; i++) {
+      const config = payloadsToTry[i];
+      try {
+        const components: any[] = [];
+        if (config.header) {
+          components.push({
+            type: 'header',
+            parameters: config.header
+          });
+        }
+        components.push({
+          type: 'body',
+          parameters: config.body
+        });
+
+        console.log(`Trying to send diagnosticado_reparado template payload option ${i + 1}...`);
+        const response = await axios.post(
+          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+              name: 'diagnosticado_reparado',
+              language: { code: 'es_CO' },
+              components
+            }
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${wpToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        console.log(`✅ diagnosticado_reparado template sent successfully using payload option ${i + 1}.`);
+        successResponse = response.data;
+        break; // Exit loop on success
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = err.response?.data?.error?.message || err.message;
+        const errDetails = err.response?.data?.error?.error_data?.details || '';
+        console.log(`Payload option ${i + 1} failed: ${errMsg}. Details: ${errDetails}`);
+      }
+    }
+
+    if (!successResponse) {
+      throw lastError || new Error("Failed to send diagnosticado_reparado template with all payload variations");
+    }
+
+    return { success: true, data: successResponse };
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp diagnosticado_reparado notification via Meta API:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data || error.message };
+  }
+}
+
 export default {
   sendSaleNotification,
   sendServiceSaleNotification,
@@ -837,5 +1391,9 @@ export default {
   sendSuperAdminWelcomeNotification,
   sendSubscriptionRenewalReminder,
   sendSubscriptionSuspendedNotification,
-  sendQuoteNotification
+  sendQuoteNotification,
+  sendOwnerWelcomeNotification,
+  sendAccessCodeNotification,
+  sendMotoIngresoNotification,
+  sendDiagnosticadoReparadoNotification
 };

@@ -1,6 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { sendAccessCodeNotification } from '@/lib/whatsapp';
 
 export async function updateWorkshopStatus(workshopId: string, status: any) { return { success: true }; }
 export async function updateCancellationStatus(cancellationId: string, status: any, adminNotes?: string) { return { success: true }; }
@@ -105,5 +106,62 @@ export async function updateUser(userId: string, data: any) {
     return { success: true };
 }
 
-export async function getWorkshopCredentials(userId: string) { return { email: 'mock@demo.com', password: 'password', phone: '123' }; }
-export async function resetUserPasswordAndNotify(userId: string, email: string, phone: string | undefined, name: string) { return { success: true }; }
+export async function getWorkshopCredentials(userId: string) {
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (error || !data.user) {
+        console.error('Error fetching workshop credentials:', error);
+        return { error: error?.message || 'Usuario no encontrado' };
+    }
+
+    return {
+        email: data.user.email || '',
+        password: data.user.user_metadata?.temp_password || 'Sin contraseña temporal',
+        phone: data.user.user_metadata?.phone || ''
+    };
+}
+
+export async function resetUserPasswordAndNotify(userId: string, email: string, phone: string | undefined, name: string) {
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    // Generate new 6-digit OTP code
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    console.log(`Resetting password for user ${userId} to: ${newCode}`);
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password: newCode,
+        user_metadata: {
+            temp_password: newCode,
+            needs_password_change: true
+        }
+    });
+
+    if (updateError) {
+        console.error('Error updating user password in Supabase:', updateError);
+        return { success: false, error: updateError.message };
+    }
+
+    if (phone) {
+        console.log(`Sending new code via WhatsApp to ${phone}...`);
+        const wsRes = await sendAccessCodeNotification(phone, newCode);
+        if (!wsRes.success) {
+            console.error('Failed to send WhatsApp code:', wsRes.error);
+            const errorMsg = typeof wsRes.error === 'object' ? JSON.stringify(wsRes.error) : wsRes.error;
+            return { 
+                success: false, 
+                error: `Contraseña restablecida en BD pero falló el envío de WhatsApp: ${errorMsg}` 
+            };
+        }
+    }
+
+    return { success: true, tempPassword: newCode };
+}

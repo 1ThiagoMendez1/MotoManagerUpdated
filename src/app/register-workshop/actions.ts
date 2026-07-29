@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
-import { sendCredentialsNotification } from '@/lib/whatsapp'
+import { sendOwnerWelcomeNotification } from '@/lib/whatsapp'
 
 const registrationSchema = z.object({
     workshopName: z.string().min(3),
@@ -143,15 +143,44 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
     console.log('=============================================\n');
 
     if (phone) {
-        sendCredentialsNotification(
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+
+        if (subscriptionPlan === 'monthly') {
+            endDate.setMonth(endDate.getMonth() + 1);
+        } else if (subscriptionPlan === 'biannual') {
+            endDate.setMonth(endDate.getMonth() + 6);
+        } else if (subscriptionPlan === 'yearly') {
+            endDate.setFullYear(endDate.getFullYear() + 1);
+        } else if (subscriptionPlan === 'demo') {
+            if (demoEndDate) {
+                const parsedEnd = new Date(demoEndDate);
+                if (!isNaN(parsedEnd.getTime())) {
+                    endDate.setTime(parsedEnd.getTime());
+                } else {
+                    endDate.setDate(endDate.getDate() + 7);
+                }
+            } else {
+                endDate.setDate(endDate.getDate() + 7);
+            }
+            
+            if (demoStartDate) {
+                const parsedStart = new Date(demoStartDate);
+                if (!isNaN(parsedStart.getTime())) {
+                    startDate.setTime(parsedStart.getTime());
+                }
+            }
+        }
+
+        sendOwnerWelcomeNotification(
             phone,
             fullName,
             workshopName,
-            slug,
-            email,
-            loginUrl,
+            subscriptionPlan,
+            startDate,
+            endDate,
             generatedPassword
-        ).catch(e => console.error('Failed to send WhatsApp credentials:', e));
+        ).catch(e => console.error('Failed to send WhatsApp owner welcome template:', e));
     }
 
     console.log('Workshop created successfully:', orgId);

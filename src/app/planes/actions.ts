@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
-import { sendCredentialsNotification } from '@/lib/whatsapp'
+import { sendOwnerWelcomeNotification } from '@/lib/whatsapp'
 
 const registrationSchema = z.object({
     workshopName: z.string().min(3, 'El nombre del taller debe tener al menos 3 caracteres'),
@@ -48,7 +48,7 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     const { workshopName, slug, email, fullName, phone, workshopPhone, address, mapsLink, city, nit, subscriptionPlan } = validation.data
     
     // Generate automatic password
-    const generatedPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
+    const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
     console.log('🔑 Contraseña generada (guardar!):', generatedPassword)
 
     const supabaseAdmin = createSupabaseClient(
@@ -148,15 +148,15 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
 
     // Try to send WhatsApp notification with credentials
     if (phone) {
-        sendCredentialsNotification(
+        sendOwnerWelcomeNotification(
             phone,
             fullName,
             workshopName,
-            slug,
-            email,
-            'http://localhost:3000/login',
+            subscriptionPlan,
+            startDate,
+            endDate,
             generatedPassword
-        ).catch(e => console.error('⚠️ Failed to send WhatsApp credentials:', e));
+        ).catch(e => console.error('⚠️ Failed to send WhatsApp owner welcome template:', e));
     }
 
     console.log('✅ ===== REGISTRO COMPLETADO → redirigiendo a / =====\n')

@@ -48,6 +48,70 @@ export default function Header({
 }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [readIds, setReadIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && userName) {
+      const stored = localStorage.getItem(`motomanager_read_notifications_${userName}`);
+      if (stored) {
+        try {
+          setReadIds(JSON.parse(stored));
+        } catch (e) {
+          console.error('Error parsing read notifications from localStorage', e);
+        }
+      }
+    }
+  }, [userName]);
+
+  useEffect(() => {
+    if (!userName) return;
+
+    const fetchNotifications = async () => {
+      try {
+        const { getNotificationsForUser } = await import('@/lib/actions/notifications');
+        const res = await getNotificationsForUser();
+        if (res.success && res.data) {
+          let currentReadIds: string[] = [];
+          if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem(`motomanager_read_notifications_${userName}`);
+            if (stored) {
+              try {
+                currentReadIds = JSON.parse(stored);
+              } catch (e) {}
+            }
+          }
+          const filtered = res.data.filter((n: any) => !currentReadIds.includes(n.id));
+          setNotifications(filtered);
+        }
+      } catch (err) {
+        console.error('Error loading notifications:', err);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000);
+    return () => clearInterval(interval);
+  }, [userName]);
+
+  const markAsRead = (id: string) => {
+    const updatedReadIds = Array.from(new Set([...readIds, id])).slice(-100);
+    setReadIds(updatedReadIds);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`motomanager_read_notifications_${userName}`, JSON.stringify(updatedReadIds));
+    }
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  const markAllAsRead = () => {
+    const currentIds = notifications.map((n) => n.id);
+    const updatedReadIds = Array.from(new Set([...readIds, ...currentIds])).slice(-100);
+    setReadIds(updatedReadIds);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`motomanager_read_notifications_${userName}`, JSON.stringify(updatedReadIds));
+    }
+    setNotifications([]);
+  };
 
   const isRoot = pathname === '/' || pathname === '/login' || pathname === '/register-workshop' || pathname === '/admin' || (!!workshopSlug && pathname === `/${workshopSlug}`);
 
@@ -153,18 +217,47 @@ export default function Header({
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative hover:bg-card/50 h-9 w-9">
                   <Bell className="h-5 w-5 text-foreground/80" />
+                  {notifications.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80 p-0 border border-white/10 shadow-2xl rounded-xl overflow-hidden bg-background/95 backdrop-blur-xl">
                 <div className="bg-muted/50 p-3 border-b border-white/5 flex items-center justify-between">
                   <h3 className="font-semibold text-sm">Notificaciones</h3>
-                  <span className="text-xs text-primary cursor-pointer hover:underline">Marcar leídas</span>
+                  <span className="text-xs text-primary cursor-pointer hover:underline" onClick={markAllAsRead}>Marcar leídas</span>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto">
-                  <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-                    <Bell className="h-8 w-8 opacity-20" />
-                    <p className="text-sm">No hay notificaciones nuevas</p>
-                  </div>
+                  {notifications.length > 0 ? (
+                    <div className="divide-y divide-white/5">
+                      {notifications.map((notif) => (
+                        <DropdownMenuItem
+                          key={notif.id}
+                          className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-white/5 transition-colors focus:bg-white/5 focus:text-foreground text-foreground"
+                          onClick={() => {
+                            markAsRead(notif.id);
+                            if (notif.link) {
+                              router.push(notif.link);
+                            }
+                          }}
+                        >
+                          <div className="flex items-center gap-2 w-full">
+                            <span className={`h-2 w-2 rounded-full flex-shrink-0 ${notif.urgent ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-amber-500'}`} />
+                            <span className="font-semibold text-xs text-muted-foreground">{notif.time}</span>
+                          </div>
+                          <p className="text-sm font-medium leading-snug">{notif.text}</p>
+                        </DropdownMenuItem>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                      <Bell className="h-8 w-8 opacity-20" />
+                      <p className="text-sm">No hay notificaciones nuevas</p>
+                    </div>
+                  )}
                 </div>
                 <div className="p-2 border-t border-white/5 bg-muted/20 text-center">
                   <Button variant="ghost" className="text-xs w-full h-8 text-primary hover:bg-primary/10" onClick={() => router.push('/dashboard')}>
