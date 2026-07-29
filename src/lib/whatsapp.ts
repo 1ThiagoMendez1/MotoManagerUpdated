@@ -260,17 +260,23 @@ export async function sendQuoteNotification(
         to: formattedPhone,
         type: 'template',
         template: {
-          name: 'diagnostico_aprobacion_cliente',
+          name: 'resultado_de_diagnostico',
           language: {
-            code: 'es' // Asegúrate de que este código coincida con el de tu plantilla (ej. es_MX, es_CO, es)
+            code: 'es_CO' // Asegúrate de que este código coincida con el de tu plantilla (ej. es_MX, es_CO, es)
           },
           components: [
+            {
+              type: 'header',
+              parameters: [
+                { type: 'text', text: '🎉' }
+              ]
+            },
             {
               type: 'body',
               parameters: [
                 { type: 'text', text: customerName || 'Cliente' },
                 { type: 'text', text: workshopName || 'nuestro taller' },
-                { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
+                { type: 'text', text: `${orderNumber || workOrderId.substring(0, 8)}\n\n🔗 *Enlace para ver cotización:*\n${portalUrl}` }
               ]
             },
             {
@@ -280,7 +286,7 @@ export async function sendQuoteNotification(
               parameters: [
                 {
                   type: 'text',
-                  text: workOrderId // Asumiendo que el botón tiene una variable dinámica para el ID al final de la URL
+                  text: `cotizacion/${workOrderId}`
                 }
               ]
             }
@@ -312,15 +318,21 @@ export async function sendQuoteNotification(
             to: formattedPhone,
             type: 'template',
             template: {
-              name: 'diagnostico_aprobacion_cliente',
-              language: { code: 'es' },
+              name: 'resultado_de_diagnostico',
+              language: { code: 'es_CO' },
               components: [
+                {
+                  type: 'header',
+                  parameters: [
+                    { type: 'text', text: '🎉' }
+                  ]
+                },
                 {
                   type: 'body',
                   parameters: [
                     { type: 'text', text: customerName || 'Cliente' },
                     { type: 'text', text: workshopName || 'nuestro taller' },
-                    { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
+                    { type: 'text', text: `${orderNumber || workOrderId.substring(0, 8)}\n\n🔗 *Enlace para ver cotización:*\n${portalUrl}` }
                   ]
                 }
               ]

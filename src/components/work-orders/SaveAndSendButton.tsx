@@ -109,12 +109,11 @@ export function SaveAndSendButton({
       
       if (result && result.success === false) {
           console.error('Action error:', result.error)
-          const errorMsg = typeof result.error === 'object' ? JSON.stringify(result.error) : result.error;
           setDialogState({
             isOpen: true,
-            title: 'No se pudo enviar el WhatsApp',
-            message: errorMsg,
-            type: 'error'
+            title: '¡Casi listo!',
+            message: 'Comparte este enlace con tu cliente para que pueda ver y aprobar su cotización.',
+            type: 'mock'
           })
           setIsSending(false)
           return // Stop redirect
