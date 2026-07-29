@@ -9,24 +9,21 @@ import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans'
 export default async function SubscriptionPage() {
     const user = await requireWorkshop()
     const currentUser = await getCurrentUserServer()
-    const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+    const { supabase } = await getScopedClient();
 
     const { data: workshop } = await supabase
-        .from('workshops')
+        .from('organizations')
         .select('*')
         .eq('id', user.workshopId)
         .single()
 
     const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('name')
+        .from('profiles')
+        .select('first_name, last_name')
         .eq('id', user.userId)
         .single()
+    
+    const profileName = profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : null;
 
     if (!workshop) return <div className="p-8 text-center text-muted-foreground">No se encontró el taller</div>
 
@@ -49,7 +46,7 @@ export default async function SubscriptionPage() {
             <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                 <ManageSubscriptionClient 
                     currentPlan={workshop.subscription_plan || 'monthly'}
-                    userName={profile?.name || currentUser?.email || 'Usuario'}
+                    userName={profileName || currentUser?.email || 'Usuario'}
                     userEmail={currentUser?.email || ''}
                     userId={currentUser?.userId || ''}
                     workshopSlug={workshop.slug}

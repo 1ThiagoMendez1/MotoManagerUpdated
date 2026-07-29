@@ -62,7 +62,7 @@ export default async function AdminPage({
     })) || []
   })) || [];
 
-  // Fetch all users
+  // Fetch all users from profiles
   const { data: rawUsers, error: usersError } = await adminSupabase
     .from('profiles')
     .select(`
@@ -78,15 +78,31 @@ export default async function AdminPage({
     console.error("Error loading users:", usersError);
   }
 
-  const users = rawUsers?.map((u: any) => ({
-    id: u.id,
-    name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Sin Nombre',
-    email: '',
-    phone: u.phone,
-    avatar_url: u.avatar_path,
-    created_at: u.created_at,
-    workshop_members: u.workshop_members
-  })) || [];
+  // Fetch auth users to get emails and is_super_admin from user_metadata
+  const { data: authData } = await adminSupabase.auth.admin.listUsers();
+  const authUsersMap = new Map();
+  if (authData && authData.users) {
+    authData.users.forEach((u) => {
+      authUsersMap.set(u.id, {
+        email: u.email,
+        is_super_admin: u.user_metadata?.is_super_admin === true
+      });
+    });
+  }
+
+  const users = rawUsers?.map((u: any) => {
+    const authUser = authUsersMap.get(u.id) || {};
+    return {
+      id: u.id,
+      name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || 'Sin Nombre',
+      email: authUser.email || u.email || '', 
+      phone: u.phone,
+      avatar_url: u.avatar_path,
+      created_at: u.created_at,
+      workshop_members: u.workshop_members,
+      is_super_admin: authUser.is_super_admin || u.is_super_admin || false
+    };
+  }) || [];
 
   // Fetch plans from DB (or fallback to defaults if table doesn't exist yet)
   let dbPlans: any[] = [];
@@ -142,8 +158,8 @@ export default async function AdminPage({
     .from('cancellation_feedback')
     .select(`
       *,
-      workshop:workshops(name, slug),
-      owner:user_profiles(name, email, phone)
+      workshop:organizations(name, slug),
+      owner:profiles(name, email, phone)
     `)
     .order('created_at', { ascending: false });
 
@@ -243,50 +259,7 @@ export default async function AdminPage({
 
   const chartData = Array.from(chartDataMap.entries()).map(([name, ingresos]) => ({ name, ingresos }));
 
-  const menuCards = [
-    { 
-      id: 'dashboard', 
-      title: 'Dashboard Financiero', 
-      description: 'Resumen de métricas y crecimiento', 
-      icon: LayoutDashboard 
-    },
-    { 
-      id: 'workshops', 
-      title: 'Gestión de Talleres', 
-      description: 'Administra los talleres registrados', 
-      icon: Store 
-    },
-    { 
-      id: 'users', 
-      title: 'Control de Usuarios', 
-      description: 'Gestiona accesos y roles del sistema', 
-      icon: Users 
-    },
-    { 
-      id: 'planes', 
-      title: 'Gestión de Planes', 
-      description: 'Modifica precios y características', 
-      icon: LayoutDashboard // Or a different icon if preferred, maybe just use LayoutDashboard
-    },
-    {
-      id: 'payments',
-      title: 'Historial de Pagos',
-      description: 'Transacciones de todos los talleres',
-      icon: ReceiptText
-    },
-    {
-      id: 'cancellations',
-      title: 'Cancelaciones y Quejas',
-      description: 'Clientes que intentaron cancelar o dejaron feedback',
-      icon: HeartCrack
-    },
-    {
-      id: 'tickets',
-      title: 'Soporte y Tickets',
-      description: 'Ver y solucionar problemas de los talleres',
-      icon: Users // Assuming we want an icon here, or we can use Mail/MessageCircle if available, but let's just reuse Users or a similar one imported above. Actually, we imported HeartCrack, ReceiptText... I'll just use Users for now, or maybe add Ticket. Let me add Ticket to imports above. Wait, I'll just use Store or Users to be safe since I didn't add Ticket to imports yet. Let me use ReceiptText. No, I'll add a generic one. Let me import LifeBuoy at the top. I'll just use HeartCrack or Users. Let's use Users for now to avoid import errors.
-    },
-  ];
+  // The menu cards have been hardcoded into the new Bento Grid layout below
 
   return (
     <div className="w-full bg-transparent text-foreground font-sans selection:bg-blue-500/30 relative">
@@ -296,31 +269,142 @@ export default async function AdminPage({
         
         {currentView === 'menu' ? (
           /* MAIN MENU VIEW */
-          <div className="flex flex-col items-center justify-center w-full animate-in fade-in zoom-in-95 duration-700 mt-10 lg:mt-16">
-            <div className="text-center mb-12">
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground dark:text-white tracking-tight mb-4 drop-shadow-md">
-                Panel de Administración
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Selecciona una opción para comenzar a gestionar la plataforma MotoManager.
-              </p>
-            </div>
+          <div className="w-full relative min-h-screen pt-4 pb-12">
+            {/* Background orbs para que el Liquid Glass resalte como en Apple Control Center */}
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/20 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-500/20 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen" />
+            <div className="absolute top-[30%] left-[50%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none z-0 mix-blend-screen" />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
-              {menuCards.map((card) => {
-                const Icon = card.icon;
-                return (
-                  <Link href={`/admin?view=${card.id}`} key={card.id}>
-                    <div className="group flex flex-col items-center justify-center p-8 rounded-2xl bg-card dark:bg-[#111623] border border-border dark:border-white/5 hover:border-blue-500/30 dark:hover:bg-[#151b2b] hover:bg-muted/50 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] hover:-translate-y-1 h-full text-center">
-                      <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-blue-500/20 transition-all duration-300">
-                        <Icon className="w-8 h-8 text-blue-600 dark:text-blue-500" />
+            <div className="w-full mx-auto z-10 relative">
+              <div className="mb-4 lg:mb-6 mt-1 animate-in fade-in slide-in-from-top-4 duration-500">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-1">
+                  Panel de Administración
+                </h1>
+                <p className="text-sm sm:text-base text-foreground/70 flex items-center gap-2">
+                  <span>Gestión global de la plataforma <span className="font-medium text-foreground">MotoManager</span>.</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-3 lg:gap-4 animate-in fade-in zoom-in-95 duration-700">
+                {/* 1. Hero Card - Dashboard Financiero */}
+                <div className="md:col-span-8 lg:col-span-8 flex flex-col h-full group">
+                  <div className="relative h-full min-h-[180px] sm:min-h-[200px] flex flex-col justify-between p-5 sm:p-6 rounded-[24px] sm:rounded-[32px] bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-xl overflow-hidden transition-all duration-300 hover:bg-foreground/[0.05] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2]">
+                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none transition-colors duration-500 group-hover:bg-blue-500/30" />
+                    <div className="relative z-10 flex flex-col h-full">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-2xl bg-blue-500 text-white shadow-md">
+                          <LayoutDashboard className="w-6 h-6" />
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Dashboard Financiero</h2>
                       </div>
-                      <h2 className="text-xl font-bold text-foreground dark:text-white mb-2">{card.title}</h2>
-                      <p className="text-sm text-muted-foreground">{card.description}</p>
+                      <p className="text-muted-foreground max-w-md text-xs sm:text-sm mb-5 font-medium line-clamp-2">
+                        Resumen de métricas, MRR y crecimiento de la plataforma.
+                      </p>
+                      <div className="mt-auto">
+                        <Link href="/admin?view=dashboard">
+                          <button className="w-full sm:w-auto py-3.5 px-6 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98]">
+                            Ver Dashboard
+                          </button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Secondary Card - Gestión de Talleres */}
+                <div className="md:col-span-4 lg:col-span-4 h-full">
+                  <Link href="/admin?view=workshops" className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
+                    <div className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0">
+                      <div className="relative z-10 flex flex-col h-full min-w-0">
+                        <div className="p-2 rounded-2xl text-white w-fit mb-3 shadow-sm bg-indigo-500">
+                          <Store className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">Gestión de Talleres</h3>
+                        <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">Administra los talleres registrados</p>
+                      </div>
                     </div>
                   </Link>
-                );
-              })}
+                </div>
+
+                {/* 3. Secondary Card - Control de Usuarios */}
+                <div className="md:col-span-4 lg:col-span-4 h-full">
+                  <Link href="/admin?view=users" className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
+                    <div className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0">
+                      <div className="relative z-10 flex flex-col h-full min-w-0">
+                        <div className="p-2 rounded-2xl text-white w-fit mb-3 shadow-sm bg-emerald-500">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">Control de Usuarios</h3>
+                        <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">Gestiona accesos y roles del sistema</p>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+
+                {/* 4. Secondary Card - Gestión de Planes */}
+                <div className="md:col-span-4 lg:col-span-4 h-full">
+                  <Link href="/admin?view=planes" className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
+                    <div className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0">
+                      <div className="relative z-10 flex flex-col h-full min-w-0">
+                        <div className="p-2 rounded-2xl text-white w-fit mb-3 shadow-sm bg-amber-500">
+                          <LayoutDashboard className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">Gestión de Planes</h3>
+                        <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">Modifica precios y características</p>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+
+                {/* 5. Secondary Card - Historial de Pagos */}
+                <div className="md:col-span-4 lg:col-span-4 h-full">
+                  <Link href="/admin?view=payments" className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
+                    <div className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0">
+                      <div className="relative z-10 flex flex-col h-full min-w-0">
+                        <div className="p-2 rounded-2xl text-white w-fit mb-3 shadow-sm bg-green-500">
+                          <ReceiptText className="w-5 h-5" />
+                        </div>
+                        <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">Historial de Pagos</h3>
+                        <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">Transacciones de todos los talleres</p>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+
+                {/* 6. Tertiary Small Card - Cancelaciones */}
+                <div className="md:col-span-4 lg:col-span-6 h-full">
+                  <Link href="/admin?view=cancellations" className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl min-w-0">
+                    <div className="relative h-full p-4 sm:p-5 rounded-2xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[40px] border border-foreground/[0.08] dark:border-white/[0.1] transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] min-w-0">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="p-2 rounded-xl text-white shadow-sm shrink-0 bg-rose-500">
+                          <HeartCrack className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-base font-semibold text-foreground truncate">Cancelaciones</h3>
+                          <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">Feedback de clientes</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+
+                {/* 7. Tertiary Small Card - Soporte */}
+                <div className="md:col-span-4 lg:col-span-6 h-full">
+                  <Link href="/admin?view=tickets" className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl min-w-0">
+                    <div className="relative h-full p-4 sm:p-5 rounded-2xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[40px] border border-foreground/[0.08] dark:border-white/[0.1] transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] min-w-0">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="p-2 rounded-xl text-white shadow-sm shrink-0 bg-cyan-500">
+                          <Users className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-base font-semibold text-foreground truncate">Soporte y Tickets</h3>
+                          <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">Resolver problemas</p>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         ) : (

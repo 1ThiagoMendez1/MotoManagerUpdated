@@ -17,12 +17,7 @@ const REASON_LABELS: Record<string, string> = {
 export async function saveCancellationFeedback(reason: string) {
   try {
     const user = await requireWorkshop()
-    const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+    const supabase = createAdminClient();
 
     const { error } = await supabase
       .from('cancellation_feedback')

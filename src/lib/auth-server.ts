@@ -134,11 +134,14 @@ export async function getWorkshopDetails(knownUser?: any) {
     const org = _org as any;
     
     if (org) {
+      const settings = org.settings || {};
       return {
         name: org.name,
         slug: org.slug,
-        subscription_status: org.subscription_status || 'active',
-        subscription_plan: 'premium', 
+        subscription_status: settings.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
+        subscription_plan: settings.plan || 'monthly', 
+        subscription_end_date: settings.demoEndDate || null,
+        created_at: org.created_at,
         has_seen_welcome: true,
         user_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Usuario',
         user_role: userRole
