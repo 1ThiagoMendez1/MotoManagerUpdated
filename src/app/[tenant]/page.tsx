@@ -31,9 +31,8 @@ export default async function TenantPage({ params }: TenantPageProps) {
     getWorkOrders()
   ]);
 
-  const activeWorkOrders = workOrdersData.items.filter((wo) => wo.status !== 'Entregado');
-  const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
-    (moto) => !activeWorkOrders.some((wo) => wo.motorcycle?.id === moto.id)
+  const motorcyclesWithoutAnyWorkOrder = motorcycles.filter(
+    (moto) => !workOrdersData.items.some((wo) => wo.motorcycle?.id === moto.id)
   );
 
   return (
@@ -42,7 +41,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
         role={user.role} 
         userName={workshopDetails?.user_name || 'Usuario'}
         workshopName={workshopDetails?.slug || 'tu-taller'}
-        motorcycles={motorcyclesWithoutActiveWorkOrders}
+        motorcycles={motorcyclesWithoutAnyWorkOrder}
         technicians={technicians}
       />
       <Suspense fallback={null}>

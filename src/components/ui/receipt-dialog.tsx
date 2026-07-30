@@ -484,7 +484,7 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
         <DialogFooter className="flex gap-2">
           {receiptData.paymentMethod === 'Wompi' && (
             <WompiButton
-              amountInCents={Math.round(receiptData.total * 100)}
+              amountInCents={Math.round((receiptData.remainingBalance !== undefined ? receiptData.remainingBalance : receiptData.total) * 100)}
               reference={`MM-SALE-${receiptData.saleNumber}`}
               customerEmail={(receiptData as any).customerEmail}
               redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || 'https://www.motomanager.com.co'}/sales?payment=success&sale=${(receiptData as any).id}`}

@@ -65,8 +65,11 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
   }, [state]);
 
   const statusOptions = [
+    { value: 'Ingreso a revisión', label: 'Ingreso a revisión' },
     { value: 'Diagnosticando', label: 'Diagnosticando' },
+    { value: 'En proceso', label: 'En proceso' },
     { value: 'Reparado', label: 'Reparado' },
+    { value: 'Entregado', label: 'Entregado' },
   ];
 
   const handleSubmit = (formData: FormData) => {

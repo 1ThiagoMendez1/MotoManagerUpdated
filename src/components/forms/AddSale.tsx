@@ -624,7 +624,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                     <div className="border-t border-primary/20 pt-3 flex justify-between items-end mt-2">
                       <span className="text-base font-semibold text-foreground">Total a Cobrar:</span>
                       <span className="text-3xl font-bold tracking-tight text-primary">
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total)}
+                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(remainingBalanceTotal)}
                       </span>
                     </div>
                   </Card>

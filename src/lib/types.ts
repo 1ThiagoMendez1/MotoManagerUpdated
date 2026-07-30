@@ -111,3 +111,17 @@ export type Reminder = {
   sentAt?: string | null;
   createdAt: string;
 };
+
+export type Appointment = {
+  id: string;
+  motorcycleId: string;
+  motorcycle: Motorcycle;
+  technicianId?: string | null;
+  technician: Technician;
+  service: string;
+  date: string;
+  time: string;
+  status: 'Programada' | 'Confirmada' | 'En Progreso' | 'Completada' | 'Cancelada';
+  notes?: string | null;
+  createdAt: string;
+};

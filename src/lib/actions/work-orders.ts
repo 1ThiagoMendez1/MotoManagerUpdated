@@ -45,13 +45,18 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
     const { motorcycleId, technicianId } = validatedFields.data;
 
     // Check for duplicate active work order
-    const { data: activeOrder } = await supabase
+    const { data: activeOrders } = await supabase
         .from('work_orders')
-        .select('id')
+        .select('id, status, sales(status)')
         .eq('organization_id', user.workshopId)
         .eq('motorcycle_id', motorcycleId)
         .neq('status', 'delivered')
-        .maybeSingle();
+        .neq('status', 'cancelled');
+
+    const activeOrder = activeOrders?.find(wo => {
+        const hasCompletedSale = wo.sales && (wo.sales as any[]).some((s: any) => s.status === 'paid');
+        return !hasCompletedSale;
+    });
         
     if (activeOrder) return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en el taller.' };
 
@@ -622,14 +627,17 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
         return { message: 'Datos incompletos.' };
     }
 
-    // Map UI Spanish status back to DB status
-    let dbStatus = 'waiting_approval';
-    if (quoteStatus === 'Aprobada') dbStatus = 'diagnosis'; // Entra a diagnosticado (diagnosis) cuando se aprueba
-    if (quoteStatus === 'Rechazada') dbStatus = 'diagnosis';
+    const dbQuoteStatus = quoteStatus === 'Aprobada' ? 'approved' : 
+                          quoteStatus === 'Rechazada' ? 'rejected' : 
+                          'pending';
 
     // Manejo inteligente e innovador del inventario según aprobación/rechazo
     const { data: woData } = await supabase.from('work_orders').select('status, customer_observations').eq('id', id).single();
-    const wasApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(woData?.status);
+    if (!woData) {
+        return { message: 'Orden de trabajo no encontrada.' };
+    }
+
+    const wasApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(woData.status);
 
     const { data: sale } = await supabase.from('sales').select('id').eq('work_order_id', id).maybeSingle();
     let quoteItems: any[] = [];
@@ -638,22 +646,23 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
         quoteItems = items || [];
     }
 
-    if (dbStatus === 'approved' && !wasApproved) {
-        // Si recién se aprueba, descontamos el stock reservado
-        for (const item of quoteItems) {
-            if (item.item_type === 'inventory' && item.inventory_item_id) {
-                await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+    let newStatus = woData.status;
+
+    if (dbQuoteStatus === 'approved') {
+        if (!wasApproved) {
+            // Si recién se aprueba, descontamos el stock reservado
+            for (const item of quoteItems) {
+                if (item.item_type === 'inventory' && item.inventory_item_id) {
+                    await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+                }
             }
         }
-    }
-
-    if (dbStatus === 'diagnosis') {
-        // Si se rechaza la cotización, ya que no se aprobó, los ítems no se usarán y no se descontarán.
-        // 1. Devolver el inventario si la orden estaba aprobada (por error y la rechazan después)
-        // 2. Mantenemos los sale_items de la cotización para el registro histórico
-        // 3. Dejamos un log permanente en observaciones
-        
+        if (!['completed', 'delivered'].includes(woData.status)) {
+            newStatus = 'diagnosis';
+        }
+    } else if (dbQuoteStatus === 'rejected') {
         if (wasApproved) {
+            // Devolver el inventario si la orden estaba aprobada (por error y la rechazan después)
             for (const item of quoteItems) {
                 if (item.item_type === 'inventory' && item.inventory_item_id) {
                     const { data: invItem } = await supabase.from('inventory_items').select('quantity').eq('id', item.inventory_item_id).single();
@@ -663,23 +672,33 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
                 }
             }
         }
+        if (!['completed', 'delivered'].includes(woData.status)) {
+            newStatus = 'diagnosis';
+        }
 
         if (sale && quoteItems.length > 0) {
             // Dejar historial
             const rejectMsg = `\n[Cotización Rechazada]`;
-            const newObs = (woData?.customer_observations || '') + rejectMsg;
-            
+            const newObs = (woData.customer_observations || '') + rejectMsg;
             await supabase.from('work_orders').update({ customer_observations: newObs }).eq('id', id);
+        }
+    } else {
+        if (!['completed', 'delivered'].includes(woData.status)) {
+            newStatus = 'waiting_approval';
         }
     }
 
     const { error } = await supabase
         .from('work_orders')
-        .update({ status: dbStatus })
+        .update({ 
+            status: newStatus,
+            quote_status: dbQuoteStatus,
+            quote_responded_at: dbQuoteStatus !== 'pending' ? new Date().toISOString() : null
+        })
         .eq('id', id)
         .eq('organization_id', user.workshopId);
 
-    if (error) return { message: 'Error al actualizar cotización' };
+    if (error) return { message: 'Error al actualizar cotización: ' + error.message };
 
     revalidatePath('/work-orders');
     revalidatePath(`/work-orders/${id}`);

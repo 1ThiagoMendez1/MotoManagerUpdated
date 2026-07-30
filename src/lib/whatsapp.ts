@@ -1379,6 +1379,638 @@ export async function sendDiagnosticadoReparadoNotification(
   }
 }
 
+export async function sendVentaPorOrdenNotification(
+  customerPhone: string,
+  customerName: string,
+  workshopName: string,
+  orderNumber: string,
+  motorcycleInfo: string,
+  plate: string,
+  total: number,
+  items: Array<{ name: string; quantity: number; price: number }>,
+  laborCost?: number,
+  depositAmount?: number
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  const evolutionApiUrl = process.env.EVOLUTION_API_URL;
+  const evolutionApiKey = process.env.EVOLUTION_API_KEY;
+  const whatsappInstance = process.env.EVOLUTION_INSTANCE_NAME;
+
+  const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+  
+  const formattedTotal = total.toLocaleString('es-CO');
+
+  const itemsNames: string[] = [];
+  if (items && items.length > 0) {
+    items.forEach(item => {
+      itemsNames.push(item.name);
+    });
+  }
+  if (laborCost && laborCost > 0) {
+    itemsNames.push('mano de obra');
+  }
+  const workDoneText = itemsNames.length > 0 ? itemsNames.join('   ') : 'mantenimiento';
+
+  // Get formatted date as DD-MM-YYYY
+  const dateObj = new Date();
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+  const formattedDate = `${day}-${month}-${year}`;
+
+  let sentSuccessfully = false;
+  let successResponse = null;
+  let lastMetaError = null;
+
+  // 1. Intentar enviar con Meta Cloud API (si está configurada)
+  if (wpToken && wpPhoneId) {
+    try {
+      const payloadsToTry = [
+        // Option 1: 8 body params (with dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: motorcycleInfo },
+            { type: 'text', text: plate },
+            { type: 'text', text: formattedDate },
+            { type: 'text', text: orderNumber },
+            { type: 'text', text: workDoneText },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: workshopName }
+          ]
+        },
+        // Option 2: 8 body params (without dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: motorcycleInfo },
+            { type: 'text', text: plate },
+            { type: 'text', text: formattedDate },
+            { type: 'text', text: orderNumber },
+            { type: 'text', text: workDoneText },
+            { type: 'text', text: formattedTotal },
+            { type: 'text', text: workshopName }
+          ]
+        },
+        // Option 3: 7 body params (no workshop name, with dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: motorcycleInfo },
+            { type: 'text', text: plate },
+            { type: 'text', text: formattedDate },
+            { type: 'text', text: orderNumber },
+            { type: 'text', text: workDoneText },
+            { type: 'text', text: `$${formattedTotal}` }
+          ]
+        },
+        // Option 4: 7 body params (no workshop name, without dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: motorcycleInfo },
+            { type: 'text', text: plate },
+            { type: 'text', text: formattedDate },
+            { type: 'text', text: orderNumber },
+            { type: 'text', text: workDoneText },
+            { type: 'text', text: formattedTotal }
+          ]
+        }
+      ];
+
+      console.log(`Sending template 'salida_de_motos' to ${formattedPhone} via Meta Cloud API...`);
+
+      for (let i = 0; i < payloadsToTry.length; i++) {
+        const config = payloadsToTry[i];
+        try {
+          const components: any[] = [];
+          if (config.header) {
+            components.push({
+              type: 'header',
+              parameters: config.header
+            });
+          }
+          components.push({
+            type: 'body',
+            parameters: config.body
+          });
+
+          console.log(`Trying Meta payload option ${i + 1} (${config.body.length} body params)...`);
+          const response = await axios.post(
+            `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+            {
+              messaging_product: 'whatsapp',
+              to: formattedPhone,
+              type: 'template',
+              template: {
+                name: 'salida_de_motos',
+                language: { code: 'es_CO' },
+                components
+              }
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${wpToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          console.log(`✅ salida_de_motos template sent successfully using payload option ${i + 1} via Meta.`);
+          successResponse = response.data;
+          sentSuccessfully = true;
+          break; // Exit loop on success
+        } catch (err: any) {
+          lastMetaError = err;
+          const errMsg = err.response?.data?.error?.message || err.message;
+          console.log(`Meta payload option ${i + 1} failed: ${errMsg}`);
+        }
+      }
+
+      if (sentSuccessfully) {
+        return { success: true, provider: 'meta', data: successResponse };
+      }
+    } catch (metaErr: any) {
+      console.error('❌ Error general en Meta Cloud API:', metaErr.message);
+    }
+  }
+
+  // 2. Fallback: Evolution API (si Meta no está configurada o falló)
+  if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
+    try {
+      const textMessage = `¡Tu moto está lista y ha sido entregada! 🏍️
+Hola, ${customerName}.👋
+
+🟩Te informamos que la moto 
+${motorcycleInfo} de placas ${plate} fue entregada exitosamente el:
+${formattedDate}.
+
+📋 Resumen del servicio:
+🔖 Orden de servicio:${orderNumber}
+🛠️ Trabajo realizado:
+${workDoneText}
+💰 Valor del servicio:$${formattedTotal}
+
+🤗Agradecemos la confianza que depositaste en ${workshopName}. Esperamos que hayas quedado satisfecho con nuestro servicio.
+
+¡Buen viaje y gracias por elegirnos! 🏍️🤝
+Motomanager - CRM`;
+
+      console.log(`Sending salida_de_motos text via Evolution API fallback to ${formattedPhone}...`);
+      const response = await axios.post(
+        `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+        {
+          number: formattedPhone,
+          text: textMessage,
+          delay: 1000
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          }
+        }
+      );
+
+      console.log('✅ WhatsApp message sent successfully via Evolution API fallback:', response.data);
+      return { success: true, provider: 'evolution', data: response.data };
+    } catch (error: any) {
+      console.error('❌ Error sending WhatsApp notification via Evolution API fallback:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data || error.message };
+    }
+  }
+
+  const finalErrorMsg = lastMetaError?.response?.data?.error?.message || lastMetaError?.message || 'Ningún servicio de WhatsApp está configurado o ambos fallaron.';
+  return { success: false, error: finalErrorMsg };
+}
+
+export async function sendDirectSalePaidNotification(
+  customerPhone: string,
+  customerName: string,
+  workshopName: string,
+  saleNumber: string,
+  total: number,
+  paymentMethod: string = 'Wompi',
+  items: Array<{ name: string; quantity: number; price: number }> = []
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const evolutionApiUrl = process.env.EVOLUTION_API_URL;
+  const evolutionApiKey = process.env.EVOLUTION_API_KEY;
+  const whatsappInstance = process.env.EVOLUTION_INSTANCE_NAME;
+
+  const formattedPhone = customerPhone.replace('+', '').startsWith('57') 
+    ? customerPhone.replace('+', '') 
+    : `57${customerPhone.replace('+', '')}`;
+
+  const formattedTotal = total.toLocaleString('es-CO');
+
+  const itemsText = items.map(item => 
+    `${item.name} Cantidad: ${item.quantity} $${(item.price * item.quantity).toLocaleString('es-CO')} $${item.price.toLocaleString('es-CO')} c/u`
+  ).join('\n');
+
+  let sentSuccessfully = false;
+  let successResponse = null;
+  let lastMetaError = null;
+
+  // 1. Intentar enviar con Meta Cloud API
+  if (wpToken && wpPhoneId) {
+    try {
+      const payloadsToTry = [
+        // A1. Body-only: 6 params (new adjusted template with itemsText and paymentMethod)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: itemsText }
+          ]
+        },
+        // A2. Body-only: 6 params (new adjusted template without dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: formattedTotal },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: itemsText }
+          ]
+        },
+        // B. Body-only: 5 params
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // C. Body-only: 4 params
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` }
+          ]
+        },
+        // D. Body-only: 3 params
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` }
+          ]
+        },
+        // E. Body-only: 2 params
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: `$${formattedTotal}` }
+          ]
+        },
+        // F. Body-only: 1 param
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName }
+          ]
+        },
+        // G. Body-only: 6 params (old/legacy 6 params)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: workshopName }
+          ]
+        },
+        // H. Body-only: 7 params
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: customerName }
+          ]
+        },
+        // I. Body-only: 8 params
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: customerName },
+            { type: 'text', text: saleNumber }
+          ]
+        },
+        // J. Header (1 param) + Body: 4 params
+        {
+          header: [{ type: 'text', text: workshopName }],
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // K. Header (1 param) + Body: 3 params
+        {
+          header: [{ type: 'text', text: workshopName }],
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` }
+          ]
+        },
+        // L. Header (1 param) + Body: 2 params
+        {
+          header: [{ type: 'text', text: workshopName }],
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: `$${formattedTotal}` }
+          ]
+        },
+        // M. Header (1 param) + Body: 5 params
+        {
+          header: [{ type: 'text', text: workshopName }],
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod }
+          ]
+        }
+      ];
+
+      console.log(`Sending template 'compra_realizada_venta_directa' to ${formattedPhone} via Meta...`);
+      for (let i = 0; i < payloadsToTry.length; i++) {
+        const config = payloadsToTry[i];
+        try {
+          const components: any[] = [];
+          if (config.header) {
+            components.push({
+              type: 'header',
+              parameters: config.header
+            });
+          }
+          components.push({
+            type: 'body',
+            parameters: config.body
+          });
+
+          console.log(`Trying Meta payload option ${i + 1} (${config.header ? 'Header + ' : ''}${config.body.length} body params)...`);
+          const response = await axios.post(
+            `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+            {
+              messaging_product: 'whatsapp',
+              to: formattedPhone,
+              type: 'template',
+              template: {
+                name: 'compra_realizada_venta_directa',
+                language: { code: 'es_CO' },
+                components
+              }
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${wpToken}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          console.log(`✅ Template 'compra_realizada_venta_directa' sent successfully using option ${i + 1} via Meta.`);
+          successResponse = response.data;
+          sentSuccessfully = true;
+          break; // Salir en caso de éxito
+        } catch (err: any) {
+          lastMetaError = err;
+          console.log(`Meta payload option ${i + 1} failed:`, err.response?.data?.error?.message || err.message);
+        }
+      }
+
+      if (sentSuccessfully) {
+        return { success: true, provider: 'meta', data: successResponse };
+      }
+    } catch (metaErr: any) {
+      console.error('❌ Error general en Meta Cloud API para venta directa:', metaErr.message);
+    }
+  }
+
+  // 2. Fallback: Evolution API (Mensaje de texto plano)
+  if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
+    try {
+      const textMessage = `Hola, ${customerName}.👋
+
+✅Gracias por tu compra en ${workshopName}. Tu venta ha sido registrada exitosamente.
+
+📋 Resumen de la compra
+🧾 Número de venta: ${saleNumber}
+💵 Total pagado: $${formattedTotal}
+💸Metodo de pago: ${paymentMethod} 
+🛒 Productos adquiridos:
+${itemsText}
+
+💭Si tienes alguna inquietud sobre tu compra o necesitas soporte, estaremos encantados de ayudarte.
+
+¡Gracias por confiar en nosotros! 🏍️🛣️`;
+
+      console.log(`Sending direct sale paid text via Evolution API fallback to ${formattedPhone}...`);
+      const response = await axios.post(
+        `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+        {
+          number: formattedPhone,
+          text: textMessage,
+          delay: 1000
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          }
+        }
+      );
+
+      console.log('✅ WhatsApp message sent successfully via Evolution API fallback:', response.data);
+      return { success: true, provider: 'evolution', data: response.data };
+    } catch (error: any) {
+      console.error('❌ Error sending WhatsApp notification via Evolution API fallback:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data || error.message };
+    }
+  }
+
+  const finalErr = lastMetaError?.response?.data?.error?.message || lastMetaError?.message || 'Ningún servicio de WhatsApp está configurado o ambos fallaron.';
+  return { success: false, error: finalErr };
+}
+
+export async function sendCitaConfirmadaNotification(
+  customerPhone: string,
+  customerName: string,
+  workshopName: string,
+  appointmentDate: Date | string
+) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+
+  if (!wpToken || !wpPhoneId) {
+    console.error('❌ citas_confirmadas: WHATSAPP_API_TOKEN o WHATSAPP_PHONE_NUMBER_ID no configurados.');
+    return { success: false, error: 'Meta WhatsApp API no configurada' };
+  }
+
+  const formattedPhone = customerPhone.replace('+', '').startsWith('57')
+    ? customerPhone.replace('+', '')
+    : `57${customerPhone.replace('+', '')}`;
+
+  let dateStr = '';
+  if (appointmentDate instanceof Date) {
+    const day = String(appointmentDate.getDate()).padStart(2, '0');
+    const month = String(appointmentDate.getMonth() + 1).padStart(2, '0');
+    const year = appointmentDate.getFullYear();
+    dateStr = `${day}-${month}-${year}`;
+  } else {
+    try {
+      const dateObj = new Date(appointmentDate);
+      if (!isNaN(dateObj.getTime())) {
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        dateStr = `${day}-${month}-${year}`;
+      } else {
+        dateStr = appointmentDate;
+      }
+    } catch {
+      dateStr = appointmentDate;
+    }
+  }
+
+  // Ya sabemos por los logs que el idioma correcto es es_CO (es el único que da 132000 en vez de 132001)
+  const langCode = 'es_CO';
+
+  // Todas las combinaciones de parámetros posibles (Header y Body)
+  const paramVariants: Array<{ label: string; components: any[] }> = [
+    // Body only (1 a 6 params)
+    { label: 'Body: 1 param', components: [{ type: 'body', parameters: [{ type: 'text', text: workshopName }] }] },
+    { label: 'Body: 2 params', components: [{ type: 'body', parameters: [{ type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }] },
+    { label: 'Body: 3 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }] },
+    { label: 'Body: 4 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }, { type: 'text', text: workshopName }] }] },
+    { label: 'Body: 5 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }, { type: 'text', text: workshopName }, { type: 'text', text: customerName }] }] },
+    { label: 'Body: 6 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }, { type: 'text', text: workshopName }, { type: 'text', text: customerName }, { type: 'text', text: dateStr }] }] },
+    
+    // Header (1 param) + Body (1 a 4 params)
+    { 
+      label: 'Header: 1, Body: 1', 
+      components: [
+        { type: 'header', parameters: [{ type: 'text', text: workshopName }] },
+        { type: 'body', parameters: [{ type: 'text', text: dateStr }] }
+      ] 
+    },
+    { 
+      label: 'Header: 1, Body: 2', 
+      components: [
+        { type: 'header', parameters: [{ type: 'text', text: workshopName }] },
+        { type: 'body', parameters: [{ type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }
+      ] 
+    },
+    { 
+      label: 'Header: 1, Body: 3', 
+      components: [
+        { type: 'header', parameters: [{ type: 'text', text: workshopName }] },
+        { type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }
+      ] 
+    },
+    { 
+      label: 'Header: 1, Body: 4', 
+      components: [
+        { type: 'header', parameters: [{ type: 'text', text: workshopName }] },
+        { type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }, { type: 'text', text: workshopName }] }
+      ] 
+    },
+    
+    // Media Header: IMAGE sin parámetros (algunas plantillas requieren esto si tienen imagen fija)
+    {
+      label: 'Header: IMAGE, Body: 2',
+      components: [
+        { type: 'header', parameters: [{ type: 'image', image: { link: 'https://i.imgur.com/K3n8g6D.png' } }] },
+        { type: 'body', parameters: [{ type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }
+      ]
+    },
+    {
+      label: 'Header: IMAGE, Body: 3',
+      components: [
+        { type: 'header', parameters: [{ type: 'image', image: { link: 'https://i.imgur.com/K3n8g6D.png' } }] },
+        { type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }
+      ]
+    }
+  ];
+
+  console.log(`Sending 'citas_confirmadas' to ${formattedPhone} for ${workshopName} on ${dateStr}...`);
+
+  for (const variant of paramVariants) {
+    try {
+      const templatePayload: any = {
+        name: 'citas_confirmadas',
+        language: { code: langCode },
+      };
+      if (variant.components.length > 0) {
+        templatePayload.components = variant.components;
+      }
+
+      const response = await axios.post(
+        `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'template',
+          template: templatePayload
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${wpToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log(`✅ Template 'citas_confirmadas' sent successfully via Meta [lang=${langCode}, ${variant.label}].`);
+      return { success: true, provider: 'meta', data: response.data };
+    } catch (err: any) {
+      const metaErr = err.response?.data?.error;
+      console.log(`❌ ${variant.label} failed — code: ${metaErr?.code}, msg: ${metaErr?.message || err.message}`);
+    }
+  }
+
+  return { success: false, error: 'No se pudo enviar la plantilla citas_confirmadas por Meta tras probar todas las combinaciones.' };
+}
+
+
+
 export default {
   sendSaleNotification,
   sendServiceSaleNotification,
@@ -1395,5 +2027,8 @@ export default {
   sendOwnerWelcomeNotification,
   sendAccessCodeNotification,
   sendMotoIngresoNotification,
-  sendDiagnosticadoReparadoNotification
+  sendDiagnosticadoReparadoNotification,
+  sendVentaPorOrdenNotification,
+  sendDirectSalePaidNotification,
+  sendCitaConfirmadaNotification
 };

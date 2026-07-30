@@ -63,8 +63,8 @@ export default async function WorkOrdersPage({
   const totalCompletedPages = Math.ceil(allCompletedWorkOrders.length / itemsPerPage) || 1;
   const completedWorkOrders = allCompletedWorkOrders.slice((completedPage - 1) * itemsPerPage, completedPage * itemsPerPage);
 
-  const motorcyclesWithoutActiveWorkOrders = motorcycles.filter(
-    (moto) => !allActiveWorkOrders.some((wo) => wo.motorcycle?.id === moto.id)
+  const motorcyclesWithoutAnyWorkOrder = motorcycles.filter(
+    (moto) => !workOrders.some((wo) => wo.motorcycle?.id === moto.id)
   );
 
   const getStatusVariant = (status: string) => {
@@ -91,7 +91,7 @@ export default async function WorkOrdersPage({
           <SearchWorkOrders />
         </div>
         <div className="flex gap-3">
-          <AddWorkOrder motorcycles={motorcyclesWithoutActiveWorkOrders} technicians={technicians} />
+          <AddWorkOrder motorcycles={motorcyclesWithoutAnyWorkOrder} technicians={technicians} />
         </div>
       </div>
       <Card className="bg-card/50 border-border/50 text-foreground backdrop-blur-sm overflow-hidden">

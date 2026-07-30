@@ -3,7 +3,7 @@ import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { sendServiceSaleNotification, sendSaleNotification } from '@/lib/whatsapp';
+import { sendServiceSaleNotification, sendSaleNotification, sendVentaPorOrdenNotification, sendDirectSalePaidNotification } from '@/lib/whatsapp';
 
 // --- Schemas ---
 
@@ -278,6 +278,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     brand,
                     model,
                     license_plate,
+                    model_year,
                     customers (
                         first_name,
                         last_name,
@@ -293,35 +294,6 @@ export async function createServiceSale(prevState: any, formData: FormData) {
 
         if (workOrderError) {
             console.error('Error updating work order status:', workOrderError);
-        }
-
-        // 7. Send Notification
-        if (workOrder) {
-            const mc = Array.isArray(workOrder.motorcycles) ? workOrder.motorcycles[0] : workOrder.motorcycles;
-            const customer = mc?.customers;
-            const tech = Array.isArray(workOrder.profiles) ? workOrder.profiles[0] : workOrder.profiles;
-            
-            if (customer?.phone) {
-                try {
-                    const { data: org } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
-                    await sendServiceSaleNotification(
-                        customer.phone,
-                        `${customer.first_name} ${customer.last_name}`.trim(),
-                        saleNumber,
-                        total,
-                        { make: mc?.brand, model: mc?.model, plate: mc?.license_plate },
-                        tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico',
-                        data.laborCost > 0 ? data.laborCost : undefined,
-                        data.items?.map(i => ({ name: 'Repuesto', quantity: i.quantity, price: i.price })),
-                        subtotal,
-                        data.discountPercentage || 0,
-                        discountAmount,
-                        org?.name
-                    );
-                } catch (notifyError) {
-                    console.error('Notification error:', notifyError);
-                }
-            }
         }
 
         revalidatePath('/sales');
@@ -363,6 +335,28 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             price: item.price,
             total: item.total || (item.quantity * item.price)
         }));
+
+        // 7. Send Notification
+        if (formattedCustomer?.phone) {
+            try {
+                const motorcycleBrandModel = fomattedMotorcycle ? `${fomattedMotorcycle.brand} ${fomattedMotorcycle.model}` : '';
+                const customerFullName = formattedCustomer ? `${formattedCustomer.first_name} ${formattedCustomer.last_name}`.trim() : 'Cliente';
+                await sendVentaPorOrdenNotification(
+                    formattedCustomer.phone,
+                    customerFullName,
+                    workshopName,
+                    wo?.order_number || '',
+                    motorcycleBrandModel,
+                    fomattedMotorcycle?.license_plate || '',
+                    total,
+                    formattedItems,
+                    data.laborCost > 0 ? data.laborCost : undefined,
+                    parsedDeposit
+                );
+            } catch (notifyError) {
+                console.error('Notification error:', notifyError);
+            }
+        }
 
         const formattedSale = {
             id: sale.id,
@@ -506,6 +500,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         const total = subtotal - discountAmount;
 
         // 5. Create Sale
+        const initialStatus = data.paymentMethod === 'Wompi' ? 'pending' : 'paid';
         const { data: sale, error: saleError } = await supabase
             .from('sales')
             .insert({
@@ -517,7 +512,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                 subtotal: subtotal,
                 discount_total: discountAmount,
                 total: total,
-                status: 'paid',
+                status: initialStatus,
                 created_by: user.userId || null
             })
             .select()
@@ -546,31 +541,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
             if (updateError) throw new Error(`Error al descontar inventario.`);
         }
 
-        // 7. Notification
-        try {
-            if (finalCustomerPhone) {
-                const { data: org } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
-                await sendSaleNotification(
-                    finalCustomerPhone,
-                    finalCustomerName || 'Cliente',
-                    saleNumber,
-                    total,
-                    data.items.map(i => ({ name: 'Producto', quantity: i.quantity, price: i.price })),
-                    subtotal,
-                    data.discountPercentage || 0,
-                    discountAmount,
-                    org?.name
-                );
-            }
-        } catch (notifyError) {
-            console.error('Direct sale notification error:', notifyError);
-        }
-
-        revalidatePath('/sales');
-        revalidatePath('/inventory');
-        revalidatePath('/', 'layout');
-
-        // Return formatted sale
+        // 7. Return formatted sale
         const { data: fullSale, error: fullSaleError } = await supabase
             .from('sales')
             .select(`
@@ -583,6 +554,42 @@ export async function createDirectSale(prevState: any, formData: FormData) {
             `)
             .eq('id', sale.id)
             .single();
+
+        // 8. Send Notification
+        try {
+            if (initialStatus === 'paid' && finalCustomerPhone) {
+                const { data: org } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
+                
+                // Map items from fullSale or fallback to data.items
+                const notificationItems = fullSale?.sale_items
+                    ? fullSale.sale_items.map((si: any) => ({
+                        name: si.inventory_items?.name || si.description || 'Producto',
+                        quantity: si.quantity,
+                        price: si.unit_price
+                    }))
+                    : data.items.map((item: any) => ({
+                        name: item.name || 'Producto',
+                        quantity: item.quantity,
+                        price: item.price
+                    }));
+
+                await sendDirectSalePaidNotification(
+                    finalCustomerPhone,
+                    finalCustomerName || 'Cliente',
+                    org?.name || 'MotoManager',
+                    saleNumber,
+                    total,
+                    data.paymentMethod,
+                    notificationItems
+                );
+            }
+        } catch (notifyError) {
+            console.error('Direct sale notification error:', notifyError);
+        }
+
+        revalidatePath('/sales');
+        revalidatePath('/inventory');
+        revalidatePath('/', 'layout');
 
         if (fullSaleError || !fullSale) {
             console.error('Error fetching full direct sale for receipt:', fullSaleError);

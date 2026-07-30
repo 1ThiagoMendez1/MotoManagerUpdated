@@ -173,7 +173,15 @@ export default function Header({
       <div className="flex items-center gap-2 sm:gap-4">
         {!isRoot && (
           <Button
-            onClick={() => router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/'))}
+            onClick={() => {
+              if (pathname.startsWith('/clientes') || pathname.startsWith('/cotizacion')) {
+                const searchParams = new URLSearchParams(window.location.search);
+                const authParam = searchParams.get('auth');
+                router.push(authParam ? `/clientes?auth=${authParam}` : '/clientes');
+              } else {
+                router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/'));
+              }
+            }}
             variant="ghost"
             size="icon"
             className="text-foreground hover:bg-card/50 h-9 w-9 rounded-full transition-transform hover:scale-110"
@@ -183,7 +191,17 @@ export default function Header({
           </Button>
         )}
         <Link
-          href={pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/')}
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            if (pathname.startsWith('/clientes') || pathname.startsWith('/cotizacion')) {
+              const searchParams = new URLSearchParams(window.location.search);
+              const authParam = searchParams.get('auth');
+              router.push(authParam ? `/clientes?auth=${authParam}` : '/clientes');
+            } else {
+              router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/'));
+            }
+          }}
           className="flex items-center gap-3 font-semibold hover:opacity-80 transition-opacity"
         >
           <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 drop-shadow-md">

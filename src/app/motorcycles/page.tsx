@@ -44,18 +44,24 @@ export default async function MotorcyclesPage({
 
   const workOrders = workOrdersData.items;
 
-  // Filtrar motocicletas que tengan una orden de trabajo activa (estado distinto de "Entregado", es decir, que están en el taller)
-  const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
+  // Show motorcycles that do NOT have any active (non-delivered) work order.
+  // Once a work order is created, the bike moves to the Work Orders module.
+  const activeWorkOrderMotorcycleIds = new Set(
+    workOrders
+      .filter((wo) => wo.status !== 'Entregado')
+      .map((wo) => wo.motorcycle?.id)
+      .filter(Boolean)
+  );
   const motorcyclesInWorkshop = motorcycles.filter(
-    (moto) => activeWorkOrders.some((wo) => wo.motorcycle && wo.motorcycle.id === moto.id)
+    (moto) => !activeWorkOrderMotorcycleIds.has(moto.id)
   );
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Motos en Taller</h1>
-          <p className="text-muted-foreground">Gestiona las motocicletas que se encuentran físicamente en el taller.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Recepción de Motos</h1>
+          <p className="text-muted-foreground">Motos ingresadas al taller sin orden de trabajo activa. Crea la orden para moverlas a gestión.</p>
         </div>
         <div className="flex gap-2 flex-grow sm:flex-grow-0">
           <SearchMotorcycles />
@@ -68,9 +74,9 @@ export default async function MotorcyclesPage({
       <Card className="glass-card relative overflow-hidden group text-foreground">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
         <CardHeader className="relative z-10">
-          <CardTitle>Motocicletas en el Taller</CardTitle>
+          <CardTitle>Motos Pendientes de Orden</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Una lista de todas las motocicletas que se encuentran en el taller en proceso de revisión o reparación.
+            Motos registradas en el taller que todavía no tienen una orden de trabajo activa asignada.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -13,7 +13,8 @@ import {
   UserCog,
   LifeBuoy,
   PlusCircle,
-  ArrowRight
+  ArrowRight,
+  Calendar,
 } from 'lucide-react';
 import { hasPermission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
@@ -68,9 +69,10 @@ export function DashboardMenu({
   const canAccessSales = hasPermission(role, '/sales');
   const canAccessTeam = hasPermission(role, '/team');
   const canAccessTickets = hasPermission(role, '/tickets');
+  const canAccessAppointments = hasPermission(role, '/appointments');
 
   // Calcular espacios dinámicos para que el layout siempre se vea lleno y proporcionado
-  const secondaryCardsCount = [canAccessCustomers, canAccessMotorcycles, canAccessInventory, canAccessSales].filter(Boolean).length;
+  const secondaryCardsCount = [canAccessCustomers, canAccessMotorcycles, canAccessInventory, canAccessSales, canAccessAppointments].filter(Boolean).length;
   let secondarySpanLg = "lg:col-span-3";
   let secondarySpanMd = "md:col-span-4";
   if (secondaryCardsCount === 1) {
@@ -81,6 +83,13 @@ export function DashboardMenu({
     secondarySpanMd = "md:col-span-4";
   } else if (secondaryCardsCount === 3) {
     secondarySpanLg = "lg:col-span-4";
+    secondarySpanMd = "md:col-span-4";
+  } else if (secondaryCardsCount === 4) {
+    secondarySpanLg = "lg:col-span-3";
+    secondarySpanMd = "md:col-span-4";
+  } else if (secondaryCardsCount === 5) {
+    secondarySpanLg = "lg:col-span-2.4 lg:w-[20%] lg:min-w-[200px]"; // we can just let tailwind or flex handle layout, or make it span-2
+    secondarySpanLg = "lg:col-span-2";
     secondarySpanMd = "md:col-span-4";
   }
 
@@ -232,6 +241,18 @@ export function DashboardMenu({
                 title="Ventas"
                 description="Punto de venta y caja."
                 iconBg="bg-green-500"
+              />
+            </div>
+          )}
+
+          {canAccessAppointments && (
+            <div id="tour-appointments" className={cn(secondarySpanMd, secondarySpanLg)}>
+              <AppleGlassCard 
+                href="/appointments"
+                icon={Calendar}
+                title="Citas"
+                description="Gestión y programación de citas."
+                iconBg="bg-blue-500"
               />
             </div>
           )}

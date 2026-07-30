@@ -17,6 +17,7 @@ interface WompiSaleButtonProps {
   saleId: string;
   saleNumber: string;
   total: number;
+  remainingBalance?: number;
   customerEmail?: string;
 }
 
@@ -32,9 +33,10 @@ function formatCOP(amount: number) {
  * Botón "Cobrar" en el detalle de una venta específica.
  * Usa el saleId + saleNumber como referencia única para Wompi.
  */
-export function WompiSaleButton({ saleId, saleNumber, total, customerEmail }: WompiSaleButtonProps) {
+export function WompiSaleButton({ saleId, saleNumber, total, remainingBalance, customerEmail }: WompiSaleButtonProps) {
   const [open, setOpen] = useState(false);
-  const amountInCents = Math.round(total * 100);
+  const amountToCharge = remainingBalance !== undefined ? remainingBalance : total;
+  const amountInCents = Math.round(amountToCharge * 100);
   const reference = `MM-SALE-${saleNumber}`;
 
   return (
@@ -71,7 +73,7 @@ export function WompiSaleButton({ saleId, saleNumber, total, customerEmail }: Wo
             </div>
             <div className="p-3 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-xl border border-blue-400/20">
               <p className="text-xs text-blue-300/80 mb-1">Total a cobrar</p>
-              <p className="text-lg font-bold text-foreground">{formatCOP(total)}</p>
+              <p className="text-lg font-bold text-foreground">{formatCOP(amountToCharge)}</p>
             </div>
           </div>
 

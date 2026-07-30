@@ -10,6 +10,7 @@ export const rolePermissions: Record<Role, string[]> = {
     '/inventory',
     '/technicians',
     '/sales',
+    '/appointments',
   ], // Excludes /team (Usuarios y Permisos)
   'mechanic': [
     '/work-orders',
@@ -20,13 +21,15 @@ export const rolePermissions: Record<Role, string[]> = {
     '/sales',
     '/customers',
     '/work-orders',
-    '/motorcycles'
+    '/motorcycles',
+    '/appointments',
   ],
   'service_advisor': [
     '/sales',
     '/customers',
     '/work-orders',
-    '/motorcycles'
+    '/motorcycles',
+    '/appointments',
   ],
   'user': [],
 };

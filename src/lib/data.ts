@@ -142,8 +142,9 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
     createdDate: wo.created_at,
     status: hasCompletedSale || wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'received' ? 'Ingreso a revisión' :
-            wo.status === 'diagnosis' ? 'Diagnosticando' : 
-            'Reparado',
+            wo.status === 'diagnosis' ? 'Diagnosticando' :
+            wo.status === 'completed' ? 'Reparado' :
+            'Diagnosticando',
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status,
     customerObservations: wo.customer_observations || '',
@@ -218,8 +219,9 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'received' ? 'Ingreso a revisión' :
-            wo.status === 'diagnosis' ? 'Diagnosticando' : 
-            'Reparado',
+            wo.status === 'diagnosis' ? 'Diagnosticando' :
+            wo.status === 'completed' ? 'Reparado' :
+            'Diagnosticando',
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status,
     customerObservations: wo.customer_observations || '',
@@ -275,10 +277,11 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
     const laborItem = s.sale_items?.find((si: any) => si.item_type === 'service');
     const laborCost = laborItem ? Number(laborItem.unit_price) : 0;
 
-    // Parse deposit amount from work order's customer_observations o de la venta
-    let depositAmount = Number(s.deposit_amount) || 0;
     const woRaw = s.work_orders;
     const woData = Array.isArray(woRaw) ? woRaw[0] : woRaw;
+
+    // Parse deposit amount from work order's deposit_amount, customer_observations o de la venta
+    let depositAmount = Number(woData?.deposit_amount) || Number(s.deposit_amount) || 0;
     
     if (depositAmount === 0 && woData?.customer_observations) {
       const match = woData.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
@@ -301,8 +304,9 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
         solutionDescription: woData.technical_diagnosis,
         status: woData.status === 'delivered' ? 'Entregado' : 
                 woData.status === 'received' ? 'Ingreso a revisión' :
-                woData.status === 'diagnosis' ? 'Diagnosticando' : 
-                'Reparado',
+                woData.status === 'diagnosis' ? 'Diagnosticando' :
+                woData.status === 'completed' ? 'Reparado' :
+                'Diagnosticando',
         technician: technicians.find(t => t.id === woData.assigned_mechanic_id) || null,
         motorcycle: mc ? {
           id: mc.id,
