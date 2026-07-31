@@ -197,11 +197,11 @@ export default async function AdminPage({
     .from('subscription_transactions')
     .select(`
       *,
-      workshop:workshops(
+      workshop:organizations(
         name,
-        members:workshop_members(
+        members:organization_members(
           role,
-          profile:user_profiles(name)
+          profile:profiles(first_name, last_name)
         )
       )
     `)
@@ -210,7 +210,8 @@ export default async function AdminPage({
 
   // Normalizar transacciones para el componente
   const normalizedTransactions = (allTransactions || []).map((tx: any) => {
-    const owner = tx.workshop?.members?.find((m: any) => m.role === 'owner')?.profile?.name || null;
+    const ownerProfile = tx.workshop?.members?.find((m: any) => m.role === 'owner')?.profile;
+    const owner = ownerProfile ? `${ownerProfile.first_name || ''} ${ownerProfile.last_name || ''}`.trim() : null;
     return {
       id: tx.id,
       workshop_id: tx.workshop_id,

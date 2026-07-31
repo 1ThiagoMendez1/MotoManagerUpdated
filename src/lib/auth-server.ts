@@ -104,11 +104,12 @@ export async function getWorkshopDetails(knownUser?: any) {
     // If we only have knownUser from auth but not the workshopId, fetch it
     let workshopId = user.workshopId;
     let userRole = user.role;
-    if (!workshopId && user.id) {
+    const actualUserId = user.userId || user.id;
+    if (!workshopId && actualUserId) {
        const { data: _orgMembers } = await supabaseAdmin
         .from('organization_members')
         .select('organization_id, role')
-        .eq('user_id', user.id)
+        .eq('user_id', actualUserId)
         .limit(1);
        if (_orgMembers && _orgMembers.length > 0) {
            workshopId = _orgMembers[0].organization_id;
