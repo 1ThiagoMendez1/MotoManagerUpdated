@@ -1,75 +1,98 @@
-const { createClient } = require('@supabase/supabase-js');
+const axios = require('axios');
 const fs = require('fs');
 
 const env = fs.readFileSync('.env', 'utf8');
 const lines = env.split('\n');
-const supabaseUrl = lines.find(l => l.startsWith('NEXT_PUBLIC_SUPABASE_URL')).split('=')[1].trim().replace(/['"]/g, '');
-const supabaseKey = lines.find(l => l.startsWith('SUPABASE_SERVICE_ROLE_KEY')).split('=')[1].trim().replace(/['"]/g, '');
+const wpToken = lines.find(l => l.startsWith('WHATSAPP_API_TOKEN')).split('=')[1].trim().replace(/['"]/g, '');
+const wpPhoneId = lines.find(l => l.startsWith('WHATSAPP_PHONE_NUMBER_ID')).split('=')[1].trim().replace(/['"]/g, '');
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const toPhone = '573183101859';
+const workshopName = 'Taller la 90';
+const orderNumber = '1329';
+const motorcycleInfo = 'Susuki Gixxer 150';
+const plate = 'BHF764';
+const formattedTotal = '400.000';
+const formattedItemsList = '• Cambio de aceite ×1 — $80.000   • Filtro de aceite ×1 — $25.000   • Pastillas de freno ×1 — $95.000';
+const motoAndPlate = `${motorcycleInfo} - ${plate}`;
 
-async function getMotorcycles() {
-  const { data } = await supabase.from('motorcycles').select('*, customers(*)');
-  return data.map((m) => ({
-    id: m.id,
-    make: m.brand || '',
-    model: m.model || '',
-    plate: m.license_plate || '',
-    intakeDate: m.created_at,
-    customer: { name: m.customers ? `${m.customers.first_name} ${m.customers.last_name}` : 'Unknown' }
-  }));
+async function testPayload(payload, index, langCode = 'es_CO') {
+  try {
+    const components = [];
+    if (payload.header) {
+      components.push({
+        type: 'header',
+        parameters: payload.header
+      });
+    }
+    components.push({
+      type: 'body',
+      parameters: payload.body
+    });
+
+    const response = await axios.post(
+      `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        to: toPhone,
+        type: 'template',
+        template: {
+          name: 'venta_por_orden',
+          language: { code: langCode },
+          components
+        }
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${wpToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    console.log(`✅ Success for option ${index} (lang=${langCode}):`, response.data);
+    return true;
+  } catch (err) {
+    console.log(`❌ Option ${index} (lang=${langCode}) failed:`, JSON.stringify(err.response?.data || err.message));
+    return false;
+  }
 }
 
-async function getWorkOrders() {
-  const { data } = await supabase.from('work_orders').select('*, motorcycles(*), customers(*), sales(id, status)');
-  return data.map((wo) => {
-    const hasCompletedSale = wo.sales && wo.sales.some((s) => s.status === 'paid');
-    return {
-      id: wo.id,
-      motorcycle: wo.motorcycles ? { id: wo.motorcycles.id } : null,
-      createdDate: wo.created_at,
-      status: hasCompletedSale || wo.status === 'delivered' ? 'Entregado' : 'Reparado',
-    };
-  });
-}
+const customerName = 'Diego Mendez';
 
 async function run() {
-  const motorcycles = await getMotorcycles();
-  const workOrders = await getWorkOrders();
+  const payloads = [
+    // Variant 1: Header (1), Body (7) - with $ in total
+    {
+      header: [{ type: 'text', text: workshopName }],
+      body: [
+        { type: 'text', text: customerName },
+        { type: 'text', text: orderNumber },
+        { type: 'text', text: motorcycleInfo },
+        { type: 'text', text: plate },
+        { type: 'text', text: `$${formattedTotal}` },
+        { type: 'text', text: formattedItemsList },
+        { type: 'text', text: workshopName }
+      ]
+    },
+    // Variant 2: Header (1), Body (7) - without $ in total
+    {
+      header: [{ type: 'text', text: workshopName }],
+      body: [
+        { type: 'text', text: customerName },
+        { type: 'text', text: orderNumber },
+        { type: 'text', text: motorcycleInfo },
+        { type: 'text', text: plate },
+        { type: 'text', text: formattedTotal },
+        { type: 'text', text: formattedItemsList },
+        { type: 'text', text: workshopName }
+      ]
+    }
+  ];
 
-  // Simulate registering a new motorcycle (Case A)
-  motorcycles.push({
-    id: 'new-moto-id',
-    make: 'Yamaha',
-    model: 'R6',
-    plate: 'YAM123',
-    intakeDate: new Date().toISOString(),
-    customer: { name: 'New Customer' }
-  });
-
-  // Simulate re-registering an existing motorcycle (Case D)
-  // Let's modify Auteco Mu82 (GBH432) intakeDate to now
-  const mu82 = motorcycles.find(m => m.plate === 'GBH432');
-  if (mu82) {
-    mu82.intakeDate = new Date().toISOString();
-  }
-
-  const activeWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
-
-  const filtered = motorcycles.filter((moto) => {
-    const hasActive = activeWorkOrders.some((wo) => wo.motorcycle?.id === moto.id);
-    if (hasActive) return false;
-
-    const motoWorkOrders = workOrders.filter((wo) => wo.motorcycle?.id === moto.id);
-    if (motoWorkOrders.length === 0) return true;
-
-    const latestWoDate = new Date(Math.max(...motoWorkOrders.map(wo => new Date(wo.createdDate).getTime())));
-    return new Date(moto.intakeDate).getTime() > latestWoDate.getTime();
-  });
-
-  console.log('--- Motorcycles in Dropdown under Simulation ---');
-  for (const m of filtered) {
-    console.log(`- ${m.make} ${m.model} (${m.plate})`);
+  for (const lang of ['es_CO']) {
+    for (let i = 0; i < payloads.length; i++) {
+      const success = await testPayload(payloads[i], i + 1, lang);
+      if (success) return;
+    }
   }
 }
 

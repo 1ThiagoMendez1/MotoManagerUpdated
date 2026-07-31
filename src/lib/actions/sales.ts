@@ -384,11 +384,14 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         }));
 
         // 7. Send Notification (Skip receipt if Wompi, webhook handles it)
+        console.log(`[Sales Action] Checking notification conditions. Customer Phone: ${formattedCustomer?.phone || 'NOT FOUND'}, Payment Method: ${data.paymentMethod}`);
         if (formattedCustomer?.phone && data.paymentMethod !== 'Wompi') {
             try {
                 const firstName = formattedCustomer.first_name || '';
                 const lastName = formattedCustomer.last_name || '';
                 const customerFullName = formattedCustomer ? `${firstName} ${lastName}`.trim() || 'Cliente' : 'Cliente';
+                
+                console.log(`[Sales Action] Sending service sale notification to ${customerFullName} (${formattedCustomer.phone})...`);
                 const notifyResult = await sendServiceSaleNotification(
                     formattedCustomer.phone,
                     customerFullName,
@@ -408,6 +411,8 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     workshopName
                 );
                 
+                console.log('[Sales Action] Notification result:', JSON.stringify(notifyResult, null, 2));
+                
                 const fs = require('fs');
                 fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
                     date: new Date().toISOString(),
@@ -416,7 +421,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                 }, null, 2));
 
             } catch (notifyError: any) {
-                console.error('Service sale notification error:', notifyError);
+                console.error('[Sales Action] Service sale notification error:', notifyError);
                 const fs = require('fs');
                 fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
                     date: new Date().toISOString(),
@@ -424,6 +429,8 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     stack: notifyError.stack
                 }, null, 2));
             }
+        } else {
+            console.log('[Sales Action] Notification skipped because customer has no phone or payment method is Wompi.');
         }
 
         const formattedSale = {

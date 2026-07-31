@@ -49,16 +49,15 @@ export default async function MotorcyclesPage({
 
   const workOrders = workOrdersData.items;
 
-  // Show motorcycles that do NOT have any active (non-delivered) work order.
+  // Show motorcycles that do NOT have any work order.
   // Once a work order is created, the bike moves to the Work Orders module.
-  const activeWorkOrderMotorcycleIds = new Set(
+  const workOrderMotorcycleIds = new Set(
     workOrders
-      .filter((wo) => wo.status !== 'Entregado')
       .map((wo) => wo.motorcycle?.id)
       .filter(Boolean)
   );
   const motorcyclesInWorkshop = motorcycles.filter(
-    (moto) => !activeWorkOrderMotorcycleIds.has(moto.id)
+    (moto) => !workOrderMotorcycleIds.has(moto.id)
   );
 
   return (

@@ -89,68 +89,19 @@ export async function sendServiceSaleNotification(
   discountAmount?: number,
   workshopName?: string
 ) {
-  if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
-    console.log('Evolution API not configured, skipping WhatsApp notification');
-    return { success: false, error: 'Evolution API not configured' };
-  }
-
-  try {
-    // Format phone number for WhatsApp (remove + and add country code if needed)
-    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
-
-    let itemsText = '';
-    if (items && items.length > 0) {
-      itemsText = '\n\n🛒 *Repuestos utilizados:*\n' +
-        items.map(item =>
-          `• ${item.name} x${item.quantity} - $${(item.price * item.quantity).toLocaleString('es-CO')}`
-        ).join('\n');
-    }
-
-    const laborText = laborCost ? `\nMano de obra: $${laborCost.toLocaleString('es-CO')}` : '';
-
-    const discountText = (discountPercentage && discountPercentage > 0) ?
-      `\nDescuento: ${discountPercentage}% (-$${discountAmount?.toLocaleString('es-CO')})` : '';
-
-    const subtotalText = subtotal ? `\nSubtotal: $${subtotal.toLocaleString('es-CO')}` : '';
-
-    const message = `🔧 *MotoManager - Servicio Completado*
-
-¡Hola ${customerName}!
-
-Tu motocicleta ${motorcycleInfo.make} ${motorcycleInfo.model} (${motorcycleInfo.plate}) ha sido reparada exitosamente.
-
-📋 *Detalles del servicio:*
-Número: ${saleNumber}
-Técnico: ${technicianName}${subtotalText}${discountText}${laborText}${itemsText}
-Total: $${total.toLocaleString('es-CO')}
-
-✅ *Estado:* Entregado
-
-¡Gracias por confiar en nosotros! Tu motocicleta está lista para recoger.
-
-🏍️ *${workshopName || 'MotoManager'}*`;
-
-    const response = await axios.post(
-      `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
-      {
-        number: formattedPhone,
-        text: message,
-        delay: 1000
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey
-        }
-      }
-    );
-
-    console.log('✅ WhatsApp service notification sent via Evolution API:', response.data);
-    return { success: true, data: response.data };
-  } catch (error: any) {
-    console.error('❌ Error sending WhatsApp service notification via Evolution API:', error.response?.data || error.message);
-    return { success: false, error: error.response?.data || error.message };
-  }
+  console.log(`Redirecting sendServiceSaleNotification to sendVentaPorOrdenNotification...`);
+  return sendVentaPorOrdenNotification(
+    customerPhone,
+    customerName,
+    workshopName || 'MotoManager',
+    saleNumber,
+    `${motorcycleInfo.make} ${motorcycleInfo.model}`.trim(),
+    motorcycleInfo.plate || 'Sin Placa',
+    total,
+    items || [],
+    laborCost,
+    undefined // depositAmount
+  );
 }
 
 export async function sendOrderStatusUpdate(
@@ -508,16 +459,90 @@ export async function sendCredentialsNotification(
   workshopSlug: string,
   email: string,
   setupUrl: string,
-  tempPassword?: string
+  tempPassword?: string,
+  role?: string
 ) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+
+  // 1. Intentar con Meta Cloud API si está configurada
+  if (wpToken && wpPhoneId) {
+    try {
+      const roleLabels: Record<string, string> = {
+        owner: 'Dueño',
+        admin: 'Administrador',
+        mechanic: 'Técnico',
+        service_advisor: 'Recepcionista',
+        receptionist: 'Recepcionista'
+      };
+      const roleDisplay = roleLabels[role || 'mechanic'] || 'Técnico';
+      
+      const dateObj = new Date();
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const year = dateObj.getFullYear();
+      const formattedDate = `${day}-${month}-${year}`;
+
+      console.log(`Sending template 'registros_manuales_de_talleres' to ${formattedPhone} via Meta Cloud API...`);
+      
+      const response = await axios.post(
+        `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'template',
+          template: {
+            name: 'registros_manuales_de_talleres',
+            language: { code: 'es_CO' },
+            components: [
+              {
+                type: 'header',
+                parameters: [{ type: 'text', text: 'MotoManager' }]
+              },
+              {
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: roleDisplay },        // {{1}} -> Rol (ej. "Técnico")
+                  { type: 'text', text: workshopName },       // {{2}} -> Taller
+                  { type: 'text', text: roleDisplay },        // {{3}} -> Rol (ej. "Técnico")
+                  { type: 'text', text: formattedDate },      // {{4}} -> Inicio de acceso (ej. "27-07-2026")
+                  { type: 'text', text: workshopName }        // {{5}} -> Taller
+                ]
+              }
+            ]
+          }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${wpToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      console.log('✅ WhatsApp credentials template sent via Meta Cloud API:', response.data);
+
+      // Si existe contraseña temporal/código, enviar también el código de acceso
+      if (tempPassword) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await sendAccessCodeNotification(customerPhone, tempPassword);
+      }
+
+      return { success: true, provider: 'meta', data: response.data };
+    } catch (error: any) {
+      console.error('❌ Error sending WhatsApp credentials template via Meta Cloud API:', error.response?.data || error.message);
+      // Fallback a Evolution API si falla
+    }
+  }
+
+  // 2. Fallback o uso directo de Evolution API
   if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
     console.log('Evolution API not configured, skipping WhatsApp notification');
     return { success: false, error: 'Evolution API not configured' };
   }
 
   try {
-    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
-
     const message = `🎉 *¡Bienvenido a MotoManager!*
 
 ¡Hola ${customerName}!
@@ -554,7 +579,7 @@ ${tempPassword ? `(Alternativamente, puedes ingresar en https://${workshopSlug}.
     );
 
     console.log('✅ WhatsApp credentials notification sent via Evolution API:', response.data);
-    return { success: true, data: response.data };
+    return { success: true, provider: 'evolution', data: response.data };
   } catch (error: any) {
     console.error('❌ Error sending WhatsApp credentials notification via Evolution API:', error.response?.data || error.message);
     return { success: false, error: error.response?.data || error.message };
@@ -1402,16 +1427,12 @@ export async function sendVentaPorOrdenNotification(
   
   const formattedTotal = total.toLocaleString('es-CO');
 
-  const itemsNames: string[] = [];
-  if (items && items.length > 0) {
-    items.forEach(item => {
-      itemsNames.push(item.name);
-    });
-  }
-  if (laborCost && laborCost > 0) {
-    itemsNames.push('mano de obra');
-  }
-  const workDoneText = itemsNames.length > 0 ? itemsNames.join('   ') : 'mantenimiento';
+  const formattedItemsList = items && items.length > 0
+    ? [
+        ...items.map(item => `• ${item.name} ×${item.quantity} — $${item.price.toLocaleString('es-CO')}`),
+        ...(laborCost && laborCost > 0 ? [`• Mano de Obra ×1 — $${laborCost.toLocaleString('es-CO')}`] : [])
+      ].join('   ')
+    : 'Servicios de taller';
 
   // Get formatted date as DD-MM-YYYY
   const dateObj = new Date();
@@ -1428,107 +1449,86 @@ export async function sendVentaPorOrdenNotification(
   if (wpToken && wpPhoneId) {
     try {
       const payloadsToTry = [
-        // Option 1: 8 body params (with dollar sign)
+        // Working layout: Header (1: workshopName), Body (7: customerName, orderNumber, motorcycleInfo, plate, total, items, workshopName)
         {
-          header: null,
+          header: [{ type: 'text', text: workshopName }],
           body: [
             { type: 'text', text: customerName },
+            { type: 'text', text: orderNumber },
             { type: 'text', text: motorcycleInfo },
             { type: 'text', text: plate },
-            { type: 'text', text: formattedDate },
-            { type: 'text', text: orderNumber },
-            { type: 'text', text: workDoneText },
             { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: formattedItemsList },
             { type: 'text', text: workshopName }
           ]
         },
-        // Option 2: 8 body params (without dollar sign)
+        // Fallback layout: Header (1: workshopName), Body (7: customerName, orderNumber, motorcycleInfo, plate, total without $, items, workshopName)
         {
-          header: null,
+          header: [{ type: 'text', text: workshopName }],
           body: [
             { type: 'text', text: customerName },
+            { type: 'text', text: orderNumber },
             { type: 'text', text: motorcycleInfo },
             { type: 'text', text: plate },
-            { type: 'text', text: formattedDate },
-            { type: 'text', text: orderNumber },
-            { type: 'text', text: workDoneText },
             { type: 'text', text: formattedTotal },
+            { type: 'text', text: formattedItemsList },
             { type: 'text', text: workshopName }
-          ]
-        },
-        // Option 3: 7 body params (no workshop name, with dollar sign)
-        {
-          header: null,
-          body: [
-            { type: 'text', text: customerName },
-            { type: 'text', text: motorcycleInfo },
-            { type: 'text', text: plate },
-            { type: 'text', text: formattedDate },
-            { type: 'text', text: orderNumber },
-            { type: 'text', text: workDoneText },
-            { type: 'text', text: `$${formattedTotal}` }
-          ]
-        },
-        // Option 4: 7 body params (no workshop name, without dollar sign)
-        {
-          header: null,
-          body: [
-            { type: 'text', text: customerName },
-            { type: 'text', text: motorcycleInfo },
-            { type: 'text', text: plate },
-            { type: 'text', text: formattedDate },
-            { type: 'text', text: orderNumber },
-            { type: 'text', text: workDoneText },
-            { type: 'text', text: formattedTotal }
           ]
         }
       ];
 
-      console.log(`Sending template 'salida_de_motos' to ${formattedPhone} via Meta Cloud API...`);
+      console.log(`Sending template 'venta_por_orden' to ${formattedPhone} via Meta Cloud API...`);
 
-      for (let i = 0; i < payloadsToTry.length; i++) {
-        const config = payloadsToTry[i];
-        try {
-          const components: any[] = [];
-          if (config.header) {
-            components.push({
-              type: 'header',
-              parameters: config.header
-            });
-          }
-          components.push({
-            type: 'body',
-            parameters: config.body
-          });
+      const languages = [{ code: 'es_CO' }, { code: 'es' }];
 
-          console.log(`Trying Meta payload option ${i + 1} (${config.body.length} body params)...`);
-          const response = await axios.post(
-            `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
-            {
-              messaging_product: 'whatsapp',
-              to: formattedPhone,
-              type: 'template',
-              template: {
-                name: 'salida_de_motos',
-                language: { code: 'es_CO' },
-                components
-              }
-            },
-            {
-              headers: {
-                'Authorization': `Bearer ${wpToken}`,
-                'Content-Type': 'application/json'
-              }
+      for (const lang of languages) {
+        if (sentSuccessfully) break;
+        console.log(`Attempting language: ${lang.code}`);
+        
+        for (let i = 0; i < payloadsToTry.length; i++) {
+          const config = payloadsToTry[i];
+          try {
+            const components: any[] = [];
+            if (config.header) {
+              components.push({
+                type: 'header',
+                parameters: config.header
+              });
             }
-          );
-          console.log(`✅ salida_de_motos template sent successfully using payload option ${i + 1} via Meta.`);
-          successResponse = response.data;
-          sentSuccessfully = true;
-          break; // Exit loop on success
-        } catch (err: any) {
-          lastMetaError = err;
-          const errMsg = err.response?.data?.error?.message || err.message;
-          console.log(`Meta payload option ${i + 1} failed: ${errMsg}`);
+            components.push({
+              type: 'body',
+              parameters: config.body
+            });
+
+            console.log(`Trying Meta payload option ${i + 1} (${config.body.length} body params) using language ${lang.code}...`);
+            const response = await axios.post(
+              `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+              {
+                messaging_product: 'whatsapp',
+                to: formattedPhone,
+                type: 'template',
+                template: {
+                  name: 'venta_por_orden',
+                  language: lang,
+                  components
+                }
+              },
+              {
+                headers: {
+                  'Authorization': `Bearer ${wpToken}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            console.log(`✅ venta_por_orden template sent successfully using payload option ${i + 1} with language ${lang.code} via Meta.`);
+            successResponse = response.data;
+            sentSuccessfully = true;
+            break; // Exit loop on success
+          } catch (err: any) {
+            lastMetaError = err;
+            const errMsg = err.response?.data?.error?.message || err.message;
+            console.log(`Meta payload option ${i + 1} with language ${lang.code} failed: ${errMsg}`);
+          }
         }
       }
 
@@ -1543,25 +1543,26 @@ export async function sendVentaPorOrdenNotification(
   // 2. Fallback: Evolution API (si Meta no está configurada o falló)
   if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
     try {
-      const textMessage = `¡Tu moto está lista y ha sido entregada! 🏍️
-Hola, ${customerName}.👋
+      const textMessage = `!Resumen de tu compra con servicio en: ${workshopName} ✅¡
+________________________
 
-🟩Te informamos que la moto 
-${motorcycleInfo} de placas ${plate} fue entregada exitosamente el:
-${formattedDate}.
+😀Te informamos que los servicios y/o repuestos asociados a la reparación de tu moto han sido registrados correctamente.
 
-📋 Resumen del servicio:
-🔖 Orden de servicio:${orderNumber}
-🛠️ Trabajo realizado:
-${workDoneText}
-💰 Valor del servicio:$${formattedTotal}
+📋 Resumen de la orden de servicio
+🔖 Orden de servicio: #${orderNumber}
+🛵 Moto: ${motorcycleInfo} - ${plate}
+💵 Total:$${formattedTotal}
+🛠️ Servicios y productos registrados:
 
-🤗Agradecemos la confianza que depositaste en ${workshopName}. Esperamos que hayas quedado satisfecho con nuestro servicio.
+${formattedItemsList}
 
-¡Buen viaje y gracias por elegirnos! 🏍️🤝
-Motomanager - CRM`;
+💭Si tienes alguna inquietud sobre los servicios realizados o los repuestos instalados, no dudes en comunicarte con nosotros *${workshopName}*.
 
-      console.log(`Sending salida_de_motos text via Evolution API fallback to ${formattedPhone}...`);
+¡Gracias por confiar el cuidado de tu moto con nosotros! 🏍️🛣️
+________________________
+MotoManager - CRM`;
+
+      console.log(`Sending venta_por_orden text via Evolution API fallback to ${formattedPhone}...`);
       const response = await axios.post(
         `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
         {
@@ -1610,9 +1611,20 @@ export async function sendDirectSalePaidNotification(
 
   const formattedTotal = total.toLocaleString('es-CO');
 
-  const itemsText = items.map(item => 
-    `${item.name} Cantidad: ${item.quantity} $${(item.price * item.quantity).toLocaleString('es-CO')} $${item.price.toLocaleString('es-CO')} c/u`
-  ).join('\n');
+  // Format 1: Bullet and × symbol (e.g., • Producto A ×1  $2.000.000)
+  const itemsTextWithBullet = items.length > 0 
+    ? items.map((item: any) => `• ${item.name} ×${item.quantity}  $${(item.price * item.quantity).toLocaleString('es-CO')}`).join('\n')
+    : '';
+
+  // Format 2: No bullet (e.g., Producto A ×1  $2.000.000)
+  const itemsTextNoBullet = items.length > 0 
+    ? items.map((item: any) => `${item.name} ×${item.quantity}  $${(item.price * item.quantity).toLocaleString('es-CO')}`).join('\n')
+    : '';
+
+  // Format 3: Legacy format fallback
+  const itemsTextLegacy = items.length > 0 
+    ? items.map((item: any) => `${item.name} Cantidad: ${item.quantity} $${(item.price * item.quantity).toLocaleString('es-CO')} $${item.price.toLocaleString('es-CO')} c/u`).join('\n')
+    : '';
 
   let sentSuccessfully = false;
   let successResponse = null;
@@ -1622,7 +1634,7 @@ export async function sendDirectSalePaidNotification(
   if (wpToken && wpPhoneId) {
     try {
       const payloadsToTry = [
-        // A1. Body-only: 6 params (new adjusted template with itemsText and paymentMethod)
+        // A1. Body-only: 6 params (Format 1: With bullet, with dollar sign) - SWAPPED (items then payment)
         {
           header: null,
           body: [
@@ -1630,11 +1642,11 @@ export async function sendDirectSalePaidNotification(
             { type: 'text', text: workshopName },
             { type: 'text', text: saleNumber },
             { type: 'text', text: `$${formattedTotal}` },
-            { type: 'text', text: paymentMethod },
-            { type: 'text', text: itemsText }
+            { type: 'text', text: itemsTextWithBullet },
+            { type: 'text', text: paymentMethod }
           ]
         },
-        // A2. Body-only: 6 params (new adjusted template without dollar sign)
+        // A2. Body-only: 6 params (Format 1: With bullet, without dollar sign) - SWAPPED (items then payment)
         {
           header: null,
           body: [
@@ -1642,11 +1654,47 @@ export async function sendDirectSalePaidNotification(
             { type: 'text', text: workshopName },
             { type: 'text', text: saleNumber },
             { type: 'text', text: formattedTotal },
-            { type: 'text', text: paymentMethod },
-            { type: 'text', text: itemsText }
+            { type: 'text', text: itemsTextWithBullet },
+            { type: 'text', text: paymentMethod }
           ]
         },
-        // B. Body-only: 5 params
+        // A3. Body-only: 6 params (Format 2: No bullet, with dollar sign) - SWAPPED (items then payment)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: itemsTextNoBullet },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // A4. Body-only: 6 params (Format 2: No bullet, without dollar sign) - SWAPPED (items then payment)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: formattedTotal },
+            { type: 'text', text: itemsTextNoBullet },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // A5. Body-only: 6 params (Format 3: Legacy, with dollar sign) - SWAPPED (items then payment)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: itemsTextLegacy },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // B. Body-only: 5 params (with dollar sign)
         {
           header: null,
           body: [
@@ -1767,6 +1815,54 @@ export async function sendDirectSalePaidNotification(
             { type: 'text', text: `$${formattedTotal}` },
             { type: 'text', text: paymentMethod }
           ]
+        },
+        // N. Header (1 param) + Body: 6 params (With bullet) - SWAPPED
+        {
+          header: [{ type: 'text', text: '¡Compra realizada con éxito!💳' }],
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: itemsTextWithBullet },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // O. Header (1 param) + Body: 6 params (No bullet) - SWAPPED
+        {
+          header: [{ type: 'text', text: '¡Compra realizada con éxito!💳' }],
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: itemsTextNoBullet },
+            { type: 'text', text: paymentMethod }
+          ]
+        },
+        // P1. Original (Not Swapped) Option for fallback: 6 params Body-only (Format 1: With bullet, with dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: `$${formattedTotal}` },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: itemsTextWithBullet }
+          ]
+        },
+        // P2. Original (Not Swapped) Option: 6 params Body-only (Format 1: With bullet, without dollar sign)
+        {
+          header: null,
+          body: [
+            { type: 'text', text: customerName },
+            { type: 'text', text: workshopName },
+            { type: 'text', text: saleNumber },
+            { type: 'text', text: formattedTotal },
+            { type: 'text', text: paymentMethod },
+            { type: 'text', text: itemsTextWithBullet }
+          ]
         }
       ];
 
@@ -1827,7 +1923,8 @@ export async function sendDirectSalePaidNotification(
   // 2. Fallback: Evolution API (Mensaje de texto plano)
   if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
     try {
-      const textMessage = `Hola, ${customerName}.👋
+      const textMessage = `¡Compra realizada con éxito!💳
+Hola, ${customerName}.👋
 
 ✅Gracias por tu compra en ${workshopName}. Tu venta ha sido registrada exitosamente.
 
@@ -1836,11 +1933,12 @@ export async function sendDirectSalePaidNotification(
 💵 Total pagado: $${formattedTotal}
 💳Métodos de pago: ${paymentMethod} 
 🛒 Productos adquiridos:
-${itemsText}
+${itemsTextWithBullet}
 
 💭Si tienes alguna inquietud sobre tu compra o necesitas soporte, estaremos encantados de ayudarte.
 
-¡Gracias por confiar en nosotros! 🏍️🛣️`;
+¡Gracias por confiar en nosotros! 🏍️🛡️
+Equipo Motomanager`;
 
       console.log(`Sending direct sale paid text via Evolution API fallback to ${formattedPhone}...`);
       const response = await axios.post(
