@@ -211,7 +211,7 @@ export default async function AdminPage({
   // Normalizar transacciones para el componente
   const normalizedTransactions = (allTransactions || []).map((tx: any) => {
     const ownerProfile = tx.workshop?.members?.find((m: any) => m.role === 'owner')?.profile;
-    const owner = ownerProfile ? `${ownerProfile.first_name || ''} ${ownerProfile.last_name || ''}`.trim() : null;
+    const owner = ownerProfile ? `${ownerProfile.first_name || ''} ${ownerProfile.last_name || ''}`.trim() : undefined;
     return {
       id: tx.id,
       workshop_id: tx.workshop_id,
