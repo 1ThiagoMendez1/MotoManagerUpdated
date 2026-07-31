@@ -42,26 +42,24 @@ export default async function WorkOrdersPage({
   const activePage = Number(resolvedSearchParams.activePage) || 1;
   const completedPage = Number(resolvedSearchParams.completedPage) || 1;
 
-  const [workOrdersData, motorcycles, technicians] = await Promise.all([
-    getWorkOrders(),
-    getMotorcycles(),
-    getTechnicians(),
+  const [activeWOData, completedWOData, motorcyclesData, techniciansData] = await Promise.all([
+    getWorkOrders({ query, page: activePage, statusFilter: 'active' }),
+    getWorkOrders({ query, page: completedPage, statusFilter: 'completed' }),
+    getMotorcycles({ limit: 1000 } as any),
+    getTechnicians({ limit: 1000 } as any),
   ]);
 
-  const workOrders = workOrdersData.items;
-  
-  // Filter all work orders
-  const allActiveWorkOrders = workOrders.filter((wo) => wo.status !== 'Entregado');
-  const allCompletedWorkOrders = workOrders.filter((wo) => wo.status === 'Entregado');
-  
-  // Pagination logic
-  const itemsPerPage = 10;
-  
-  const totalActivePages = Math.ceil(allActiveWorkOrders.length / itemsPerPage) || 1;
-  const activeWorkOrders = allActiveWorkOrders.slice((activePage - 1) * itemsPerPage, activePage * itemsPerPage);
+  const activeWorkOrders = activeWOData.items;
+  const totalActivePages = activeWOData.totalPages;
 
-  const totalCompletedPages = Math.ceil(allCompletedWorkOrders.length / itemsPerPage) || 1;
-  const completedWorkOrders = allCompletedWorkOrders.slice((completedPage - 1) * itemsPerPage, completedPage * itemsPerPage);
+  const completedWorkOrders = completedWOData.items;
+  const totalCompletedPages = completedWOData.totalPages;
+  
+  const motorcycles = motorcyclesData.items;
+  const technicians = techniciansData.items;
+  // Para la creacion de ordenes, idealmente no traemos todas las ordenes pero chequeamos.
+  const [allWO] = await Promise.all([getWorkOrders({ limit: 1000 } as any)]);
+  const workOrders = allWO.items;
 
   const motorcyclesWithoutAnyWorkOrder = motorcycles.filter(
     (moto) => !workOrders.some((wo) => wo.motorcycle?.id === moto.id)

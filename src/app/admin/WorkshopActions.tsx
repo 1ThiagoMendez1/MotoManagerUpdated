@@ -21,8 +21,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { KeyRound, Mail, MessageCircle, Copy, Check, MoreHorizontal, Loader2, Zap, ShieldAlert, CreditCard } from 'lucide-react';
-import { updateWorkshopPlan, updateWorkshopStatus, getWorkshopCredentials, resetUserPasswordAndNotify } from './actions';
+import { KeyRound, MessageCircle, Copy, Check, MoreHorizontal, Loader2, Zap, ShieldAlert, CreditCard } from 'lucide-react';
+import { updateWorkshopPlan, updateWorkshopStatus, getWorkshopCredentials, resetUserPasswordAndNotify, sendCredentialsViaWhatsApp } from './actions';
 import { useToast } from '@/hooks/use-toast';
 import { WompiButton } from '@/components/payments/WompiButton';
 
@@ -51,6 +51,7 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
     const [showPayModal, setShowPayModal] = useState(false);
     const [showCredsModal, setShowCredsModal] = useState(false);
     const [isLoadingCreds, setIsLoadingCreds] = useState(false);
+    const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
     const [credentials, setCredentials] = useState<{ email?: string, password?: string, phone?: string } | null>(null);
     const [copied, setCopied] = useState(false);
     const { toast } = useToast();
@@ -151,13 +152,28 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
         toast({ title: 'Copiado', description: 'Credenciales copiadas al portapapeles' });
     };
 
-    const whatsappLink = credentials?.phone 
-        ? `https://wa.me/${credentials.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola! Aquí tienes tus credenciales de acceso a MotoManager:\n\nURL: https://${workshop.slug}.motomanager.com.co\nUsuario: ${credentials.email}\nContraseña: ${credentials.password}`)}`
-        : '#';
+    const handleSendWhatsApp = async () => {
+        const ownerMember = workshop.members?.find((m: any) => m.role === 'owner');
+        if (!ownerMember?.user_id) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo identificar al propietario del taller' });
+            return;
+        }
 
-    const mailtoLink = credentials 
-        ? `mailto:${credentials.email}?subject=Tus Credenciales de MotoManager&body=${encodeURIComponent(`Hola!\n\nAquí tienes tus credenciales de acceso a MotoManager:\n\nURL: https://${workshop.slug}.motomanager.com.co\nUsuario: ${credentials.email}\nContraseña: ${credentials.password}\n\nPor favor, cambia tu contraseña una vez ingreses.`)}`
-        : '#';
+        try {
+            setIsSendingWhatsApp(true);
+            const res = await sendCredentialsViaWhatsApp(ownerMember.user_id);
+            if (res.success) {
+                toast({ title: 'Enviado', description: 'Código de acceso enviado por WhatsApp al cliente' });
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: res.error || 'No se pudo enviar el código por WhatsApp' });
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
+        } finally {
+            setIsSendingWhatsApp(false);
+        }
+    };
+
 
     return (
         <>
@@ -173,11 +189,21 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                     <DropdownMenuItem onClick={() => navigator.clipboard.writeText(workshop.id)}>
                         Copiar ID Taller
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleViewCredentials} className="text-blue-400 focus:text-blue-300">
+                    <DropdownMenuItem 
+                        onSelect={(e) => {
+                            setTimeout(() => handleViewCredentials(), 200);
+                        }}
+                        className="text-blue-400 focus:text-blue-300"
+                    >
                         <KeyRound className="mr-2 h-4 w-4" />
                         Ver Credenciales
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleGenerateNewCode} className="text-amber-400 focus:text-amber-300 focus:bg-amber-500/10">
+                    <DropdownMenuItem 
+                        onSelect={(e) => {
+                            setTimeout(() => handleGenerateNewCode(), 200);
+                        }}
+                        className="text-amber-400 focus:text-amber-300 focus:bg-amber-500/10"
+                    >
                         <Zap className="mr-2 h-4 w-4" />
                         Generar Nuevo Código
                     </DropdownMenuItem>
@@ -336,7 +362,7 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-xs text-muted-foreground font-sans">Contraseña temporal:</span>
-                                        <span className="text-foreground font-bold">{credentials.password}</span>
+                                        <span className="text-foreground font-bold">••••••</span>
                                     </div>
                                 </div>
 
@@ -351,24 +377,16 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                                     </Button>
                                     
                                     <Button 
-                                        className="w-full bg-green-600 hover:bg-green-700 text-white"
-                                        asChild
-                                        disabled={!credentials.phone}
+                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+                                        onClick={handleSendWhatsApp}
+                                        disabled={isSendingWhatsApp || isLoadingCreds || !credentials.phone}
                                     >
-                                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                                        {isSendingWhatsApp ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
                                             <MessageCircle className="mr-2 h-4 w-4" />
-                                            WhatsApp
-                                        </a>
-                                    </Button>
-
-                                    <Button 
-                                        className="w-full col-span-2 bg-blue-600 hover:bg-blue-700 text-white"
-                                        asChild
-                                    >
-                                        <a href={mailtoLink}>
-                                            <Mail className="mr-2 h-4 w-4" />
-                                            Enviar por Correo
-                                        </a>
+                                        )}
+                                        Enviar
                                     </Button>
 
                                     <Button 

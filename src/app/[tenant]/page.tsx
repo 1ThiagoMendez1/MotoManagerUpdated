@@ -25,7 +25,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const workshopDetails = await getWorkshopDetails();
   
   // Fetch data for the "Nueva Orden" modal
-  const [motorcycles, technicians, workOrdersData] = await Promise.all([
+  const [{ items: motorcycles }, { items: technicians }, workOrdersData] = await Promise.all([
     getMotorcycles(),
     getTechnicians(),
     getWorkOrders()

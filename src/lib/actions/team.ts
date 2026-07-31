@@ -94,7 +94,8 @@ export async function inviteUser(data: {
       workshopDetails.slug || 'taller',
       data.email,
       loginUrl,
-      tempPassword
+      tempPassword,
+      data.role
     );
 
     return { success: true, result, tempPassword, loginUrl, email: data.email };

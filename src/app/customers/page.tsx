@@ -20,19 +20,24 @@ import { DeleteCustomer } from '@/components/forms/DeleteCustomer';
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchCustomers } from '@/components/forms/SearchCustomers';
+import { Pagination } from '@/components/Pagination';
 
 export default async function CustomersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ query?: string }>;
+  searchParams?: Promise<{ query?: string, page?: string }>;
 }) {
   await authorize('/customers');
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams?.query || '';
+  const page = Number(resolvedSearchParams?.page) || 1;
 
   let customers: Customer[] = [];
+  let totalPages = 0;
   try {
-    customers = await getCustomers({ query });
+    const result = await getCustomers({ query, page });
+    customers = result.items;
+    totalPages = result.totalPages;
   } catch (error) {
     console.error('Error fetching customers:', error);
   }
@@ -121,6 +126,11 @@ export default async function CustomersPage({
               </div>
               <h3 className="text-lg font-bold text-foreground mb-1">Sin clientes</h3>
               <p className="text-muted-foreground text-sm max-w-sm">No se encontraron clientes registrados en el sistema. Puedes empezar añadiendo uno nuevo.</p>
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="mt-4 border-t border-foreground/[0.08] dark:border-white/[0.1] pt-4">
+              <Pagination totalPages={totalPages} />
             </div>
           )}
         </div>

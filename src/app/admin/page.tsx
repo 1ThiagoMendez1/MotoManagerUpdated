@@ -42,6 +42,18 @@ export default async function AdminPage({
     return <div className="text-red-500">Error cargando talleres: {orgsError.message}</div>;
   }
 
+  // Fetch auth users to get emails and is_super_admin from user_metadata
+  const { data: authData } = await adminSupabase.auth.admin.listUsers();
+  const authUsersMap = new Map();
+  if (authData && authData.users) {
+    authData.users.forEach((u) => {
+      authUsersMap.set(u.id, {
+        email: u.email,
+        is_super_admin: u.user_metadata?.is_super_admin === true
+      });
+    });
+  }
+
   const workshops = orgs?.map((org: any) => ({
     id: org.id,
     name: org.name,
@@ -55,7 +67,7 @@ export default async function AdminPage({
       user_id: m.user_id,
       profile: {
         name: `${m.profile?.first_name || ''} ${m.profile?.last_name || ''}`.trim() || 'Sin Nombre',
-        email: org.email || '',
+        email: authUsersMap.get(m.user_id)?.email || org.email || '',
         phone: m.profile?.phone || '',
         avatar_url: m.profile?.avatar_path || null
       }
@@ -76,18 +88,6 @@ export default async function AdminPage({
 
   if (usersError) {
     console.error("Error loading users:", usersError);
-  }
-
-  // Fetch auth users to get emails and is_super_admin from user_metadata
-  const { data: authData } = await adminSupabase.auth.admin.listUsers();
-  const authUsersMap = new Map();
-  if (authData && authData.users) {
-    authData.users.forEach((u) => {
-      authUsersMap.set(u.id, {
-        email: u.email,
-        is_super_admin: u.user_metadata?.is_super_admin === true
-      });
-    });
   }
 
   const users = rawUsers?.map((u: any) => {

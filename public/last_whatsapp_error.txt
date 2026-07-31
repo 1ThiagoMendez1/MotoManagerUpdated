@@ -1,0 +1,23 @@
+{
+  "date": "2026-07-30T18:20:02.397Z",
+  "customerPhone": "3183101859",
+  "result": {
+    "success": true,
+    "provider": "meta",
+    "data": {
+      "messaging_product": "whatsapp",
+      "contacts": [
+        {
+          "input": "573183101859",
+          "wa_id": "573183101859"
+        }
+      ],
+      "messages": [
+        {
+          "id": "wamid.HBgMNTczMTgzMTAxODU5FQIAERgSODMxQzM1OTYyNjQwQ0IwRjNEAA==",
+          "message_status": "accepted"
+        }
+      ]
+    }
+  }
+}

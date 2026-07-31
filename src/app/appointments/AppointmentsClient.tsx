@@ -44,6 +44,10 @@ interface Appointment {
     model: string | null;
     licensePlate: string | null;
   } | null;
+  createdBy?: string | null;
+  acceptedBy?: string | null;
+  creatorName?: string | null;
+  acceptorName?: string | null;
 }
 
 interface AppointmentsClientProps {
@@ -278,7 +282,7 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
                       </div>
 
                       {/* Customer & Vehicle Info */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-8 shrink-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 lg:gap-8 shrink-0">
                         <div className="space-y-1">
                           <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Cliente</span>
                           <div className="flex items-center gap-1.5">
@@ -302,6 +306,29 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
                               {apt.motorcycle.licensePlate}
                             </Badge>
                           )}
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Gestión</span>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div>
+                              Creado: <span className="font-semibold text-foreground">{apt.creatorName || 'Cliente (Portal)'}</span>
+                            </div>
+                            {apt.acceptorName ? (
+                              <div>
+                                Aceptado: <span className="font-semibold text-foreground">{apt.acceptorName}</span>
+                              </div>
+                            ) : (
+                              apt.status === 'confirmed' ? (
+                                <div>
+                                  Aceptado: <span className="text-muted-foreground italic">Sistema / Auto</span>
+                                </div>
+                              ) : (
+                                <div className="text-amber-500 italic">
+                                  Pendiente aprobación
+                                </div>
+                              )
+                            )}
+                          </div>
                         </div>
                       </div>
 

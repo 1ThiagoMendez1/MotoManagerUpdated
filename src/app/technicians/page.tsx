@@ -25,18 +25,29 @@ import { TechnicianRow } from '@/components/TechnicianRow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TechniciansChart } from '@/components/TechniciansChart';
 import { DownloadTechniciansReportButton } from '@/components/DownloadTechniciansReportButton';
+import { Pagination } from '@/components/Pagination';
 
-export default async function TechniciansPage() {
+export default async function TechniciansPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
   await authorize('/technicians');
   const user = await requireWorkshop();
   const isAdminOrOwner = user.role === 'admin' || user.role === 'owner';
+  const resolvedSearchParams = await searchParams;
+  const page = Number(resolvedSearchParams?.page) || 1;
   let technicians: Technician[] = [];
+  let totalPages = 0;
   let error: string | null = null;
 
   try {
-    technicians = await getTechnicians();
+    const result = await getTechnicians({ page });
+    technicians = result.items;
+    totalPages = result.totalPages;
     const { getWorkOrders } = await import('@/lib/data');
-    const { items: workOrders } = await getWorkOrders();
+    const woResult = await getWorkOrders();
+    const workOrders = woResult.items;
     
     technicians = technicians.map(tech => ({
       ...tech,
@@ -107,6 +118,11 @@ export default async function TechniciansPage() {
                     )}
                   </TableBody>
                 </Table>
+              )}
+              {totalPages > 1 && (
+                <div className="mt-4 border-t border-border/50 pt-4">
+                  <Pagination totalPages={totalPages} />
+                </div>
               )}
             </CardContent>
           </Card>

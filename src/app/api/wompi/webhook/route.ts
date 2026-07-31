@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { wompiService } from '@/lib/services/WompiService';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendDirectSalePaidNotification } from '@/lib/whatsapp';
+import { sendDirectSalePaidNotification, sendServiceSaleNotification } from '@/lib/whatsapp';
 
 function getFriendlyPaymentMethod(type: string) {
   if (!type) return 'Wompi';
@@ -127,6 +127,23 @@ export async function POST(req: Request) {
 
       console.log(`[Wompi Webhook] Sale ${sale.sale_number} marked as paid successfully.`);
 
+      if (sale.work_order_id) {
+        const { error: woError } = await supabase
+          .from('work_orders')
+          .update({
+            status: 'delivered',
+            quote_status: 'approved',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', sale.work_order_id);
+          
+        if (woError) {
+          console.error('[Wompi Webhook] Error updating work order status:', woError);
+        } else {
+          console.log(`[Wompi Webhook] Work order ${sale.work_order_id} marked as delivered.`);
+        }
+      }
+
       // Send WhatsApp Alert
       const customer = Array.isArray(sale.customers) ? sale.customers[0] : sale.customers;
       const customerPhone = customer?.phone;
@@ -138,14 +155,48 @@ export async function POST(req: Request) {
         try {
           const friendlyMethod = getFriendlyPaymentMethod(payment_method_type);
           console.log(`[Wompi Webhook] Triggering WhatsApp notification for ${customerName} (${customerPhone})...`);
-          await sendDirectSalePaidNotification(
-            customerPhone,
-            customerName,
-            workshopName,
-            sale.sale_number,
-            sale.total,
-            friendlyMethod
-          );
+          if (sale.work_order_id) {
+             const { data: woData } = await supabase
+               .from('work_orders')
+               .select(`
+                 order_number, 
+                 motorcycles (brand, model, license_plate), 
+                 profiles!work_orders_assigned_mechanic_id_fkey (first_name, last_name)
+               `)
+               .eq('id', sale.work_order_id)
+               .single();
+
+             const fMoto = woData?.motorcycles ? (Array.isArray(woData.motorcycles) ? woData.motorcycles[0] : woData.motorcycles) : null;
+             const fTech = woData?.profiles ? (Array.isArray(woData.profiles) ? woData.profiles[0] : woData.profiles) : null;
+
+             await sendServiceSaleNotification(
+                customerPhone,
+                customerName,
+                woData?.order_number || sale.sale_number,
+                sale.total,
+                {
+                    make: fMoto?.brand || 'Moto',
+                    model: fMoto?.model || '',
+                    plate: fMoto?.license_plate || 'Sin Placa'
+                },
+                fTech ? `${fTech.first_name || ''} ${fTech.last_name || ''}`.trim() : 'Técnico',
+                undefined, 
+                undefined, 
+                sale.subtotal,
+                0, 
+                sale.discount_total,
+                workshopName
+             );
+          } else {
+             await sendDirectSalePaidNotification(
+               customerPhone,
+               customerName,
+               workshopName,
+               sale.sale_number,
+               sale.total,
+               friendlyMethod
+             );
+          }
         } catch (notifyError: any) {
           console.error('[Wompi Webhook] Error sending WhatsApp notification:', notifyError.message);
         }

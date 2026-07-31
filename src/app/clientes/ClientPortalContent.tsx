@@ -20,7 +20,7 @@ import {
   Loader2,
   Phone,
   Mail,
-  ArrowLeft,
+  LogOut,
 } from 'lucide-react'
 import { createCustomerAppointment } from './actions'
 import { format } from 'date-fns'
@@ -506,8 +506,8 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
             href="/clientes"
             className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-400 text-xs transition-colors"
           >
-            <ArrowLeft className="w-3 h-3" />
-            Cambiar placa
+            <LogOut className="w-3 h-3" />
+            Cerrar sesión
           </Link>
         </div>
       </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -137,14 +137,25 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   const watchCedula = form.watch('customerCedula');
   const watchName = form.watch('customerName');
 
+  // Refs to prevent circular trigger loop between search hooks
+  const skipNextNameSearch = useRef(false);
+  const skipNextCedulaSearch = useRef(false);
+
   // Auto-complete customer data when cedula changes
   useEffect(() => {
+    if (skipNextCedulaSearch.current) {
+      skipNextCedulaSearch.current = false;
+      return;
+    }
+
     const lookupCustomer = async () => {
       if (watchCedula && watchCedula.length > 0) {
         setIsLoading(true);
         try {
           const customer = await getCustomerByCedula(watchCedula);
           if (customer) {
+            // Signal that we programmatically update the name, so skip the next name lookup
+            skipNextNameSearch.current = true;
             if (form.getValues('customerName') !== customer.name) {
               form.setValue('customerName', customer.name || '');
             }
@@ -169,12 +180,19 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
 
   // Auto-complete customer data when name changes
   useEffect(() => {
+    if (skipNextNameSearch.current) {
+      skipNextNameSearch.current = false;
+      return;
+    }
+
     const lookupCustomerName = async () => {
       if (watchName && watchName.trim().includes(' ')) {
         setIsLoading(true);
         try {
           const customer = await getCustomerByName(watchName);
           if (customer) {
+            // Signal that we programmatically update the cedula, so skip the next cedula lookup
+            skipNextCedulaSearch.current = true;
             if (form.getValues('customerCedula') !== customer.cedula) {
               form.setValue('customerCedula', customer.cedula || '');
             }

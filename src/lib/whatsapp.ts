@@ -1834,7 +1834,7 @@ export async function sendDirectSalePaidNotification(
 📋 Resumen de la compra
 🧾 Número de venta: ${saleNumber}
 💵 Total pagado: $${formattedTotal}
-💸Metodo de pago: ${paymentMethod} 
+💳Métodos de pago: ${paymentMethod} 
 🛒 Productos adquiridos:
 ${itemsText}
 

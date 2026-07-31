@@ -12,7 +12,13 @@ export function LayoutWrapper({ children, header, footer }: LayoutWrapperProps) 
   const pathname = usePathname();
   
   // Rutas donde no queremos mostrar el Header/Footer de la aplicación
-  const isPublicRoute = pathname === '/login' || pathname === '/register-workshop' || pathname === '/';
+  const isPublicRoute = 
+    pathname === '/login' || 
+    pathname === '/register-workshop' || 
+    pathname === '/' || 
+    pathname === '/change-password' || 
+    pathname === '/no-workshop' || 
+    pathname === '/tenant-select';
   
   return (
     <>

@@ -148,7 +148,7 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
 
     // Try to send WhatsApp notification with credentials
     if (phone) {
-        sendOwnerWelcomeNotification(
+        await sendOwnerWelcomeNotification(
             phone,
             fullName,
             workshopName,

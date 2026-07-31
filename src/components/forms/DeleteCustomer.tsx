@@ -33,40 +33,6 @@ interface DeleteCustomerProps {
 
 export function DeleteCustomer({ customer }: DeleteCustomerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { toast } = useToast();
-  const router = useRouter();
-  // @ts-ignore
-  const [state, formAction] = useActionState(deleteCustomer, undefined);
-  const [handledSuccess, setHandledSuccess] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setHandledSuccess(false);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (state?.message) {
-      toast({
-        title: "Error",
-        description: state.message,
-        variant: "destructive",
-      });
-      setIsOpen(false);
-    }
-  }, [state?.message, toast]);
-
-  useEffect(() => {
-    if (state?.success && !handledSuccess) {
-      setHandledSuccess(true);
-      toast({
-        title: "Éxito",
-        description: "Cliente eliminado correctamente.",
-      });
-      setIsOpen(false);
-      router.refresh(); // Force re-render so deleted client disappears immediately
-    }
-  }, [state?.success, handledSuccess, toast, router]);
 
   return (
     <>
@@ -84,14 +50,47 @@ export function DeleteCustomer({ customer }: DeleteCustomerProps) {
               ¿Estás seguro de que deseas eliminar el cliente "<span className="font-semibold">{customer.name}</span>"? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
-          <form action={formAction} className="space-y-4">
-            <input type="hidden" name="id" value={customer.id} />
-            <DialogFooter>
-              <SubmitButton />
-            </DialogFooter>
-          </form>
+          {isOpen && <DeleteCustomerForm customer={customer} onClose={() => setIsOpen(false)} />}
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function DeleteCustomerForm({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+  const { toast } = useToast();
+  const router = useRouter();
+  // @ts-ignore
+  const [state, formAction] = useActionState(deleteCustomer, undefined);
+
+  useEffect(() => {
+    if (state?.message) {
+      toast({
+        title: "Error",
+        description: state.message,
+        variant: "destructive",
+      });
+      onClose();
+    }
+  }, [state?.message, toast, onClose]);
+
+  useEffect(() => {
+    if (state?.success) {
+      toast({
+        title: "Éxito",
+        description: "Cliente eliminado correctamente.",
+      });
+      onClose();
+      router.refresh(); // Force re-render so deleted client disappears immediately
+    }
+  }, [state?.success, toast, router, onClose]);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <input type="hidden" name="id" value={customer.id} />
+      <DialogFooter>
+        <SubmitButton />
+      </DialogFooter>
+    </form>
   );
 }

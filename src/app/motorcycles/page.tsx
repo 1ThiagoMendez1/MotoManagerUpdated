@@ -22,6 +22,7 @@ import { MotorcycleDetails } from '@/components/details/MotorcycleDetails';
 import { SearchMotorcycles } from '@/components/forms/SearchMotorcycles';
 import { ExportMotorcyclesButton } from '@/components/buttons/ExportMotorcyclesButton';
 import { format } from 'date-fns';
+import { Pagination } from '@/components/Pagination';
 
 // Force dynamic rendering to avoid database connection during build
 export const dynamic = 'force-dynamic';
@@ -29,18 +30,22 @@ export const dynamic = 'force-dynamic';
 export default async function MotorcyclesPage({
   searchParams,
 }: {
-  searchParams: { query?: string };
+  searchParams: Promise<{ query?: string, page?: string }>;
 }) {
   await authorize('/motorcycles');
   const resolvedSearchParams = await searchParams;
   const query = resolvedSearchParams.query || '';
+  const page = Number(resolvedSearchParams.page) || 1;
 
-  const [motorcycles, customers, technicians, workOrdersData] = await Promise.all([
-    getMotorcycles({ query }),
-    getCustomers(),
-    getTechnicians(),
-    getWorkOrders(),
+  const [motoResult, custResult, techResult, workOrdersData] = await Promise.all([
+    getMotorcycles({ query, page }),
+    getCustomers({ limit: 1000 } as any),
+    getTechnicians({ limit: 1000 } as any),
+    getWorkOrders({ limit: 1000 } as any),
   ]);
+
+  const motorcycles = motoResult.items;
+  const totalPages = motoResult.totalPages;
 
   const workOrders = workOrdersData.items;
 
@@ -121,6 +126,11 @@ export default async function MotorcyclesPage({
               ))}
             </TableBody>
           </Table>
+          {totalPages > 1 && (
+            <div className="mt-4 border-t border-border/50 pt-4">
+              <Pagination totalPages={totalPages} />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

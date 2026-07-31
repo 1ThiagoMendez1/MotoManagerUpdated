@@ -172,7 +172,7 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
             }
         }
 
-        sendOwnerWelcomeNotification(
+        await sendOwnerWelcomeNotification(
             phone,
             fullName,
             workshopName,

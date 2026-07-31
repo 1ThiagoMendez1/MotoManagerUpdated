@@ -11,12 +11,25 @@ const mapPaymentMethodToUi = (dbMethod: string | null | undefined): string => {
   return dbMethod.charAt(0).toUpperCase() + dbMethod.slice(1);
 };
 
-export const getCustomers = async (): Promise<Customer[]> => {
+export const getCustomers = async (params: { query?: string, page?: number } = {}): Promise<{ items: Customer[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
-  const { data } = await supabase.from('customers').select('*').eq('organization_id', user.workshopId);
-  if (!data) return [];
-  return data.map((c: any) => ({
+  
+  const page = params.page || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  let q = supabase.from('customers').select('*', { count: 'exact' }).eq('organization_id', user.workshopId);
+  
+  if (params.query) {
+    q = q.or(`first_name.ilike.%${params.query}%,last_name.ilike.%${params.query}%,document_number.ilike.%${params.query}%`);
+  }
+
+  const { data, count } = await q.range(offset, offset + limit - 1);
+  
+  if (!data) return { items: [], totalPages: 0 };
+  
+  const items = data.map((c: any) => ({
     id: c.id,
     name: `${c.first_name} ${c.last_name}`,
     email: c.email || '',
@@ -24,9 +37,11 @@ export const getCustomers = async (): Promise<Customer[]> => {
     cedula: c.document_number,
     isFrequent: false
   }));
+
+  return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getTechnicians = async (): Promise<Technician[]> => {
+export const getTechnicians = async (params: { page?: number } = {}): Promise<{ items: Technician[], totalPages: number }> => {
   const user = await requireWorkshop();
   const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
   const supabaseAdmin = createSupabaseClient(
@@ -34,11 +49,16 @@ export const getTechnicians = async (): Promise<Technician[]> => {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data } = await supabaseAdmin.from('organization_members')
-    .select('role, user_id, profiles ( id, first_name, last_name, avatar_path, phone )')
-    .eq('organization_id', user.workshopId);
+  const page = params.page || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  const { data, count } = await supabaseAdmin.from('organization_members')
+    .select('role, user_id, profiles ( id, first_name, last_name, avatar_path, phone )', { count: 'exact' })
+    .eq('organization_id', user.workshopId)
+    .range(offset, offset + limit - 1);
   
-  if (!data) return [];
+  if (!data) return { items: [], totalPages: 0 };
   
   const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
   const usersMap = new Map();
@@ -46,7 +66,7 @@ export const getTechnicians = async (): Promise<Technician[]> => {
      authData.users.forEach(u => usersMap.set(u.id, u.email));
   }
 
-  return data.map((m: any) => ({
+  const allItems = data.map((m: any) => ({
     id: m.profiles?.id || m.user_id,
     name: `${m.profiles?.first_name || ''} ${m.profiles?.last_name || ''}`.trim() || 'Técnico',
     specialty: m.role === 'mechanic' ? 'Técnico' : (m.role === 'service_advisor' ? 'Recepcionista' : m.role),
@@ -54,17 +74,31 @@ export const getTechnicians = async (): Promise<Technician[]> => {
     phone: m.profiles?.phone || '',
     avatarUrl: m.profiles?.avatar_path
   })).filter(t => t.id && (t.specialty === 'Técnico' || t.specialty === 'mechanic'));
+
+  return { items: allItems, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getMotorcycles = async (): Promise<Motorcycle[]> => {
+export const getMotorcycles = async (params: { query?: string, page?: number } = {}): Promise<{ items: Motorcycle[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
-  const { data } = await supabase.from('motorcycles')
-    .select('*, customers(*)')
-    .eq('organization_id', user.workshopId);
   
-  if (!data) return [];
-  return data.map((m: any) => ({
+  const page = params.page || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  let q = supabase.from('motorcycles')
+    .select('*, customers(*)', { count: 'exact' })
+    .eq('organization_id', user.workshopId);
+    
+  if (params.query) {
+    q = q.or(`brand.ilike.%${params.query}%,model.ilike.%${params.query}%,license_plate.ilike.%${params.query}%`);
+  }
+
+  const { data, count } = await q.range(offset, offset + limit - 1);
+  
+  if (!data) return { items: [], totalPages: 0 };
+  
+  const items = data.map((m: any) => ({
     id: m.id,
     make: m.brand || '',
     model: m.model || '',
@@ -80,12 +114,25 @@ export const getMotorcycles = async (): Promise<Motorcycle[]> => {
       cedula: m.customers.document_number
     } : { id: '', name: 'Desconocido', email: '' }
   }));
+
+  return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getInventory = async (): Promise<{ items: InventoryItem[], totalPages: number }> => {
+export const getInventory = async (params: { query?: string, page?: number } = {}): Promise<{ items: InventoryItem[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
-  const { data } = await supabase.from('inventory_items').select('*').eq('organization_id', user.workshopId);
+  
+  const page = params.page || 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  let q = supabase.from('inventory_items').select('*', { count: 'exact' }).eq('organization_id', user.workshopId);
+
+  if (params.query) {
+    q = q.or(`name.ilike.%${params.query}%,code.ilike.%${params.query}%`);
+  }
+
+  const { data, count } = await q.range(offset, offset + limit - 1);
   if (!data) return { items: [], totalPages: 0 };
   
   const items: InventoryItem[] = data.map((i: any) => ({
@@ -97,23 +144,40 @@ export const getInventory = async (): Promise<{ items: InventoryItem[], totalPag
     minimumQuantity: i.min_quantity || 0,
     location: i.description || '',
     category: (i.category as any) || 'Repuestos',
-    supplierPrice: 0, // Not in DB yet
-    supplier: '' // Not in DB yet
+    supplierPrice: 0,
+    supplier: ''
   }));
-  return { items, totalPages: 1 };
+  return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages: number }> => {
+export const getWorkOrders = async (params: { query?: string, page?: number, statusFilter?: 'active' | 'completed', limit?: number } = {}): Promise<{ items: WorkOrder[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
-  const { data } = await supabase.from('work_orders')
-    .select('*, motorcycles(*), customers(*), sales(id, status)')
+  
+  const page = params.page || 1;
+  const limit = params.limit || 10;
+  const offset = (page - 1) * limit;
+
+  let q = supabase.from('work_orders')
+    .select('*, motorcycles(*), customers(*), sales(id, status)', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
+  if (params.statusFilter === 'active') {
+    q = q.neq('status', 'delivered');
+  } else if (params.statusFilter === 'completed') {
+    q = q.eq('status', 'delivered');
+  }
+
+  if (params.query) {
+     q = q.or(`order_number.ilike.%${params.query}%`);
+  }
+
+  const { data, count } = await q.range(offset, offset + limit - 1);
+
   if (!data) return { items: [], totalPages: 0 };
 
-  const technicians = await getTechnicians();
+  const { items: technicians } = await getTechnicians();
 
   const items: WorkOrder[] = data.map((wo: any) => {
     const hasCompletedSale = wo.sales && wo.sales.some((s: any) => s.status === 'paid');
@@ -140,7 +204,7 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
-    status: hasCompletedSale || wo.status === 'delivered' ? 'Entregado' : 
+    status: wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'received' ? 'Ingreso a revisión' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
@@ -161,7 +225,7 @@ export const getWorkOrders = async (): Promise<{ items: WorkOrder[], totalPages:
     };
   });
 
-  return { items, totalPages: 1 };
+  return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
 export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
@@ -183,7 +247,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
 
   if (!wo) return null;
 
-  const technicians = await getTechnicians();
+  const { items: technicians } = await getTechnicians();
 
   let parsedDeposit = 0;
   if (wo.customer_observations) {
@@ -247,12 +311,16 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   };
 };
 
-export const getSales = async (params: any = {}): Promise<{ items: Sale[], totalPages: number }> => {
+export const getSales = async (params: { type?: string, limit?: number, query?: string, page?: number } = {}): Promise<{ items: Sale[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
   
+  const page = params.page || 1;
+  const limit = params.limit || 10;
+  const offset = (page - 1) * limit;
+
   let query = supabase.from('sales')
-    .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, motorcycles(*, customers(*)))')
+    .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, motorcycles(*, customers(*)))', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .neq('status', 'pending');
     
@@ -261,10 +329,14 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
   } else if (params.type === 'service') {
     query = query.not('work_order_id', 'is', null);
   }
+
+  if (params.query) {
+    query = query.or(`sale_number.ilike.%${params.query}%`);
+  }
   
-  const [technicians, { data }, orgResult] = await Promise.all([
+  const [{ items: technicians }, { data, count }, orgResult] = await Promise.all([
     getTechnicians(),
-    query.order('created_at', { ascending: false }).limit(params.limit || 1000),
+    query.order('created_at', { ascending: false }).range(offset, offset + limit - 1),
     supabase.from('organizations').select('name').eq('id', user.workshopId).single()
   ]);
 
@@ -373,7 +445,7 @@ export const getSales = async (params: any = {}): Promise<{ items: Sale[], total
     };
   });
 
-  return { items, totalPages: 1 };
+  return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
 export const getSalesDataForChart = async () => {

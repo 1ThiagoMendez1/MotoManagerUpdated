@@ -119,11 +119,73 @@ export async function getWorkshopCredentials(userId: string) {
         return { error: error?.message || 'Usuario no encontrado' };
     }
 
+    // Query profiles for the phone number
+    const { data: profileData } = await supabaseAdmin
+        .from('profiles')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+
     return {
         email: data.user.email || '',
         password: data.user.user_metadata?.temp_password || 'Sin contraseña temporal',
-        phone: data.user.user_metadata?.phone || ''
+        phone: profileData?.phone || data.user.user_metadata?.phone || ''
     };
+}
+
+export async function sendCredentialsViaWhatsApp(userId: string) {
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    // Get phone from profiles table
+    const { data: profileData, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('phone')
+        .eq('id', userId)
+        .single();
+
+    const targetPhone = profileData?.phone;
+    if (profileError || !targetPhone) {
+        return { success: false, error: 'El propietario no tiene un teléfono registrado' };
+    }
+
+    // Get the user's current temporary password or generate one if missing
+    const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (getUserError || !userData.user) {
+        return { success: false, error: 'Usuario no encontrado' };
+    }
+
+    let tempPassword = userData.user.user_metadata?.temp_password;
+    if (!tempPassword) {
+        tempPassword = Math.floor(100000 + Math.random() * 900000).toString();
+        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+            password: tempPassword,
+            user_metadata: {
+                ...userData.user.user_metadata,
+                temp_password: tempPassword,
+                needs_password_change: true
+            }
+        });
+        if (updateError) {
+            return { success: false, error: `Error al generar contraseña: ${updateError.message}` };
+        }
+    }
+
+    console.log(`Sending credentials via WhatsApp to ${targetPhone}...`);
+    const wsRes = await sendAccessCodeNotification(targetPhone, tempPassword);
+    if (!wsRes.success) {
+        console.error('Failed to send WhatsApp code:', wsRes.error);
+        const errorMsg = typeof wsRes.error === 'object' ? JSON.stringify(wsRes.error) : wsRes.error;
+        return { 
+            success: false, 
+            error: `Error al enviar WhatsApp: ${errorMsg}` 
+        };
+    }
+
+    return { success: true };
 }
 
 export async function resetUserPasswordAndNotify(userId: string, email: string, phone: string | undefined, name: string) {

@@ -40,39 +40,6 @@ function SubmitButton() {
 
 export function AddCustomer() {
   const [isOpen, setIsOpen] = useState(false);
-  const { toast } = useToast();
-  const router = useRouter();
-  // @ts-ignore
-  const [state, formAction] = useActionState(createCustomer, undefined);
-  const [handledSuccess, setHandledSuccess] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setHandledSuccess(false);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (state?.success && !handledSuccess) {
-      setHandledSuccess(true);
-      toast({
-        title: "Cliente creado",
-        description: "El cliente ha sido guardado exitosamente.",
-      });
-      setIsOpen(false);
-      router.refresh(); // Force the server component to re-render with new data
-    } else if (state?.message) {
-      toast({
-        title: "Error",
-        description: state.message,
-        variant: "destructive",
-      });
-    }
-  }, [state, handledSuccess, toast, router]);
-
-  const handleFormSubmit = (formData: FormData) => {
-    return formAction(formData);
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -89,46 +56,74 @@ export function AddCustomer() {
             Completa los detalles para agregar un nuevo cliente.
           </DialogDescription>
         </DialogHeader>
-        <form action={handleFormSubmit} className="space-y-4">
-          {state?.message && (
-            <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-2.5 rounded-lg text-sm font-medium">
-              {state.message}
-            </div>
-          )}
-          <div>
-            <label className="text-sm font-medium text-foreground">Nombre *</label>
-            <Input name="name" placeholder="p. ej., Juan Pérez" className="bg-card text-card-foreground border-border" required />
-            {state?.errors?.name && (
-              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.name[0]}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Email (Opcional)</label>
-            <Input name="email" type="email" placeholder="p. ej., juan@email.com" className="bg-card text-card-foreground border-border" />
-            {state?.errors?.email && (
-              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.email[0]}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Teléfono (Opcional)</label>
-            <Input name="phone" placeholder="p. ej., 3001234567" className="bg-card text-card-foreground border-border" />
-            {state?.errors?.phone && (
-              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.phone[0]}</p>
-            )}
-          </div>
-          <div>
-            <label className="text-sm font-medium text-foreground">Cédula / Documento (Opcional)</label>
-            <Input name="cedula" placeholder="p. ej., 123456789" className="bg-card text-card-foreground border-border" />
-            {state?.errors?.cedula && (
-              <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.cedula[0]}</p>
-            )}
-          </div>
-
-          <DialogFooter className="pt-2">
-            <SubmitButton />
-          </DialogFooter>
-        </form>
+        {isOpen && <AddCustomerForm onClose={() => setIsOpen(false)} />}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AddCustomerForm({ onClose }: { onClose: () => void }) {
+  const { toast } = useToast();
+  const router = useRouter();
+  // @ts-ignore
+  const [state, formAction] = useActionState(createCustomer, undefined);
+
+  useEffect(() => {
+    if (state?.success) {
+      toast({
+        title: "Cliente creado",
+        description: "El cliente ha sido guardado exitosamente.",
+      });
+      onClose();
+      router.refresh(); // Force the server component to re-render with new data
+    } else if (state?.message) {
+      toast({
+        title: "Error",
+        description: state.message,
+        variant: "destructive",
+      });
+    }
+  }, [state, toast, router, onClose]);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      {state?.message && (
+        <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-2.5 rounded-lg text-sm font-medium">
+          {state.message}
+        </div>
+      )}
+      <div>
+        <label className="text-sm font-medium text-foreground">Nombre *</label>
+        <Input name="name" placeholder="p. ej., Juan Pérez" className="bg-card text-card-foreground border-border" required />
+        {state?.errors?.name && (
+          <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.name[0]}</p>
+        )}
+      </div>
+      <div>
+        <label className="text-sm font-medium text-foreground">Email (Opcional)</label>
+        <Input name="email" type="email" placeholder="p. ej., juan@email.com" className="bg-card text-card-foreground border-border" />
+        {state?.errors?.email && (
+          <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.email[0]}</p>
+        )}
+      </div>
+      <div>
+        <label className="text-sm font-medium text-foreground">Teléfono (Opcional)</label>
+        <Input name="phone" placeholder="p. ej., 3001234567" className="bg-card text-card-foreground border-border" />
+        {state?.errors?.phone && (
+          <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.phone[0]}</p>
+        )}
+      </div>
+      <div>
+        <label className="text-sm font-medium text-foreground">Cédula / Documento (Opcional)</label>
+        <Input name="cedula" placeholder="p. ej., 123456789" className="bg-card text-card-foreground border-border" />
+        {state?.errors?.cedula && (
+          <p className="text-red-500 text-xs mt-1 font-medium">{state.errors.cedula[0]}</p>
+        )}
+      </div>
+
+      <DialogFooter className="pt-2">
+        <SubmitButton />
+      </DialogFooter>
+    </form>
   );
 }

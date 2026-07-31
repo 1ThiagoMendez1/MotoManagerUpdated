@@ -14,28 +14,26 @@ export async function GET(
     const resolvedParams = await Promise.resolve(params);
     const workOrderId = resolvedParams.id;
     
-    // 1. Obtener la venta (sale) pendiente asociada a esta orden de trabajo
-    const { data: sale } = await supabase
+    // 1. Obtener TODAS las ventas pendientes asociadas a esta orden de trabajo
+    const { data: sales, error: salesError } = await supabase
       .from('sales')
       .select('id')
       .eq('work_order_id', workOrderId)
-      .eq('organization_id', user.workshopId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .eq('organization_id', user.workshopId);
       
-    if (!sale) {
+    if (salesError || !sales || sales.length === 0) {
       return NextResponse.json({ items: [] });
     }
     
+    const saleIds = sales.map(s => s.id);
+    
     // 2. Obtener los items (sale_items)
-    const { data: saleItems } = await supabase
+    const { data: saleItems, error: itemsError } = await supabase
       .from('sale_items')
       .select('*, inventory_items(name, code)')
-      .eq('sale_id', sale.id);
+      .in('sale_id', saleIds);
       
-    if (!saleItems) {
+    if (itemsError || !saleItems) {
       return NextResponse.json({ items: [] });
     }
     

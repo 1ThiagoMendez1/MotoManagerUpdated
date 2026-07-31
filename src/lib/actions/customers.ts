@@ -246,17 +246,22 @@ export async function getCustomerByName(name: string) {
     const supabase = await createClient();
 
     // Remove extra spaces and split to try matching first_name and last_name
-    const parts = name.trim().split(' ');
+    const parts = name.trim().split(/\s+/);
     const searchFirst = parts[0];
-    const searchLast = parts.length > 1 ? parts.slice(1).join(' ') : searchFirst;
+    const searchLast = parts.length > 1 ? parts.slice(1).join(' ') : '';
 
-    const { data } = await supabase
+    let query = supabase
         .from('customers')
         .select('id, first_name, last_name, email, phone, document_number')
-        .eq('organization_id', user.workshopId)
-        .or(`first_name.ilike.%${searchFirst}%,last_name.ilike.%${searchLast}%`)
-        .limit(1)
-        .maybeSingle();
+        .eq('organization_id', user.workshopId);
+
+    if (searchLast) {
+        query = query.ilike('first_name', `%${searchFirst}%`).ilike('last_name', `%${searchLast}%`);
+    } else {
+        query = query.or(`first_name.ilike.%${searchFirst}%,last_name.ilike.%${searchFirst}%`);
+    }
+
+    const { data } = await query.limit(1).maybeSingle();
 
     if (!data) return null;
 

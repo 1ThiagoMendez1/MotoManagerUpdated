@@ -118,7 +118,7 @@ export default async function SalesPage({
 
   try {
     const [sls, wos, inv, custs, allSales] = await Promise.all([
-      getSales({ dateFrom, dateTo, type, page: currentPage, limit: 20 }),
+      getSales({ dateFrom, dateTo, type, page: currentPage, limit: 10 }),
       getWorkOrders({ limit: 200 }), // Get all work orders for forms
       getInventory({ limit: 200 }),
       getCustomers(),

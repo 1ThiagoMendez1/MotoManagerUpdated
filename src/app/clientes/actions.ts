@@ -1,6 +1,6 @@
 'use server';
 
-import { createAdminClient } from '@/lib/auth-server';
+import { createAdminClient, getCurrentUserServer } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -161,6 +161,16 @@ export async function createCustomerAppointment(formData: FormData) {
   // Default appointment duration: 1 hour
   const scheduledEnd = new Date(scheduledStart.getTime() + 60 * 60 * 1000);
 
+  let creatorId: string | null = null;
+  try {
+    const currentUser = await getCurrentUserServer();
+    if (currentUser) {
+      creatorId = currentUser.id;
+    }
+  } catch (e) {
+    // Si no hay sesión (flujo de portal público), queda null
+  }
+
   const { error: insertError } = await supabase
     .from('appointments')
     .insert({
@@ -171,6 +181,7 @@ export async function createCustomerAppointment(formData: FormData) {
       scheduled_end: scheduledEnd.toISOString(),
       status: 'pending',
       notes: serviceType + (notes ? ` — ${notes}` : ''),
+      created_by: creatorId
     });
 
   if (insertError) {

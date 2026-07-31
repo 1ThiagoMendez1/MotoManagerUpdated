@@ -37,7 +37,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
   if (!workOrder) return <div className="text-foreground p-8 flex flex-col items-center justify-center min-h-[50vh]"><AlertCircle className="w-12 h-12 text-red-500 mb-4" /><h2 className="text-2xl font-bold">Orden no encontrada</h2></div>;
 
-  const [inventory, technicians, reminders] = await Promise.all([
+  const [inventory, { items: technicians }, reminders] = await Promise.all([
     getInventory({ page: 1, limit: 100 }),
     getTechnicians(),
     getRemindersByMotorcycleId(workOrder.motorcycle.id)

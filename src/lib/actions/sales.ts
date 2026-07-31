@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendServiceSaleNotification, sendSaleNotification, sendVentaPorOrdenNotification, sendDirectSalePaidNotification } from '@/lib/whatsapp';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // --- Schemas ---
 
@@ -178,7 +179,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     subtotal: subtotal,
                     discount_total: discountAmount,
                     total: total,
-                    status: 'paid',
+                    status: data.paymentMethod === 'Wompi' ? 'pending' : 'paid',
                     created_by: user.userId || null
                 })
                 .eq('id', existingSale.id)
@@ -202,7 +203,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     subtotal: subtotal,
                     discount_total: discountAmount,
                     total: total,
-                    status: 'paid',
+                    status: data.paymentMethod === 'Wompi' ? 'pending' : 'paid',
                     created_by: user.userId || null
                 })
                 .select()
@@ -259,41 +260,87 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                 });
         }
 
-        // 6. Update Work Order Status
-        const { data: workOrder, error: workOrderError } = await supabase
-            .from('work_orders')
-            .update({
-                status: 'delivered',
-                quote_status: 'approved',
-                completed_at: new Date().toISOString()
-            })
-            .eq('id', data.workOrderId)
-            .eq('organization_id', user.workshopId)
-            .select(`
-                motorcycle_id, 
-                order_number,
-                customer_observations,
-                motorcycles (
-                    customer_id,
-                    brand,
-                    model,
-                    license_plate,
-                    model_year,
-                    customers (
-                        first_name,
-                        last_name,
-                        phone
-                    )
-                ),
-                profiles!work_orders_assigned_mechanic_id_fkey (
-                    first_name,
-                    last_name
-                )
-            `)
-            .single();
+        // 6. Conditionally Update Work Order Status (Skip if Wompi pending)
+        let workOrder = null;
+        if (data.paymentMethod !== 'Wompi') {
+            const supabaseAdmin = createAdminClient();
+            
+            // Separamos el update del select para evitar errores de .single() si algo falla en los joins
+            const { error: workOrderError } = await supabaseAdmin
+                .from('work_orders')
+                .update({
+                    status: 'delivered',
+                    quote_status: 'approved',
+                    completed_at: new Date().toISOString()
+                })
+                .eq('id', data.workOrderId)
+                .eq('organization_id', user.workshopId);
 
-        if (workOrderError) {
-            console.error('Error updating work order status:', workOrderError);
+            if (workOrderError) {
+                console.error('Error updating work order status (update step):', JSON.stringify(workOrderError, null, 2));
+            } else {
+                // Fetch the updated data for WhatsApp alert
+                const { data: updatedWorkOrder, error: fetchError } = await supabaseAdmin
+                    .from('work_orders')
+                    .select(`
+                        motorcycle_id, 
+                        order_number,
+                        customer_observations,
+                        motorcycles (
+                            customer_id,
+                            brand,
+                            model,
+                            license_plate,
+                            model_year,
+                            customers (
+                                first_name,
+                                last_name,
+                                phone
+                            )
+                        ),
+                        profiles!work_orders_assigned_mechanic_id_fkey (
+                            first_name,
+                            last_name
+                        )
+                    `)
+                    .eq('id', data.workOrderId)
+                    .eq('organization_id', user.workshopId)
+                    .maybeSingle();
+                
+                if (fetchError) {
+                    console.error('Error fetching work order after update:', JSON.stringify(fetchError, null, 2));
+                }
+                workOrder = updatedWorkOrder;
+            }
+        } else {
+            // Fetch work order details without updating status for Wompi
+            const { data: existingWo } = await supabase
+                .from('work_orders')
+                .select(`
+                    motorcycle_id, 
+                    order_number,
+                    customer_observations,
+                    motorcycles (
+                        customer_id,
+                        brand,
+                        model,
+                        license_plate,
+                        model_year,
+                        customers (
+                            first_name,
+                            last_name,
+                            phone
+                        )
+                    ),
+                    profiles!work_orders_assigned_mechanic_id_fkey (
+                        first_name,
+                        last_name
+                    )
+                `)
+                .eq('id', data.workOrderId)
+                .eq('organization_id', user.workshopId)
+                .single();
+            workOrder = existingWo;
         }
 
         revalidatePath('/sales');
@@ -336,25 +383,46 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             total: item.total || (item.quantity * item.price)
         }));
 
-        // 7. Send Notification
-        if (formattedCustomer?.phone) {
+        // 7. Send Notification (Skip receipt if Wompi, webhook handles it)
+        if (formattedCustomer?.phone && data.paymentMethod !== 'Wompi') {
             try {
-                const motorcycleBrandModel = fomattedMotorcycle ? `${fomattedMotorcycle.brand} ${fomattedMotorcycle.model}` : '';
-                const customerFullName = formattedCustomer ? `${formattedCustomer.first_name} ${formattedCustomer.last_name}`.trim() : 'Cliente';
-                await sendVentaPorOrdenNotification(
+                const firstName = formattedCustomer.first_name || '';
+                const lastName = formattedCustomer.last_name || '';
+                const customerFullName = formattedCustomer ? `${firstName} ${lastName}`.trim() || 'Cliente' : 'Cliente';
+                const notifyResult = await sendServiceSaleNotification(
                     formattedCustomer.phone,
                     customerFullName,
-                    workshopName,
-                    wo?.order_number || '',
-                    motorcycleBrandModel,
-                    fomattedMotorcycle?.license_plate || '',
+                    wo?.order_number || saleNumber,
                     total,
-                    formattedItems,
+                    {
+                        make: fomattedMotorcycle?.brand || 'Moto',
+                        model: fomattedMotorcycle?.model || '',
+                        plate: fomattedMotorcycle?.license_plate || 'Sin Placa'
+                    },
+                    formattedTech ? `${formattedTech.first_name} ${formattedTech.last_name}`.trim() : 'Técnico',
                     data.laborCost > 0 ? data.laborCost : undefined,
-                    parsedDeposit
+                    formattedItems,
+                    subtotal,
+                    data.discountPercentage,
+                    discountAmount,
+                    workshopName
                 );
-            } catch (notifyError) {
-                console.error('Notification error:', notifyError);
+                
+                const fs = require('fs');
+                fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
+                    date: new Date().toISOString(),
+                    customerPhone: formattedCustomer.phone,
+                    result: notifyResult
+                }, null, 2));
+
+            } catch (notifyError: any) {
+                console.error('Service sale notification error:', notifyError);
+                const fs = require('fs');
+                fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
+                    date: new Date().toISOString(),
+                    error: notifyError.message,
+                    stack: notifyError.stack
+                }, null, 2));
             }
         }
 

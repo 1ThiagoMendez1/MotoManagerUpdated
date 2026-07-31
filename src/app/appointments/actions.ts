@@ -17,6 +17,10 @@ export async function getAppointments() {
       notes,
       reason,
       created_at,
+      created_by,
+      accepted_by,
+      creator:profiles!created_by(id, first_name, last_name),
+      acceptor:profiles!accepted_by(id, first_name, last_name),
       customers (
         id,
         first_name,
@@ -48,6 +52,10 @@ export async function getAppointments() {
     notes: apt.notes,
     reason: apt.reason,
     createdAt: apt.created_at,
+    createdBy: apt.created_by,
+    acceptedBy: apt.accepted_by,
+    creatorName: apt.creator ? `${apt.creator.first_name || ''} ${apt.creator.last_name || ''}`.trim() : null,
+    acceptorName: apt.acceptor ? `${apt.acceptor.first_name || ''} ${apt.acceptor.last_name || ''}`.trim() : null,
     customer: apt.customers ? {
       id: apt.customers.id,
       name: `${apt.customers.first_name || ''} ${apt.customers.last_name || ''}`.trim(),
@@ -68,9 +76,14 @@ export async function updateAppointmentStatus(id: string, status: string) {
   const user = await requireWorkshop();
   const supabase = await createAdminClient();
 
+  const updateData: any = { status };
+  if (status === 'confirmed') {
+    updateData.accepted_by = user.id;
+  }
+
   const { error } = await supabase
     .from('appointments')
-    .update({ status })
+    .update(updateData)
     .eq('id', id)
     .eq('organization_id', user.workshopId);
 

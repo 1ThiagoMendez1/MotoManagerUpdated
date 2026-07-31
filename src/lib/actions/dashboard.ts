@@ -28,9 +28,7 @@ export async function getDashboardData() {
   if (e2) console.error('Dashboard Error (WOs for stats):', e2)
 
   const activeWorkOrders = (wosData || []).filter(wo => {
-    const salesArr = wo.sales ? (Array.isArray(wo.sales) ? wo.sales : [wo.sales]) : [];
-    const hasCompletedSale = salesArr.some((s: any) => s.status === 'paid');
-    return !hasCompletedSale && wo.status !== 'delivered';
+    return wo.status !== 'delivered';
   });
 
   const activeWorkOrdersCount = activeWorkOrders.length;

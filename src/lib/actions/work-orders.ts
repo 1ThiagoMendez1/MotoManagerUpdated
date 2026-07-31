@@ -54,8 +54,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         .neq('status', 'cancelled');
 
     const activeOrder = activeOrders?.find(wo => {
-        const hasCompletedSale = wo.sales && (wo.sales as any[]).some((s: any) => s.status === 'paid');
-        return !hasCompletedSale;
+        return wo.status !== 'delivered';
     });
         
     if (activeOrder) return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en el taller.' };

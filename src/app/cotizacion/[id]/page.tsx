@@ -139,6 +139,7 @@ export default async function QuotePage({
         id,
         quantity,
         unit_price,
+        description,
         inventory_items (
           name
         ),
@@ -147,22 +148,21 @@ export default async function QuotePage({
         )
       )
     `)
-    .eq('work_order_id', resolvedParams.id)
-    .maybeSingle()
+    .eq('work_order_id', resolvedParams.id);
 
   const mc = workOrder.motorcycles as any
   const customer = mc?.customers ? { name: `${mc.customers.first_name || ''} ${mc.customers.last_name || ''}`.trim() } : null;
   const workshop = workOrder.organizations as any
   const tech = workOrder.mechanic ? { name: `${(workOrder.mechanic as any).first_name || ''} ${(workOrder.mechanic as any).last_name || ''}`.trim() } : null;
   
-  const saleItems = saleData?.sale_items || []
+  const saleItems = (saleData || []).flatMap(sale => sale.sale_items || []);
   
   // Calcular el total dinámicamente para asegurar precisión, ya que total en la base de datos podría estar desincronizado
   const calculatedTotalCost = saleItems.reduce((acc: number, item: any) => {
     return acc + ((Number(item.unit_price) || 0) * (Number(item.quantity) || 0));
   }, 0);
   
-  const totalCost = calculatedTotalCost > 0 ? calculatedTotalCost : (saleData?.total || 0);
+  const totalCost = calculatedTotalCost > 0 ? calculatedTotalCost : ((saleData || []).reduce((acc, sale) => acc + (sale.total || 0), 0));
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500/30">
@@ -321,7 +321,7 @@ export default async function QuotePage({
                     <div key={item.id} className="flex items-center justify-between p-5 hover:bg-slate-800/30 transition-colors">
                       <div className="flex-1">
                         <p className="font-medium text-slate-200 mb-1">
-                          {item.inventory_items?.name || item.service_catalog?.description || 'Item desconocido'}
+                          {item.description || item.inventory_items?.name || item.service_catalog?.description || 'Item desconocido'}
                         </p>
                         <p className="text-xs text-slate-500">Cantidad: {item.quantity}</p>
                       </div>
@@ -355,6 +355,13 @@ export default async function QuotePage({
                 <span className="text-2xl font-bold text-emerald-400">
                   ${Math.max(0, totalCost - (workOrder.deposit_amount || 0)).toLocaleString('es-CO')}
                 </span>
+              </div>
+
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400/90 text-sm text-center flex items-start sm:items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
+                <p className="text-left sm:text-center leading-tight">
+                  <strong className="font-semibold text-blue-300">Nota importante:</strong> El costo de la mano de obra no está incluido en este valor y será determinado por el taller.
+                </p>
               </div>
             </div>
           </Card>
