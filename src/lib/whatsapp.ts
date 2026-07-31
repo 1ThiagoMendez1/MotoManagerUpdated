@@ -464,7 +464,8 @@ export async function sendCredentialsNotification(
 ) {
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+  const cleanPhone = customerPhone.replace(/\D/g, '');
+  const formattedPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
 
   // 1. Intentar con Meta Cloud API si está configurada
   if (wpToken && wpPhoneId) {
@@ -484,52 +485,128 @@ export async function sendCredentialsNotification(
       const year = dateObj.getFullYear();
       const formattedDate = `${day}-${month}-${year}`;
 
-      console.log(`Sending template 'registros_manuales_de_talleres' to ${formattedPhone} via Meta Cloud API...`);
-      
-      const response = await axios.post(
-        `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
-        {
+      console.log(`Sending credentials to ${formattedPhone} via Meta Cloud API...`);
+
+      // 1. Intentar enviar la plantilla de bienvenida PRIMERO
+      let templateSent = false;
+      const postPayload = (includeHeader: boolean, includeButton: boolean, numBodyParams: number = 7) => {
+        const components: any[] = [];
+
+        if (includeHeader) {
+          components.push({
+            type: 'header',
+            parameters: [{ type: 'text', text: workshopName }]
+          });
+        }
+
+        // Creamos un array de parametros seguro para diferentes versiones de la plantilla
+        const baseParams = [
+          { type: 'text', text: roleDisplay },   // {{1}} Ej: Tecnico
+          { type: 'text', text: workshopName },  // {{2}} Ej: Taller
+          { type: 'text', text: workshopName },  // {{3}} Ej: Taller
+          { type: 'text', text: roleDisplay },   // {{4}} Ej: Tecnico
+          { type: 'text', text: formattedDate }, // {{5}} Ej: Fecha
+          { type: 'text', text: workshopName },  // {{6}} Ej: Taller
+          { type: 'text', text: workshopName },  // {{7}} Extra
+          { type: 'text', text: roleDisplay }    // {{8}} Extra
+        ];
+
+        components.push({
+          type: 'body',
+          parameters: baseParams.slice(0, numBodyParams)
+        });
+
+        if (includeButton) {
+          components.push({
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [{ type: 'text', text: 'login' }]
+          });
+        }
+
+        return {
           messaging_product: 'whatsapp',
           to: formattedPhone,
           type: 'template',
           template: {
-            name: 'registros_manuales_de_talleres',
+            name: 'bienvenida_miembros_del_taller',
             language: { code: 'es_CO' },
-            components: [
-              {
-                type: 'header',
-                parameters: [{ type: 'text', text: 'MotoManager' }]
-              },
-              {
-                type: 'body',
-                parameters: [
-                  { type: 'text', text: roleDisplay },        // {{1}} -> Rol (ej. "Técnico")
-                  { type: 'text', text: workshopName },       // {{2}} -> Taller
-                  { type: 'text', text: roleDisplay },        // {{3}} -> Rol (ej. "Técnico")
-                  { type: 'text', text: formattedDate },      // {{4}} -> Inicio de acceso (ej. "27-07-2026")
-                  { type: 'text', text: workshopName }        // {{5}} -> Taller
-                ]
+            components
+          }
+        };
+      };
+
+      const payloadsToTry = [
+        // Variaciones probables de cantidad de parametros
+        { includeHeader: false, includeButton: false, numBodyParams: 7 },
+        { includeHeader: true, includeButton: false, numBodyParams: 7 },
+        { includeHeader: false, includeButton: false, numBodyParams: 6 },
+        { includeHeader: true, includeButton: false, numBodyParams: 6 },
+        { includeHeader: false, includeButton: false, numBodyParams: 8 },
+        { includeHeader: false, includeButton: true, numBodyParams: 7 },
+        { includeHeader: false, includeButton: false, numBodyParams: 5 },
+        { includeHeader: false, includeButton: false, numBodyParams: 4 },
+        { includeHeader: false, includeButton: false, numBodyParams: 3 },
+      ];
+
+      for (const config of payloadsToTry) {
+        try {
+          const templateResponse = await axios.post(
+            `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+            postPayload(config.includeHeader, config.includeButton, config.numBodyParams),
+            {
+              headers: {
+                'Authorization': `Bearer ${wpToken}`,
+                'Content-Type': 'application/json'
               }
-            ]
-          }
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${wpToken}`,
-            'Content-Type': 'application/json'
-          }
+            }
+          );
+          console.log(`✅ Template bienvenida_miembros_del_taller accepted (header: ${config.includeHeader}, button: ${config.includeButton}, params: ${config.numBodyParams}):`, templateResponse.data);
+          templateSent = true;
+          break; // Rompe el ciclo si tuvo éxito
+        } catch (templateError: any) {
+          console.warn(`⚠️ Template attempt failed (header: ${config.includeHeader}, button: ${config.includeButton}, params: ${config.numBodyParams}):`, templateError.response?.data?.error?.message || templateError.message);
         }
-      );
-
-      console.log('✅ WhatsApp credentials template sent via Meta Cloud API:', response.data);
-
-      // Si existe contraseña temporal/código, enviar también el código de acceso
-      if (tempPassword) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        await sendAccessCodeNotification(customerPhone, tempPassword);
       }
 
-      return { success: true, provider: 'meta', data: response.data };
+      // 2. Enviar el código de acceso DESPUES de la bienvenida
+      if (tempPassword) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          await sendAccessCodeNotification(customerPhone, tempPassword);
+        } catch (codeErr: any) {
+          console.warn('⚠️ Falló el envío de codigo_de_acceso en sendCredentialsNotification:', codeErr.message);
+        }
+      }
+
+      // 3. Enviar mensaje de texto de bienvenida como respaldo
+      //    (la plantilla tiene estado "calidad pendiente" en Meta y puede no entregarse)
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const welcomeText = `¡Bienvenido a MotoManager! 🏍️\n\n🎉 Nos alegra darte la bienvenida. Tu cuenta como ${roleDisplay} ha sido creada exitosamente para el taller ${workshopName}. Ya puedes ingresar a consultar tus apartados disponibles.\n\n🏍️ Taller: ${workshopName}\n🔧 Tu rol asignado: ${roleDisplay}\n📅 Inicio de acceso: ${formattedDate}\n\n🔑 ¿Cómo ingresar?\n📧 Usuario: Tu correo electrónico registrado.\n🌐 Ingresa a la plataforma y asigna tu contraseña en tu primer acceso.\n\n💭 Si tienes alguna duda o necesitas ayuda, estaremos encantados de apoyarte.\n\n¡Bienvenido a ${workshopName}! 🏍️ 🛣️🛣️\nEquipo MotoManager`;
+
+        const textResponse = await axios.post(
+          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'text',
+            text: { body: welcomeText }
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${wpToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        console.log('✅ Welcome text message sent:', textResponse.data);
+      } catch (textError: any) {
+        console.warn('⚠️ Welcome text fallback also failed:', textError.response?.data?.error?.message || textError.message);
+      }
+
+      return { success: true, provider: 'meta' };
     } catch (error: any) {
       console.error('❌ Error sending WhatsApp credentials template via Meta Cloud API:', error.response?.data || error.message);
       // Fallback a Evolution API si falla
@@ -1012,7 +1089,8 @@ export async function sendAccessCodeNotification(
   }
 
   try {
-    const formattedPhone = phone.replace('+', '').startsWith('57') ? phone.replace('+', '') : `57${phone.replace('+', '')}`;
+    const cleanPhone = phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
 
     const postCodePayload = (includeButtonParam: boolean, buttonType: string) => {
       const components: any[] = [
