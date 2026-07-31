@@ -60,8 +60,8 @@ export function WorkshopTicketsClient({ initialTickets }: { initialTickets: any[
       // Find the last message that is actually from an agent (not a system event)
       const adminMsg = [...msgs].reverse().find(m => 
         (m.senderName === 'Admin' || m.senderName === 'Sistema') && 
-        m.raw_json?.sender !== 'system' && 
-        m.raw_json?.type !== 'event'
+        (m.raw_json as any)?.sender !== 'system' && 
+        (m.raw_json as any)?.type !== 'event'
       );
       console.log("Mensaje identificado como solución:", adminMsg);
 

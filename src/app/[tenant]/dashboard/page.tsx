@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 interface TenantDashboardProps {
-  params: {
+  params: Promise<{
     tenant: string;
-  };
+  }>;
 }
 
 export default async function TenantDashboard({ params }: TenantDashboardProps) {

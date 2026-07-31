@@ -71,7 +71,7 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
                   <div key={workOrder.id} className="flex items-center justify-between p-3 bg-card/50 rounded border border-border/30 hover:bg-primary/5 transition-colors">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge variant={workOrder.status === 'Completado' ? 'secondary' : workOrder.status === 'En Reparación' ? 'default' : 'outline'}>
+                        <Badge variant={(workOrder.status as string) === 'Completado' ? 'secondary' : (workOrder.status as string) === 'En Reparación' ? 'default' : 'outline'}>
                           {workOrder.status}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
@@ -86,9 +86,9 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
                         Cliente: {workOrder.motorcycle.customer.name}
                       </div>
                       <div className="text-sm text-muted-foreground mt-1">
-                        {workOrder.issueDescription.length > 60
-                          ? `${workOrder.issueDescription.substring(0, 60)}...`
-                          : workOrder.issueDescription}
+                        {(workOrder.issueDescription || '').length > 60
+                          ? `${(workOrder.issueDescription || '').substring(0, 60)}...`
+                          : (workOrder.issueDescription || '')}
                       </div>
                     </div>
                     <div className="text-right text-sm text-muted-foreground">

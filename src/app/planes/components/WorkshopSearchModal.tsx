@@ -451,8 +451,8 @@ export function WorkshopSearchModal({ isOpen, onClose }: WorkshopSearchModalProp
                         longitude={workshop.lng} 
                         latitude={workshop.lat}
                       >
-                        <MarkerContent className="group" onClick={() => setSelectedWorkshopId(workshop.id)}>
-                          <div className={`relative ${isSelected ? 'h-8 w-8 ring-4 ring-primary ring-offset-2 ring-offset-background' : 'h-6 w-6'} rounded-full border-2 border-white ${markerBg} shadow-lg flex items-center justify-center transition-all hover:scale-110 cursor-pointer`}>
+                        <MarkerContent className="group">
+                          <div onClick={() => setSelectedWorkshopId(workshop.id)} className={`relative ${isSelected ? 'h-8 w-8 ring-4 ring-primary ring-offset-2 ring-offset-background' : 'h-6 w-6'} rounded-full border-2 border-white ${markerBg} shadow-lg flex items-center justify-center transition-all hover:scale-110 cursor-pointer`}>
                             <Wrench className={`${isSelected ? 'w-4 h-4' : 'w-3 h-3'} text-white`} />
                           </div>
                         </MarkerContent>

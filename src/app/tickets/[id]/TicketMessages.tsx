@@ -20,7 +20,7 @@ export function TicketMessages({ ticketId, messages, isCustomer = false }: { tic
   useEffect(() => {
     const supabase = new Proxy({}, {
   get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
     return () => supabase;
   }
 }) as any;
@@ -30,7 +30,7 @@ export function TicketMessages({ ticketId, messages, isCustomer = false }: { tic
         schema: 'public',
         table: 'ticket_messages',
         filter: `ticket_id=eq.${ticketId}`
-      }, (payload) => {
+      }, (payload: any) => {
         const newMsg = payload.new;
         let parsed = { text: newMsg.message, sender: 'agent', guide_number: '', isInternal: false };
         try {

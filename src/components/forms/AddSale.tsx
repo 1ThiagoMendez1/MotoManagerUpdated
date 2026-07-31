@@ -331,7 +331,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                             <CurrencyInput
                               placeholder="Ej: 120000"
                               value={field.value ?? ''}
-                              onChange={(val) => field.onChange(val === '' ? undefined : val)}
+                              onChange={(val: any) => field.onChange(val === '' ? undefined : val)}
                               className="bg-background border-input focus:ring-primary/20 transition-all"
                             />
                           </FormControl>
@@ -349,7 +349,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                             <CurrencyInput
                               placeholder="Ej: 50000"
                               value={field.value ?? ''}
-                              onChange={(val) => field.onChange(val === '' ? undefined : val)}
+                              onChange={(val: any) => field.onChange(val === '' ? undefined : val)}
                               className="bg-background border-input focus:ring-primary/20 transition-all"
                             />
                           </FormControl>
@@ -525,7 +525,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                           </div>
                           
                           {/* Item Subtotal Line */}
-                          {watchItems[index]?.inventoryItemId && (
+                          {watchItems?.[index]?.inventoryItemId && (
                             <div className="mt-3 flex justify-between items-center text-sm">
                               <div className={isOutOfStock ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
                                 {isOutOfStock ? "⚠️ Producto sin stock" : `Precio unitario: $${itemPrice.toLocaleString('es-CO')}`}

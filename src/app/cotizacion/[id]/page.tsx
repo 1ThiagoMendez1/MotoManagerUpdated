@@ -344,7 +344,7 @@ export default async function QuotePage({
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-400 font-medium">Abono Realizado</span>
                 <span className="font-semibold text-blue-400">
-                  - ${(workOrder.deposit_amount || 0).toLocaleString('es-CO')}
+                  - ${((workOrder as any).deposit_amount || 0).toLocaleString('es-CO')}
                 </span>
               </div>
 
@@ -353,7 +353,7 @@ export default async function QuotePage({
               <div className="flex items-center justify-between">
                 <span className="text-slate-300 font-medium text-lg">Saldo Estimado</span>
                 <span className="text-2xl font-bold text-emerald-400">
-                  ${Math.max(0, totalCost - (workOrder.deposit_amount || 0)).toLocaleString('es-CO')}
+                  ${Math.max(0, totalCost - ((workOrder as any).deposit_amount || 0)).toLocaleString('es-CO')}
                 </span>
               </div>
 
@@ -369,7 +369,7 @@ export default async function QuotePage({
           {/* Actions */}
           {(workOrder.quote_status === 'pending' || workOrder.quote_status === null) && (
             <div className="pt-6 space-y-4">
-              <form action={submitQuoteResponse.bind(null, workOrder.id, 'approved')}>
+              <form action={submitQuoteResponse.bind(null, workOrder.id, 'approved') as any}>
                 <Button 
                   type="submit"
                   className="w-full py-6 text-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transition-all rounded-xl border border-emerald-500/50"
@@ -378,7 +378,7 @@ export default async function QuotePage({
                 </Button>
               </form>
               
-              <form action={submitQuoteResponse.bind(null, workOrder.id, 'rejected')} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/50 flex flex-col gap-3">
+              <form action={submitQuoteResponse.bind(null, workOrder.id, 'rejected') as any} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/50 flex flex-col gap-3">
                 <p className="text-sm text-slate-400 text-center">¿Deseas rechazar la oferta?</p>
                 <input 
                   type="text" 

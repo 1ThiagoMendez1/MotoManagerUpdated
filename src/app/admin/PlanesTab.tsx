@@ -47,7 +47,7 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
   async function handlePlanSubmit(e: React.FormEvent<HTMLFormElement>, planId: string) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const result = await updatePlan(planId, formData);
+    const result: any = await updatePlan(planId, formData);
     if (result.success) {
       toast.success('Plan actualizado correctamente');
       setEditingPlan(null);
@@ -86,11 +86,10 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
         toast.success('Guardado correctamente');
         router.refresh();
       } else {
-        toast.error('Error al guardar en base de datos: ' + result?.error);
-        // Si hay un error, se podría revertir el estado aquí si fuera necesario
+        throw new Error((result as any)?.error || 'Error al guardar en base de datos');
       }
     } catch (e: any) {
-      toast.error('Error de conexión: ' + e.message);
+      toast.error('Error: ' + e.message);
     }
   }
 

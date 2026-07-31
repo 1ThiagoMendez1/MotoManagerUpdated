@@ -7,14 +7,15 @@ import { ArrowLeft } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-export default async function WorkOrderBillingPage({ params }: { params: { id: string } }) {
-  const workOrder = await getWorkOrderById(params.id);
+export default async function WorkOrderBillingPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const workOrder = await getWorkOrderById(id);
 
   if (!workOrder) return <div className="text-foreground">Orden no encontrada</div>;
 
   // Calculate total cost of items
-  const totalCost = workOrder.sales.reduce((total, sale) => {
-    return total + sale.saleItems.reduce((saleTotal, item) => {
+  const totalCost = (workOrder.sales || []).reduce((total: number, sale: any) => {
+    return total + (sale.saleItems || []).reduce((saleTotal: number, item: any) => {
       return saleTotal + (item.price * item.quantity);
     }, 0);
   }, 0);
@@ -95,14 +96,14 @@ export default async function WorkOrderBillingPage({ params }: { params: { id: s
         <CardContent className="pt-6">
           <div className="mt-6">
             <h3 className="text-lg font-medium mb-4">Productos e Insumos Utilizados</h3>
-            {workOrder.sales.length === 0 || workOrder.sales.every(sale => sale.saleItems.length === 0) ? (
+            {(!workOrder.sales || workOrder.sales.length === 0 || workOrder.sales.every((sale: any) => !sale.saleItems || sale.saleItems.length === 0)) ? (
               <div className="text-center py-8 text-muted-foreground border border-dashed border-border/50 rounded-lg">
                 No hay insumos o repuestos registrados para esta orden.
               </div>
             ) : (
               <div className="space-y-3">
-                {workOrder.sales.flatMap(sale =>
-                  sale.saleItems.map(item => (
+                {(workOrder.sales || []).flatMap((sale: any) =>
+                  (sale.saleItems || []).map((item: any) => (
                     <div key={item.id} className="flex justify-between items-center bg-card/30 p-3 rounded-lg border border-border/30">
                       <div className="flex-1">
                         <p className="font-medium">{item.inventoryItem.name}</p>

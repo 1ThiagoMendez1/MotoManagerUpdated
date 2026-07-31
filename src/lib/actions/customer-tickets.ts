@@ -16,7 +16,7 @@ const newCustomerTicketSchema = z.object({
 export async function submitCustomerTicket(prevState: any, formData: FormData) {
   const supabase = new Proxy({}, {
   get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
     return () => supabase;
   }
 }) as any;
@@ -38,7 +38,7 @@ export async function submitCustomerTicket(prevState: any, formData: FormData) {
   // We need to bypass RLS here because the customer is not logged in.
   // Actually, we should use the service role key or a secure RPC to fetch workshop and validate customer
   // Since we don't want to expose customer data, we'll use supabaseAdmin
-  const { createClient: createSupabaseClient } = await Promise.resolve({ createClient: () => ({} as any) });
+  const { createClient: createSupabaseClient } = await Promise.resolve({ createClient: (...args: any[]) => ({} as any) });
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

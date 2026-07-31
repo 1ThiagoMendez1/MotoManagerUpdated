@@ -102,12 +102,12 @@ function SalesPageError({ error }: { error: string }) {
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     dateFrom?: string;
     dateTo?: string;
     type?: string;
     page?: string;
-  };
+  }>;
 }) {
   await authorize('/sales');
   const resolvedSearchParams = await searchParams;
@@ -118,18 +118,18 @@ export default async function SalesPage({
 
   try {
     const [sls, wos, inv, custs, allSales] = await Promise.all([
-      getSales({ dateFrom, dateTo, type, page: currentPage, limit: 10 }),
+      getSales({ dateFrom, dateTo, type, page: currentPage, limit: 10 } as any),
       getWorkOrders({ limit: 200 }), // Get all work orders for forms
-      getInventory({ limit: 200 }),
+      getInventory({ limit: 200 } as any),
       getCustomers(),
-      getSales({ dateFrom, dateTo, type, limit: 1000 }), // For export
+      getSales({ dateFrom, dateTo, type, limit: 1000 } as any), // For export
     ]);
 
     const sales = sls.items;
     const totalPages = sls.totalPages;
     const workOrders = wos.items || wos; // Handle both paginated and non-paginated responses
     const inventoryItems = inv.items as InventoryItem[];
-    const customers = custs;
+    const customers = (custs as any).items || custs;
     const allFilteredSales = allSales.items;
 
     const getSaleDetails = (sale: Sale) => {

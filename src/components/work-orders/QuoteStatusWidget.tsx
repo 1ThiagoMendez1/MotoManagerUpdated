@@ -31,7 +31,7 @@ export function QuoteStatusWidget({
   const [isSending, setIsSending] = useState(false)
   const supabase = new Proxy({}, {
   get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
     return () => supabase;
   }
 }) as any;
@@ -48,7 +48,7 @@ export function QuoteStatusWidget({
           table: 'work_orders',
           filter: `id=eq.${workOrderId}`
         },
-        (payload) => {
+        (payload: any) => {
           if (payload.new && payload.new.quote_status !== undefined) {
             setStatus(payload.new.quote_status)
           }

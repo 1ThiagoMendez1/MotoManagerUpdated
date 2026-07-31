@@ -101,7 +101,7 @@ export function LandingTopWorkshops() {
         // Si hay menos de 3 reales, rellenamos con fallbacks para que se vea bien
         const missing = 3 - formatted.length;
         if (missing > 0) {
-          formatted.push(...fallbackWorkshops.slice(0, missing));
+          formatted.push(...(fallbackWorkshops as any[]).slice(0, missing));
         }
         setWorkshops(formatted);
       } else {

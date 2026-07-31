@@ -95,7 +95,7 @@ export default function TeamPage() {
   React.useEffect(() => {
     const supabase = new Proxy({}, {
   get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
     return () => supabase;
   }
 }) as any;
@@ -117,7 +117,7 @@ export default function TeamPage() {
           schema: 'public',
           table: 'organization_members',
         },
-        (payload) => {
+        (payload: any) => {
           const { user_id, role } = payload.new;
           setUsers((currentUsers) => 
             currentUsers.map(u => u.id === user_id ? { ...u, role } : u)
@@ -440,7 +440,7 @@ export default function TeamPage() {
                         <Avatar className="h-10 w-10 border border-border">
                           <AvatarImage src={user.avatar} />
                           <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                            {user.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0,2)}
+                            {user.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0,2)}
                           </AvatarFallback>
                         </Avatar>
                         <div>

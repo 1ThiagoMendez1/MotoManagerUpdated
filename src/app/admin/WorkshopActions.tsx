@@ -322,7 +322,7 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                                 reference={reference}
                                 customerEmail={ownerEmail}
                                 redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || 'https://www.motomanager.com.co'}/admin?payment=success&workshop=${workshop.id}`}
-                                label="Haz clic para cobrar la suscripción:"
+                                buttonLabel="Haz clic para cobrar la suscripción:"
                             />
                         </div>
                     </div>

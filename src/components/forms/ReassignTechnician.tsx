@@ -42,7 +42,7 @@ interface ReassignTechnicianProps {
 
 export function ReassignTechnician({ workOrder, technicians }: ReassignTechnicianProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedTechnician, setSelectedTechnician] = useState<string>(workOrder.technicianId || '');
+  const [selectedTechnician, setSelectedTechnician] = useState<string>(workOrder.technician?.id || '');
   // @ts-ignore
   const [state, formAction] = useActionState(reassignWorkOrderTechnician, undefined);
 

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import {
   Building2, User, Phone, MapPin, Hash, Mail,
   ArrowLeft, Save, CheckCircle2, AlertCircle, Loader2,
-  Wrench, City
+  Wrench
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getProfileData, updateProfileData } from '@/lib/actions/profile';
@@ -42,7 +42,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     getProfileData().then((d) => {
-      setData(d);
+      setData(d as any);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

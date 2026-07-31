@@ -4,7 +4,7 @@ import { requireWorkshop } from '@/lib/auth-server';
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ id: string }> | { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireWorkshop();

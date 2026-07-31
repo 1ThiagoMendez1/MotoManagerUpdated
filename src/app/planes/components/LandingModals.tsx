@@ -10,7 +10,7 @@ import { registerWorkshopPublic } from '../actions';
 
 // Separate inner component so useActionState resets when key changes
 function RegistrationForm({ plan, name, email, reference, info }: { plan: string; name: string; email: string; reference: string; info: { name: string; price: number; period: string } }) {
-  const [regState, regAction] = useActionState(registerWorkshopPublic, { error: '', details: {} });
+  const [regState, regAction] = useActionState(registerWorkshopPublic as any, { error: '', details: {} } as any);
   const formatCOPInner = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
 
@@ -165,9 +165,9 @@ function RegistrationForm({ plan, name, email, reference, info }: { plan: string
         {regState?.error && (
           <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/25 text-red-400 text-sm">
             {regState.error as string}
-            {regState.details && Object.keys(regState.details).length > 0 && (
+            {(regState as any).details && Object.keys((regState as any).details).length > 0 && (
               <ul className="mt-2 list-disc list-inside text-xs text-red-300/70">
-                {Object.entries(regState.details).map(([field, errors]: [string, any]) => (
+                {Object.entries((regState as any).details).map(([field, errors]: [string, any]) => (
                   <li key={field}>
                     <span className="capitalize font-medium">{field}:</span>{' '}
                     {Array.isArray(errors) ? errors.join(', ') : errors}

@@ -17,7 +17,7 @@ const REASON_LABELS: Record<string, string> = {
 export async function saveCancellationFeedback(reason: string) {
   try {
     const user = await requireWorkshop()
-    const supabase = createAdminClient();
+    const supabase = await createAdminClient();
 
     const { error } = await supabase
       .from('cancellation_feedback')

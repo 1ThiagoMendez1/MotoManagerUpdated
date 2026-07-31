@@ -119,11 +119,11 @@ export function SaveAndSendButton({
           return // Stop redirect
       }
 
-      if (result && result.mockMessage) {
+      if (result && (result as any).mockMessage) {
           setDialogState({
             isOpen: true,
             title: '¡Simulación de WhatsApp!',
-            message: `Destinatario: ${result.mockTo}\n\n${result.mockMessage}`,
+            message: `Destinatario: ${(result as any).mockTo}\n\n${(result as any).mockMessage}`,
             type: 'mock'
           })
           setIsSending(false)

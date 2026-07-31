@@ -1,6 +1,6 @@
 import { NewTicketForm } from './NewTicketForm';
 
-export default async function NewTicketPage({ params }: { params: { tenant: string } }) {
+export default async function NewTicketPage({ params }: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await params;
   
   return (

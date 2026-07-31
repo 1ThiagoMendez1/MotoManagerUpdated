@@ -65,9 +65,9 @@ export default async function RootLayout({
           {workshop && (
             <>
               <SubscriptionStatusAlert
-                status={workshop.subscription_status}
-                startDate={workshop.subscription_start_date}
-                endDate={workshop.subscription_end_date}
+                status={workshop.subscription_status as any}
+                startDate={(workshop as any).subscription_start_date}
+                endDate={(workshop as any).subscription_end_date}
               />
               <WelcomeModal
                 hasSeenWelcome={workshop.has_seen_welcome ?? false}

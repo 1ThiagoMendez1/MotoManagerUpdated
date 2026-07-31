@@ -6,7 +6,7 @@ import { TicketMessages } from '@/app/tickets/[id]/TicketMessages'; // Reusing t
 
 export const dynamic = 'force-dynamic';
 
-export default async function PublicTicketPage({ params }: { params: { tenant: string, id: string } }) {
+export default async function PublicTicketPage({ params }: { params: Promise<{ tenant: string, id: string }> }) {
   const { tenant, id } = await params;
   
   const ticket = await getPublicTicketById(id, tenant);

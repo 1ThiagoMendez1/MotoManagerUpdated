@@ -11,7 +11,7 @@ import { TicketMessages } from './TicketMessages';
 
 export const dynamic = 'force-dynamic';
 
-export default async function TicketDetailsPage({ params }: { params: { id: string } }) {
+export default async function TicketDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   await authorize('/tickets');
   const { id } = await params;
   
@@ -22,7 +22,8 @@ export default async function TicketDetailsPage({ params }: { params: { id: stri
   }
 
   // Fetch technicians to populate the assignment dropdown
-  const technicians = await getTechnicians();
+  const techniciansRes = await getTechnicians() as any;
+  const technicians = techniciansRes.items || techniciansRes;
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">

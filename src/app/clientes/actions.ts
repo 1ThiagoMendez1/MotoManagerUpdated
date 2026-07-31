@@ -122,7 +122,7 @@ export async function getCustomerPortalData(licensePlate: string) {
         scheduledEnd: apt.scheduled_end,
         status: apt.status,
         notes: apt.notes,
-        createdAt: apt.created_at,
+        createdAt: apt.created_at
       })),
     },
   };
@@ -165,7 +165,7 @@ export async function createCustomerAppointment(formData: FormData) {
   try {
     const currentUser = await getCurrentUserServer();
     if (currentUser) {
-      creatorId = currentUser.id;
+      creatorId = currentUser.userId;
     }
   } catch (e) {
     // Si no hay sesión (flujo de portal público), queda null

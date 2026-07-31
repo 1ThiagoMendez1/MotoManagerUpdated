@@ -10,9 +10,9 @@ import { redirect } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 
 interface TenantPageProps {
-  params: {
+  params: Promise<{
     tenant: string;
-  };
+  }>;
 }
 
 export default async function TenantPage({ params }: TenantPageProps) {

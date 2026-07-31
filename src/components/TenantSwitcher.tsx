@@ -9,7 +9,7 @@ import { Loader2, Building2, Check } from 'lucide-react';
 import { useTenant } from './TenantContextProvider';
 
 export default function TenantSwitcher({ initialWorkshopName }: { initialWorkshopName?: string | null }) {
-  const { currentTenant, tenants, isLoading, switchTenant } = useTenant();
+  const { currentTenant, tenants, isLoading, switchTenant } = useTenant() as { currentTenant: any, tenants: any[], isLoading: boolean, switchTenant: any };
   const [isSwitching, setIsSwitching] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(currentTenant?.id || null);
 

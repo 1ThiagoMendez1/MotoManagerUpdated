@@ -78,7 +78,7 @@ export async function updateAppointmentStatus(id: string, status: string) {
 
   const updateData: any = { status };
   if (status === 'confirmed') {
-    updateData.accepted_by = user.id;
+    updateData.accepted_by = user.userId;
   }
 
   const { error } = await supabase

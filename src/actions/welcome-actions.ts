@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 export async function dismissWelcomeMessage() {
     const supabase = new Proxy({}, {
   get: (target, prop) => {
-    if (prop === 'then') return (resolve) => resolve({ data: [], count: 0, error: null });
+    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
     return () => supabase;
   }
 }) as any;

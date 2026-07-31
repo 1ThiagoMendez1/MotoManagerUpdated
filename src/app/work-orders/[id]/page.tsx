@@ -38,7 +38,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   if (!workOrder) return <div className="text-foreground p-8 flex flex-col items-center justify-center min-h-[50vh]"><AlertCircle className="w-12 h-12 text-red-500 mb-4" /><h2 className="text-2xl font-bold">Orden no encontrada</h2></div>;
 
   const [inventory, { items: technicians }, reminders] = await Promise.all([
-    getInventory({ page: 1, limit: 100 }),
+    getInventory({ page: 1 } as any),
     getTechnicians(),
     getRemindersByMotorcycleId(workOrder.motorcycle.id)
   ]);
@@ -74,7 +74,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         <QuoteStatusWidget 
           workOrderId={workOrder.id} 
           initialStatus={(workOrder as any).quote_status} 
-          customerPhone={workOrder.motorcycle.customer.phone}
+          customerPhone={workOrder.motorcycle.customer.phone || undefined}
           customerName={workOrder.motorcycle.customer.name}
           workshopName={(workOrder as any).workshop?.name}
           orderNumber={workOrder.workOrderNumber?.toString()}
@@ -338,8 +338,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(workOrder.sales || []).flatMap(sale =>
-                  (sale.saleItems || []).map(item => (
+                {(workOrder.sales || []).flatMap((sale: any) =>
+                  (sale.saleItems || []).map((item: any) => (
                     <div key={item.id} className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-muted/30 hover:bg-muted/50 p-4 rounded-xl border border-border/50 transition-colors group">
                       <div className="flex-1">
                         <p className="font-medium text-foreground mb-1">{item.inventoryItem.name}</p>
@@ -367,7 +367,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         <div className="w-full sm:w-auto">
           <SaveAndSendButton 
             workOrderId={workOrder.id}
-            customerPhone={workOrder.motorcycle.customer.phone}
+            customerPhone={workOrder.motorcycle.customer.phone || undefined}
             customerName={workOrder.motorcycle.customer.name}
             workshopName={(workOrder as any).workshop?.name}
             orderNumber={workOrder.workOrderNumber?.toString()}

@@ -46,11 +46,11 @@ const ITEMS_PER_PAGE = 10;
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: {
+  searchParams: Promise<{
     query?: string;
     category?: string;
     page?: string;
-  };
+  }>;
 }) {
   const user = await authorize('/inventory');
   const resolvedSearchParams = await searchParams;
@@ -59,8 +59,8 @@ export default async function InventoryPage({
   const currentPage = Number(resolvedSearchParams.page) || 1;
 
   const [paginated, full] = await Promise.all([
-    getInventory({ query, category, page: currentPage, limit: ITEMS_PER_PAGE }),
-    getInventory({ limit: 1000 }), // Fetch all for export
+    getInventory({ query, category, page: currentPage, limit: ITEMS_PER_PAGE } as any),
+    getInventory({ limit: 1000 } as any), // Fetch all for export
   ]);
 
   const inventory = paginated.items;

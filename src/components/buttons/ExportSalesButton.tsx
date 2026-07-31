@@ -15,7 +15,7 @@ export function ExportSalesButton({ sales }: ExportSalesButtonProps) {
     const dataToExport = sales.map((sale) => {
         let details = '';
         if (sale.workOrderId && sale.workOrder) {
-            details = sale.workOrder.issueDescription;
+            details = sale.workOrder.issueDescription || '';
         } else if (sale.items && sale.items.length > 0) {
             // This is a simplification. In a real app, you'd fetch item names.
             details = sale.items.map(item => `ID:${item.inventoryItemId} (x${item.quantity})`).join(', ');

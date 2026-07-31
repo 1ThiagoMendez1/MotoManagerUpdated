@@ -32,7 +32,7 @@ export function TechnicianDetails({ technician }: TechnicianDetailsProps) {
         <DialogHeader>
             <div className="flex flex-col items-center text-center">
                  <Avatar className="h-24 w-24 border-2 border-primary mb-4">
-                    <AvatarImage src={technician.avatarUrl} alt={technician.name} data-ai-hint="man woman" />
+                    <AvatarImage src={technician.avatarUrl || undefined} alt={technician.name} data-ai-hint="man woman" />
                     <AvatarFallback className="text-4xl">{technician.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <DialogTitle className="text-2xl text-foreground">{technician.name}</DialogTitle>
