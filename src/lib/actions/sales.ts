@@ -443,7 +443,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             depositAmount: parsedDeposit,
             remainingBalance: parsedDeposit > 0 ? Math.max(0, total - parsedDeposit) : undefined,
             total: total,
-            paymentMethod: mapPaymentMethodToUi(dbPaymentMethod),
+            paymentMethod: data.paymentMethod === 'Wompi' ? 'Wompi' : mapPaymentMethodToUi(dbPaymentMethod),
             workOrderId: wo?.order_number,
             customerName: formattedCustomer ? `${formattedCustomer.first_name} ${formattedCustomer.last_name}`.trim() : undefined,
             workshopName: workshopName,
@@ -676,7 +676,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                 discountPercentage: data.discountPercentage,
                 discountAmount: discountAmount,
                 total: sale.total,
-                paymentMethod: mapPaymentMethodToUi(sale.payment_method),
+                paymentMethod: data.paymentMethod === 'Wompi' ? 'Wompi' : mapPaymentMethodToUi(sale.payment_method),
                 customerName: finalCustomerName || 'Cliente de Mostrador',
                 workshopName: workshopName,
                 items: data.items || []
@@ -693,7 +693,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
             discountPercentage: data.discountPercentage,
             discountAmount: discountAmount,
             total: fullSale.total,
-            paymentMethod: mapPaymentMethodToUi(fullSale.payment_method),
+            paymentMethod: data.paymentMethod === 'Wompi' ? 'Wompi' : mapPaymentMethodToUi(fullSale.payment_method),
             customerName: customer ? `${customer.first_name} ${customer.last_name}`.trim() : 'Cliente de Mostrador',
             workshopName: workshopName,
             items: fullSale.sale_items?.map((item: any) => ({

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CalendarIcon, Loader2, Wrench, PlusCircle, Trash2, Search } from 'lucide-react';
+import { CalendarIcon, Loader2, Wrench, PlusCircle, Trash2, Search, Banknote, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -55,7 +55,7 @@ const saleItemSchema = z.object({
 const formSchema = z.object({
   workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
   laborCost: z.coerce.number().min(0, "El costo no puede ser negativo."),
-  paymentMethod: z.enum(['DaviPlata', 'Nequi', 'Efectivo', 'Tarjeta', 'Addi', 'Otros'], {
+  paymentMethod: z.enum(['Efectivo', 'Wompi'], {
     required_error: "Se requiere seleccionar un medio de pago.",
   }),
   date: z.date({
@@ -227,6 +227,51 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
     const result = await createServiceSale(null, formData);
 
     if (result.success && result.sale) {
+      if (values.paymentMethod === 'Wompi') {
+        toast({
+          title: "Redirigiendo a Wompi...",
+          description: "Por favor espera mientras abrimos la pasarela de pagos.",
+        });
+        
+        const amountInCents = Math.round(result.sale.total * 100);
+        const reference = `SALE-${result.sale.id.substring(0, 8)}-${Date.now()}`;
+        const redirectUrl = `${window.location.origin}/sales?payment=success&sale=${result.sale.id}`;
+        
+        try {
+          const res = await fetch('/api/wompi/sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference, amountInCents, currency: 'COP' }),
+          });
+          
+          if (res.ok) {
+            const signData = await res.json();
+            const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
+            
+            if (publicKey) {
+              const params = new URLSearchParams({
+                'public-key': publicKey,
+                'currency': signData.currency ?? 'COP',
+                'amount-in-cents': String(signData.amountInCents ?? amountInCents),
+                'reference': signData.reference ?? reference,
+                'signature:integrity': signData.signature,
+                'redirect-url': redirectUrl
+              });
+
+              window.location.href = `https://checkout.wompi.co/p/?${params.toString()}`;
+              return;
+            }
+          }
+          toast({
+            title: "Error Wompi",
+            description: "No se pudo firmar la transacción. Intenta pagar desde la tabla de ventas.",
+            variant: "destructive",
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       toast({
         title: "Éxito",
         description: "Nueva venta registrada correctamente.",
@@ -557,22 +602,33 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                       name="paymentMethod"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Medio de Pago</FormLabel>
+                          <FormLabel>Método de Pago</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger className="bg-background border-input h-12">
-                                <SelectValue placeholder="Selecciona medio de pago" />
+                                <SelectValue placeholder="Selecciona el medio de pago" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Efectivo">Efectivo</SelectItem>
-                              <SelectItem value="Tarjeta">Tarjeta</SelectItem>
-                              <SelectItem value="DaviPlata">DaviPlata</SelectItem>
-                              <SelectItem value="Nequi">Nequi</SelectItem>
-                              <SelectItem value="Addi">Addi</SelectItem>
-                              <SelectItem value="Otros">Otros</SelectItem>
+                              <SelectItem value="Efectivo">
+                                <div className="flex items-center gap-2">
+                                  <Banknote className="w-4 h-4 text-green-500" />
+                                  <span>Efectivo</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Wompi">
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="w-4 h-4 text-blue-500" />
+                                  <span>Wompi (Nequi, PSE, Tarjeta...)</span>
+                                </div>
+                              </SelectItem>
                             </SelectContent>
                           </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {field.value === 'Wompi' 
+                              ? "Selecciona esta opción si el cliente pagará usando el link de cobro de Wompi." 
+                              : "Registro interno del método de pago utilizado."}
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -639,7 +695,14 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                   </DialogTrigger>
                   <Button type="submit" disabled={isSubmitting} className="px-8 shadow-lg shadow-primary/20">
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Registrar Venta
+                    {form.watch("paymentMethod") === 'Wompi' ? (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Pagar con Wompi
+                      </>
+                    ) : (
+                      'Registrar Venta'
+                    )}
                   </Button>
                 </div>
               </div>

@@ -321,8 +321,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
 
   let query = supabase.from('sales')
     .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, motorcycles(*, customers(*)))', { count: 'exact' })
-    .eq('organization_id', user.workshopId)
-    .neq('status', 'pending');
+    .eq('organization_id', user.workshopId);
     
   if (params.type === 'direct') {
     query = query.is('work_order_id', null);
@@ -430,6 +429,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
       date: s.created_at,
       total: Number(s.total) || 0,
       subtotal,
+      status: s.status,
       discountPercentage,
       discountTotal,
       laborCost,

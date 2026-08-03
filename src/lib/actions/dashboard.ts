@@ -8,16 +8,22 @@ export async function getDashboardData() {
 
   // 1. Ingresos del Mes (Revenue this month)
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const year = now.getFullYear();
+  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+  const startOfMonthStr = `${year}-${monthStr}-01`;
+  
   const { data: salesThisMonth, error: e1 } = await supabase
     .from('sales')
-    .select('total')
+    .select('total, status')
     .eq('organization_id', user.workshopId)
-    .gte('created_at', startOfMonth)
+    .gte('created_at', startOfMonthStr)
 
   if (e1) console.error('Dashboard Error (sales):', e1)
 
-  const ingresosMes = (salesThisMonth || []).reduce((sum, sale) => sum + Number(sale.total), 0)
+  // Sumar solo las ventas pagadas o completadas
+  const ingresosMes = (salesThisMonth || [])
+    .filter(sale => sale.status === 'paid' || sale.status === 'completed')
+    .reduce((sum, sale) => sum + Number(sale.total), 0)
 
   // 2. Motos en Taller & 3. Órdenes Activas
   const { data: wosData, error: e2 } = await supabase
@@ -52,17 +58,28 @@ export async function getDashboardData() {
   for (let i = 6; i >= 0; i--) {
     const d = new Date(today)
     d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().split('T')[0]
+    
+    const dYear = d.getFullYear();
+    const dMonth = String(d.getMonth() + 1).padStart(2, '0');
+    const dDay = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${dYear}-${dMonth}-${dDay}`;
+    
+    // Para el .lt (less than) usamos el día siguiente
+    const nextD = new Date(d);
+    nextD.setDate(nextD.getDate() + 1);
+    const nextDateStr = `${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`;
     
     // sum sales for this date
     const { data: dailySales } = await supabase
       .from('sales')
-      .select('total')
+      .select('total, status')
       .eq('organization_id', user.workshopId)
-      .gte('created_at', `${dateStr}T00:00:00.000Z`)
-      .lt('created_at', `${dateStr}T23:59:59.999Z`)
+      .gte('created_at', dateStr)
+      .lt('created_at', nextDateStr)
       
-    const dayTotal = (dailySales || []).reduce((sum, sale) => sum + Number(sale.total), 0)
+    const dayTotal = (dailySales || [])
+      .filter(sale => sale.status === 'paid' || sale.status === 'completed')
+      .reduce((sum, sale) => sum + Number(sale.total), 0)
     
     revenueData.push({
       name: d.toLocaleDateString('es-CO', { weekday: 'short' }),

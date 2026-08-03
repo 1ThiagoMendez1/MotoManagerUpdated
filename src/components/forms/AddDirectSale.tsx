@@ -203,19 +203,15 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
     const result = await createDirectSale(null, formData);
 
     if (result.success && result.sale) {
-      toast({
-        title: "Éxito",
-        description: "Venta directa registrada correctamente.",
-      });
-      setIsOpen(false);
-      form.reset();
-      setReceiptData(result.sale);
-      setReceiptDialogOpen(true);
-      
-      // Si el método de pago es Wompi, redirigir a la pasarela en una nueva pestaña
       if (values.paymentMethod === 'Wompi') {
+        toast({
+          title: "Redirigiendo a Wompi...",
+          description: "Por favor espera mientras abrimos la pasarela de pagos.",
+        });
+        
         const amountInCents = Math.round(result.sale.total * 100);
         const reference = `SALE-${result.sale.id.substring(0, 8)}-${Date.now()}`;
+        const redirectUrl = `${window.location.origin}/sales?payment=success&sale=${result.sale.id}`;
         
         try {
           const res = await fetch('/api/wompi/sign', {
@@ -226,57 +222,44 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
           
           if (res.ok) {
             const signData = await res.json();
-            const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY || '';
+            const publicKey = process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY;
             
             if (publicKey) {
-              const openWidget = () => {
-                const config: any = {
-                  currency: signData.currency ?? 'COP',
-                  amountInCents: Number(signData.amountInCents ?? amountInCents),
-                  reference: signData.reference ?? reference,
-                  publicKey: publicKey,
-                  signature: { integrity: signData.signature }
-                };
+              const params = new URLSearchParams({
+                'public-key': publicKey,
+                'currency': signData.currency ?? 'COP',
+                'amount-in-cents': String(signData.amountInCents ?? amountInCents),
+                'reference': signData.reference ?? reference,
+                'signature:integrity': signData.signature,
+                'redirect-url': redirectUrl
+              });
 
-                if (values.customerName) {
-                  config.customerData = { fullName: values.customerName };
-                }
-
-                const checkout = new (window as any).WidgetCheckout(config);
-                
-                checkout.open((result: any) => {
-                  console.log('[Wompi AddDirectSale] Result:', result);
-                });
-              };
-              
-              if ((window as any).WidgetCheckout) {
-                openWidget();
-              } else {
-                const script = document.createElement('script');
-                script.src = 'https://checkout.wompi.co/widget.js';
-                script.async = true;
-                script.onload = openWidget;
-                script.onerror = () => {
-                  toast({
-                    title: "Aviso Wompi",
-                    description: "Error al cargar la pasarela de pagos.",
-                    variant: "destructive",
-                  });
-                };
-                document.body.appendChild(script);
+              if (values.customerName) {
+                params.append('customer-data:full-name', values.customerName);
               }
+
+              window.location.href = `https://checkout.wompi.co/p/?${params.toString()}`;
+              return;
             }
           }
-        } catch (e) {
-          console.error("Error al redirigir a Wompi", e);
           toast({
-            title: "Aviso Wompi",
-            description: "No se pudo abrir automáticamente la pasarela de pagos.",
+            title: "Error Wompi",
+            description: "No se pudo firmar la transacción. Intenta pagar desde la tabla de ventas.",
             variant: "destructive",
           });
+        } catch (e) {
+          console.error(e);
         }
       }
 
+      toast({
+        title: "Éxito",
+        description: "Venta directa registrada correctamente.",
+      });
+      setIsOpen(false);
+      form.reset();
+      setReceiptData(result.sale);
+      setReceiptDialogOpen(true);
     } else {
       console.error("Direct Sale Error Result:", result);
       toast({
@@ -640,7 +623,14 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                   </DialogTrigger>
                   <Button type="submit" disabled={isSubmitting || watchItems.length === 0} className="px-8 shadow-lg shadow-primary/20">
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirmar Pagar
+                    {form.watch("paymentMethod") === 'Wompi' ? (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Pagar con Wompi
+                      </>
+                    ) : (
+                      'Confirmar Pagar'
+                    )}
                   </Button>
                 </div>
               </div>

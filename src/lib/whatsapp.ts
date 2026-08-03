@@ -1276,89 +1276,143 @@ export async function sendMotoIngresoNotification(
 ) {
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const evolutionApiUrl = process.env.EVOLUTION_API_URL;
+  const evolutionApiKey = process.env.EVOLUTION_API_KEY;
+  const whatsappInstance = process.env.EVOLUTION_INSTANCE_NAME;
 
-  if (!wpToken || !wpPhoneId) {
-    console.log('WhatsApp Cloud API no configurada para ingreso de moto.');
-    return { success: false, error: 'WhatsApp API no configurada' };
-  }
+  const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
 
-  try {
-    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
-
-    let dateStr = '';
-    if (intakeDate instanceof Date) {
-      const day = String(intakeDate.getDate()).padStart(2, '0');
-      const month = String(intakeDate.getMonth() + 1).padStart(2, '0');
-      const year = intakeDate.getFullYear();
-      const hours = String(intakeDate.getHours()).padStart(2, '0');
-      const minutes = String(intakeDate.getMinutes()).padStart(2, '0');
-      dateStr = `${day}-${month}-${year} ${hours}:${minutes}`;
-    } else {
-      try {
-        const dateObj = new Date(intakeDate);
-        if (!isNaN(dateObj.getTime())) {
-          const day = String(dateObj.getDate()).padStart(2, '0');
-          const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-          const year = dateObj.getFullYear();
-          const hours = String(dateObj.getHours()).padStart(2, '0');
-          const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-          dateStr = `${day}-${month}-${year} ${hours}:${minutes}`;
-        } else {
-          dateStr = intakeDate;
-        }
-      } catch {
+  let dateStr = '';
+  if (intakeDate instanceof Date) {
+    const day = String(intakeDate.getDate()).padStart(2, '0');
+    const month = String(intakeDate.getMonth() + 1).padStart(2, '0');
+    const year = intakeDate.getFullYear();
+    const hours = String(intakeDate.getHours()).padStart(2, '0');
+    const minutes = String(intakeDate.getMinutes()).padStart(2, '0');
+    dateStr = `${day}-${month}-${year} ${hours}:${minutes}`;
+  } else {
+    try {
+      const dateObj = new Date(intakeDate);
+      if (!isNaN(dateObj.getTime())) {
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const year = dateObj.getFullYear();
+        const hours = String(dateObj.getHours()).padStart(2, '0');
+        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+        dateStr = `${day}-${month}-${year} ${hours}:${minutes}`;
+      } else {
         dateStr = intakeDate;
       }
+    } catch {
+      dateStr = intakeDate;
     }
-
-    const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to: formattedPhone,
-        type: 'template',
-        template: {
-          name: 'plantilla_ingreso_moto',
-          language: {
-            code: 'es_CO'
-          },
-          components: [
-            {
-              type: 'header',
-              parameters: [
-                { type: 'text', text: `${brand} ${model}`.trim() }  // {{1}} of header (e.g. brand + model)
-              ]
-            },
-            {
-              type: 'body',
-              parameters: [
-                { type: 'text', text: customerName }, // {{1}}
-                { type: 'text', text: workshopName }, // {{2}}
-                { type: 'text', text: brand },        // {{3}}
-                { type: 'text', text: model },        // {{4}}
-                { type: 'text', text: plate },        // {{5}}
-                { type: 'text', text: dateStr },      // {{6}}
-                { type: 'text', text: orderNumber },  // {{7}}
-                { type: 'text', text: workshopName }  // {{8}}
-              ]
-            }
-          ]
-        }
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${wpToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    console.log('✅ WhatsApp moto ingreso template sent successfully:', response.data);
-    return { success: true, data: response.data };
-  } catch (error: any) {
-    console.error('❌ Error sending WhatsApp moto ingreso notification via Meta API:', error.response?.data || error.message);
-    return { success: false, error: error.response?.data || error.message };
   }
+
+  let sentSuccessfully = false;
+  let successResponse = null;
+  let lastMetaError = null;
+
+  if (wpToken && wpPhoneId) {
+    try {
+      const response = await axios.post(
+        `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'template',
+          template: {
+            name: 'plantilla_ingreso_moto',
+            language: {
+              code: 'es_CO'
+            },
+            components: [
+              {
+                type: 'header',
+                parameters: [
+                  { type: 'text', text: `${brand} ${model}`.trim() }
+                ]
+              },
+              {
+                type: 'body',
+                parameters: [
+                  { type: 'text', text: customerName },
+                  { type: 'text', text: workshopName },
+                  { type: 'text', text: brand },
+                  { type: 'text', text: model },
+                  { type: 'text', text: plate },
+                  { type: 'text', text: dateStr },
+                  { type: 'text', text: orderNumber },
+                  { type: 'text', text: workshopName }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${wpToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      console.log('✅ WhatsApp moto ingreso template sent successfully via Meta:', response.data);
+      successResponse = response.data;
+      sentSuccessfully = true;
+    } catch (error: any) {
+      lastMetaError = error;
+      console.error('❌ Error sending WhatsApp moto ingreso notification via Meta API:', error.response?.data || error.message);
+    }
+  }
+
+  if (sentSuccessfully) {
+    return { success: true, provider: 'meta', data: successResponse };
+  }
+
+  // Fallback to Evolution API
+  if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
+    try {
+      const message = `🔧 *Ingreso a Revisión - ${workshopName}*
+      
+¡Hola ${customerName}!
+
+Te confirmamos que tu motocicleta ha ingresado exitosamente a nuestro taller.
+
+📋 *Detalles del Ingreso:*
+Vehículo: ${brand} ${model}
+Placa: ${plate}
+Fecha: ${dateStr}
+Orden de trabajo: #${orderNumber}
+
+Estaremos revisando tu motocicleta y te notificaremos cuando el diagnóstico esté listo.
+
+Gracias por confiar en *${workshopName}*.
+🏍️ MotoManager`;
+
+      const response = await axios.post(
+        `${evolutionApiUrl}/message/sendText/${whatsappInstance}`,
+        {
+          number: formattedPhone,
+          text: message,
+          delay: 1000
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          }
+        }
+      );
+
+      console.log('✅ WhatsApp moto ingreso notification sent via Evolution API fallback:', response.data);
+      return { success: true, provider: 'evolution', data: response.data };
+    } catch (error: any) {
+      console.error('❌ Error sending WhatsApp moto ingreso notification via Evolution API fallback:', error.response?.data || error.message);
+      return { success: false, error: error.response?.data || error.message };
+    }
+  }
+
+  const finalErrorMsg = lastMetaError?.response?.data?.error?.message || lastMetaError?.message || 'Ningún servicio de WhatsApp está configurado o ambos fallaron.';
+  return { success: false, error: finalErrorMsg };
 }
 
 export async function sendDiagnosticadoReparadoNotification(

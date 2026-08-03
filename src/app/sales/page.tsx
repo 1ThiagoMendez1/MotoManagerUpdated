@@ -182,6 +182,7 @@ export default async function SalesPage({
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Cliente / Vehículo</TableHead>
                     <TableHead className="hidden md:table-cell text-foreground/90 text-xs sm:text-sm">Detalles</TableHead>
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Fecha</TableHead>
+                    <TableHead className="text-foreground/90 text-xs sm:text-sm">Estado</TableHead>
                     <TableHead className="text-right text-foreground/90 text-xs sm:text-sm">Total</TableHead>
                     <TableHead className="text-center text-foreground/90 text-xs sm:text-sm">Detalle</TableHead>
                   </TableRow>
@@ -213,6 +214,13 @@ export default async function SalesPage({
                         {getSaleDetails(sale)}
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm">{format(new Date(sale.date), 'yyyy-MM-dd')}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">
+                        {sale.status === 'pending' ? (
+                          <Badge variant="destructive" className="bg-amber-500 hover:bg-amber-600 text-white border-transparent">Pendiente</Badge>
+                        ) : (
+                          <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-600 text-white border-transparent">Pagada</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-medium text-xs sm:text-sm">{formatCurrency(sale.total)}</TableCell>
                       <TableCell className="text-center">
                         <SaleDetails sale={sale} inventoryItems={inventoryItems} />

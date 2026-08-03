@@ -101,6 +101,7 @@ export type Sale = {
   discountPercentage?: number;
   discountTotal?: number;
   laborCost?: number;
+  status?: string;
 };
 
 export type Reminder = {
