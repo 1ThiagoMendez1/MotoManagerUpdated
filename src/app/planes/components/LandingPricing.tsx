@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { CheckCircle2, CreditCard, Zap, Lock, Shield, ArrowRight, Phone, Gift, Star } from 'lucide-react';
 
 function formatCOP(n: number) {
@@ -13,10 +14,20 @@ interface Props {
 }
 
 export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes }: Props) {
-  // Sort plans by months
-  const sortedPlans = [...plans].sort((a, b) => a.months - b.months);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'biannual' | 'yearly'>('monthly');
+
+  // Sort plans by base price
+  const sortedPlans = [...plans].sort((a, b) => a.price - b.price);
   // Sort features by order_index
   const sortedFeatures = [...features].sort((a, b) => a.order_index - b.order_index);
+
+  const getCycleInfo = (cycle: string) => {
+    if (cycle === 'biannual') return { months: 6, discount: 0.9, label: '/ 6 meses' };
+    if (cycle === 'yearly') return { months: 12, discount: 0.8, label: '/ año' };
+    return { months: 1, discount: 1, label: '/ mes' };
+  };
+
+  const cycleInfo = getCycleInfo(billingCycle);
 
   return (
     <section id="planes" className="py-24 px-4 scroll-mt-20 relative">
@@ -38,23 +49,57 @@ export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes
           </p>
         </div>
 
+        {/* Billing Cycle Toggle */}
+        <div className="flex justify-center">
+          <div className="bg-muted/50 p-1.5 rounded-full inline-flex border border-border/50 backdrop-blur-sm">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                billingCycle === 'monthly' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Mensual
+            </button>
+            <button
+              onClick={() => setBillingCycle('biannual')}
+              className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                billingCycle === 'biannual' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Semestral <span className="ml-1 text-[10px] bg-green-500/20 text-green-500 px-1.5 py-0.5 rounded-full">-10%</span>
+            </button>
+            <button
+              onClick={() => setBillingCycle('yearly')}
+              className={`px-6 py-2 rounded-full text-sm font-bold transition-all relative ${
+                billingCycle === 'yearly' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Anual <span className="ml-1 text-[10px] bg-red-500/20 text-red-500 px-1.5 py-0.5 rounded-full">-20%</span>
+              {billingCycle !== 'yearly' && (
+                <span className="absolute -top-3 -right-2 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Pricing cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-center">
           {sortedPlans.map(plan => {
-            const isAnnual = plan.id === 'yearly';
-            const isMonthly = plan.id === 'monthly';
-            const pricePerMonth = plan.months > 0 ? plan.price / plan.months : plan.price;
-            
-            // Decoy calculation (making annual look super cheap compared to monthly x 12)
-            const monthlyPlan = sortedPlans.find(p => p.id === 'monthly');
-            const monthlyPrice = monthlyPlan ? monthlyPlan.price : 20000; // fallback
-            const normalAnnualPrice = monthlyPrice * plan.months; 
+            const isFull = plan.id === 'full';
+            const basePrice = plan.price;
+            const finalPrice = Math.round(basePrice * cycleInfo.months * cycleInfo.discount);
+            const pricePerMonth = finalPrice / cycleInfo.months;
+            const normalPriceWithoutDiscount = basePrice * cycleInfo.months;
+            const hasDiscount = cycleInfo.months > 1;
 
             return (
               <div
                 key={plan.id}
                 className={`relative flex flex-col gap-6 rounded-3xl transition-all duration-300 ${
-                  isAnnual 
+                  isFull 
                     ? 'bg-gradient-to-b from-gray-900 to-black border-2 border-red-500 shadow-[0_0_50px_rgba(239,68,68,0.3)] scale-105 z-10 p-8' 
                     : 'bg-card/50 border border-border/50 p-7 hover:border-primary/30 hover:bg-card z-0'
                 }`}
@@ -62,79 +107,98 @@ export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes
                 {plan.badge && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                     <span className={`px-4 py-1.5 rounded-full text-xs font-black text-white whitespace-nowrap shadow-lg flex items-center gap-1 ${
-                      isAnnual ? 'bg-gradient-to-r from-red-600 to-orange-500 ring-4 ring-background animate-bounce' : 'bg-gradient-to-r from-blue-600 to-blue-500'
+                      isFull ? 'bg-gradient-to-r from-red-600 to-orange-500 ring-4 ring-background animate-bounce' : 'bg-gradient-to-r from-blue-600 to-blue-500'
                     }`}>
-                      {isAnnual && <Star className="w-3 h-3 fill-white" />}
+                      {isFull && <Star className="w-3 h-3 fill-white" />}
                       {plan.badge}
                     </span>
                   </div>
                 )}
 
                 <div className="space-y-2 text-center">
-                  <h3 className={`text-2xl font-black ${isAnnual ? 'text-white' : 'text-foreground'}`}>{plan.name}</h3>
-                  <p className={`text-sm font-medium ${isAnnual ? 'text-gray-400' : 'text-muted-foreground'}`}>{plan.description}</p>
+                  <h3 className={`text-2xl font-black ${isFull ? 'text-white' : 'text-foreground'}`}>{plan.name}</h3>
+                  <p className={`text-sm font-medium ${isFull ? 'text-gray-400' : 'text-muted-foreground'}`}>{plan.description}</p>
                 </div>
 
                 <div className="text-center py-4 border-y border-white/10">
-                  {/* Price Anchoring for Annual */}
-                  {isAnnual && (
+                  {/* Price Anchoring for Discounts */}
+                  {hasDiscount && (
                      <div className="flex justify-center items-center gap-2 mb-1 opacity-70">
                         <span className="text-sm font-bold text-red-400 line-through">
-                          {formatCOP(normalAnnualPrice)}
+                          {formatCOP(normalPriceWithoutDiscount)}
                         </span>
                         <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold">
-                          Ahorras {formatCOP(normalAnnualPrice - plan.price)}
+                          Ahorras {formatCOP(normalPriceWithoutDiscount - finalPrice)}
                         </span>
                      </div>
                   )}
 
                   <div className="flex justify-center items-end gap-1">
-                    <span className={`text-5xl font-black tracking-tighter ${isAnnual ? 'text-white' : 'text-foreground'}`}>
-                      {formatCOP(plan.price)}
+                    <span className={`text-5xl font-black tracking-tighter ${isFull ? 'text-white' : 'text-foreground'}`}>
+                      {formatCOP(finalPrice)}
                     </span>
                   </div>
-                  <p className={`text-sm mt-1 font-bold ${plan.accent_text}`}>{plan.period}</p>
+                  <p className={`text-sm mt-1 font-bold ${plan.accent_text || 'text-primary'}`}>{cycleInfo.label}</p>
                   
-                  {plan.months > 1 && (
-                    <p className={`text-sm mt-2 font-semibold ${isAnnual ? 'text-green-400' : 'text-muted-foreground'}`}>
+                  {hasDiscount && (
+                    <p className={`text-sm mt-2 font-semibold ${isFull ? 'text-green-400' : 'text-muted-foreground'}`}>
                       Equivale a solo {formatCOP(Math.round(pricePerMonth))}/mes
                     </p>
                   )}
                 </div>
 
-                {isAnnual && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-3 items-start">
+                {isFull && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-3 items-start mt-4">
                     <Gift className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-red-200 leading-tight">
-                      <strong>BONO HOY:</strong> Soporte prioritario VIP por WhatsApp y migración de base de datos inicial GRATIS.
+                      <strong>BONO FULL TALLER:</strong> Soporte prioritario VIP y todas las funciones ilimitadas.
                     </p>
                   </div>
                 )}
 
                 <ul className="space-y-3 flex-1 mt-4">
-                  {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).map((f, i) => (
-                    <li key={f.id} className="flex items-start gap-3 text-sm">
-                      <CheckCircle2 className={`h-5 w-5 shrink-0 ${isAnnual ? 'text-red-500' : 'text-green-500'}`} />
-                      <span className={`font-medium ${isAnnual ? 'text-gray-300' : 'text-foreground/80'}`}>{f.feature_name}</span>
-                    </li>
-                  ))}
+                  {sortedFeatures.map((f, i) => {
+                    const value = f[`included_in_${plan.id}`];
+                    const isIncluded = value && value !== 'No';
+                    const isYes = value === 'Sí';
+                    
+                    return (
+                      <li key={f.id} className="flex items-start gap-3 text-sm">
+                        {isIncluded ? (
+                          <CheckCircle2 className={`h-5 w-5 shrink-0 ${plan.id === 'full' ? 'text-red-500' : 'text-green-500'}`} />
+                        ) : (
+                          <div className="h-5 w-5 shrink-0 flex items-center justify-center">
+                            <span className="text-red-500 font-bold text-lg leading-none">×</span>
+                          </div>
+                        )}
+                        <span className={`font-medium flex-1 ${plan.id === 'full' && isIncluded ? 'text-gray-300' : 'text-foreground/80'} ${!isIncluded ? 'text-muted-foreground opacity-50 line-through' : ''}`}>
+                          {f.feature_name}
+                          {!isYes && isIncluded && (
+                            <span className="ml-2 inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border">
+                              {value}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
 
                 <button
-                  onClick={() => onSelectPlan(plan)}
+                  onClick={() => onSelectPlan({ ...plan, price: finalPrice, amountInCents: finalPrice * 100, billingCycle, period: cycleInfo.label })}
                   className={`w-full flex items-center justify-center gap-2 font-extrabold h-14 rounded-xl shadow-lg transition-all hover:scale-105 text-base mt-4 ${
-                    isAnnual 
+                    isFull 
                       ? 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-red-500/25' 
-                      : `bg-gradient-to-r ${plan.btn} text-primary-foreground`
+                      : `bg-gradient-to-r ${plan.btn || 'from-blue-600 to-indigo-600'} text-primary-foreground`
                   }`}
                 >
-                  {isAnnual ? 'APROVECHAR OFERTA' : `Elegir ${plan.name}`}
+                  {isFull ? 'APROVECHAR FULL TALLER' : `Elegir ${plan.name}`}
                   <ArrowRight className="h-5 w-5" />
                 </button>
                 
-                {isAnnual && (
+                {hasDiscount && (
                   <p className="text-[10px] text-center text-gray-500 mt-2">
-                    Precio promocional válido únicamente por hoy.
+                    Descuento aplicado por pago anticipado.
                   </p>
                 )}
               </div>

@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { ai } from '@/ai/genkit';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { getPlanLimits } from '@/lib/constants/plans';
 
 const evolutionApiUrl = process.env.EVOLUTION_API_URL;
 const evolutionApiKey = process.env.EVOLUTION_API_KEY;
@@ -2333,4 +2335,49 @@ export default {
   sendVentaPorOrdenNotification,
   sendDirectSalePaidNotification,
   sendCitaConfirmadaNotification
+}
+
+export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<boolean> {
+  if (!workshopId) return true;
+
+  try {
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: org, error } = await supabaseAdmin
+      .from('organizations')
+      .select('settings')
+      .eq('id', workshopId)
+      .single();
+
+    if (error || !org) return true;
+
+    const settings = typeof org.settings === 'string' ? JSON.parse(org.settings) : (org.settings || {});
+    const subPlan = settings.sub_plan || 'basic';
+    const planLimits = getPlanLimits(subPlan);
+
+    if (planLimits.whatsapp === 'unlimited') return true;
+
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const msgCountKey = `whatsapp_count_${currentMonth}`;
+    const currentCount = settings[msgCountKey] || 0;
+
+    if (currentCount >= (planLimits.whatsapp as number)) {
+      console.warn(`WhatsApp limit reached for workshop ${workshopId}. Plan: ${subPlan}, Limit: ${planLimits.whatsapp}`);
+      return false;
+    }
+
+    settings[msgCountKey] = currentCount + 1;
+    await supabaseAdmin
+      .from('organizations')
+      .update({ settings })
+      .eq('id', workshopId);
+
+    return true;
+  } catch (err) {
+    console.error('Error checking WhatsApp limit:', err);
+    return true; // allow by default if db fails
+  }
 };

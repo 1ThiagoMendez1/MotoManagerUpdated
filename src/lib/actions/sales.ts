@@ -3,7 +3,7 @@ import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { sendServiceSaleNotification, sendSaleNotification, sendVentaPorOrdenNotification, sendDirectSalePaidNotification } from '@/lib/whatsapp';
+import { sendServiceSaleNotification, sendSaleNotification, sendVentaPorOrdenNotification, sendDirectSalePaidNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // --- Schemas ---
@@ -387,39 +387,43 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         console.log(`[Sales Action] Checking notification conditions. Customer Phone: ${formattedCustomer?.phone || 'NOT FOUND'}, Payment Method: ${data.paymentMethod}`);
         if (formattedCustomer?.phone && data.paymentMethod !== 'Wompi') {
             try {
-                const firstName = formattedCustomer.first_name || '';
-                const lastName = formattedCustomer.last_name || '';
-                const customerFullName = formattedCustomer ? `${firstName} ${lastName}`.trim() || 'Cliente' : 'Cliente';
-                
-                console.log(`[Sales Action] Sending service sale notification to ${customerFullName} (${formattedCustomer.phone})...`);
-                const notifyResult = await sendServiceSaleNotification(
-                    formattedCustomer.phone,
-                    customerFullName,
-                    wo?.order_number || saleNumber,
-                    total,
-                    {
-                        make: fomattedMotorcycle?.brand || 'Moto',
-                        model: fomattedMotorcycle?.model || '',
-                        plate: fomattedMotorcycle?.license_plate || 'Sin Placa'
-                    },
-                    formattedTech ? `${formattedTech.first_name} ${formattedTech.last_name}`.trim() : 'Técnico',
-                    data.laborCost > 0 ? data.laborCost : undefined,
-                    formattedItems,
-                    subtotal,
-                    data.discountPercentage,
-                    discountAmount,
-                    workshopName
-                );
-                
-                console.log('[Sales Action] Notification result:', JSON.stringify(notifyResult, null, 2));
-                
-                const fs = require('fs');
-                fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
-                    date: new Date().toISOString(),
-                    customerPhone: formattedCustomer.phone,
-                    result: notifyResult
-                }, null, 2));
-
+                const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+                if (canSend) {
+                    const firstName = formattedCustomer.first_name || '';
+                    const lastName = formattedCustomer.last_name || '';
+                    const customerFullName = formattedCustomer ? `${firstName} ${lastName}`.trim() || 'Cliente' : 'Cliente';
+                    
+                    console.log(`[Sales Action] Sending service sale notification to ${customerFullName} (${formattedCustomer.phone})...`);
+                    const notifyResult = await sendServiceSaleNotification(
+                        formattedCustomer.phone,
+                        customerFullName,
+                        wo?.order_number || saleNumber,
+                        total,
+                        {
+                            make: fomattedMotorcycle?.brand || 'Moto',
+                            model: fomattedMotorcycle?.model || '',
+                            plate: fomattedMotorcycle?.license_plate || 'Sin Placa'
+                        },
+                        formattedTech ? `${formattedTech.first_name} ${formattedTech.last_name}`.trim() : 'Técnico',
+                        data.laborCost > 0 ? data.laborCost : undefined,
+                        formattedItems,
+                        subtotal,
+                        data.discountPercentage,
+                        discountAmount,
+                        workshopName
+                    );
+                    
+                    console.log('[Sales Action] Notification result:', JSON.stringify(notifyResult, null, 2));
+                    
+                    const fs = require('fs');
+                    fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
+                        date: new Date().toISOString(),
+                        customerPhone: formattedCustomer.phone,
+                        result: notifyResult
+                    }, null, 2));
+                } else {
+                    console.warn(`WhatsApp limit reached for org ${user.workshopId}. Skipping sale notification.`);
+                }
             } catch (notifyError: any) {
                 console.error('[Sales Action] Service sale notification error:', notifyError);
                 const fs = require('fs');
@@ -648,15 +652,20 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                         price: item.price
                     }));
 
-                await sendDirectSalePaidNotification(
-                    finalCustomerPhone,
-                    finalCustomerName || 'Cliente',
-                    org?.name || 'MotoManager',
-                    saleNumber,
-                    total,
-                    data.paymentMethod,
-                    notificationItems
-                );
+                const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+                if (canSend) {
+                    await sendDirectSalePaidNotification(
+                        finalCustomerPhone,
+                        finalCustomerName || 'Cliente',
+                        org?.name || 'MotoManager',
+                        saleNumber,
+                        total,
+                        data.paymentMethod,
+                        notificationItems
+                    );
+                } else {
+                    console.warn(`WhatsApp limit reached for org ${user.workshopId}. Skipping direct sale notification.`);
+                }
             }
         } catch (notifyError) {
             console.error('Direct sale notification error:', notifyError);

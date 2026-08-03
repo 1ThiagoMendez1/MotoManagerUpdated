@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { sendTemplateReminderNotification } from '@/lib/whatsapp';
+import { sendTemplateReminderNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { format } from 'date-fns';
 
 // Configuración recomendada para Vercel Cron u otras llamadas automatizadas
@@ -81,6 +81,17 @@ export async function GET(request: Request) {
           .single();
 
         const lastServiceDate = lastWo?.created_at ? format(new Date(lastWo.created_at), 'dd-MM-yyyy') : 'Fecha reciente';
+
+        // Check limits
+        const canSend = await checkAndUpdateWhatsAppLimit(reminder.organization_id);
+        if (!canSend) {
+          console.warn(`Límite de WhatsApp alcanzado para org ${reminder.organization_id}. Omitiendo recordatorio ${reminder.id}`);
+          // Lo dejamos en estado 'pending' para que se intente enviar el mes siguiente si aún no ha pasado mucho tiempo
+          // o lo podemos marcar como 'error' con nota.
+          await supabaseAdmin.from('reminders').update({ status: 'error', notes: 'Límite de WhatsApp alcanzado en el plan actual' }).eq('id', reminder.id);
+          errorCount++;
+          continue;
+        }
 
         // Enviar mensaje
         const result = await sendTemplateReminderNotification(

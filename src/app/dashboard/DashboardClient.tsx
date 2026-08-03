@@ -11,11 +11,15 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
-  ArrowLeft
+  ArrowLeft,
+  Lock,
+  Rocket
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { getPlanLimits } from '@/lib/constants/plans';
 import {
   AreaChart,
   Area,
@@ -26,7 +30,10 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell
 } from 'recharts';
 import { useState, useEffect } from 'react';
 import { getPendingReminders } from '@/lib/actions/reminders';
@@ -55,6 +62,7 @@ const itemVariants: any = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
   const [reminders, setReminders] = useState<any[]>([]);
   const [stats, setStats] = useState({
     ingresosMes: 0,
@@ -63,9 +71,14 @@ export default function DashboardPage() {
     stockCriticoCount: 0,
     revenueData: [] as any[],
     topPartsData: [] as any[],
+    incomeByMethodData: [] as any[],
     alerts: [] as any[],
-    workshopName: ''
+    workshopName: '',
+    subscriptionPlan: 'basic'
   });
+
+  const planLimits = getPlanLimits(stats.subscriptionPlan);
+  const isChartsLocked = planLimits.dashboard_level !== 'complete';
 
   const generatePDFReport = (currentStats: typeof stats) => {
     const doc = new jsPDF();
@@ -157,8 +170,8 @@ export default function DashboardPage() {
       doc.text("Flujo de Caja Semanal", 14, tableStartY);
       doc.text("Repuestos de Mayor Rotación", 112, tableStartY);
 
-      const revenueTableData = currentStats.revenueData.map(item => [item.name, formatCurrency(item.ingresos)]);
-      const partsTableData = currentStats.topPartsData.map(item => [item.name, item.ventas.toString()]);
+      const revenueTableData = isChartsLocked ? [['Bloqueado', 'Requiere Plan Full']] : currentStats.revenueData.map(item => [item.name, formatCurrency(item.ingresos)]);
+      const partsTableData = isChartsLocked ? [['Bloqueado', 'Requiere Plan Full']] : currentStats.topPartsData.map(item => [item.name, item.ventas.toString()]);
 
       // Tabla 1: Flujo de Caja
       autoTable(doc, {
@@ -291,12 +304,66 @@ export default function DashboardPage() {
         if (resRem.success && resRem.data) {
           setReminders(resRem.data);
         }
-      } catch (e) {
-        console.error("Error fetching dashboard data", e);
-      }
-    };
-    fetchDashboard();
-  }, []);
+        } catch (e) {
+          console.error("Error fetching dashboard data", e);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchDashboard();
+    }, []);
+  
+    if (isLoading) {
+      return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
+          {/* Glow de fondo */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px]" />
+          
+          <motion.div
+            animate={{ 
+              y: [0, -8, 0],
+              x: [-2, 2, -2],
+              rotate: [-2, 2, -2]
+            }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 0.4,
+              ease: "easeInOut"
+            }}
+            className="relative z-10 flex flex-col items-center"
+          >
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/25 mb-6 relative overflow-hidden">
+              {/* Líneas de velocidad animadas simulando viento */}
+              <motion.div
+                animate={{ x: ['150%', '-150%'], opacity: [0, 1, 0] }}
+                transition={{ repeat: Infinity, duration: 0.6, ease: "linear" }}
+                className="absolute top-4 right-0 w-12 h-[2px] bg-white/40 rounded-full"
+              />
+              <motion.div
+                animate={{ x: ['150%', '-150%'], opacity: [0, 1, 0] }}
+                transition={{ repeat: Infinity, duration: 0.8, ease: "linear", delay: 0.2 }}
+                className="absolute top-10 right-0 w-8 h-[2px] bg-white/60 rounded-full"
+              />
+              <motion.div
+                animate={{ x: ['150%', '-150%'], opacity: [0, 1, 0] }}
+                transition={{ repeat: Infinity, duration: 0.5, ease: "linear", delay: 0.4 }}
+                className="absolute bottom-4 right-0 w-10 h-[2px] bg-white/30 rounded-full"
+              />
+              
+              <Bike className="w-10 h-10 text-white relative z-10" />
+            </div>
+          </motion.div>
+          
+          <motion.p 
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            className="text-foreground/80 font-medium z-10 text-lg tracking-tight"
+          >
+            Calentando motores...
+          </motion.p>
+        </div>
+      );
+    }
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
@@ -402,10 +469,29 @@ export default function DashboardPage() {
           </div>
 
           {/* Charts Section */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          <div className="relative grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             
+            {isChartsLocked && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
+                <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-blue-500/20 to-transparent opacity-50 pointer-events-none" />
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                  <Lock className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Análisis Avanzado Bloqueado</h3>
+                <p className="text-muted-foreground text-sm max-w-md mb-6">
+                  El Flujo de Caja, Repuestos de Mayor Rotación y otros gráficos avanzados están disponibles exclusivamente en el plan <strong className="text-white">Full Taller</strong>.
+                </p>
+                <Link href="/planes">
+                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
+                    <Rocket className="w-4 h-4 mr-2" />
+                    Mejorar a Full Taller
+                  </Button>
+                </Link>
+              </div>
+            )}
+
             {/* Revenue Chart */}
-            <motion.div variants={itemVariants} className="lg:col-span-4">
+            <motion.div variants={itemVariants} className={`lg:col-span-4 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
               <Card id="tour-chart-flujo" className="bg-card border-border/50 h-full">
                 <CardHeader>
                   <CardTitle>Flujo de Caja (Semanal)</CardTitle>
@@ -448,7 +534,7 @@ export default function DashboardPage() {
             </motion.div>
 
             {/* Top Selling Parts Chart */}
-            <motion.div variants={itemVariants} className="lg:col-span-3">
+            <motion.div variants={itemVariants} className={`lg:col-span-3 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
               <Card id="tour-chart-repuestos" className="bg-card border-border/50 h-full">
                 <CardHeader>
                   <CardTitle>Repuestos de Mayor Rotación</CardTitle>
@@ -467,6 +553,71 @@ export default function DashboardPage() {
                           />
                           <Bar dataKey="ventas" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
                         </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                        <p>No hay datos suficientes</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Income By Payment Method Row */}
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 relative">
+            {isChartsLocked && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                  <Lock className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Gráfico Bloqueado</h3>
+                <p className="text-muted-foreground text-sm max-w-md mb-6">
+                  El detalle de ingresos por método de pago requiere el plan Full Taller.
+                </p>
+                <Link href="/planes">
+                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
+                    <Rocket className="w-4 h-4 mr-2" />
+                    Mejorar Plan
+                  </Button>
+                </Link>
+              </div>
+            )}
+            
+            <motion.div variants={itemVariants} className={`${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
+              <Card id="tour-chart-metodos" className="bg-card border-border/50 h-[400px]">
+                <CardHeader>
+                  <CardTitle>Ingresos por Medio de Pago (Mes Actual)</CardTitle>
+                  <CardDescription>Distribución de los pagos recibidos</CardDescription>
+                </CardHeader>
+                <CardContent className="h-[300px] pb-4">
+                  <div className="h-full w-full flex flex-col items-center justify-center">
+                    {stats.incomeByMethodData?.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={stats.incomeByMethodData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="amount"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          >
+                            {stats.incomeByMethodData.map((entry, index) => {
+                              const colors = ['#2f80ed', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                              return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                            })}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                            itemStyle={{ color: 'hsl(var(--foreground))' }}
+                          />
+                        </PieChart>
                       </ResponsiveContainer>
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">

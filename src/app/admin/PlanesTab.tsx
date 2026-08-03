@@ -6,6 +6,7 @@ import { updatePlan, addFeature, updateFeature, deleteFeature } from './plansAct
 import { Pencil, Save, Plus, Trash2, X, CheckCircle2, Eye, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { DEFAULT_PLANS, DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans';
+import { LandingPricing } from '@/app/planes/components/LandingPricing';
 
 export default function PlanesTab({ plans, features }: { plans: any[], features: any[] }) {
   const router = useRouter();
@@ -66,9 +67,9 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
         ...f,
         feature_name: formData.get('feature_name') as string,
         order_index: parseInt(formData.get('order_index') as string, 10) || 0,
-        included_in_monthly: formData.get('included_in_monthly') === 'on',
-        included_in_biannual: formData.get('included_in_biannual') === 'on',
-        included_in_yearly: formData.get('included_in_yearly') === 'on',
+        included_in_basic: formData.get('included_in_basic') as string || 'No',
+        included_in_pro: formData.get('included_in_pro') as string || 'No',
+        included_in_full: formData.get('included_in_full') as string || 'No',
       } : f));
       setEditingFeature(null);
     } else if (action === 'add') {
@@ -109,60 +110,22 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
 
       {/* VISTA PREVIA EN VIVO */}
       {showPreview && (
-        <div className="bg-card dark:bg-[#111623] border border-blue-500/30 dark:border-blue-500/30 rounded-2xl p-8 shadow-[0_0_30px_rgba(59,130,246,0.1)] relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-amber-500" />
-          <h2 className="text-xl font-bold text-foreground dark:text-white mb-8 text-center flex items-center justify-center gap-2">
-            <Eye className="w-5 h-5 text-blue-500" /> Vista Previa (Landing Page)
-          </h2>
+        <div className="bg-card dark:bg-[#111623] border border-blue-500/30 dark:border-blue-500/30 rounded-2xl p-2 shadow-[0_0_30px_rgba(59,130,246,0.1)] relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-amber-500 z-10" />
+          <div className="pt-4 pb-2">
+            <h2 className="text-xl font-bold text-foreground dark:text-white text-center flex items-center justify-center gap-2">
+              <Eye className="w-5 h-5 text-blue-500" /> Vista Previa (Landing Page)
+            </h2>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {sortedPlans.map(plan => (
-              <div
-                key={plan.id}
-                className={`relative flex flex-col gap-6 rounded-2xl bg-gradient-to-br ${plan.gradient} border ${plan.border} p-7 transition-all hover:scale-[1.02] hover:shadow-2xl ${plan.badge === 'MÁS POPULAR' ? 'ring-2 ring-amber-500/40 shadow-xl shadow-amber-500/10' : ''}`}
-              >
-                {plan.badge && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold text-foreground whitespace-nowrap bg-gradient-to-r ${plan.id === 'biannual' ? 'from-amber-500 to-orange-500' : plan.id === 'yearly' ? 'from-purple-600 to-purple-500' : 'from-blue-600 to-blue-500'}`}>
-                      {plan.badge}
-                    </span>
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
-                  <p className="text-sm text-muted-foreground">{plan.description}</p>
-                  {plan.savings && (
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 text-xs font-medium">
-                      ✓ {plan.savings}
-                    </span>
-                  )}
-                </div>
-
-                <div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-foreground tracking-tight">${Number(plan.price).toLocaleString('es-CO')}</span>
-                  </div>
-                  <p className={`text-sm mt-0.5 ${plan.accent_text || 'text-primary'}`}>{plan.period}</p>
-                </div>
-
-                <ul className="space-y-2 flex-1">
-                  {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).slice(0, 5).map(f => (
-                    <li key={f.id} className="flex items-center gap-2 text-sm text-foreground/75">
-                      <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
-                      {f.feature_name}
-                    </li>
-                  ))}
-                  {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).length > 5 && (
-                    <li className="text-xs text-muted-foreground italic mt-2">+ otras características...</li>
-                  )}
-                </ul>
-
-                <button className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r ${plan.btn} text-foreground font-semibold h-12 rounded-xl shadow-lg transition-all hover:scale-105 text-sm`}>
-                  <CreditCard className="h-4 w-4" /> Contratar {plan.name}
-                </button>
-              </div>
-            ))}
+          {/* Renderizamos el componente real de la landing para que sea 100% fiel */}
+          <div className="scale-[0.85] origin-top -mt-12 -mb-24">
+            <LandingPricing 
+              plans={localPlans} 
+              features={localFeatures} 
+              onSelectPlan={() => {}} 
+              onScrollToPlanes={() => {}} 
+            />
           </div>
         </div>
       )}
@@ -251,9 +214,15 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
                       <input name="feature_name" placeholder="Nombre de funcionalidad..." className="flex-1 bg-background border border-border rounded-md px-3 py-1 text-sm" required />
                       
                       <div className="flex gap-4 px-4 items-center">
-                        <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" name="included_in_monthly" defaultChecked /> M</label>
-                        <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" name="included_in_biannual" defaultChecked /> S</label>
-                        <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" name="included_in_yearly" defaultChecked /> A</label>
+                        <label className="flex items-center gap-1 text-xs">
+                          Básico: <input name="included_in_basic" defaultValue="Sí" className="w-16 bg-background border border-border rounded-md px-2 py-1 text-xs" />
+                        </label>
+                        <label className="flex items-center gap-1 text-xs">
+                          Pro: <input name="included_in_pro" defaultValue="Sí" className="w-16 bg-background border border-border rounded-md px-2 py-1 text-xs" />
+                        </label>
+                        <label className="flex items-center gap-1 text-xs">
+                          Full: <input name="included_in_full" defaultValue="Sí" className="w-16 bg-background border border-border rounded-md px-2 py-1 text-xs" />
+                        </label>
                       </div>
                       
                       <div className="flex gap-2">
@@ -275,14 +244,14 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
                         <input name="feature_name" defaultValue={feature.feature_name} className="flex-1 bg-background border border-border rounded-md px-3 py-1 text-sm" required />
                         
                         <div className="flex gap-4 px-4 items-center">
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" name="included_in_monthly" defaultChecked={feature.included_in_monthly} /> M
+                          <label className="flex items-center gap-1 text-xs">
+                            Básico: <input name="included_in_basic" defaultValue={feature.included_in_basic} className="w-16 bg-background border border-border rounded-md px-2 py-1 text-xs" />
                           </label>
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" name="included_in_biannual" defaultChecked={feature.included_in_biannual} /> S
+                          <label className="flex items-center gap-1 text-xs">
+                            Pro: <input name="included_in_pro" defaultValue={feature.included_in_pro} className="w-16 bg-background border border-border rounded-md px-2 py-1 text-xs" />
                           </label>
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" name="included_in_yearly" defaultChecked={feature.included_in_yearly} /> A
+                          <label className="flex items-center gap-1 text-xs">
+                            Full: <input name="included_in_full" defaultValue={feature.included_in_full} className="w-16 bg-background border border-border rounded-md px-2 py-1 text-xs" />
                           </label>
                         </div>
                         
@@ -297,13 +266,13 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
                       <td className="py-3 px-4 text-muted-foreground w-16">{feature.order_index}</td>
                       <td className="py-3 px-4">{feature.feature_name}</td>
                       <td className="py-3 px-4 text-center">
-                        {feature.included_in_monthly ? <CheckCircle2 className="w-4 h-4 mx-auto text-green-400" /> : <span className="text-muted-foreground/30">-</span>}
+                        {feature.included_in_basic === 'Sí' ? <CheckCircle2 className="w-4 h-4 mx-auto text-green-400" /> : feature.included_in_basic === 'No' || !feature.included_in_basic ? <span className="text-muted-foreground/30">-</span> : <span className="text-xs bg-muted px-2 py-1 rounded text-foreground">{feature.included_in_basic}</span>}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {feature.included_in_biannual ? <CheckCircle2 className="w-4 h-4 mx-auto text-green-400" /> : <span className="text-muted-foreground/30">-</span>}
+                        {feature.included_in_pro === 'Sí' ? <CheckCircle2 className="w-4 h-4 mx-auto text-green-400" /> : feature.included_in_pro === 'No' || !feature.included_in_pro ? <span className="text-muted-foreground/30">-</span> : <span className="text-xs bg-muted px-2 py-1 rounded text-foreground">{feature.included_in_pro}</span>}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {feature.included_in_yearly ? <CheckCircle2 className="w-4 h-4 mx-auto text-green-400" /> : <span className="text-muted-foreground/30">-</span>}
+                        {feature.included_in_full === 'Sí' ? <CheckCircle2 className="w-4 h-4 mx-auto text-green-400" /> : feature.included_in_full === 'No' || !feature.included_in_full ? <span className="text-muted-foreground/30">-</span> : <span className="text-xs bg-muted px-2 py-1 rounded text-foreground">{feature.included_in_full}</span>}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

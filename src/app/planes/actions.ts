@@ -19,7 +19,8 @@ const registrationSchema = z.object({
     mapsLink: z.string().url('Debe ser un link válido').optional().or(z.literal('')),
     city: z.string().min(2, 'La ciudad debe tener al menos 2 caracteres'),
     nit: z.string().min(5, 'El NIT debe tener al menos 5 caracteres'),
-    subscriptionPlan: z.enum(['monthly', 'biannual', 'yearly']),
+    subscriptionPlan: z.enum(['basic', 'pro', 'full']),
+    billingCycle: z.enum(['monthly', 'biannual', 'yearly']),
     paymentRef: z.string().optional(),
 })
 
@@ -45,7 +46,7 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     }
     console.log('✅ Validación OK')
 
-    const { workshopName, slug, email, fullName, phone, workshopPhone, address, mapsLink, city, nit, subscriptionPlan } = validation.data
+    const { workshopName, slug, email, fullName, phone, workshopPhone, address, mapsLink, city, nit, subscriptionPlan, billingCycle } = validation.data
     
     // Generate automatic password
     const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
@@ -87,18 +88,18 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     }
     console.log('✅ Usuario auth creado. ID:', authData.user.id)
 
-    // Calculate subscription dates
+    // Calculate subscription dates based on billingCycle
     const startDate = new Date();
     const endDate = new Date(startDate);
     
-    if (subscriptionPlan === 'monthly') {
+    if (billingCycle === 'monthly') {
         endDate.setMonth(endDate.getMonth() + 1);
-    } else if (subscriptionPlan === 'biannual') {
+    } else if (billingCycle === 'biannual') {
         endDate.setMonth(endDate.getMonth() + 6);
-    } else if (subscriptionPlan === 'yearly') {
+    } else if (billingCycle === 'yearly') {
         endDate.setFullYear(endDate.getFullYear() + 1);
     }
-    console.log('📅 Plan:', subscriptionPlan, '| Inicio:', startDate.toISOString(), '| Fin:', endDate.toISOString())
+    console.log('📅 Plan:', subscriptionPlan, '| Ciclo:', billingCycle, '| Inicio:', startDate.toISOString(), '| Fin:', endDate.toISOString())
 
     // Create organization using RPC via temp client
     console.log('🏭 Creando taller via RPC:', workshopName, '| Slug:', slug)

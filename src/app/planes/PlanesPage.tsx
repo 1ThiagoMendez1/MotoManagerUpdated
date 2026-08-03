@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bike, Users, FileText, Warehouse, DollarSign, UserPlus, LayoutDashboard, UserCog } from 'lucide-react';
+import { Bike, Users, FileText, Warehouse, DollarSign, UserPlus, LayoutDashboard, UserCog, Calendar, LifeBuoy, PlusCircle, ArrowRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { LandingNavbar } from './components/LandingNavbar';
 import { LandingHero } from './components/LandingHero';
@@ -17,7 +17,7 @@ import { SalesNotification } from './components/SalesNotification';
 // ─── Plan type ────────────────────────────────────────────────────────────────
 
 interface Plan {
-  id: 'monthly' | 'biannual' | 'yearly';
+  id: 'basic' | 'pro' | 'full';
   name: string;
   price: number;
   amountInCents: number;
@@ -25,6 +25,7 @@ interface Plan {
   gradient: string;
   border: string;
   savings: string | null;
+  billingCycle: 'monthly' | 'biannual' | 'yearly';
 }
 
 // ─── Dashboard preview ────────────────────────────────────────────────────────
@@ -58,38 +59,114 @@ function DashboardPreview() {
             </div>
           </div>
 
-          {/* Main content - Real Dashboard Layout */}
-          <div className="p-8 md:p-12 relative overflow-hidden">
+          {/* Main content - Real Dashboard Layout (Updated Design) */}
+          <div className="p-8 md:p-12 relative overflow-hidden bg-background">
             {/* Background glow effects simulating the real dashboard */}
-            <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-500/20 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-orange-500/20 rounded-full blur-[120px] pointer-events-none z-0 mix-blend-screen" />
+            <div className="absolute top-[30%] left-[50%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none z-0 mix-blend-screen" />
 
-            <div className="relative z-10 text-center mb-10">
-              <h1 className="text-2xl md:text-4xl font-bold text-foreground tracking-tight font-space">Bienvenido a MotoManager</h1>
-              <p className="text-sm md:text-base text-muted-foreground mt-2">Selecciona una opción para comenzar a gestionar tu taller.</p>
-            </div>
-            
-            <div className="relative z-10 grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4 w-full max-w-6xl mx-auto">
-              {[
-                { icon: LayoutDashboard, label: "Dashboard", description: "Resumen de finanzas y taller" },
-                { icon: Bike, label: "Motocicletas", description: "Gestiona los vehículos" },
-                { icon: UserPlus, label: "Clientes", description: "Administra tus clientes" },
-                { icon: FileText, label: "Órdenes de Trabajo", description: "Administra las reparaciones" },
-                { icon: Warehouse, label: "Inventario", description: "Controla tus repuestos" },
-                { icon: Users, label: "Técnicos", description: "Administra tu equipo" },
-                { icon: DollarSign, label: "Ventas", description: "Revisa las transacciones" },
-                { icon: UserCog, label: "Usuarios y Permisos", description: "Controla accesos al sistema" },
-              ].map(({ icon: Icon, label, description }) => (
-                <div key={label} className="group relative h-full">
-                  <div className="relative h-full rounded-xl p-6 flex flex-col items-center text-center bg-card/60 shadow-[0px_-16px_24px_rgba(255,255,255,0.02)_inset] overflow-hidden border border-border/40 group-hover:border-primary/50 transition-all duration-300 backdrop-blur-md group-hover:-translate-y-1">
-                    <div className="p-4 bg-primary/10 rounded-full mb-4 ring-1 ring-primary/20 group-hover:ring-primary/50 transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(47,128,237,0.5)]">
-                      <Icon className="h-8 w-8 text-primary" />
+            <div className="relative z-10 w-full max-w-6xl mx-auto">
+              
+              {/* Header / Apertura Personalizada */}
+              <div className="mb-4 lg:mb-6 mt-1 text-left">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight mb-1 text-foreground">
+                  Buenas tardes, Juan.
+                </h1>
+                <p className="text-sm sm:text-base text-foreground/70 flex items-center gap-2">
+                  <span>Tu taller <span className="font-medium text-foreground">repuestos-motos</span>, bajo control.</span>
+                </p>
+              </div>
+
+              {/* Bento Grid 12 Columnas */}
+              <div className="grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-3 lg:gap-4">
+                
+                {/* 1. Centro de Operaciones - Órdenes de Trabajo */}
+                <div className="flex flex-col h-full group md:col-span-8 lg:col-span-8">
+                  <div className="relative h-full min-h-[180px] sm:min-h-[200px] flex flex-col justify-between p-5 sm:p-6 rounded-[24px] sm:rounded-[32px] bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-xl overflow-hidden text-left">
+                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/20 rounded-full blur-[80px] pointer-events-none" />
+                    
+                    <div className="relative z-10 flex flex-col h-full">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-2 rounded-2xl bg-blue-500 text-white shadow-md">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">Órdenes de Trabajo</h2>
+                      </div>
+                      <p className="text-muted-foreground max-w-md text-xs sm:text-sm mb-5 font-medium line-clamp-2">
+                        El corazón de tu taller. Gestiona reparaciones activas y entregas.
+                      </p>
+                      
+                      <div className="flex flex-col sm:flex-row gap-4 mt-auto">
+                        <div className="flex-1">
+                          <button className="w-full py-3.5 px-6 rounded-2xl bg-blue-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg">
+                            <PlusCircle className="w-5 h-5" />
+                            Nueva Orden
+                          </button>
+                        </div>
+                        <div className="flex-1">
+                          <button className="w-full py-3.5 px-6 rounded-2xl bg-foreground/5 text-foreground font-medium border border-foreground/10 flex items-center justify-center gap-2">
+                            Ver todas
+                            <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold tracking-tight text-foreground">{label}</h3>
-                    <p className="text-muted-foreground mt-2 text-sm">{description}</p>
                   </div>
                 </div>
-              ))}
+
+                {/* 2. Resumen General / Dashboard */}
+                <div className="md:col-span-8 lg:col-span-4 h-full">
+                  <div className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden flex flex-col text-left">
+                    <div className="p-2 rounded-2xl text-white w-fit mb-3 shadow-sm bg-indigo-500">
+                      <LayoutDashboard className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">Dashboard</h3>
+                    <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">Visión global de finanzas y rendimiento.</p>
+                  </div>
+                </div>
+
+                {/* 3. Bloque Operativo Relacionado: Secundarios */}
+                <div className="md:col-span-8 lg:col-span-12 grid gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                  {[
+                    { icon: UserPlus, label: "Clientes", description: "Directorio y contactos.", bg: "bg-emerald-500" },
+                    { icon: Bike, label: "Motocicletas", description: "Historial vehicular.", bg: "bg-orange-500" },
+                    { icon: Warehouse, label: "Inventario", description: "Control de repuestos y stock.", bg: "bg-amber-500" },
+                    { icon: DollarSign, label: "Ventas", description: "Punto de venta y caja.", bg: "bg-green-500" },
+                    { icon: Calendar, label: "Citas", description: "Gestión y programación de citas.", bg: "bg-blue-500" },
+                  ].map(({ icon: Icon, label, description, bg }) => (
+                    <div key={label} className="relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg flex flex-col text-left">
+                      <div className={`p-2 rounded-2xl text-white w-fit mb-3 shadow-sm ${bg}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <h3 className="text-lg font-bold text-foreground tracking-tight mb-1 truncate">{label}</h3>
+                      <p className="text-muted-foreground text-xs sm:text-sm font-medium mt-auto line-clamp-2">{description}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 4. Administración y Equipo */}
+                <div className="md:col-span-8 lg:col-span-12 grid gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-3">
+                  {[
+                    { icon: Users, label: "Técnicos", description: "Rendimiento del equipo.", bg: "bg-cyan-500" },
+                    { icon: UserCog, label: "Permisos", description: "Accesos al sistema.", bg: "bg-purple-500" },
+                    { icon: LifeBuoy, label: "Soporte", description: "Centro de ayuda y tickets.", bg: "bg-rose-500" },
+                  ].map(({ icon: Icon, label, description, bg }) => (
+                    <div key={label} className="relative h-full p-4 sm:p-5 rounded-2xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[40px] border border-foreground/[0.08] dark:border-white/[0.1] text-left">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className={`p-2 rounded-xl text-white shadow-sm shrink-0 ${bg}`}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-base font-semibold text-foreground truncate">{label}</h3>
+                          <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">{description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+              </div>
             </div>
           </div>
         </div>
@@ -105,11 +182,13 @@ export default function PlanesPage({ plans, features, user }: { plans?: any[], f
   const paymentStatus = searchParams.get('payment');
   const urlPlan = searchParams.get('plan');
   const paymentRef = searchParams.get('ref');
+  const urlBillingCycle = searchParams.get('cycle');
 
   const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [regModal, setRegModal] = useState({
     open: false,
-    plan: 'biannual',
+    plan: 'basic',
+    billingCycle: 'monthly',
     name: '',
     email: '',
     reference: '',
@@ -126,7 +205,8 @@ export default function PlanesPage({ plans, features, user }: { plans?: any[], f
       const saved = JSON.parse(localStorage.getItem('mm_prepayment') || '{}');
       setRegModal({
         open: true,
-        plan: urlPlan || saved.plan || 'monthly',
+        plan: urlPlan || saved.plan || 'basic',
+        billingCycle: urlBillingCycle || saved.billingCycle || 'monthly',
         name: saved.name || '',
         email: saved.email || '',
         reference: paymentRef || '',
@@ -194,6 +274,7 @@ export default function PlanesPage({ plans, features, user }: { plans?: any[], f
       <RegistrationModal
         open={regModal.open}
         plan={regModal.plan}
+        billingCycle={regModal.billingCycle}
         name={regModal.name}
         email={regModal.email}
         reference={regModal.reference}

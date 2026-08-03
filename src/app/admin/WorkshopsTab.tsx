@@ -146,10 +146,10 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
 
                                             <TableCell className="py-4">
                                                 <div className="inline-flex items-center px-2.5 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-400 text-xs font-bold shadow-[0_0_10px_rgba(245,158,11,0.1)]">
-                                                    {workshop.subscription_plan === 'monthly' ? 'MENSUAL' :
-                                                        workshop.subscription_plan === 'biannual' ? 'SEMESTRAL' :
-                                                            workshop.subscription_plan === 'yearly' ? 'ANUAL' :
-                                                                workshop.subscription_plan.toUpperCase()}
+                                                    {workshop.subscription_plan === 'basic' ? 'BÁSICO' :
+                                                        workshop.subscription_plan === 'pro' ? 'PRO' :
+                                                            workshop.subscription_plan === 'full' ? 'FULL' :
+                                                                (workshop.subscription_plan || 'BASIC').toUpperCase()}
                                                 </div>
                                             </TableCell>
 

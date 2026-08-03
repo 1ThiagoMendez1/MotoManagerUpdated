@@ -41,6 +41,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
         role={user.role} 
         userName={workshopDetails?.user_name || 'Usuario'}
         workshopName={workshopDetails?.slug || 'tu-taller'}
+        subscriptionPlan={workshopDetails?.subscription_plan}
         motorcycles={motorcyclesWithoutAnyWorkOrder}
         technicians={technicians}
       />

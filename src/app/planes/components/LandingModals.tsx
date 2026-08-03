@@ -9,7 +9,7 @@ import { WompiButton } from '@/components/payments/WompiButton';
 import { registerWorkshopPublic } from '../actions';
 
 // Separate inner component so useActionState resets when key changes
-function RegistrationForm({ plan, name, email, reference, info }: { plan: string; name: string; email: string; reference: string; info: { name: string; price: number; period: string } }) {
+function RegistrationForm({ plan, billingCycle, name, email, reference, info }: { plan: string; billingCycle: string; name: string; email: string; reference: string; info: { name: string; price: number; period: string } }) {
   const [regState, regAction] = useActionState(registerWorkshopPublic as any, { error: '', details: {} } as any);
   const formatCOPInner = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
@@ -32,6 +32,7 @@ function RegistrationForm({ plan, name, email, reference, info }: { plan: string
       {/* Registration form */}
       <form action={regAction} className="space-y-4">
         <input type="hidden" name="subscriptionPlan" value={plan} />
+        <input type="hidden" name="billingCycle" value={billingCycle} />
         <input type="hidden" name="paymentRef" value={reference} />
 
         <div className="space-y-1.5">
@@ -191,7 +192,7 @@ function RegistrationForm({ plan, name, email, reference, info }: { plan: string
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Plan {
-  id: 'monthly' | 'biannual' | 'yearly';
+  id: 'basic' | 'pro' | 'full';
   name: string;
   price: number;
   amountInCents: number;
@@ -199,6 +200,7 @@ interface Plan {
   gradient: string;
   border: string;
   savings: string | null;
+  billingCycle: 'monthly' | 'biannual' | 'yearly';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -245,12 +247,12 @@ export function PaymentModal({ plan, onClose, appUrl }: PayModalProps) {
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-    console.log('==== INICIO DE PAGO EN /PLANES ====', { name, email, planId: plan.id, reference });
-    localStorage.setItem('mm_prepayment', JSON.stringify({ name, email, plan: plan.id }));
+    console.log('==== INICIO DE PAGO EN /PLANES ====', { name, email, planId: plan.id, billingCycle: plan.billingCycle, reference });
+    localStorage.setItem('mm_prepayment', JSON.stringify({ name, email, plan: plan.id, billingCycle: plan.billingCycle }));
     setStep(2);
   };
 
-  const redirectUrl = `${appUrl}/planes?payment=success&plan=${plan.id}&ref=${reference}`;
+  const redirectUrl = `${appUrl}/planes?payment=success&plan=${plan.id}&cycle=${plan.billingCycle}&ref=${reference}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -367,23 +369,34 @@ export function PaymentModal({ plan, onClose, appUrl }: PayModalProps) {
 
 // ─── Registration modal (post-payment) ───────────────────────────────────────
 
-const PLAN_LABELS: Record<string, { name: string; price: number; period: string }> = {
-  monthly:  { name: 'Mensual',   price: 18900,  period: '/ mes' },
-  biannual: { name: 'Semestral', price: 99900,  period: '/ 6 meses' },
-  yearly:   { name: 'Anual',     price: 199900, period: '/ año' },
-};
-
 interface RegModalProps {
   open: boolean;
   plan: string;
+  billingCycle: string;
   name: string;
   email: string;
   reference: string;
   onClose: () => void;
 }
 
-export function RegistrationModal({ open, plan, name, email, reference, onClose }: RegModalProps) {
-  const info = PLAN_LABELS[plan] ?? PLAN_LABELS.monthly;
+export function RegistrationModal({ open, plan, billingCycle, name, email, reference, onClose }: RegModalProps) {
+  // Compute basic info for display
+  const PLAN_LABELS: Record<string, string> = {
+    basic: 'Básico',
+    pro: 'Pro Taller',
+    full: 'Full Taller'
+  };
+  const CYCLE_LABELS: Record<string, string> = {
+    monthly: '/ mes',
+    biannual: '/ 6 meses',
+    yearly: '/ año'
+  };
+  
+  const info = {
+    name: PLAN_LABELS[plan] || 'Plan Personalizado',
+    price: 0, // We don't have the exact price paid here without querying Wompi, but the UI only uses it for display, so we can hide the price or keep it generic
+    period: CYCLE_LABELS[billingCycle] || '/ mes'
+  };
 
   if (!open) return null;
 
@@ -404,7 +417,7 @@ export function RegistrationModal({ open, plan, name, email, reference, onClose 
 
         <div className="p-5 space-y-5">
           {/* key=reference forces full remount (and form reset) on each new payment */}
-          <RegistrationForm key={reference} plan={plan} name={name} email={email} reference={reference} info={info} />
+          <RegistrationForm key={reference} plan={plan} billingCycle={billingCycle} name={name} email={email} reference={reference} info={info} />
         </div>
       </div>
     </div>

@@ -28,9 +28,9 @@ import { WompiButton } from '@/components/payments/WompiButton';
 
 // Precios de los planes en pesos colombianos
 const PLAN_PRICES: Record<string, { label: string; price: number }> = {
-    monthly:  { label: 'Mensual',   price: 18900 },
-    biannual: { label: 'Semestral', price: 99900 },
-    yearly:   { label: 'Anual',     price: 199900 },
+    basic: { label: 'Básico', price: 50000 }, // Precios de prueba
+    pro:   { label: 'Pro',    price: 100000 },
+    full:  { label: 'Full',   price: 200000 },
 };
 
 function formatCOP(amount: number) {
@@ -56,8 +56,8 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
     const [copied, setCopied] = useState(false);
     const { toast } = useToast();
 
-    const plan = workshop.subscription_plan || 'monthly';
-    const planInfo = PLAN_PRICES[plan] ?? { label: plan, price: 16900 };
+    const plan = workshop.subscription_plan || 'basic';
+    const planInfo = PLAN_PRICES[plan] ?? { label: plan, price: 50000 };
     const amountInCents = planInfo.price * 100;
 
     // Email del propietario
@@ -78,7 +78,7 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
         }
     };
 
-    const handlePlanChange = async (plan: 'monthly' | 'biannual' | 'yearly') => {
+    const handlePlanChange = async (plan: 'basic' | 'pro' | 'full') => {
         try {
             setIsLoading(true);
             await updateWorkshopPlan(workshop.id, plan);
@@ -252,14 +252,14 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
                             Cambiar Plan
                         </DropdownMenuSubTrigger>
                         <DropdownMenuSubContent>
-                            <DropdownMenuItem onClick={() => handlePlanChange('monthly')}>
-                                Mensual ($18.900)
+                            <DropdownMenuItem onClick={() => handlePlanChange('basic')}>
+                                Básico
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePlanChange('biannual')}>
-                                Semestral ($99.900)
+                            <DropdownMenuItem onClick={() => handlePlanChange('pro')}>
+                                Pro
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePlanChange('yearly')}>
-                                Anual ($199.900)
+                            <DropdownMenuItem onClick={() => handlePlanChange('full')}>
+                                Full
                             </DropdownMenuItem>
                         </DropdownMenuSubContent>
                     </DropdownMenuSub>

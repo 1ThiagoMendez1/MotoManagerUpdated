@@ -14,16 +14,31 @@ export async function getDashboardData() {
   
   const { data: salesThisMonth, error: e1 } = await supabase
     .from('sales')
-    .select('total, status')
+    .select('total, status, payment_method')
     .eq('organization_id', user.workshopId)
     .gte('created_at', startOfMonthStr)
 
   if (e1) console.error('Dashboard Error (sales):', e1)
 
-  // Sumar solo las ventas pagadas o completadas
-  const ingresosMes = (salesThisMonth || [])
-    .filter(sale => sale.status === 'paid' || sale.status === 'completed')
-    .reduce((sum, sale) => sum + Number(sale.total), 0)
+  let ingresosMes = 0;
+  const incomeByMethodMap: Record<string, number> = {};
+
+  (salesThisMonth || []).forEach(sale => {
+    if (sale.status === 'paid' || sale.status === 'completed') {
+      const amount = Number(sale.total) || 0;
+      ingresosMes += amount;
+      
+      const method = sale.payment_method || 'Otros';
+      if (!incomeByMethodMap[method]) {
+        incomeByMethodMap[method] = 0;
+      }
+      incomeByMethodMap[method] += amount;
+    }
+  });
+
+  const incomeByMethodData = Object.entries(incomeByMethodMap)
+    .map(([method, amount]) => ({ name: method, amount }))
+    .sort((a, b) => b.amount - a.amount);
 
   // 2. Motos en Taller & 3. Órdenes Activas
   const { data: wosData, error: e2 } = await supabase
@@ -140,8 +155,10 @@ export async function getDashboardData() {
       stockCriticoCount,
       revenueData,
       topPartsData,
+      incomeByMethodData,
       alerts,
-      workshopName: workshop?.name || 'Mi Taller'
+      workshopName: workshop?.name || 'Mi Taller',
+      subscriptionPlan: workshop?.subscription_plan || 'basic'
     }
   }
 }
