@@ -4,6 +4,9 @@ import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminC
 
 
 import { revalidatePath } from 'next/cache'
+import { sendTemplateReminderNotification } from '@/lib/whatsapp';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 
 export async function getPendingReminders() {
@@ -109,15 +112,16 @@ export async function addReminderFromWorkOrder(formData: FormData) {
   const workOrderId = formData.get('workOrderId') as string;
   const serviceType = formData.get('serviceType') as string;
   const dueDate = formData.get('dueDate') as string; // Viene del input type="date" (YYYY-MM-DD)
+  const dueTime = formData.get('dueTime') as string; // Viene del input type="time" (HH:mm)
 
   if (!workOrderId || !serviceType || !dueDate) {
     throw new Error('Faltan datos para crear el recordatorio');
   }
 
-  // Obtenemos customer_id y motorcycle_id desde la orden de trabajo
+  // Obtenemos info de la orden, cliente y organización
   const { data: wo, error: fetchError } = await supabase
     .from('work_orders')
-    .select('motorcycle_id, motorcycles ( customer_id )')
+    .select('created_at, motorcycle_id, motorcycles ( customer_id, brand, model, license_plate )')
     .eq('id', workOrderId)
     .eq('organization_id', workshopId)
     .single();
@@ -134,8 +138,9 @@ export async function addReminderFromWorkOrder(formData: FormData) {
     throw new Error('No se pudo determinar el cliente o motocicleta para el recordatorio');
   }
 
-  // Aseguramos que se guarde configurado para las 10:00 AM hora local (UTC-5 para Colombia)
-  const dateWithTime = new Date(`${dueDate}T10:00:00-05:00`);
+  // Combinamos fecha y hora indicadas (hora local Colombia UTC-5)
+  const timeStr = dueTime || '10:00';
+  const dateWithTime = new Date(`${dueDate}T${timeStr}:00-05:00`);
 
   const { error } = await supabase
     .from('reminders')
@@ -146,9 +151,11 @@ export async function addReminderFromWorkOrder(formData: FormData) {
         motorcycle_id: motorcycleId,
         service_type: serviceType,
         due_date: dateWithTime.toISOString(),
-        status: 'pending'
+        status: 'pending' // Queda pendiente para ser procesado por el Cron Job
       }
-    ]);
+    ])
+    .select('id')
+    .single();
 
   if (error) {
     console.error('Error creating reminder:', error);
@@ -158,3 +165,4 @@ export async function addReminderFromWorkOrder(formData: FormData) {
   revalidatePath('/work-orders/' + workOrderId);
   return { success: true };
 }
+

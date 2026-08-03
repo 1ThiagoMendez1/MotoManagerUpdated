@@ -63,8 +63,8 @@ export function AddReminderForm({ workOrderId, reminders }: { workOrderId: strin
         <form action={handleAction} className="space-y-4 p-4 border border-blue-500/20 rounded-xl bg-blue-500/5 animate-in fade-in slide-in-from-top-2">
           <input type="hidden" name="workOrderId" value={workOrderId} />
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2 md:col-span-3">
               <label className="text-sm font-medium text-muted-foreground">Descripción del recordatorio</label>
               <Textarea 
                 name="serviceType"
@@ -81,6 +81,15 @@ export function AddReminderForm({ workOrderId, reminders }: { workOrderId: strin
                 name="dueDate"
                 className="bg-muted text-foreground border-border/50"
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">Hora a notificar</label>
+              <Input 
+                type="time"
+                name="dueTime"
+                className="bg-muted text-foreground border-border/50"
               />
             </div>
 

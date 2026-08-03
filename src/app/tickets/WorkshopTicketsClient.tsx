@@ -159,6 +159,14 @@ export function WorkshopTicketsClient({ initialTickets }: { initialTickets: any[
               </DialogHeader>
               <form action={handleCreateTicket} className="space-y-5 mt-4">
                 {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">{error}</div>}
+                
+                <div className="p-3 bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm rounded-xl border border-blue-500/20 flex gap-3 items-start">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    Tu solicitud será evaluada y atendida en un plazo máximo de <strong>3 días hábiles</strong>.
+                  </p>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="subject" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Asunto</Label>
                   <Input id="subject" name="subject" placeholder="Ej: Error al registrar venta" className="rounded-xl bg-background/50 border-border/50" required />
