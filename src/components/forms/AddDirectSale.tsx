@@ -240,7 +240,11 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
 
               window.location.href = `https://checkout.wompi.co/p/?${params.toString()}`;
               return;
+            } else {
+              console.error("NEXT_PUBLIC_WOMPI_PUBLIC_KEY is missing");
             }
+          } else {
+             console.error("Failed to sign Wompi transaction", await res.text());
           }
           toast({
             title: "Error Wompi",
@@ -248,8 +252,19 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
             variant: "destructive",
           });
         } catch (e) {
-          console.error(e);
+          console.error("Error in Wompi redirect flow:", e);
+          toast({
+            title: "Error Wompi",
+            description: "Error de red al conectar con Wompi. Intenta pagar desde la tabla de ventas.",
+            variant: "destructive",
+          });
         }
+        
+        // Cierra el form de venta pero NO mostramos el recibo si falló Wompi
+        setIsOpen(false);
+        form.reset();
+        router.refresh();
+        return;
       }
 
       toast({
@@ -258,6 +273,7 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
       });
       setIsOpen(false);
       form.reset();
+      router.refresh();
       setReceiptData(result.sale);
       setReceiptDialogOpen(true);
     } else {
