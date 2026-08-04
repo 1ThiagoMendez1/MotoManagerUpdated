@@ -11,9 +11,10 @@ interface Props {
   features: any[];
   onSelectPlan: (plan: any) => void;
   onScrollToPlanes: () => void;
+  previewMode?: boolean;
 }
 
-export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes }: Props) {
+export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes, previewMode = false }: Props) {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'biannual' | 'yearly'>('monthly');
 
   // Sort plans by base price
@@ -30,7 +31,7 @@ export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes
   const cycleInfo = getCycleInfo(billingCycle);
 
   return (
-    <section id="planes" className="py-24 px-4 scroll-mt-20 relative">
+    <section id="planes" className={`${previewMode ? 'py-8' : 'py-24'} px-4 scroll-mt-20 relative`}>
       {/* Background elements */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background -z-10" />
       
@@ -207,53 +208,57 @@ export function LandingPricing({ plans, features, onSelectPlan, onScrollToPlanes
         </div>
 
         {/* Guarantees & Trust */}
-        <div className="bg-card/40 border border-border/50 rounded-3xl p-8 md:p-12 max-w-5xl mx-auto">
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div>
-                 <div className="mx-auto w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mb-4">
-                    <Shield className="w-6 h-6" />
-                 </div>
-                 <h4 className="font-bold text-foreground text-lg mb-2">Pago 100% Seguro</h4>
-                 <p className="text-sm text-muted-foreground">Transacciones protegidas y procesadas por Wompi Bancolombia.</p>
-              </div>
-              <div>
-                 <div className="mx-auto w-12 h-12 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4">
-                    <Zap className="w-6 h-6" />
-                 </div>
-                 <h4 className="font-bold text-foreground text-lg mb-2">Activación Inmediata</h4>
-                 <p className="text-sm text-muted-foreground">Tendrás acceso a tu sistema en segundos después del pago.</p>
-              </div>
-              <div>
-                 <div className="mx-auto w-12 h-12 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4">
-                    <Lock className="w-6 h-6" />
-                 </div>
-                 <h4 className="font-bold text-foreground text-lg mb-2">Sin Contratos</h4>
-                 <p className="text-sm text-muted-foreground">Eres libre. Cancela o cambia de plan en cualquier momento.</p>
-              </div>
-           </div>
-        </div>
+        {!previewMode && (
+          <div className="bg-card/40 border border-border/50 rounded-3xl p-8 md:p-12 max-w-5xl mx-auto">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                <div>
+                   <div className="mx-auto w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mb-4">
+                      <Shield className="w-6 h-6" />
+                   </div>
+                   <h4 className="font-bold text-foreground text-lg mb-2">Pago 100% Seguro</h4>
+                   <p className="text-sm text-muted-foreground">Transacciones protegidas y procesadas por Wompi Bancolombia.</p>
+                </div>
+                <div>
+                   <div className="mx-auto w-12 h-12 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                      <Zap className="w-6 h-6" />
+                   </div>
+                   <h4 className="font-bold text-foreground text-lg mb-2">Activación Inmediata</h4>
+                   <p className="text-sm text-muted-foreground">Tendrás acceso a tu sistema en segundos después del pago.</p>
+                </div>
+                <div>
+                   <div className="mx-auto w-12 h-12 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mb-4">
+                      <Lock className="w-6 h-6" />
+                   </div>
+                   <h4 className="font-bold text-foreground text-lg mb-2">Sin Contratos</h4>
+                   <p className="text-sm text-muted-foreground">Eres libre. Cancela o cambia de plan en cualquier momento.</p>
+                </div>
+             </div>
+          </div>
+        )}
 
         {/* Final CTA */}
-        <div className="relative rounded-3xl bg-gradient-to-br from-red-600 via-orange-600 to-red-700 border border-red-500/50 p-10 md:p-16 text-center space-y-6 overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/20 blur-3xl rounded-full pointer-events-none" />
-          
-          <h2 className="text-3xl md:text-5xl font-black text-white relative z-10">
-            ¿Vas a dejar que tu competencia te gane?
-          </h2>
-          <p className="text-red-100 max-w-2xl mx-auto leading-relaxed text-lg font-medium relative z-10">
-            Cada día que pasas sin MotoManager, estás perdiendo ventas y desorganizando tu inventario.
-            Da el paso hacia la modernización hoy mismo.
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center relative z-10 pt-4">
-            <button
-              onClick={onScrollToPlanes}
-              className="group flex items-center gap-2 bg-white text-red-600 hover:bg-gray-100 font-black px-10 py-5 rounded-2xl shadow-2xl transition-all hover:scale-105 text-lg"
-            >
-              QUIERO ORGANIZAR MI TALLER <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </button>
+        {!previewMode && (
+          <div className="relative rounded-3xl bg-gradient-to-br from-red-600 via-orange-600 to-red-700 border border-red-500/50 p-10 md:p-16 text-center space-y-6 overflow-hidden">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
+            <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/20 blur-3xl rounded-full pointer-events-none" />
+            
+            <h2 className="text-3xl md:text-5xl font-black text-white relative z-10">
+              ¿Vas a dejar que tu competencia te gane?
+            </h2>
+            <p className="text-red-100 max-w-2xl mx-auto leading-relaxed text-lg font-medium relative z-10">
+              Cada día que pasas sin MotoManager, estás perdiendo ventas y desorganizando tu inventario.
+              Da el paso hacia la modernización hoy mismo.
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center relative z-10 pt-4">
+              <button
+                onClick={onScrollToPlanes}
+                className="group flex items-center gap-2 bg-white text-red-600 hover:bg-gray-100 font-black px-10 py-5 rounded-2xl shadow-2xl transition-all hover:scale-105 text-lg"
+              >
+                QUIERO ORGANIZAR MI TALLER <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

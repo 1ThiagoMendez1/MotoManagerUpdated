@@ -125,6 +125,7 @@ export default function PlanesTab({ plans, features }: { plans: any[], features:
               features={localFeatures} 
               onSelectPlan={() => {}} 
               onScrollToPlanes={() => {}} 
+              previewMode={true}
             />
           </div>
         </div>
