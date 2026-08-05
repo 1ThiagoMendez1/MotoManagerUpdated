@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { CreditCard, ArrowRight, Lock, Shield, CheckCircle2, Loader2, Wrench } from 'lucide-react';
+import { CreditCard, ArrowRight, Lock, Shield, CheckCircle2, Loader2, Wrench, MapPin } from 'lucide-react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,33 @@ import { registerWorkshopPublic } from '../actions';
 // Separate inner component so useActionState resets when key changes
 function RegistrationForm({ plan, billingCycle, name, email, reference, info }: { plan: string; billingCycle: string; name: string; email: string; reference: string; info: { name: string; price: number; period: string } }) {
   const [regState, regAction] = useActionState(registerWorkshopPublic as any, { error: '', details: {} } as any);
+  const [address, setAddress] = useState("");
+  const [mapsLink, setMapsLink] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Tu navegador no soporta geolocalización.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setMapsLink(`https://maps.google.com/?q=${latitude},${longitude}`);
+        if (!address) {
+          setAddress("Ubicación GPS");
+        }
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error("Error obteniendo ubicación:", error);
+        alert("No se pudo obtener la ubicación. Verifica los permisos de tu navegador.");
+        setIsLocating(false);
+      }
+    );
+  };
+
   const formatCOPInner = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
 
@@ -98,29 +125,34 @@ function RegistrationForm({ plan, billingCycle, name, email, reference, info }: 
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="reg-address" className="text-muted-foreground text-sm">Dirección exacta</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="reg-address" className="text-muted-foreground text-sm">Dirección exacta</Label>
+          <div className="flex gap-2">
             <Input
               id="reg-address"
               name="address"
-              defaultValue=""
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
               required
               placeholder="Ej: Calle 10 # 5-32, Local 3"
-              className="rounded-xl h-11"
+              className="rounded-xl h-11 flex-1"
             />
+            <input type="hidden" name="mapsLink" value={mapsLink} />
+            <button
+              type="button"
+              onClick={handleGetLocation}
+              disabled={isLocating}
+              className="flex items-center justify-center gap-2 px-4 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium rounded-xl transition-colors disabled:opacity-50 shrink-0"
+            >
+              {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+              <span className="hidden sm:inline">{mapsLink ? 'Ubicación lista' : 'Tomar ubicación'}</span>
+            </button>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="reg-mapsLink" className="text-muted-foreground text-sm">Link de Maps o Waze</Label>
-            <Input
-              id="reg-mapsLink"
-              name="mapsLink"
-              type="url"
-              defaultValue=""
-              placeholder="Ej: https://maps.app.goo.gl/..."
-              className="rounded-xl h-11"
-            />
-          </div>
+          {mapsLink && (
+            <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
+              <CheckCircle2 className="h-3 w-3" /> Coordenadas capturadas correctamente
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">

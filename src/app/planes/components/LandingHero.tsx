@@ -17,7 +17,7 @@ function StarRating({ count }: { count: number }) {
 
 export function LandingHero({ onScrollToPlanes }: Props) {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 text-center overflow-hidden pt-20">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 text-center overflow-hidden pt-32">
       {/* Animated glow blobs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/20 rounded-full blur-3xl animate-pulse pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '1s' }} />
