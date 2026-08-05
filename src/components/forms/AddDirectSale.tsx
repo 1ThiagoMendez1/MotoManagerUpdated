@@ -539,9 +539,7 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {field.value === 'Wompi' 
-                              ? "Selecciona esta opción si el cliente pagará usando el link de cobro de Wompi." 
-                              : "Registro interno del método de pago utilizado."}
+                            Registro interno del método de pago utilizado.
                           </p>
                           <FormMessage />
                         </FormItem>
