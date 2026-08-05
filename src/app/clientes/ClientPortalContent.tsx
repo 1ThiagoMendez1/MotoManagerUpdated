@@ -22,7 +22,7 @@ import {
   Mail,
   LogOut,
 } from 'lucide-react'
-import { createCustomerAppointment } from './actions'
+import { createCustomerAppointment, cancelCustomerAppointment } from './actions'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
@@ -104,6 +104,17 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
       setShowAppointmentForm(false)
       // Reload to show new appointment
       window.location.reload()
+    }
+  }
+
+  const handleCancelAppointment = async (id: string) => {
+    if (confirm('¿Estás seguro de que deseas cancelar esta cita?')) {
+      const result = await cancelCustomerAppointment(id);
+      if (result.success) {
+        window.location.reload();
+      } else {
+        alert(result.message);
+      }
     }
   }
 
@@ -423,7 +434,7 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                         ) : (
                           <>
                             <CalendarPlus className="w-4 h-4 mr-2" />
-                            Confirmar Cita
+                            Agendar Cita
                           </>
                         )}
                       </Button>
@@ -492,10 +503,19 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                               </div>
                             </div>
                           </div>
-
-                          <Badge className={`${statusInfo.color} border text-[10px] font-semibold px-2 py-0.5 rounded-lg shrink-0`}>
-                            {statusInfo.label}
-                          </Badge>
+                          <div className="flex flex-col items-end gap-2 shrink-0">
+                            <Badge className={`${statusInfo.color} border text-[10px] font-semibold px-2 py-0.5 rounded-lg`}>
+                              {statusInfo.label}
+                            </Badge>
+                            {(apt.status === 'pending' || apt.status === 'confirmed') && (
+                              <button
+                                onClick={() => handleCancelAppointment(apt.id)}
+                                className="text-[10px] font-medium text-slate-500 hover:text-red-400 underline underline-offset-2 transition-colors"
+                              >
+                                Cancelar cita
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )

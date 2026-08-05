@@ -196,3 +196,20 @@ export async function createCustomerAppointment(formData: FormData) {
   revalidatePath('/clientes');
   return { success: true, message: 'Cita agendada exitosamente.' };
 }
+
+export async function cancelCustomerAppointment(appointmentId: string) {
+  const supabase = await createAdminClient();
+
+  const { error } = await supabase
+    .from('appointments')
+    .update({ status: 'cancelled' })
+    .eq('id', appointmentId);
+
+  if (error) {
+    console.error('Error cancelling appointment:', error);
+    return { success: false, message: 'Error al cancelar la cita.' };
+  }
+
+  revalidatePath('/clientes');
+  return { success: true, message: 'Cita cancelada correctamente.' };
+}

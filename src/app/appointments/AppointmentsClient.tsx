@@ -57,7 +57,7 @@ interface AppointmentsClientProps {
 export default function AppointmentsClient({ initialAppointments }: AppointmentsClientProps) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all');
+  const [activeTab, setActiveTab] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -105,7 +105,7 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
 
   const filteredAppointments = appointments.filter(apt => {
     // Tab filter
-    if (activeTab !== 'all' && apt.status !== activeTab) {
+    if (apt.status !== activeTab) {
       return false;
     }
 
@@ -149,8 +149,7 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
         {[
           { label: 'Total Citas', value: total, color: 'from-blue-500 to-indigo-600', icon: Calendar },
           { label: 'Pendientes', value: pending, color: 'from-amber-400 to-orange-500', icon: AlertCircle },
-          { label: 'Confirmadas', value: confirmed, color: 'from-indigo-500 to-purple-600', icon: CheckCircle2 },
-          { label: 'Completadas', value: completed, color: 'from-emerald-400 to-teal-500', icon: CheckCircle2 }
+          { label: 'Confirmadas', value: confirmed, color: 'from-indigo-500 to-purple-600', icon: CheckCircle2 }
         ].map((card, index) => {
           const Icon = card.icon;
           return (
@@ -192,10 +191,8 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
         <div className="border-b border-foreground/[0.08] dark:border-white/[0.1] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2">
             {[
-              { id: 'all', label: 'Todos' },
               { id: 'pending', label: 'Pendientes' },
               { id: 'confirmed', label: 'Confirmadas' },
-              { id: 'completed', label: 'Completadas' },
               { id: 'cancelled', label: 'Canceladas' }
             ].map(tab => (
               <button
@@ -367,15 +364,6 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
 
                           {apt.status === 'confirmed' && (
                             <>
-                              <Button
-                                size="sm"
-                                disabled={isProcessing}
-                                onClick={() => handleStatusChange(apt.id, 'completed')}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl h-8 px-3"
-                              >
-                                {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 mr-1" />}
-                                Completar
-                              </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
