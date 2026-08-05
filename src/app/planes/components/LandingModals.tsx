@@ -257,7 +257,7 @@ export function PaymentModal({ plan, onClose, appUrl }: PayModalProps) {
     setStep(2);
   };
 
-  const redirectUrl = `${appUrl}/planes?payment=success&plan=${plan.id}&cycle=${plan.billingCycle}&ref=${reference}`;
+  const redirectUrl = `${appUrl}/?payment=success&plan=${plan.id}&cycle=${plan.billingCycle}&ref=${reference}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
