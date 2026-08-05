@@ -10,6 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Crown, MessageCircle, Users, CheckCircle2, Lock, Infinity as InfinityIcon, ArrowUpCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 interface PlanUsageModalProps {
   open: boolean;
@@ -17,7 +19,26 @@ interface PlanUsageModalProps {
   plan: any; // The current plan object from DEFAULT_PLANS
 }
 
-export function PlanUsageModal({ open, onOpenChange, plan }: PlanUsageModalProps) {
+export function PlanUsageModal({ open, onOpenChange, plan: propPlan }: PlanUsageModalProps) {
+  const [plan, setPlan] = useState<any>(propPlan);
+
+  useEffect(() => {
+    if (!open || !propPlan) return;
+    setPlan(propPlan);
+    const fetchRealPlan = async () => {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.from('subscription_plans').select('*').eq('id', propPlan.id).single();
+        if (data) {
+          setPlan({ ...propPlan, ...data });
+        }
+      } catch (err) {
+        console.error('Error fetching real plan:', err);
+      }
+    };
+    fetchRealPlan();
+  }, [open, propPlan]);
+
   if (!plan) return null;
 
   // Mocked consumption for demonstration purposes
