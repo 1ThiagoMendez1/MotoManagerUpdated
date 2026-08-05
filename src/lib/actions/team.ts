@@ -27,7 +27,7 @@ export async function inviteUser(data: {
 
     // Verify user limit against current plan
     const planLimits = getPlanLimits(workshopDetails.subscription_plan || 'basic');
-    if (planLimits.users !== 'unlimited') {
+    if (planLimits.users_limit !== -1) {
       const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -37,7 +37,7 @@ export async function inviteUser(data: {
         .select('*', { count: 'exact', head: true })
         .eq('organization_id', currentUser.workshopId);
 
-      if (count !== null && count >= (planLimits.users as number)) {
+      if (count !== null && count >= planLimits.users_limit) {
         throw new Error(`Límite de usuarios alcanzado para el plan ${planLimits.name}. Actualiza tu plan para invitar a más usuarios.`);
       }
     }
