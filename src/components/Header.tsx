@@ -17,6 +17,7 @@ import { PlanUsageModal } from './PlanUsageModal';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ColombiaClock } from '@/components/ColombiaClock';
 
 
 import {
@@ -291,6 +292,7 @@ export default function Header({
       </div>
       <div className="flex items-center gap-1 sm:gap-2">
 
+        <ColombiaClock />
         <ThemeToggle />
         
         {/* Notificaciones y Perfil (solo si hay sesión) */}

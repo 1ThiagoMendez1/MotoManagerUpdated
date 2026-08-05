@@ -16,6 +16,7 @@ function mapStatusToDb(uiStatus: string) {
     if (uiStatus === 'En proceso') return 'in_progress';
     if (uiStatus === 'Reparado') return 'completed';
     if (uiStatus === 'Entregado') return 'delivered';
+    if (uiStatus === 'Moto entregada por cotización rechazada') return 'delivered_quote_rejected';
     if (uiStatus === 'Ingreso a revisión') return 'received';
     return 'draft';
 }
@@ -25,6 +26,7 @@ function mapStatusToUi(dbStatus: string) {
     if (dbStatus === 'in_progress') return 'En proceso';
     if (dbStatus === 'completed') return 'Reparado';
     if (dbStatus === 'delivered') return 'Entregado';
+    if (dbStatus === 'delivered_quote_rejected') return 'Moto entregada por cotización rechazada';
     if (dbStatus === 'received') return 'Ingreso a revisión';
     return dbStatus;
 }
@@ -72,9 +74,10 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         `)
         .ilike('motorcycles.license_plate', mc.license_plate.trim())
         .neq('status', 'delivered')
+        .neq('status', 'delivered_quote_rejected')
         .neq('status', 'cancelled');
 
-    const activeOrder = activeOrders?.find(wo => wo.status !== 'delivered' && wo.status !== 'cancelled');
+    const activeOrder = activeOrders?.find(wo => wo.status !== 'delivered' && wo.status !== 'delivered_quote_rejected' && wo.status !== 'cancelled');
         
     if (activeOrder) {
         if (activeOrder.organization_id === user.workshopId) {
@@ -210,7 +213,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
     const updateData: any = { status };
     const now = new Date().toISOString();
 
-    if (status === 'delivered') {
+    if (status === 'delivered' || status === 'delivered_quote_rejected') {
         updateData.completed_at = now;
     } else if (status === 'in_progress') {
         updateData.started_at = now;
@@ -455,7 +458,7 @@ export async function addItemToWorkOrder(formData: FormData) {
             .eq('id', workOrderId)
             .single();
         
-        const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(orderData?.status);
+        const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
 
         // Obtener detalles del item
         const { data: inventoryItem } = await supabase
@@ -549,7 +552,7 @@ export async function removeItemFromWorkOrder(formData: FormData) {
         .eq('id', workOrderId)
         .single();
         
-    const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(orderData?.status);
+    const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
 
     const { data: saleItem } = await supabase
         .from('sale_items')
@@ -650,7 +653,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
         return { message: 'Orden de trabajo no encontrada.' };
     }
 
-    const wasApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered'].includes(woData.status);
+    const wasApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status);
 
     const { data: sale } = await supabase.from('sales').select('id').eq('work_order_id', id).maybeSingle();
     let quoteItems: any[] = [];
@@ -670,7 +673,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
                 }
             }
         }
-        if (!['completed', 'delivered'].includes(woData.status)) {
+        if (!['completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status)) {
             newStatus = 'diagnosis';
         }
     } else if (dbQuoteStatus === 'rejected') {
@@ -685,7 +688,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
                 }
             }
         }
-        if (!['completed', 'delivered'].includes(woData.status)) {
+        if (!['completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status)) {
             newStatus = 'diagnosis';
         }
 
@@ -696,7 +699,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
             await supabase.from('work_orders').update({ customer_observations: newObs }).eq('id', id);
         }
     } else {
-        if (!['completed', 'delivered'].includes(woData.status)) {
+        if (!['completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status)) {
             newStatus = 'waiting_approval';
         }
     }

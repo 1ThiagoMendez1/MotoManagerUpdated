@@ -171,9 +171,9 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     .order('created_at', { ascending: false });
 
   if (params.statusFilter === 'active') {
-    q = q.neq('status', 'delivered');
+    q = q.neq('status', 'delivered').neq('status', 'delivered_quote_rejected');
   } else if (params.statusFilter === 'completed') {
-    q = q.eq('status', 'delivered');
+    q = q.in('status', ['delivered', 'delivered_quote_rejected']);
   }
 
   if (params.query) {
@@ -212,6 +212,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
+            wo.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
             wo.status === 'received' ? 'Ingreso a revisión' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
@@ -289,6 +290,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
+            wo.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
             wo.status === 'received' ? 'Ingreso a revisión' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
@@ -328,7 +330,8 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
 
   let query = supabase.from('sales')
     .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, motorcycles(*, customers(*)))', { count: 'exact' })
-    .eq('organization_id', user.workshopId);
+    .eq('organization_id', user.workshopId)
+    .not('sale_number', 'is', null);
     
   if (params.type === 'direct') {
     query = query.is('work_order_id', null);
@@ -381,6 +384,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
         issueDescription: woData.reported_symptoms,
         solutionDescription: woData.technical_diagnosis,
         status: woData.status === 'delivered' ? 'Entregado' : 
+                woData.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
                 woData.status === 'received' ? 'Ingreso a revisión' :
                 woData.status === 'diagnosis' ? 'Diagnosticando' :
                 woData.status === 'completed' ? 'Reparado' :

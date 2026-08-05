@@ -144,6 +144,8 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
         return { label: 'Reparado', color: 'bg-emerald-500/15 text-emerald-400' }
       case 'delivered':
         return { label: 'Entregado', color: 'bg-green-500/15 text-green-400' }
+      case 'delivered_quote_rejected':
+        return { label: 'Moto entregada por cotización rechazada', color: 'bg-red-500/15 text-red-400' }
       default:
         return { label: status, color: 'bg-slate-500/15 text-slate-400' }
     }

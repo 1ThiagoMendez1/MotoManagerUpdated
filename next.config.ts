@@ -1,3 +1,4 @@
+process.env.TZ = 'America/Bogota';
 import type {NextConfig} from 'next';
 
 

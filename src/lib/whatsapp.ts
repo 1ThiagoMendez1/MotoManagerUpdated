@@ -790,54 +790,89 @@ export async function sendTemplateReminderNotification(
   try {
     const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
 
-    const response = await axios.post(
-      `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to: formattedPhone,
-        type: 'template',
-        template: {
-          name: 'recordatorio_clientes',
-          language: {
-            code: 'es_CO'
-          },
-          components: [
-            {
-              type: 'body',
-              parameters: [
-                { type: 'text', text: customerName }, // {{1}} Juan Urian
-                { type: 'text', text: motorcycleMakeModel }, // {{2}} Suzuki Gixxer 150
-                { type: 'text', text: motorcyclePlate }, // {{3}} GHK098
-                { type: 'text', text: workshopName }, // {{4}} Aguilas doradas
-                { type: 'text', text: 'mantenimiento o servicio' }, // {{5}} "cambio de aceite en tu moto" -> we can just pass generic or maybe omit if not parameterized
-                { type: 'text', text: lastServiceDate }, // {{6}} 25-06-2026
-                { type: 'text', text: serviceType }, // {{7}} Mantenimiento general
-                { type: 'text', text: workshopAddress }, // {{8}} Carrera 64 #73-67b
-                { type: 'text', text: workshopName } // {{9}} Aguilas Doradas (at the end)
-              ]
-            }
-          ]
-        }
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${wpToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    const baseParams = [
+      { type: 'text', text: customerName || 'Cliente' }, // {{1}} Juan Urian
+      { type: 'text', text: motorcycleMakeModel || 'tu moto' }, // {{2}} Suzuki Gixxer 150
+      { type: 'text', text: motorcyclePlate || 'Sin placa' }, // {{3}} GHK098
+      { type: 'text', text: workshopName || 'nuestro taller' }, // {{4}} Aguilas doradas
+      { type: 'text', text: serviceType || 'mantenimiento o servicio' }, // {{5}} "cambio de aceite en tu moto"
+      { type: 'text', text: lastServiceDate || 'recientemente' }, // {{6}} 25-06-2026
+      { type: 'text', text: serviceType || 'Mantenimiento general' }, // {{7}} Mantenimiento general
+      { type: 'text', text: workshopAddress || 'nuestras instalaciones' }, // {{8}} Carrera 64 #73-67b
+      { type: 'text', text: workshopName || 'nuestro taller' }, // {{9}} Aguilas Doradas (at the end)
+      { type: 'text', text: workshopName || 'nuestro taller' }  // {{10}} extra parameter if needed
+    ];
 
-    console.log('✅ WhatsApp template reminder sent via Meta API:', response.data);
-    return { success: true, data: response.data };
-  } catch (error: any) {
-    console.error('❌ Error sending WhatsApp template reminder via Meta API:', error.response?.data || error.message);
-    
-    // Si la plantilla espera otra cantidad de parametros, podemos intentar un fallback
-    if (error.response?.data?.error?.message) {
-      console.log('Error detallado de Meta:', error.response.data.error.message);
+    const headerParams = [
+      { type: 'text', text: workshopName || 'MotoManager' }
+    ];
+
+    const payloadsToTry = [
+      { includeHeader: true, numParams: 10 },
+      { includeHeader: true, numParams: 9 },
+      { includeHeader: false, numParams: 10 },
+      { includeHeader: false, numParams: 9 },
+      { includeHeader: false, numParams: 8 }
+    ];
+
+    let templateSent = false;
+    let lastError = null;
+    let successData = null;
+
+    for (const config of payloadsToTry) {
+      try {
+        const components: any[] = [];
+        
+        if (config.includeHeader) {
+          components.push({
+            type: 'header',
+            parameters: headerParams
+          });
+        }
+        
+        components.push({
+          type: 'body',
+          parameters: baseParams.slice(0, config.numParams)
+        });
+
+        const templateResponse = await axios.post(
+          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
+          {
+            messaging_product: 'whatsapp',
+            to: formattedPhone,
+            type: 'template',
+            template: {
+              name: 'recordatorio_clientes',
+              language: { code: 'es_CO' },
+              components
+            }
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${wpToken}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        console.log(`✅ Template recordatorio_clientes accepted (header: ${config.includeHeader}, params: ${config.numParams}):`, templateResponse.data);
+        templateSent = true;
+        successData = templateResponse.data;
+        break; // Éxito, salir del bucle
+      } catch (templateError: any) {
+        lastError = templateError;
+        console.warn(`⚠️ Template recordatorio_clientes attempt failed (header: ${config.includeHeader}, params: ${config.numParams}):`, templateError.response?.data?.error?.message || templateError.message);
+      }
     }
-    
-    return { success: false, error: error.response?.data || error.message };
+
+    if (templateSent) {
+      return { success: true, data: successData };
+    } else {
+      throw lastError;
+    }
+  } catch (error: any) {
+    console.error('❌ Error sending WhatsApp template reminder via Meta API:', error?.response?.data || error?.message);
+    return { success: false, error: error?.response?.data || error?.message };
   }
 }
 

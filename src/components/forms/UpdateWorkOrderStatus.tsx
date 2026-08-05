@@ -71,6 +71,7 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
     { value: 'En proceso', label: 'En proceso' },
     { value: 'Reparado', label: 'Reparado' },
     { value: 'Entregado', label: 'Entregado' },
+    { value: 'Moto entregada por cotización rechazada', label: 'Moto entregada por cotización rechazada' },
   ];
 
   const handleSubmit = (formData: FormData) => {
