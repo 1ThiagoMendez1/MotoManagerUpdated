@@ -6,11 +6,12 @@ import { motion } from 'framer-motion';
 import {
   Building2, User, Phone, MapPin, Hash, Mail,
   ArrowLeft, Save, CheckCircle2, AlertCircle, Loader2,
-  Wrench
+  Wrench, Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getProfileData, updateProfileData } from '@/lib/actions/profile';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProfileData {
   workshopName: string;
@@ -27,11 +28,13 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [mapsLinkText, setMapsLinkText] = useState('');
+  const [editingSections, setEditingSections] = useState({ workshop: false, owner: false });
   const [data, setData] = useState<ProfileData>({
     workshopName: '',
     workshopPhone: '',
@@ -42,6 +45,44 @@ export default function ProfilePage() {
     ownerPhone: '',
     email: '',
   });
+
+  const toggleSectionEdit = (section: 'workshop' | 'owner') => {
+    setEditingSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const renderInput = (
+    id: keyof ProfileData,
+    label: string,
+    icon: React.ReactNode,
+    type: string,
+    placeholder: string,
+    isEditing: boolean,
+    required: boolean = false
+  ) => {
+    const val = data[id] || '';
+    return (
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={id as string} className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          {icon} {label} {required && '*'}
+        </label>
+        <input
+          id={id as string}
+          name={id as string}
+          type={type}
+          required={required && isEditing} // Only enforce required if they are editing or if we really need it, actually we'll keep it required if it's required
+          value={val}
+          onChange={(e) => setData({ ...data, [id]: e.target.value })}
+          placeholder={placeholder}
+          readOnly={!isEditing}
+          className={`w-full rounded-xl px-4 py-2.5 text-sm transition-all focus:outline-none ${
+            isEditing 
+              ? 'bg-background border border-border text-foreground focus:ring-2 focus:ring-primary/40 focus:border-primary/60' 
+              : 'bg-muted/20 border border-transparent text-foreground/80 cursor-default'
+          }`}
+        />
+      </div>
+    );
+  };
 
   useEffect(() => {
     getProfileData().then((d) => {
@@ -79,15 +120,11 @@ export default function ProfilePage() {
             if (suburb) exactAddress += exactAddress ? `, ${suburb}` : suburb;
             if (!exactAddress) exactAddress = geodata.display_name.split(',')[0];
             
-            const addressInput = document.getElementById('workshopAddress') as HTMLInputElement;
-            if (addressInput && exactAddress) {
-              addressInput.value = exactAddress;
-            }
-            
-            const cityInput = document.getElementById('workshopCity') as HTMLInputElement;
-            if (cityInput && cityName) {
-              cityInput.value = cityName;
-            }
+            setData(prev => ({
+              ...prev,
+              workshopAddress: exactAddress || prev.workshopAddress,
+              workshopCity: cityName || prev.workshopCity
+            }));
           }
         } catch (e) {
           console.error("Geocoding error:", e);
@@ -115,7 +152,12 @@ export default function ProfilePage() {
       if (result.error) {
         setError(result.error);
       } else {
-        router.push('/dashboard');
+        setEditingSections({ workshop: false, owner: false });
+        toast({
+          title: '¡Datos actualizados!',
+          description: 'Tu perfil ha sido guardado exitosamente.',
+          variant: 'default',
+        });
       }
     });
   };
@@ -161,48 +203,33 @@ export default function ProfilePage() {
                 className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm"
               >
               {/* Card Header */}
-              <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-primary/5">
-                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-                  <Building2 className="w-4 h-4 text-primary" />
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-primary/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                    <Building2 className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-foreground text-sm">Información del Taller</h2>
+                    <p className="text-xs text-muted-foreground">Nombre, contacto y ubicación</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-semibold text-foreground text-sm">Información del Taller</h2>
-                  <p className="text-xs text-muted-foreground">Nombre, contacto y ubicación</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSectionEdit('workshop')}
+                  className={`transition-colors p-2 rounded-lg border ${editingSections.workshop ? 'bg-primary text-primary-foreground border-primary shadow-sm hover:opacity-90' : 'bg-background/80 text-muted-foreground hover:text-primary border-border/40 hover:bg-background'}`}
+                  title="Editar Información del Taller"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
               </div>
 
               <div className="p-6 grid grid-cols-1 gap-4">
 
                 {/* Nombre del taller */}
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="workshopName" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Wrench className="w-3.5 h-3.5" /> Nombre del taller *
-                  </label>
-                  <input
-                    id="workshopName"
-                    name="workshopName"
-                    type="text"
-                    required
-                    defaultValue={data.workshopName}
-                    placeholder="Ej: Moto Service El Rápido"
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                  />
-                </div>
+                {renderInput('workshopName', 'Nombre del taller', <Wrench className="w-3.5 h-3.5" />, 'text', 'Ej: Moto Service El Rápido', editingSections.workshop, true)}
 
                 {/* Teléfono del taller */}
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="workshopPhone" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5" /> Teléfono del taller
-                  </label>
-                  <input
-                    id="workshopPhone"
-                    name="workshopPhone"
-                    type="tel"
-                    defaultValue={data.workshopPhone}
-                    placeholder="Ej: 3001234567"
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                  />
-                </div>
+                {renderInput('workshopPhone', 'Teléfono del taller', <Phone className="w-3.5 h-3.5" />, 'tel', 'Ej: 3001234567', editingSections.workshop)}
 
                 {/* Dirección y Botón GPS */}
                 <div className="flex flex-col gap-1.5">
@@ -214,15 +241,21 @@ export default function ProfilePage() {
                       id="workshopAddress"
                       name="workshopAddress"
                       type="text"
-                      defaultValue={data.workshopAddress}
+                      value={data.workshopAddress || ''}
+                      onChange={(e) => setData({ ...data, workshopAddress: e.target.value })}
                       placeholder="Ej: Calle 10 # 5-32, Local 3"
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all flex-1"
+                      readOnly={!editingSections.workshop}
+                      className={`w-full rounded-xl px-4 py-2.5 text-sm transition-all focus:outline-none flex-1 ${
+                        editingSections.workshop 
+                          ? 'bg-background border border-border text-foreground focus:ring-2 focus:ring-primary/40 focus:border-primary/60' 
+                          : 'bg-muted/20 border border-transparent text-foreground/80 cursor-default'
+                      }`}
                     />
-                    <input type="hidden" id="workshopMapsLink" name="workshopMapsLink" defaultValue={mapsLinkText} />
+                    <input type="hidden" id="workshopMapsLink" name="workshopMapsLink" value={mapsLinkText} />
                     <button
                       type="button"
                       onClick={handleGetLocation}
-                      disabled={isLocating}
+                      disabled={isLocating || !editingSections.workshop}
                       className="flex items-center justify-center gap-2 px-4 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium rounded-xl transition-colors disabled:opacity-50 shrink-0"
                     >
                       {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
@@ -238,32 +271,8 @@ export default function ProfilePage() {
 
                 {/* Ciudad y NIT en grid */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="workshopCity" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5" /> Ciudad
-                    </label>
-                    <input
-                      id="workshopCity"
-                      name="workshopCity"
-                      type="text"
-                      defaultValue={data.workshopCity}
-                      placeholder="Ej: Bogotá"
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="workshopNit" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                      <Hash className="w-3.5 h-3.5" /> NIT
-                    </label>
-                    <input
-                      id="workshopNit"
-                      name="workshopNit"
-                      type="text"
-                      defaultValue={data.workshopNit}
-                      placeholder="Ej: 900.123.456-7"
-                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                    />
-                  </div>
+                  {renderInput('workshopCity', 'Ciudad', <MapPin className="w-3.5 h-3.5" />, 'text', 'Ej: Bogotá', editingSections.workshop)}
+                  {renderInput('workshopNit', 'NIT', <Hash className="w-3.5 h-3.5" />, 'text', 'Ej: 900.123.456-7', editingSections.workshop)}
                 </div>
               </div>
             </motion.div>
@@ -276,14 +285,24 @@ export default function ProfilePage() {
               transition={{ delay: 0.2 }}
               className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm"
             >
-              <div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-primary/5">
-                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
-                  <User className="w-4 h-4 text-primary" />
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-primary/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
+                    <User className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-foreground text-sm">Datos del Propietario</h2>
+                    <p className="text-xs text-muted-foreground">Tu nombre y contacto personal</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-semibold text-foreground text-sm">Datos del Propietario</h2>
-                  <p className="text-xs text-muted-foreground">Tu nombre y contacto personal</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSectionEdit('owner')}
+                  className={`transition-colors p-2 rounded-lg border ${editingSections.owner ? 'bg-primary text-primary-foreground border-primary shadow-sm hover:opacity-90' : 'bg-background/80 text-muted-foreground hover:text-primary border-border/40 hover:bg-background'}`}
+                  title="Editar Datos del Propietario"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
               </div>
 
               <div className="p-6 grid grid-cols-1 gap-4">
@@ -300,35 +319,10 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Nombre del propietario */}
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ownerName" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5" /> Nombre completo *
-                  </label>
-                  <input
-                    id="ownerName"
-                    name="ownerName"
-                    type="text"
-                    required
-                    defaultValue={data.ownerName}
-                    placeholder="Ej: Camilo Sánchez"
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                  />
-                </div>
+                {renderInput('ownerName', 'Nombre completo', <User className="w-3.5 h-3.5" />, 'text', 'Ej: Camilo Sánchez', editingSections.owner, true)}
 
                 {/* Teléfono del propietario */}
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ownerPhone" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5" /> Celular / WhatsApp
-                  </label>
-                  <input
-                    id="ownerPhone"
-                    name="ownerPhone"
-                    type="tel"
-                    defaultValue={data.ownerPhone}
-                    placeholder="Ej: 3109876543"
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                  />
-                </div>
+                {renderInput('ownerPhone', 'Celular / WhatsApp', <Phone className="w-3.5 h-3.5" />, 'tel', 'Ej: 3109876543', editingSections.owner)}
               </div>
             </motion.div>
 
@@ -346,29 +340,31 @@ export default function ProfilePage() {
 
 
             {/* Botón guardar */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Button
-                type="submit"
-                disabled={isPending}
-                className="w-full h-12 rounded-xl font-semibold text-sm bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/20 transition-all gap-2"
+            {(editingSections.workshop || editingSections.owner) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
               >
-                {isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Guardar cambios
-                  </>
-                )}
-              </Button>
-            </motion.div>
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="w-full h-12 rounded-xl font-semibold text-sm bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/20 transition-all gap-2"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Guardar cambios
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            )}
 
           </div>
         </form>

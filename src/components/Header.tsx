@@ -130,12 +130,64 @@ export default function Header({
   };
 
   const getPlanName = (plan?: string | null) => {
-    switch (plan) {
+    const p = plan?.toLowerCase() || '';
+    switch (p) {
       case 'monthly': return 'Mensual';
       case 'biannual': return 'Semestral';
       case 'yearly': return 'Anual';
+      case 'basic': return 'Básico';
+      case 'pro': return 'Pro';
+      case 'full': return 'Full';
       default: return plan ? plan : 'Gratis';
     }
+  };
+
+  const getPlanColor = (plan?: string | null) => {
+    const p = plan?.toLowerCase() || '';
+    if (p.includes('pro')) return 'text-yellow-500';
+    if (p.includes('full')) return 'text-red-500';
+    if (p.includes('basic')) return 'text-blue-500';
+    return 'text-primary';
+  };
+
+  const getPlanBgColor = (plan?: string | null) => {
+    const p = plan?.toLowerCase() || '';
+    if (p.includes('pro')) return 'bg-yellow-500/10';
+    if (p.includes('full')) return 'bg-red-500/10';
+    if (p.includes('basic')) return 'bg-blue-500/10';
+    return 'bg-primary/10';
+  };
+
+  const getPlanGlowColor = (plan?: string | null) => {
+    const p = plan?.toLowerCase() || '';
+    if (p.includes('pro')) return 'group-hover:bg-yellow-500/20';
+    if (p.includes('full')) return 'group-hover:bg-red-500/20';
+    if (p.includes('basic')) return 'group-hover:bg-blue-500/20';
+    return 'group-hover:bg-primary/20';
+  };
+
+  const getPlanBorderColor = (plan?: string | null) => {
+    const p = plan?.toLowerCase() || '';
+    if (p.includes('pro')) return 'border-yellow-500/30';
+    if (p.includes('full')) return 'border-red-500/30';
+    if (p.includes('basic')) return 'border-blue-500/30';
+    return 'border-border/50';
+  };
+
+  const getPlanHoverBorderColor = (plan?: string | null) => {
+    const p = plan?.toLowerCase() || '';
+    if (p.includes('pro')) return 'hover:border-yellow-500/50';
+    if (p.includes('full')) return 'hover:border-red-500/50';
+    if (p.includes('basic')) return 'hover:border-blue-500/50';
+    return 'hover:border-primary/30';
+  };
+
+  const getPlanShadowColor = (plan?: string | null) => {
+    const p = plan?.toLowerCase() || '';
+    if (p.includes('pro')) return 'shadow-[0_0_15px_rgba(234,179,8,0.1)] hover:shadow-[0_0_20px_rgba(234,179,8,0.15)]';
+    if (p.includes('full')) return 'shadow-[0_0_15px_rgba(239,68,68,0.1)] hover:shadow-[0_0_20px_rgba(239,68,68,0.15)]';
+    if (p.includes('basic')) return 'shadow-[0_0_15px_rgba(59,130,246,0.1)] hover:shadow-[0_0_20px_rgba(59,130,246,0.15)]';
+    return 'shadow-sm';
   };
 
   const getCalculatedEndDate = () => {
@@ -145,10 +197,20 @@ export default function Header({
     const startDate = new Date(workshopCreatedAt);
     let monthsToAdd = 0;
 
-    switch (subscriptionPlan) {
-      case 'monthly': monthsToAdd = 1; break;
-      case 'biannual': monthsToAdd = 6; break;
-      case 'yearly': monthsToAdd = 12; break;
+    const p = subscriptionPlan?.toLowerCase() || '';
+    switch (p) {
+      case 'monthly':
+      case 'basic':
+      case 'pro':
+      case 'full':
+        monthsToAdd = 1;
+        break;
+      case 'biannual':
+        monthsToAdd = 6;
+        break;
+      case 'yearly':
+        monthsToAdd = 12;
+        break;
       default: return null; // Si no hay plan reconocido, no hay expiración calculada
     }
 
@@ -311,14 +373,14 @@ export default function Header({
                 {/* Plan Info Card */}
                 {userRole === 'owner' && subscriptionPlan && (
                   <div className="p-3">
-                    <div className="bg-card/50 border border-border/50 rounded-lg p-3 relative overflow-hidden group hover:border-primary/30 transition-colors">
+                    <div className={`bg-card/50 border ${getPlanBorderColor(subscriptionPlan)} rounded-lg p-3 relative overflow-hidden group ${getPlanHoverBorderColor(subscriptionPlan)} transition-colors ${getPlanShadowColor(subscriptionPlan)}`}>
                       {/* Subtle shine effect */}
-                      <div className="absolute top-0 right-0 -mr-4 -mt-4 w-16 h-16 bg-primary/10 rounded-full blur-xl transition-all group-hover:bg-primary/20"></div>
+                      <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-16 h-16 ${getPlanBgColor(subscriptionPlan)} rounded-full blur-xl transition-all ${getPlanGlowColor(subscriptionPlan)}`}></div>
                       
                       <div className="flex items-center justify-between mb-3 relative z-10">
                         <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                          <Crown className="w-4 h-4 text-primary" />
-                          Plan {getPlanName(subscriptionPlan)}
+                          <Crown className={`w-4 h-4 ${getPlanColor(subscriptionPlan)}`} />
+                          Plan <span className={getPlanColor(subscriptionPlan)}>{getPlanName(subscriptionPlan)}</span>
                         </div>
                         {subscriptionStatus === 'active' ? (
                           <span className="text-[10px] uppercase font-bold tracking-wider bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full border border-green-500/20">

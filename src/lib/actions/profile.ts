@@ -12,25 +12,35 @@ export async function getProfileData() {
 
   const [{ data: workshop }, { data: profile }] = await Promise.all([
     supabase
-      .from('workshops')
-      .select('name, slug, phone, address, city, nit, maps_link')
+      .from('organizations')
+      .select('name, slug, phone, settings')
       .eq('id', user.workshopId!)
       .single(),
     supabase
-      .from('user_profiles')
-      .select('name, phone')
+      .from('profiles')
+      .select('first_name, last_name, phone')
       .eq('id', user.userId)
       .single(),
   ])
 
+  const settings = workshop?.settings || {};
+  
+  const ownerNameFallback = user.user_metadata?.first_name 
+    ? `${user.user_metadata.first_name} ${user.user_metadata?.last_name || ''}`.trim() 
+    : user.email?.split('@')[0];
+
+  const profileNameFallback = profile?.first_name 
+    ? `${profile.first_name} ${profile.last_name || ''}`.trim() 
+    : '';
+
   return {
     workshopName: workshop?.name || '',
     workshopPhone: workshop?.phone || '',
-    workshopAddress: workshop?.address || '',
-    workshopCity: workshop?.city || '',
-    workshopNit: workshop?.nit || '',
-    workshopMapsLink: workshop?.maps_link || '',
-    ownerName: profile?.name || '',
+    workshopAddress: settings.address || '',
+    workshopCity: settings.city || '',
+    workshopNit: settings.nit || '',
+    workshopMapsLink: settings.maps_link || '',
+    ownerName: profileNameFallback || ownerNameFallback || '',
     ownerPhone: profile?.phone || '',
     email: user.email,
     userRole: user.role,
@@ -43,6 +53,7 @@ export async function getProfileData() {
 export async function updateProfileData(formData: FormData) {
   const user = await requireWorkshop()
   const supabase = await createClient();
+  const supabaseAdmin = await createAdminClient();
 
   const workshopName = (formData.get('workshopName') as string)?.trim()
   const workshopPhone = (formData.get('workshopPhone') as string)?.trim() || null
@@ -61,33 +72,48 @@ export async function updateProfileData(formData: FormData) {
   }
 
   if (user.role === 'owner') {
+    // Fetch existing settings to not overwrite them
+    const { data: currentOrg } = await supabaseAdmin
+      .from('organizations')
+      .select('settings')
+      .eq('id', user.workshopId!)
+      .single();
+    const currentSettings = currentOrg?.settings || {};
+
     // Actualizar datos del taller
-    const { error: workshopError } = await supabase
-      .from('workshops')
+    const { error: workshopError } = await supabaseAdmin
+      .from('organizations')
       .update({
         name: workshopName,
         phone: workshopPhone,
-        address: workshopAddress,
-        city: workshopCity,
-        nit: workshopNit,
-        maps_link: workshopMapsLink,
+        settings: {
+          ...currentSettings,
+          address: workshopAddress,
+          city: workshopCity,
+          nit: workshopNit,
+          maps_link: workshopMapsLink,
+        }
       })
       .eq('id', user.workshopId!)
 
     if (workshopError) {
-      console.error('[updateProfileData] Workshop error:', workshopError)
+      console.error('[updateProfileData] Organization error:', workshopError)
       return { error: 'Error al actualizar los datos del taller.' }
     }
   }
 
+  const first_name = ownerName.split(' ')[0];
+  const last_name = ownerName.split(' ').slice(1).join(' ');
+
   // Actualizar datos del perfil de usuario
-  const { error: profileError } = await supabase
-    .from('user_profiles')
-    .update({
-      name: ownerName,
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .upsert({
+      id: user.userId,
+      first_name,
+      last_name,
       phone: ownerPhone,
-    })
-    .eq('id', user.userId)
+    }, { onConflict: 'id' })
 
   if (profileError) {
     console.error('[updateProfileData] Profile error:', profileError)
