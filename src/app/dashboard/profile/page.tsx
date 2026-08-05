@@ -35,6 +35,7 @@ export default function ProfilePage() {
   const [isLocating, setIsLocating] = useState(false);
   const [mapsLinkText, setMapsLinkText] = useState('');
   const [editingSections, setEditingSections] = useState({ workshop: false, owner: false });
+  const [manualAddressEdited, setManualAddressEdited] = useState(false);
   const [data, setData] = useState<ProfileData>({
     workshopName: '',
     workshopPhone: '',
@@ -71,7 +72,10 @@ export default function ProfilePage() {
           type={type}
           required={required && isEditing} // Only enforce required if they are editing or if we really need it, actually we'll keep it required if it's required
           value={val}
-          onChange={(e) => setData({ ...data, [id]: e.target.value })}
+          onChange={(e) => {
+            setData({ ...data, [id]: e.target.value });
+            if (id === 'workshopCity') setManualAddressEdited(true);
+          }}
           placeholder={placeholder}
           readOnly={!isEditing}
           className={`w-full rounded-xl px-4 py-2.5 text-sm transition-all focus:outline-none ${
@@ -125,6 +129,7 @@ export default function ProfilePage() {
               workshopAddress: exactAddress || prev.workshopAddress,
               workshopCity: cityName || prev.workshopCity
             }));
+            setManualAddressEdited(false);
           }
         } catch (e) {
           console.error("Geocoding error:", e);
@@ -148,6 +153,24 @@ export default function ProfilePage() {
     const formData = new FormData(e.currentTarget);
 
     startTransition(async () => {
+      if (manualAddressEdited && editingSections.workshop) {
+        try {
+          const address = formData.get('workshopAddress') as string;
+          const city = formData.get('workshopCity') as string;
+          if (address && city) {
+            const query = `${address}, ${city}, Colombia`;
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+            const geoData = await res.json();
+            if (geoData && geoData.length > 0) {
+              const { lat, lon } = geoData[0];
+              formData.set('workshopMapsLink', `https://maps.google.com/?q=${lat},${lon}`);
+            }
+          }
+        } catch (err) {
+          console.error("Geocoding manual address error:", err);
+        }
+      }
+
       const result = await updateProfileData(formData);
       if (result.error) {
         setError(result.error);
@@ -242,7 +265,10 @@ export default function ProfilePage() {
                       name="workshopAddress"
                       type="text"
                       value={data.workshopAddress || ''}
-                      onChange={(e) => setData({ ...data, workshopAddress: e.target.value })}
+                      onChange={(e) => {
+                        setData({ ...data, workshopAddress: e.target.value });
+                        setManualAddressEdited(true);
+                      }}
                       placeholder="Ej: Calle 10 # 5-32, Local 3"
                       readOnly={!editingSections.workshop}
                       className={`w-full rounded-xl px-4 py-2.5 text-sm transition-all focus:outline-none flex-1 ${
