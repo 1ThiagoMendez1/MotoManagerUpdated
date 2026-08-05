@@ -336,7 +336,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
   if (params.type === 'direct') {
     query = query.is('work_order_id', null);
   } else if (params.type === 'service') {
-    query = query.not('work_order_id', 'is', null);
+    query = (query as any).not('work_order_id', 'is', null);
   }
 
   if (params.query) {
