@@ -21,7 +21,6 @@ interface ProfileData {
   ownerName: string;
   ownerPhone: string;
   email: string;
-  email: string;
   userRole?: string;
   workshopMapsLink?: string;
 }
