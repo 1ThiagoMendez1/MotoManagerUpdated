@@ -19,7 +19,10 @@ export const getCustomers = async (params: { query?: string, page?: number } = {
   const limit = 10;
   const offset = (page - 1) * limit;
 
-  let q = supabase.from('customers').select('*', { count: 'exact' }).eq('organization_id', user.workshopId);
+  let q = supabase.from('customers')
+    .select('*', { count: 'exact' })
+    .eq('organization_id', user.workshopId)
+    .order('created_at', { ascending: false });
   
   if (params.query) {
     q = q.or(`first_name.ilike.%${params.query}%,last_name.ilike.%${params.query}%,document_number.ilike.%${params.query}%`);
@@ -88,7 +91,8 @@ export const getMotorcycles = async (params: { query?: string, page?: number } =
 
   let q = supabase.from('motorcycles')
     .select('*, customers(*)', { count: 'exact' })
-    .eq('organization_id', user.workshopId);
+    .eq('organization_id', user.workshopId)
+    .order('created_at', { ascending: false });
     
   if (params.query) {
     q = q.or(`brand.ilike.%${params.query}%,model.ilike.%${params.query}%,license_plate.ilike.%${params.query}%`);
@@ -126,7 +130,10 @@ export const getInventory = async (params: { query?: string, page?: number } = {
   const limit = 10;
   const offset = (page - 1) * limit;
 
-  let q = supabase.from('inventory_items').select('*', { count: 'exact' }).eq('organization_id', user.workshopId);
+  let q = supabase.from('inventory_items')
+    .select('*', { count: 'exact' })
+    .eq('organization_id', user.workshopId)
+    .order('created_at', { ascending: false });
 
   if (params.query) {
     q = q.or(`name.ilike.%${params.query}%,code.ilike.%${params.query}%`);
