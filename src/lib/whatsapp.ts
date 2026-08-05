@@ -2358,14 +2358,14 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
     const subPlan = settings.sub_plan || 'basic';
     const planLimits = getPlanLimits(subPlan);
 
-    if (planLimits.whatsapp === 'unlimited') return true;
+    if (planLimits.whatsapp_limit === -1) return true;
 
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
     const msgCountKey = `whatsapp_count_${currentMonth}`;
     const currentCount = settings[msgCountKey] || 0;
 
-    if (currentCount >= (planLimits.whatsapp as number)) {
-      console.warn(`WhatsApp limit reached for workshop ${workshopId}. Plan: ${subPlan}, Limit: ${planLimits.whatsapp}`);
+    if (currentCount >= planLimits.whatsapp_limit) {
+      console.warn(`WhatsApp limit reached for workshop ${workshopId}. Plan: ${subPlan}, Limit: ${planLimits.whatsapp_limit}`);
       return false;
     }
 
