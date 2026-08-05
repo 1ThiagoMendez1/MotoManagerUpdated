@@ -73,7 +73,7 @@ export const DEFAULT_PLANS = [
     btn: 'from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 shadow-purple-500/25',
     
     // Limits & Features
-    users_limit: 5,
+    users_limit: -1, // -1 means unlimited
     whatsapp_limit: -1, // -1 means unlimited
     has_inventory: true,
     has_sales: true,
