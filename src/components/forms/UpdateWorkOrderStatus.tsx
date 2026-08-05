@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { updateWorkOrderStatus } from '@/lib/actions/work-orders';
 import type { WorkOrder } from '@/lib/types';
+import { formatExactDateTime } from '@/lib/dateUtils';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -130,12 +131,12 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
 
           {workOrder.diagnosticandoDate && (
             <div className="space-y-1 text-xs text-gray-600">
-              <div>Diagnosticando: {new Date(workOrder.diagnosticandoDate).toLocaleDateString('es-CO')}</div>
+              <div>Diagnosticando: {formatExactDateTime(workOrder.diagnosticandoDate)}</div>
               {workOrder.reparadoDate && (
-                <div>Reparado: {new Date(workOrder.reparadoDate).toLocaleDateString('es-CO')}</div>
+                <div>Reparado: {formatExactDateTime(workOrder.reparadoDate)}</div>
               )}
               {workOrder.entregadoDate && (
-                <div>Entregado: {new Date(workOrder.entregadoDate).toLocaleDateString('es-CO')}</div>
+                <div>Entregado: {formatExactDateTime(workOrder.entregadoDate)}</div>
               )}
             </div>
           )}

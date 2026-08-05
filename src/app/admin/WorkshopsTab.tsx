@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import WorkshopActions from './WorkshopActions';
 import { motion } from 'framer-motion';
+import { formatExactDateTime } from '@/lib/dateUtils';
 
 interface WorkshopsTabProps {
     workshops: any[];
@@ -207,15 +208,15 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
 
                                             <TableCell className="text-muted-foreground py-4 text-xs">
                                                 <div className="flex flex-col gap-1">
-                                                    <div className="flex justify-between items-center w-36">
+                                                    <div className="flex justify-between items-center w-full min-w-[160px]">
                                                         <span className="opacity-60">Inicio:</span>
-                                                        <span className="text-foreground/80 dark:text-white/80">{new Date(workshop.created_at).toLocaleDateString('es-CO')}</span>
+                                                        <span className="text-foreground/80 dark:text-white/80">{formatExactDateTime(workshop.created_at)}</span>
                                                     </div>
                                                     {workshop.subscription_end_date && (
-                                                        <div className="flex justify-between items-center w-36">
+                                                        <div className="flex justify-between items-center w-full min-w-[160px] mt-1">
                                                             <span className="opacity-60">Próx. Cobro:</span>
                                                             <span className="text-blue-400 font-medium">
-                                                                {new Date(workshop.subscription_end_date).toLocaleDateString('es-CO')}
+                                                                {formatExactDateTime(workshop.subscription_end_date)}
                                                             </span>
                                                         </div>
                                                     )}

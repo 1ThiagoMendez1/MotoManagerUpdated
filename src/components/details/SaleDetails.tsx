@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale, InventoryItem } from '@/lib/types';
 
 interface SaleDetailsProps {
@@ -136,7 +136,7 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
                     <Badge className="ml-2">Mostrador</Badge>
                   )}
                 </div>
-                <div><span className="font-medium">Fecha:</span> {sale.date ? format(new Date(sale.date), 'dd/MM/yyyy HH:mm') : 'Fecha no disponible'}</div>
+                <div><span className="font-medium">Fecha:</span> {sale.date ? formatExactDateTime(sale.date) : 'Fecha no disponible'}</div>
                 <div><span className="font-medium">Método de Pago:</span> {sale.paymentMethod || 'No especificado'}</div>
                 {(() => {
                   const deposit = sale.depositAmount || sale.workOrder?.depositAmount || 0;
@@ -185,7 +185,7 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
                 </div>
                 <div>
                   <div><span className="font-medium">Placa:</span> {sale.workOrder.motorcycle.plate}</div>
-                  <div><span className="font-medium">Fecha de Ingreso:</span> {sale.workOrder.motorcycle.intakeDate ? format(new Date(sale.workOrder.motorcycle.intakeDate), 'dd/MM/yyyy') : 'Fecha no disponible'}</div>
+                  <div><span className="font-medium">Fecha de Ingreso:</span> {sale.workOrder.motorcycle.intakeDate ? formatExactDateTime(sale.workOrder.motorcycle.intakeDate) : 'Fecha no disponible'}</div>
                 </div>
               </div>
             </div>

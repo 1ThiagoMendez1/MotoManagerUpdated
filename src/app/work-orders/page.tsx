@@ -26,7 +26,7 @@ import { UpdateWorkOrderStatus } from '@/components/forms/UpdateWorkOrderStatus'
 import { UpdateQuoteStatus } from '@/components/forms/UpdateQuoteStatus';
 import { ReassignTechnician } from '@/components/forms/ReassignTechnician';
 import { SearchWorkOrders } from '@/components/forms/SearchWorkOrders';
-import { format } from 'date-fns';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
@@ -122,7 +122,7 @@ export default async function WorkOrdersPage({
                     <div className="text-sm text-muted-foreground">{order.motorcycle.customer.name}</div>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {format(new Date(order.motorcycle.intakeDate), 'dd/MM/yyyy')}
+                    {formatExactDateTime(order.motorcycle.intakeDate)}
                   </TableCell>
                   <TableCell>{order.technician?.name ?? 'Sin asignar'}</TableCell>
                   <TableCell className="text-center">
@@ -132,9 +132,9 @@ export default async function WorkOrdersPage({
                       </Badge>
                       {order.diagnosticandoDate && (
                         <div className="text-xs text-muted-foreground">
-                          {order.status === 'Diagnosticando' && `Desde: ${format(new Date(order.diagnosticandoDate), 'dd/MM')}`}
-                          {order.status === 'Reparado' && order.reparadoDate && `Reparado: ${format(new Date(order.reparadoDate), 'dd/MM')}`}
-                          {order.status === 'Entregado' && order.entregadoDate && `Entregado: ${format(new Date(order.entregadoDate), 'dd/MM')}`}
+                          {order.status === 'Diagnosticando' && `Desde: ${formatExactDateTime(order.diagnosticandoDate)}`}
+                          {order.status === 'Reparado' && order.reparadoDate && `Reparado: ${formatExactDateTime(order.reparadoDate)}`}
+                          {order.status === 'Entregado' && order.entregadoDate && `Entregado: ${formatExactDateTime(order.entregadoDate)}`}
                         </div>
                       )}
                     </div>
@@ -252,7 +252,7 @@ export default async function WorkOrdersPage({
                         <div className="text-sm text-muted-foreground">{order.motorcycle.customer.name}</div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {format(new Date(order.motorcycle.intakeDate), 'dd/MM/yyyy')}
+                        {formatExactDateTime(order.motorcycle.intakeDate)}
                       </TableCell>
                       <TableCell>{order.technician?.name ?? 'Sin asignar'}</TableCell>
                       <TableCell className="text-center">
@@ -262,9 +262,9 @@ export default async function WorkOrdersPage({
                           </Badge>
                           {order.diagnosticandoDate && (
                             <div className="text-xs text-muted-foreground">
-                              {order.status === 'Diagnosticando' && `Desde: ${format(new Date(order.diagnosticandoDate), 'dd/MM')}`}
-                              {order.status === 'Reparado' && order.reparadoDate && `Reparado: ${format(new Date(order.reparadoDate), 'dd/MM')}`}
-                              {order.status === 'Entregado' && order.entregadoDate && `Entregado: ${format(new Date(order.entregadoDate), 'dd/MM')}`}
+                              {order.status === 'Diagnosticando' && `Desde: ${formatExactDateTime(order.diagnosticandoDate)}`}
+                              {order.status === 'Reparado' && order.reparadoDate && `Reparado: ${formatExactDateTime(order.reparadoDate)}`}
+                              {order.status === 'Entregado' && order.entregadoDate && `Entregado: ${formatExactDateTime(order.entregadoDate)}`}
                             </div>
                           )}
                         </div>

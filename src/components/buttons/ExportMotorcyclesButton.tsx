@@ -2,6 +2,7 @@
 
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Motorcycle } from '@/lib/types';
 import * as XLSX from 'xlsx';
 
@@ -17,7 +18,7 @@ export function ExportMotorcyclesButton({ motorcycles }: ExportMotorcyclesButton
       'Modelo': moto.model,
       'Año': moto.year,
       'Placa': moto.plate,
-      'Fecha de Ingreso': new Date(moto.intakeDate).toLocaleDateString('es-CO'),
+      'Fecha de Ingreso': formatExactDateTime(moto.intakeDate),
       'Cliente': moto.customer.name,
       'Email del Cliente': moto.customer.email || 'N/A',
       'Teléfono del Cliente': moto.customer.phone || 'N/A',

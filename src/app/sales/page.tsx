@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { format } from 'date-fns';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import { ExportSalesButton } from '@/components/buttons/ExportSalesButton';
 import { SalesFilters } from '@/components/SalesFilters';
 import { SalesPagination } from '@/components/SalesPagination';
@@ -213,7 +213,7 @@ export default async function SalesPage({
                       <TableCell className="hidden md:table-cell text-xs sm:text-sm text-muted-foreground max-w-xs truncate">
                         {getSaleDetails(sale)}
                       </TableCell>
-                      <TableCell className="text-xs sm:text-sm">{format(new Date(sale.date), 'yyyy-MM-dd')}</TableCell>
+                      <TableCell className="text-xs sm:text-sm">{formatExactDateTime(sale.date)}</TableCell>
                       <TableCell className="text-xs sm:text-sm">
                         {sale.status === 'pending' ? (
                           <Badge variant="destructive" className="bg-amber-500 hover:bg-amber-600 text-white border-transparent">Pendiente</Badge>

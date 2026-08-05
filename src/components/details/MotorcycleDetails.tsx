@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import type { Motorcycle, WorkOrder } from '@/lib/types';
 import { User, Calendar, Wrench, FileText } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import { Badge } from '@/components/ui/badge';
 
 type MotorcycleDetailsProps = {
@@ -50,7 +50,7 @@ export function MotorcycleDetails({ motorcycle, workOrders = [] }: MotorcycleDet
                  <div>
                      <h4 className="font-semibold mb-2 flex items-center text-foreground"><Calendar className="mr-2 h-4 w-4" /> Historial</h4>
                      <div className="text-sm text-muted-foreground pl-6">
-                         <p><strong>Fecha de Ingreso:</strong> {format(new Date(motorcycle.intakeDate), 'PPP')}</p>
+                         <p><strong>Fecha de Ingreso:</strong> {formatExactDateTime(motorcycle.intakeDate)}</p>
                      </div>
                  </div>
                  {motorcycle.issueDescription && (
@@ -86,18 +86,18 @@ export function MotorcycleDetails({ motorcycle, workOrders = [] }: MotorcycleDet
                                          <p><strong>Técnico:</strong> {workOrder.technician?.name ?? 'Sin asignar'}</p>
                                          {workOrder.issueDescription && <p><strong>Problema:</strong> {workOrder.issueDescription}</p>}
                                          <div className="text-xs text-gray-600 mt-2">
-                                             <p><strong>Creada:</strong> {format(new Date(workOrder.createdDate), 'dd/MM/yyyy HH:mm')}</p>
+                                             <p><strong>Creada:</strong> {formatExactDateTime(workOrder.createdDate)}</p>
                                              {workOrder.diagnosticandoDate && (
-                                                 <p><strong>Diagnosticando:</strong> {format(new Date(workOrder.diagnosticandoDate), 'dd/MM/yyyy HH:mm')}</p>
+                                                 <p><strong>Diagnosticando:</strong> {formatExactDateTime(workOrder.diagnosticandoDate)}</p>
                                              )}
                                              {workOrder.reparadoDate && (
-                                                 <p><strong>Reparado:</strong> {format(new Date(workOrder.reparadoDate), 'dd/MM/yyyy HH:mm')}</p>
+                                                 <p><strong>Reparado:</strong> {formatExactDateTime(workOrder.reparadoDate)}</p>
                                              )}
                                              {workOrder.entregadoDate && (
-                                                 <p><strong>Entregado:</strong> {format(new Date(workOrder.entregadoDate), 'dd/MM/yyyy HH:mm')}</p>
+                                                 <p><strong>Entregado:</strong> {formatExactDateTime(workOrder.entregadoDate)}</p>
                                              )}
                                              {workOrder.completedDate && (
-                                                 <p><strong>Completada:</strong> {format(new Date(workOrder.completedDate), 'dd/MM/yyyy HH:mm')}</p>
+                                                 <p><strong>Completada:</strong> {formatExactDateTime(workOrder.completedDate)}</p>
                                              )}
                                          </div>
                                      </div>

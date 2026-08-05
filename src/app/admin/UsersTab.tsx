@@ -34,6 +34,7 @@ import { UserDialog } from '@/components/admin/UserDialog';
 import { deleteUser, resetUserPasswordAndNotify } from '@/app/admin/actions';
 import { useToast } from "@/hooks/use-toast";
 import { motion } from 'framer-motion';
+import { formatExactDateTime } from '@/lib/dateUtils';
 
 interface UsersTabProps {
     users: any[];
@@ -240,7 +241,7 @@ export default function UsersTab({ users }: UsersTabProps) {
 
                                             <TableCell className="py-4">
                                                 <span className="text-muted-foreground text-xs bg-white/5 px-2 py-1 rounded-md border border-white/5">
-                                                    {new Date(user.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                    {formatExactDateTime(user.created_at)}
                                                 </span>
                                             </TableCell>
 

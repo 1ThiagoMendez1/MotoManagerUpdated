@@ -15,6 +15,7 @@ import { Download, Printer } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { WompiButton } from '@/components/payments/WompiButton';
+import { formatExactDateTime } from '@/lib/dateUtils';
 
 async function printReceipt(receiptData: ReceiptData) {
   try {
@@ -106,13 +107,7 @@ function generateReceiptHTML(data: ReceiptData): string {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatExactDateTime(dateString);
   };
 
   return `    <div style="
@@ -318,13 +313,7 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatExactDateTime(dateString);
   };
 
   return (

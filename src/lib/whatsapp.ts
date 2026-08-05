@@ -260,7 +260,9 @@ export async function sendQuoteNotification(
     console.error('❌ Error sending WhatsApp quote notification via Meta API:', error.response?.data || error.message);
     
     // Si el error es por el botón (a veces la plantilla no tiene variable en la URL configurada)
-    if (error.response?.data?.error?.message?.includes('button')) {
+    const errorMsg = error.response?.data?.error?.message || '';
+    const errorDetails = error.response?.data?.error?.error_data?.details || '';
+    if (errorMsg.includes('button') || errorDetails.includes('button')) {
       console.log('Reintentando sin el componente del botón...');
       try {
         const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;

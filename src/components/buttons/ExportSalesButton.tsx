@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 import * as XLSX from "xlsx";
-import { format } from "date-fns";
+import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale } from "@/lib/types";
 
 type ExportSalesButtonProps = {
@@ -25,7 +25,7 @@ export function ExportSalesButton({ sales }: ExportSalesButtonProps) {
             "ID Venta": sale.id,
             "Tipo Venta": sale.workOrderId ? 'Servicio' : 'Mostrador',
             "ID Orden de Trabajo": sale.workOrderId || "N/A",
-            "Fecha": format(new Date(sale.date), "yyyy-MM-dd"),
+            "Fecha": formatExactDateTime(sale.date),
             "Cliente": sale.workOrder ? sale.workOrder.motorcycle.customer.name : (sale.customer?.name || sale.customerName || "Cliente Mostrador"),
             "Motocicleta": sale.workOrder ? `${sale.workOrder.motorcycle.make} ${sale.workOrder.motorcycle.model}` : "N/A",
             "Detalles": details,

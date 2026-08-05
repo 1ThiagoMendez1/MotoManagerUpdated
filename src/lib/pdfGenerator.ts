@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { formatExactDateTime } from '@/lib/dateUtils';
 
 export interface ReceiptData {
   saleNumber: string;
@@ -133,13 +134,7 @@ function generateReceiptHTML(data: ReceiptData): string {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatExactDateTime(dateString);
   };
 
   return `

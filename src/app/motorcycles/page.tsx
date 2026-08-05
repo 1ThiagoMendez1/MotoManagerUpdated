@@ -21,7 +21,7 @@ import { AddMotorcycle } from '@/components/forms/AddMotorcycle';
 import { MotorcycleDetails } from '@/components/details/MotorcycleDetails';
 import { SearchMotorcycles } from '@/components/forms/SearchMotorcycles';
 import { ExportMotorcyclesButton } from '@/components/buttons/ExportMotorcyclesButton';
-import { format } from 'date-fns';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import { Pagination } from '@/components/Pagination';
 
 // Force dynamic rendering to avoid database connection during build
@@ -109,7 +109,7 @@ export default async function MotorcyclesPage({
                     <div>{moto.customer.name}</div>
                     <div className="text-sm text-muted-foreground">{moto.customer.phone}</div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">{format(new Date(moto.intakeDate), 'yyyy-MM-dd')}</TableCell>
+                  <TableCell className="hidden md:table-cell">{formatExactDateTime(moto.intakeDate)}</TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <div className="max-w-xs truncate" title={moto.issueDescription || 'Sin descripción'}>
                       {moto.issueDescription || 'Sin descripción'}

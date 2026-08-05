@@ -25,6 +25,7 @@ import {
 import { createCustomerAppointment, cancelCustomerAppointment } from './actions'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { formatExactDateTime } from '@/lib/dateUtils'
 import Link from 'next/link'
 
 type PortalData = {
@@ -282,7 +283,7 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                               </Badge>
                             </div>
                             <p suppressHydrationWarning className="text-slate-500 text-xs">
-                              {format(new Date(wo.createdAt), "d 'de' MMMM, yyyy", { locale: es })}
+                              {formatExactDateTime(wo.createdAt)}
                               {wo.mechanicName && <> · Técnico: {wo.mechanicName}</>}
                             </p>
                           </div>

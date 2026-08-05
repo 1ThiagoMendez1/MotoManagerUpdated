@@ -111,8 +111,8 @@ export function SaveAndSendButton({
           console.error('Action error:', result.error)
           setDialogState({
             isOpen: true,
-            title: '¡Casi listo!',
-            message: 'Comparte este enlace con tu cliente para que pueda ver y aprobar su cotización.',
+            title: 'Cliente ya informado',
+            message: 'El mensaje de WhatsApp no se pudo enviar automáticamente. Comparte este enlace con tu cliente manualmente.',
             type: 'mock'
           })
           setIsSending(false)

@@ -2,6 +2,7 @@
 
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale } from '@/lib/types';
 import * as XLSX from 'xlsx';
 
@@ -14,7 +15,7 @@ export function ExportDirectSalesButton({ sales }: ExportDirectSalesButtonProps)
     // Prepare data for Excel
     const data = sales.map(sale => ({
       'Número de Venta': sale.saleNumber,
-      'Fecha': new Date(sale.date).toLocaleDateString('es-CO'),
+      'Fecha': formatExactDateTime(sale.date),
       'Cliente': sale.customer?.name || sale.customerName || 'Cliente de Mostrador',
       'Método de Pago': sale.paymentMethod || 'N/A',
       'Total': sale.total,
