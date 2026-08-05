@@ -84,33 +84,6 @@ export function LandingNavbar({ user }: { user?: any }) {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-2">
-          {user ? (
-            <div className="flex items-center gap-4 px-4 py-2">
-              <span className="text-sm text-muted-foreground hidden lg:inline-block">
-                {user.email}
-              </span>
-              <Link
-                href="/tenant-select"
-                className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-              >
-                Ir al panel
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="text-sm text-red-400 hover:text-red-300 transition-colors"
-              >
-                Cerrar sesión
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2"
-            >
-              Iniciar sesión
-            </Link>
-          )}
-
           {/* Theme Toggle */}
           {mounted && (
             <button
@@ -125,13 +98,6 @@ export function LandingNavbar({ user }: { user?: any }) {
               )}
             </button>
           )}
-
-          <button
-            onClick={() => scrollTo('#planes')}
-            className="text-sm font-semibold bg-gradient-to-r from-primary to-primary/80 hover:opacity-90 text-primary-foreground px-5 py-2 rounded-xl shadow-lg shadow-primary/25 transition-all hover:scale-105"
-          >
-            Empezar →
-          </button>
         </div>
 
         {/* Mobile buttons */}
@@ -172,33 +138,6 @@ export function LandingNavbar({ user }: { user?: any }) {
             </button>
           ))}
           <div className="pt-2 border-t border-border/30 space-y-2">
-            {user ? (
-              <div className="px-4 py-3">
-                <p className="text-sm text-muted-foreground mb-2 truncate">{user.email}</p>
-                <Link
-                  href="/tenant-select"
-                  className="block text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-3"
-                >
-                  Ir al panel
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="text-sm text-red-400 hover:text-red-300 transition-colors"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            ) : (
-              <Link href="/login" className="block px-4 py-3 text-muted-foreground hover:text-foreground transition-colors">
-                Iniciar sesión
-              </Link>
-            )}
-            <button
-              onClick={() => scrollTo('#planes')}
-              className="w-full font-semibold bg-gradient-to-r from-primary to-primary/80 text-primary-foreground px-5 py-3 rounded-xl"
-            >
-              Ver planes y precios →
-            </button>
           </div>
         </div>
       )}
