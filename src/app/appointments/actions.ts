@@ -18,7 +18,6 @@ export async function getAppointments() {
       reason,
       created_at,
       created_by,
-      accepted_by,
       customers (
         id,
         first_name,
