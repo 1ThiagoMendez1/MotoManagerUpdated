@@ -69,14 +69,25 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
 
     const { make, model, year, plate, vin, engineDisplacementCc, color, currentMileage, engineNumber, chassisNumber, customerEmail, customerName, customerPhone, customerCedula, issueDescription } = validatedFields.data;
 
-    const { data: existingPlate } = await supabase
-        .from('motorcycles')
-        .select('id')
-        .eq('organization_id', user.workshopId)
-        .eq('license_plate', plate)
-        .maybeSingle();
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    if (existingPlate) return { message: 'Ya existe una motocicleta con esta placa en el taller.' };
+    const { data: existingPlates } = await supabaseAdmin
+        .from('motorcycles')
+        .select('id, organization_id')
+        .ilike('license_plate', plate.trim());
+
+    if (existingPlates && existingPlates.length > 0) {
+        const inSameWorkshop = existingPlates.find(p => p.organization_id === user.workshopId);
+        if (inSameWorkshop) {
+            return { message: 'Ya existe una motocicleta con esta placa en el taller.' };
+        } else {
+            return { message: 'Esta motocicleta ya está registrada en otro taller.' };
+        }
+    }
 
     // 1. Find or Create Customer
     let customer: { id: string } | null = null;

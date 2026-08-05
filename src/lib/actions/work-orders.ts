@@ -44,30 +44,44 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
 
     const { motorcycleId, technicianId } = validatedFields.data;
 
-    // Check for duplicate active work order
-    const { data: activeOrders } = await supabase
-        .from('work_orders')
-        .select('id, status, sales(status)')
-        .eq('organization_id', user.workshopId)
-        .eq('motorcycle_id', motorcycleId)
-        .neq('status', 'delivered')
-        .neq('status', 'cancelled');
-
-    const activeOrder = activeOrders?.find(wo => {
-        return wo.status !== 'delivered';
-    });
-        
-    if (activeOrder) return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en el taller.' };
-
     const { data: mc, error: mcError } = await supabase
         .from('motorcycles')
-        .select('notes, customer_id')
+        .select('license_plate, notes, customer_id')
         .eq('id', motorcycleId)
         .eq('organization_id', user.workshopId)
         .single();
 
     if (mcError || !mc) {
         return { message: 'Error: La motocicleta no existe o no pertenece a este taller.' };
+    }
+
+    // Check for duplicate active work order across all workshops
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: activeOrders } = await supabaseAdmin
+        .from('work_orders')
+        .select(`
+            id,
+            status,
+            organization_id,
+            motorcycles!inner(license_plate)
+        `)
+        .ilike('motorcycles.license_plate', mc.license_plate.trim())
+        .neq('status', 'delivered')
+        .neq('status', 'cancelled');
+
+    const activeOrder = activeOrders?.find(wo => wo.status !== 'delivered' && wo.status !== 'cancelled');
+        
+    if (activeOrder) {
+        if (activeOrder.organization_id === user.workshopId) {
+            return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en el taller.' };
+        } else {
+            return { message: 'Esta motocicleta ya tiene una orden de trabajo activa en otro taller y no puede ser registrada hasta que finalice.' };
+        }
     }
 
     const issueDescription = mc.notes || '';

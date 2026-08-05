@@ -2223,7 +2223,7 @@ export async function sendCitaConfirmadaNotification(
   const paramVariants: Array<{ label: string; components: any[] }> = [
     // Body only (1 a 6 params)
     { label: 'Body: 1 param', components: [{ type: 'body', parameters: [{ type: 'text', text: workshopName }] }] },
-    { label: 'Body: 2 params', components: [{ type: 'body', parameters: [{ type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }] },
+    { label: 'Body: 2 params', components: [{ type: 'body', parameters: [{ type: 'text', text: dateStr }, { type: 'text', text: workshopName }] }] },
     { label: 'Body: 3 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }] }] },
     { label: 'Body: 4 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }, { type: 'text', text: workshopName }] }] },
     { label: 'Body: 5 params', components: [{ type: 'body', parameters: [{ type: 'text', text: customerName }, { type: 'text', text: workshopName }, { type: 'text', text: dateStr }, { type: 'text', text: workshopName }, { type: 'text', text: customerName }] }] },

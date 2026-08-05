@@ -74,9 +74,9 @@ export async function updateAppointmentStatus(id: string, status: string) {
   const supabase = await createAdminClient();
 
   const updateData: any = { status };
-  if (status === 'confirmed') {
-    updateData.accepted_by = user.userId;
-  }
+  // if (status === 'confirmed') {
+  //   updateData.accepted_by = user.userId;
+  // }
 
   const { error } = await supabase
     .from('appointments')

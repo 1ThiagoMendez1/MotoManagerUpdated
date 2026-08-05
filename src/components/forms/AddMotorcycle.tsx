@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { Loader2, PlusCircle, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader2, PlusCircle, Check, ChevronsUpDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -276,8 +276,14 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="max-h-[60vh] overflow-y-auto px-1 space-y-4">
               {errorMsg && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-2 rounded text-sm">
-                  {errorMsg}
+                <div className="bg-red-500/10 border-l-4 border-red-500 text-red-500 p-4 rounded-md flex items-start gap-3 shadow-sm my-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-1">
+                    <p className="font-bold text-base">Atención: No se puede completar el registro</p>
+                    <p className="text-sm font-medium leading-relaxed">
+                      {errorMsg}
+                    </p>
+                  </div>
                 </div>
               )}
               <FormField
