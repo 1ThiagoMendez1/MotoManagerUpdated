@@ -105,11 +105,38 @@ export function ManageSubscriptionClient({
     }
   };
 
+  const normalizedActivePlan = activePlan === 'monthly' ? 'basic' : activePlan;
+
   const getPlanLabel = (planId: string) => {
-    return plans.find(p => p.id === planId)?.name || planId;
+    const id = planId === 'monthly' ? 'basic' : planId;
+    return plans.find(p => p.id === id)?.name || planId;
   };
 
   const sortedPlans = [...plans].sort((a, b) => a.months - b.months);
+  
+  // Calculate orders so the active plan is always in the middle (index 1)
+  const getPlanOrder = (planId: string, index: number) => {
+    if (planId === normalizedActivePlan) return 'order-first md:order-2';
+    
+    // If active plan is basic (index 0)
+    if (normalizedActivePlan === sortedPlans[0].id) {
+      if (index === 1) return 'order-2 md:order-1';
+      if (index === 2) return 'order-last md:order-3';
+    }
+    
+    // If active plan is full (index 2)
+    if (normalizedActivePlan === sortedPlans[2].id) {
+      if (index === 0) return 'order-2 md:order-1';
+      if (index === 1) return 'order-last md:order-3';
+    }
+    
+    // If active plan is pro (index 1), normal order
+    if (index === 0) return 'order-1';
+    if (index === 2) return 'order-3';
+    
+    return 'order-none';
+  };
+
   const sortedFeatures = [...features].sort((a, b) => a.order_index - b.order_index);
 
   const modalContent = selectedPlan ? (
@@ -208,12 +235,12 @@ export function ManageSubscriptionClient({
   ) : null;
 
   return (
-    <div className="space-y-12 pb-12">
+    <div className="space-y-12 pb-12 overflow-hidden">
       {/* Header section */}
       <div className="text-center max-w-2xl mx-auto space-y-4">
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Gestionar Suscripción</h1>
         <p className="text-muted-foreground text-lg">
-          Tu plan actual es <span className="font-semibold text-primary capitalize">{getPlanLabel(activePlan)}</span>
+          Tu plan actual es <span className={`font-semibold capitalize ${plans.find(p => p.id === normalizedActivePlan)?.accentText || 'text-primary'}`}>{getPlanLabel(activePlan)}</span>
         </p>
       </div>
 
@@ -226,17 +253,19 @@ export function ManageSubscriptionClient({
       )}
 
       {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-        {sortedPlans.map(plan => {
-          const isCurrent = plan.id === activePlan;
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto py-8">
+        {sortedPlans.map((plan, index) => {
+          const isCurrent = plan.id === normalizedActivePlan;
+          const orderClass = getPlanOrder(plan.id, index);
+          
           return (
             <div
               key={plan.id}
-              className={`relative flex flex-col gap-6 rounded-2xl bg-gradient-to-br ${plan.gradient} border ${plan.border} p-7 transition-all ${isCurrent ? 'ring-2 ring-primary/50 shadow-xl' : 'hover:scale-[1.02] hover:shadow-2xl'} ${plan.badge === 'MÁS POPULAR' && !isCurrent ? 'ring-2 ring-amber-500/40 shadow-xl shadow-amber-500/10' : ''}`}
+              className={`relative flex flex-col gap-6 rounded-2xl bg-gradient-to-br ${plan.gradient} border ${plan.border} p-7 transition-all duration-300 ${isCurrent ? 'ring-2 ring-primary shadow-2xl scale-105 z-10 md:scale-110' : 'hover:scale-[1.02] hover:shadow-2xl opacity-90 hover:opacity-100'} ${plan.badge === 'MÁS POPULAR' && !isCurrent ? 'ring-2 ring-amber-500/40 shadow-xl shadow-amber-500/10' : ''} ${orderClass}`}
             >
               {isCurrent && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                  <span className="px-4 py-1 rounded-full text-xs font-bold text-primary-foreground bg-primary shadow-lg shadow-primary/30">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+                  <span className="px-4 py-1.5 rounded-full text-xs font-bold text-primary-foreground bg-primary shadow-lg shadow-primary/30 uppercase tracking-wider">
                     Plan Actual
                   </span>
                 </div>
@@ -272,13 +301,48 @@ export function ManageSubscriptionClient({
               </div>
 
               <ul className="space-y-2 flex-1">
-                {sortedFeatures.filter(f => f[`included_in_${plan.id}`]).map(f => (
-                  <li key={f.id} className="flex items-center gap-2 text-sm text-foreground/75">
-                    <CheckCircle2 className="h-4 w-4 text-green-400 shrink-0" />
-                    {f.feature_name}
-                  </li>
-                ))}
+                {sortedFeatures.map(f => {
+                  const value = f[`included_in_${plan.id}`];
+                  const isNo = !value || value.toLowerCase() === 'no';
+                  const isYes = value && value.toLowerCase() === 'sí';
+                  const hasBadge = !isNo && !isYes && value;
+
+                  // Determine colors based on the plan ID
+                  const checkColor = plan.id === 'pro' ? 'text-amber-500' : plan.id === 'full' ? 'text-purple-500' : 'text-primary';
+                  const badgeColor = plan.id === 'pro' 
+                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
+                    : plan.id === 'full' 
+                      ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                      : 'bg-primary/10 text-primary border border-primary/20';
+
+                  return (
+                    <li key={f.id} className={`flex items-start gap-2 text-sm ${isNo ? 'text-muted-foreground/60' : 'text-foreground/90'}`}>
+                      {isNo ? (
+                        <X className="h-4 w-4 mt-0.5 text-destructive/60 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className={`h-4 w-4 mt-0.5 shrink-0 ${checkColor}`} />
+                      )}
+                      <div className="flex flex-col">
+                        <span className={isNo ? 'line-through decoration-muted-foreground/40' : ''}>{f.feature_name}</span>
+                        {hasBadge && (
+                          <span className={`w-fit text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md mt-0.5 ${badgeColor}`}>
+                            {value}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
+
+              {plan.id === 'full' && (
+                <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-200 text-xs flex gap-2">
+                  <Gift className="h-4 w-4 text-red-400 shrink-0" />
+                  <div>
+                    <span className="font-bold text-red-400">BONO FULL TALLER:</span> Soporte prioritario VIP y todas las funciones ilimitadas.
+                  </div>
+                </div>
+              )}
 
               {isCurrent ? (
                 <button

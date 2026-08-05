@@ -41,11 +41,13 @@ export default async function SubscriptionPage() {
     const plans = mergePlansWithDefaults(dbPlans);
     const features = dbFeatures.length > 0 ? dbFeatures : DEFAULT_FEATURES;
 
+    const currentPlan = workshop?.settings?.plan || workshop?.subscription_plan || 'monthly';
+
     return (
         <div className="container mx-auto py-10 px-4 md:px-0">
             <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                 <ManageSubscriptionClient 
-                    currentPlan={workshop.subscription_plan || 'monthly'}
+                    currentPlan={currentPlan}
                     userName={profileName || currentUser?.email || 'Usuario'}
                     userEmail={currentUser?.email || ''}
                     userId={currentUser?.userId || ''}

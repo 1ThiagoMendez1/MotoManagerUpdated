@@ -12,6 +12,8 @@ import {
   Settings,
   Bell
 } from 'lucide-react';
+import { getPlanLimits } from '@/lib/constants/plans';
+import { PlanUsageModal } from './PlanUsageModal';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -50,6 +52,7 @@ export default function Header({
   const pathname = usePathname();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [showPlanUsageModal, setShowPlanUsageModal] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && userName) {
@@ -373,33 +376,51 @@ export default function Header({
                 {/* Plan Info Card */}
                 {userRole === 'owner' && subscriptionPlan && (
                   <div className="p-3">
-                    <div className={`bg-card/50 border ${getPlanBorderColor(subscriptionPlan)} rounded-lg p-3 relative overflow-hidden group ${getPlanHoverBorderColor(subscriptionPlan)} transition-colors ${getPlanShadowColor(subscriptionPlan)}`}>
-                      {/* Subtle shine effect */}
-                      <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-16 h-16 ${getPlanBgColor(subscriptionPlan)} rounded-full blur-xl transition-all ${getPlanGlowColor(subscriptionPlan)}`}></div>
-                      
-                      <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                          <Crown className={`w-4 h-4 ${getPlanColor(subscriptionPlan)}`} />
-                          Plan <span className={getPlanColor(subscriptionPlan)}>{getPlanName(subscriptionPlan)}</span>
+                    <DropdownMenuItem 
+                      className="!p-0 !m-0 !bg-transparent !border-none !outline-none focus:!bg-transparent data-[highlighted]:!bg-transparent w-full cursor-pointer block"
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        // Utilizamos un pequeño retraso para permitir que el DropdownMenu limpie sus locks del DOM
+                        // antes de que el Dialog intente aplicar los suyos. Esto evita el bug de la pantalla congelada.
+                        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); // Forzamos el cierre del menú
+                        setTimeout(() => setShowPlanUsageModal(true), 50);
+                      }}
+                    >
+                      <div 
+                        className={`w-full block text-left bg-card/50 border ${getPlanBorderColor(subscriptionPlan)} rounded-lg p-3 relative overflow-hidden group ${getPlanHoverBorderColor(subscriptionPlan)} transition-all hover:scale-[1.02] cursor-pointer ${getPlanShadowColor(subscriptionPlan)}`}
+                      >
+                        {/* Subtle shine effect */}
+                        <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-16 h-16 ${getPlanBgColor(subscriptionPlan)} rounded-full blur-xl transition-all ${getPlanGlowColor(subscriptionPlan)}`}></div>
+                        
+                        <div className="flex items-center justify-between mb-3 relative z-10">
+                          <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                            <Crown className={`w-4 h-4 ${getPlanColor(subscriptionPlan)}`} />
+                            Plan <span className={getPlanColor(subscriptionPlan)}>{getPlanName(subscriptionPlan)}</span>
+                          </div>
+                          {subscriptionStatus === 'active' ? (
+                            <span className="text-[10px] uppercase font-bold tracking-wider bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full border border-green-500/20">
+                              Activo
+                            </span>
+                          ) : (
+                            <span className="text-[10px] uppercase font-bold tracking-wider bg-yellow-500/10 text-yellow-500 px-2 py-0.5 rounded-full border border-yellow-500/20">
+                              {subscriptionStatus}
+                            </span>
+                          )}
+                          
+                          {/* Indicador de Alerta de Consumo Simulada (ejemplo: si el plan no es ilimitado y el consumo es alto) */}
+                          {subscriptionPlan && getPlanLimits(subscriptionPlan)?.whatsapp_limit > 0 && 45 / getPlanLimits(subscriptionPlan).whatsapp_limit >= 0.9 && (
+                            <div className="absolute top-0 right-14 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="Límites casi agotados" />
+                          )}
                         </div>
-                        {subscriptionStatus === 'active' ? (
-                          <span className="text-[10px] uppercase font-bold tracking-wider bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full border border-green-500/20">
-                            Activo
-                          </span>
-                        ) : (
-                          <span className="text-[10px] uppercase font-bold tracking-wider bg-yellow-500/10 text-yellow-500 px-2 py-0.5 rounded-full border border-yellow-500/20">
-                            {subscriptionStatus}
-                          </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-col gap-2 relative z-10">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CalendarDays className="w-3.5 h-3.5" />
-                          <span>Vence: <span className="font-medium text-foreground">{formatDate(calculatedEndDate)}</span></span>
+                        
+                        <div className="flex flex-col gap-2 relative z-10">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <CalendarDays className="w-3.5 h-3.5" />
+                            <span>Vence: <span className="font-medium text-foreground">{formatDate(calculatedEndDate)}</span></span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </DropdownMenuItem>
                   </div>
                 )}
 
@@ -430,6 +451,15 @@ export default function Header({
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Plan Usage Modal */}
+            {userRole === 'owner' && subscriptionPlan && (
+              <PlanUsageModal 
+                open={showPlanUsageModal} 
+                onOpenChange={setShowPlanUsageModal} 
+                plan={getPlanLimits(subscriptionPlan)} 
+              />
+            )}
           </>
         )}
       </div>
