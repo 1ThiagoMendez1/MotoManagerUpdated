@@ -270,7 +270,7 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                                 {statusInfo.label}
                               </Badge>
                             </div>
-                            <p className="text-slate-500 text-xs">
+                            <p suppressHydrationWarning className="text-slate-500 text-xs">
                               {format(new Date(wo.createdAt), "d 'de' MMMM, yyyy", { locale: es })}
                               {wo.mechanicName && <> · Técnico: {wo.mechanicName}</>}
                             </p>
@@ -370,6 +370,7 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                           Fecha
                         </label>
                         <input
+                          suppressHydrationWarning
                           type="date"
                           name="date"
                           required
@@ -467,10 +468,10 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3">
                             <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex flex-col items-center justify-center shrink-0">
-                              <span className="text-blue-400 text-xs font-bold leading-none">
+                              <span suppressHydrationWarning className="text-blue-400 text-xs font-bold leading-none">
                                 {format(aptDate, 'dd', { locale: es })}
                               </span>
-                              <span className="text-blue-400/60 text-[9px] uppercase font-semibold leading-none mt-0.5">
+                              <span suppressHydrationWarning className="text-blue-400/60 text-[9px] uppercase font-semibold leading-none mt-0.5">
                                 {format(aptDate, 'MMM', { locale: es })}
                               </span>
                             </div>
@@ -481,9 +482,11 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                               <div className="flex items-center gap-3 text-xs text-slate-500">
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
+                                  <span suppressHydrationWarning className="text-slate-300">
                                   {format(aptDate, "h:mm a", { locale: es })}
                                 </span>
-                                <span>
+                                </span>
+                                <span suppressHydrationWarning className="text-slate-400 text-xs capitalize">
                                   {format(aptDate, "EEEE d 'de' MMMM", { locale: es })}
                                 </span>
                               </div>
