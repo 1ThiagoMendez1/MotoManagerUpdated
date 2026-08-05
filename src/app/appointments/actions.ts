@@ -19,8 +19,6 @@ export async function getAppointments() {
       created_at,
       created_by,
       accepted_by,
-      creator:profiles!created_by(id, first_name, last_name),
-      acceptor:profiles!accepted_by(id, first_name, last_name),
       customers (
         id,
         first_name,

@@ -28,6 +28,7 @@ import { es } from 'date-fns/locale'
 import Link from 'next/link'
 
 type PortalData = {
+  workshopName: string
   customer: {
     id: string
     name: string
@@ -173,6 +174,9 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
           <h1 className="text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60 mb-2">
             Portal del Cliente
           </h1>
+          <h2 className="text-xl sm:text-2xl font-semibold text-white mb-4">
+            {data.workshopName}
+          </h2>
           <p className="text-slate-400 text-base">
             Bienvenido, <span className="text-slate-200 font-medium">{data.customer.name}</span>
           </p>

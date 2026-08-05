@@ -30,6 +30,9 @@ export async function getCustomerPortalData(licensePlate: string) {
         last_name,
         email,
         phone
+      ),
+      organizations (
+        name
       )
     `)
     .ilike('license_plate', `%${normalizedPlate}%`);
@@ -89,6 +92,7 @@ export async function getCustomerPortalData(licensePlate: string) {
   return {
     success: true,
     data: {
+      workshopName: (motorcycle as any).organizations?.name || 'Portal del Cliente',
       customer: {
         id: customer.id,
         name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
