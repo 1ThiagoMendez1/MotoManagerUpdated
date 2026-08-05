@@ -115,7 +115,7 @@ export function WorkshopSearchModal({ isOpen, onClose }: WorkshopSearchModalProp
   // Generate coordinates & calculate travel times
   const workshopsWithMeta = useMemo(() => {
     return workshops.map(workshop => {
-      // Generate deterministic pseudo-random coordinates around Bogota based on ID
+      // Generate deterministic pseudo-random coordinates around Bogota based on ID as fallback
       const charSum = workshop.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
       const baseLng = -74.0721;
       const baseLat = 4.7110;
@@ -123,8 +123,20 @@ export function WorkshopSearchModal({ isOpen, onClose }: WorkshopSearchModalProp
       const latOffset = ((charSum % 100) - 50) * 0.002;
       const lngOffset = (((charSum * 3) % 100) - 50) * 0.002;
       
-      const lat = baseLat + latOffset;
-      const lng = baseLng + lngOffset;
+      let lat = baseLat + latOffset;
+      let lng = baseLng + lngOffset;
+
+      // If the workshop has a real location saved from the dashboard
+      if (workshop.maps_link && workshop.maps_link.includes('q=')) {
+        const qParam = workshop.maps_link.split('q=')[1];
+        if (qParam) {
+          const [parsedLat, parsedLng] = qParam.split(',').map(Number);
+          if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+            lat = parsedLat;
+            lng = parsedLng;
+          }
+        }
+      }
 
       let distance = 0;
       let travelTimeMinutes = 0;
