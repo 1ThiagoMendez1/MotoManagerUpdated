@@ -13,7 +13,7 @@ export async function getProfileData() {
   const [{ data: workshop }, { data: profile }] = await Promise.all([
     supabase
       .from('workshops')
-      .select('name, slug, phone, address, city, nit')
+      .select('name, slug, phone, address, city, nit, maps_link')
       .eq('id', user.workshopId!)
       .single(),
     supabase
@@ -29,6 +29,7 @@ export async function getProfileData() {
     workshopAddress: workshop?.address || '',
     workshopCity: workshop?.city || '',
     workshopNit: workshop?.nit || '',
+    workshopMapsLink: workshop?.maps_link || '',
     ownerName: profile?.name || '',
     ownerPhone: profile?.phone || '',
     email: user.email,
@@ -48,6 +49,7 @@ export async function updateProfileData(formData: FormData) {
   const workshopAddress = (formData.get('workshopAddress') as string)?.trim() || null
   const workshopCity = (formData.get('workshopCity') as string)?.trim() || null
   const workshopNit = (formData.get('workshopNit') as string)?.trim() || null
+  const workshopMapsLink = (formData.get('workshopMapsLink') as string)?.trim() || null
   const ownerName = (formData.get('ownerName') as string)?.trim()
   const ownerPhone = (formData.get('ownerPhone') as string)?.trim() || null
 
@@ -68,6 +70,7 @@ export async function updateProfileData(formData: FormData) {
         address: workshopAddress,
         city: workshopCity,
         nit: workshopNit,
+        maps_link: workshopMapsLink,
       })
       .eq('id', user.workshopId!)
 

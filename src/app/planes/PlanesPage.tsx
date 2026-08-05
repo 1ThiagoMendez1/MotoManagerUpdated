@@ -11,6 +11,7 @@ import { LandingTestimonialsAndFAQ } from './components/LandingTestimonialsAndFA
 import { LandingFooter } from './components/LandingFooter';
 import { LandingTopWorkshops } from './components/LandingTopWorkshops';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
+import { UrgencyBar } from './components/UrgencyBar';
 import { SalesNotification } from './components/SalesNotification';
 
 // ─── Plan type ────────────────────────────────────────────────────────────────
@@ -220,6 +221,11 @@ export default function PlanesPage({ plans, features, user }: { plans?: any[], f
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col relative">
+      {/* Barra de urgencia fija en la parte superior */}
+      <div className="sticky top-0 z-[100]">
+        <UrgencyBar onScrollToPlanes={scrollToPlanes} />
+      </div>
+
       {/* Notificaciones de ventas para prueba social */}
       <SalesNotification />
 

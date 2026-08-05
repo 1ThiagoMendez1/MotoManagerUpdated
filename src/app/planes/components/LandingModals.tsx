@@ -22,19 +22,45 @@ function RegistrationForm({ plan, billingCycle, name, email, reference, info }: 
     }
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
         setMapsLink(`https://maps.google.com/?q=${latitude},${longitude}`);
-        if (!address) {
-          setAddress("Ubicación GPS");
+        
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+          const data = await res.json();
+          if (data && data.address) {
+            const road = data.address.road || '';
+            const houseNumber = data.address.house_number || '';
+            const suburb = data.address.suburb || data.address.neighbourhood || '';
+            const cityName = data.address.city || data.address.town || data.address.village || data.address.county || '';
+            
+            let exactAddress = `${road} ${houseNumber}`.trim();
+            if (suburb) exactAddress += exactAddress ? `, ${suburb}` : suburb;
+            if (!exactAddress) exactAddress = data.display_name.split(',')[0];
+            
+            setAddress(exactAddress || "Ubicación GPS");
+            
+            const cityInput = document.getElementById('reg-city') as HTMLInputElement;
+            if (cityInput && cityName) {
+              cityInput.value = cityName;
+            }
+          } else {
+            if (!address) setAddress("Ubicación GPS");
+          }
+        } catch (e) {
+          console.error("Geocoding error:", e);
+          if (!address) setAddress("Ubicación GPS");
         }
+        
         setIsLocating(false);
       },
       (error) => {
         console.error("Error obteniendo ubicación:", error);
-        alert("No se pudo obtener la ubicación. Verifica los permisos de tu navegador.");
+        alert("No se pudo obtener la ubicación exacta. Verifica los permisos de tu navegador o GPS.");
         setIsLocating(false);
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 

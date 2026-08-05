@@ -21,7 +21,9 @@ interface ProfileData {
   ownerName: string;
   ownerPhone: string;
   email: string;
+  email: string;
   userRole?: string;
+  workshopMapsLink?: string;
 }
 
 export default function ProfilePage() {
@@ -29,6 +31,8 @@ export default function ProfilePage() {
   const [isPending, startTransition] = useTransition();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [mapsLinkText, setMapsLinkText] = useState('');
   const [data, setData] = useState<ProfileData>({
     workshopName: '',
     workshopPhone: '',
@@ -43,9 +47,63 @@ export default function ProfilePage() {
   useEffect(() => {
     getProfileData().then((d) => {
       setData(d as any);
+      setMapsLinkText(d.workshopMapsLink || '');
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Tu navegador no soporta geolocalización.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const newMapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
+        setMapsLinkText(newMapsLink);
+        
+        const mapsInput = document.getElementById('workshopMapsLink') as HTMLInputElement;
+        if (mapsInput) mapsInput.value = newMapsLink;
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+          const geodata = await res.json();
+          if (geodata && geodata.address) {
+            const road = geodata.address.road || '';
+            const houseNumber = geodata.address.house_number || '';
+            const suburb = geodata.address.suburb || geodata.address.neighbourhood || '';
+            const cityName = geodata.address.city || geodata.address.town || geodata.address.village || geodata.address.county || '';
+            
+            let exactAddress = `${road} ${houseNumber}`.trim();
+            if (suburb) exactAddress += exactAddress ? `, ${suburb}` : suburb;
+            if (!exactAddress) exactAddress = geodata.display_name.split(',')[0];
+            
+            const addressInput = document.getElementById('workshopAddress') as HTMLInputElement;
+            if (addressInput && exactAddress) {
+              addressInput.value = exactAddress;
+            }
+            
+            const cityInput = document.getElementById('workshopCity') as HTMLInputElement;
+            if (cityInput && cityName) {
+              cityInput.value = cityName;
+            }
+          }
+        } catch (e) {
+          console.error("Geocoding error:", e);
+        }
+        
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error("Error obteniendo ubicación:", error);
+        alert("No se pudo obtener la ubicación exacta. Verifica los permisos de tu navegador o GPS.");
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -147,19 +205,36 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                {/* Dirección */}
+                {/* Dirección y Botón GPS */}
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="workshopAddress" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5" /> Dirección
                   </label>
-                  <input
-                    id="workshopAddress"
-                    name="workshopAddress"
-                    type="text"
-                    defaultValue={data.workshopAddress}
-                    placeholder="Ej: Calle 10 # 5-32, Local 3"
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      id="workshopAddress"
+                      name="workshopAddress"
+                      type="text"
+                      defaultValue={data.workshopAddress}
+                      placeholder="Ej: Calle 10 # 5-32, Local 3"
+                      className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all flex-1"
+                    />
+                    <input type="hidden" id="workshopMapsLink" name="workshopMapsLink" defaultValue={mapsLinkText} />
+                    <button
+                      type="button"
+                      onClick={handleGetLocation}
+                      disabled={isLocating}
+                      className="flex items-center justify-center gap-2 px-4 bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium rounded-xl transition-colors disabled:opacity-50 shrink-0"
+                    >
+                      {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+                      <span className="hidden sm:inline">Tomar ubicación</span>
+                    </button>
+                  </div>
+                  {mapsLinkText && (
+                    <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
+                      <CheckCircle2 className="h-3 w-3" /> Coordenadas capturadas
+                    </p>
+                  )}
                 </div>
 
                 {/* Ciudad y NIT en grid */}
