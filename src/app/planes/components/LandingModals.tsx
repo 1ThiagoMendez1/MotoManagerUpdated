@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreditCard, ArrowRight, Lock, Shield, CheckCircle2, Loader2, Wrench } from 'lucide-react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
@@ -239,10 +239,15 @@ export function PaymentModal({ plan, onClose, appUrl }: PayModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [reference, setReference] = useState('');
+
+  useEffect(() => {
+    if (plan && !reference) {
+      setReference(`MM-NEW-${plan.id.toUpperCase()}-${Date.now().toString(36).toUpperCase()}`);
+    }
+  }, [plan, reference]);
 
   if (!plan) return null;
-
-  const reference = `MM-NEW-${plan.id.toUpperCase()}-${typeof window !== 'undefined' ? Date.now().toString(36).toUpperCase() : 'REF'}`;
 
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
