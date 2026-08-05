@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Proteger rutas que requieran sesión
-  const protectedPaths = ['/dashboard', '/inventory', '/work-orders', '/admin', '/sales', '/customers', '/motorcycles', '/appointments', '/team', '/settings']
+  const protectedPaths = ['/dashboard', '/inventory', '/work-orders', '/admin', '/sales', '/customers', '/motorcycles', '/appointments', '/team', '/settings', '/accounting']
   const isProtectedRoute = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
   
   // Prevenir sesiones concurrentes

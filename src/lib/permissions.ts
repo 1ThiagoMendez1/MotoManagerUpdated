@@ -11,6 +11,7 @@ export const rolePermissions: Record<Role, string[]> = {
     '/technicians',
     '/sales',
     '/appointments',
+    '/accounting',
   ], // Excludes /team (Usuarios y Permisos)
   'mechanic': [
     '/work-orders',

@@ -19,6 +19,7 @@ import {
   Rocket,
   Sparkles,
   Lock,
+  PieChart,
 } from 'lucide-react';
 import {
   Dialog,
@@ -91,9 +92,10 @@ export function DashboardMenu({
   const canAccessTeam = hasPermission(role, '/team');
   const canAccessTickets = hasPermission(role, '/tickets');
   const canAccessAppointments = hasPermission(role, '/appointments');
+  const canAccessAccounting = hasPermission(role, '/accounting');
 
   // Calcular cantidad de tarjetas para sub-grids dinámicos
-  const secondaryCardsCount = [canAccessCustomers, canAccessMotorcycles, canAccessInventory, canAccessSales, canAccessAppointments].filter(Boolean).length;
+  const secondaryCardsCount = [canAccessCustomers, canAccessMotorcycles, canAccessInventory, canAccessSales, canAccessAppointments, canAccessAccounting].filter(Boolean).length;
   const tertiaryCardsCount = [canAccessTechnicians, canAccessTeam, canAccessTickets].filter(Boolean).length;
 
   return (
@@ -267,6 +269,23 @@ export function DashboardMenu({
                     locked={!planLimits.has_appointments}
                     onClickLocked={() => {
                       setUpgradeModule({ title: 'Citas', description: 'Gestión y programación de citas.' });
+                      setShowUpgradeModal(true);
+                    }}
+                  />
+                </div>
+              )}
+              
+              {canAccessAccounting && (
+                <div id="tour-accounting">
+                  <AppleGlassCard 
+                    href="/accounting"
+                    icon={PieChart}
+                    title="Contabilidad"
+                    description="Finanzas, proyecciones y compras."
+                    iconBg="bg-indigo-600"
+                    locked={!planLimits.has_accounting}
+                    onClickLocked={() => {
+                      setUpgradeModule({ title: 'Contabilidad y Finanzas', description: 'Análisis financiero, proyecciones, flujo de caja y compras detalladas.' });
                       setShowUpgradeModal(true);
                     }}
                   />

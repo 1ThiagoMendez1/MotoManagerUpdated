@@ -23,8 +23,10 @@ export const DEFAULT_PLANS = [
     has_sales: false,
     has_appointments: false,
     has_technicians: false,
+    has_accounting: false,
     dashboard_level: 'none', // none, basic, complete
     permissions_level: 'none', // none, limited, complete
+    accounting_level: 'none', // none, basic, complete
     support_level: 'basic'
   },
   {
@@ -51,8 +53,10 @@ export const DEFAULT_PLANS = [
     has_sales: true,
     has_appointments: true,
     has_technicians: true,
+    has_accounting: true,
     dashboard_level: 'basic',
     permissions_level: 'limited',
+    accounting_level: 'basic',
     support_level: 'priority'
   },
   {
@@ -79,8 +83,10 @@ export const DEFAULT_PLANS = [
     has_sales: true,
     has_appointments: true,
     has_technicians: true,
+    has_accounting: true,
     dashboard_level: 'complete',
     permissions_level: 'complete',
+    accounting_level: 'complete',
     support_level: 'priority'
   }
 ];
@@ -98,9 +104,10 @@ export const DEFAULT_FEATURES = [
   { id: '10', feature_name: 'Dashboard', order_index: 100, included_in_basic: 'No', included_in_pro: 'Básico', included_in_full: 'Completo' },
   { id: '11', feature_name: 'Técnicos', order_index: 110, included_in_basic: 'No', included_in_pro: 'Sí', included_in_full: 'Avanzado' },
   { id: '12', feature_name: 'Permisos de usuarios', order_index: 120, included_in_basic: 'No', included_in_pro: 'Limitado', included_in_full: 'Sí' },
-  { id: '13', feature_name: 'Soporte', order_index: 130, included_in_basic: 'Básico', included_in_pro: 'Prioritario', included_in_full: 'Prioritario' },
-  { id: '14', feature_name: 'Usuarios incluidos', order_index: 140, included_in_basic: '1', included_in_pro: '3', included_in_full: '5 o más' },
-  { id: '15', feature_name: 'Ideal para', order_index: 150, included_in_basic: 'Taller pequeño', included_in_pro: 'Taller organizado', included_in_full: 'Taller grande o con equipo' }
+  { id: '13', feature_name: 'Contabilidad y Finanzas', order_index: 125, included_in_basic: 'No', included_in_pro: 'Básico', included_in_full: 'Completo' },
+  { id: '14', feature_name: 'Soporte', order_index: 130, included_in_basic: 'Básico', included_in_pro: 'Prioritario', included_in_full: 'Prioritario' },
+  { id: '15', feature_name: 'Usuarios incluidos', order_index: 140, included_in_basic: '1', included_in_pro: '3', included_in_full: '5 o más' },
+  { id: '16', feature_name: 'Ideal para', order_index: 150, included_in_basic: 'Taller pequeño', included_in_pro: 'Taller organizado', included_in_full: 'Taller grande o con equipo' }
 ];
 
 export function getPlanLimits(planId: string) {

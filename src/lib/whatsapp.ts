@@ -231,17 +231,6 @@ export async function sendQuoteNotification(
                 { type: 'text', text: workshopName || 'nuestro taller' },
                 { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
               ]
-            },
-            {
-              type: 'button',
-              sub_type: 'url',
-              index: "0",
-              parameters: [
-                {
-                  type: 'text',
-                  text: `/${workOrderId}`
-                }
-              ]
             }
           ]
         }
@@ -258,51 +247,6 @@ export async function sendQuoteNotification(
     return { success: true, data: response.data };
   } catch (error: any) {
     console.error('❌ Error sending WhatsApp quote notification via Meta API:', error.response?.data || error.message);
-    
-    // Si el error es por el botón (a veces la plantilla no tiene variable en la URL configurada)
-    const errorMsg = error.response?.data?.error?.message || '';
-    const errorDetails = error.response?.data?.error?.error_data?.details || '';
-    if (errorMsg.includes('button') || errorDetails.includes('button')) {
-      console.log('Reintentando sin el componente del botón...');
-      try {
-        const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
-        const retryResponse = await axios.post(
-          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
-          {
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'template',
-            template: {
-              name: 'resultado_de_diagnostico',
-              language: { code: 'es_CO' },
-              components: [
-                {
-                  type: 'header',
-                  parameters: [
-                    { type: 'text', text: '🎉' }
-                  ]
-                },
-                {
-                  type: 'body',
-                  parameters: [
-                    { type: 'text', text: customerName || 'Cliente' },
-                    { type: 'text', text: workshopName || 'nuestro taller' },
-                    { type: 'text', text: orderNumber || workOrderId.substring(0, 8) }
-                  ]
-                }
-              ]
-            }
-          },
-          {
-            headers: { 'Authorization': `Bearer ${wpToken}`, 'Content-Type': 'application/json' }
-          }
-        );
-        return { success: true, data: retryResponse.data };
-      } catch (retryError: any) {
-        return { success: false, error: retryError.response?.data || retryError.message };
-      }
-    }
-
     return { success: false, error: error.response?.data || error.message };
   }
 }

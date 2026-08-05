@@ -661,37 +661,40 @@ export default function DashboardPage() {
               </Card>
             </motion.div>
 
-            <motion.div variants={itemVariants}>
-              <Card id="tour-recordatorios" className="bg-card border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-blue-500" />
-                    Recordatorios a Clientes
-                  </CardTitle>
-                  <CardDescription>Próximos mantenimientos sugeridos</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {reminders.length > 0 ? (
-                    reminders.map((rem: any, i) => {
-                      const date = new Date(rem.due_date).toLocaleDateString('es-CO');
-                      return (
-                        <div key={rem.id || i} className="flex items-center justify-between border-b border-border/50 pb-4 last:border-0 last:pb-0">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium leading-none text-foreground">{rem.customers ? `${rem.customers.first_name} ${rem.customers.last_name}` : 'Cliente'}</p>
-                            <p className="text-xs text-muted-foreground">{rem.motorcycles?.brand} {rem.motorcycles?.model} - {rem.service_type}</p>
+            {/* Oculto temporalmente a petición del usuario. Cambiar a true para desocultar */}
+            {true && (
+              <motion.div variants={itemVariants}>
+                <Card id="tour-recordatorios" className="bg-card border-border/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-blue-500" />
+                      Recordatorios a Clientes
+                    </CardTitle>
+                    <CardDescription>Próximos mantenimientos sugeridos</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {reminders.length > 0 ? (
+                      reminders.map((rem: any, i) => {
+                        const date = new Date(rem.due_date).toLocaleDateString('es-CO');
+                        return (
+                          <div key={rem.id || i} className="flex items-center justify-between border-b border-border/50 pb-4 last:border-0 last:pb-0">
+                            <div className="space-y-1">
+                              <p className="text-sm font-medium leading-none text-foreground">{rem.customers ? `${rem.customers.first_name} ${rem.customers.last_name}` : 'Cliente'}</p>
+                              <p className="text-xs text-muted-foreground">{rem.motorcycles?.brand} {rem.motorcycles?.model} - {rem.service_type}</p>
+                            </div>
+                            <div className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-full">
+                              {date}
+                            </div>
                           </div>
-                          <div className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-full">
-                            {date}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No hay recordatorios pendientes</p>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No hay recordatorios pendientes</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
           </div>
           
         </motion.div>
