@@ -142,8 +142,14 @@ export function SaveAndSendButton({
     } finally {
       setIsSending(false)
     }
-    // Redirect back to work orders list if success (no error/mock)
-    router.push('/work-orders')
+
+    // Mostrar alerta de éxito en lugar de redireccionar
+    setDialogState({
+      isOpen: true,
+      title: 'Cliente ya informado',
+      message: 'El mensaje de WhatsApp ha sido enviado exitosamente al cliente.',
+      type: 'success'
+    })
   }
 
   const handleCloseDialog = () => {
@@ -166,12 +172,18 @@ export function SaveAndSendButton({
         if (!open) handleCloseDialog()
       }}>
         <DialogContent className="sm:max-w-md border-0 shadow-2xl rounded-2xl overflow-hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl">
-          <div className={`absolute top-0 left-0 w-full h-1 ${dialogState.type === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
+          <div className={`absolute top-0 left-0 w-full h-1 ${
+            dialogState.type === 'error' ? 'bg-red-500' : 
+            dialogState.type === 'success' ? 'bg-green-500' : 
+            'bg-amber-500'
+          }`} />
           
           <DialogHeader className="pt-4 pb-2">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 mb-4">
               {dialogState.type === 'error' ? (
                 <XCircle className="h-8 w-8 text-red-500" />
+              ) : dialogState.type === 'success' ? (
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
               ) : (
                 <AlertCircle className="h-8 w-8 text-amber-500" />
               )}
@@ -184,37 +196,39 @@ export function SaveAndSendButton({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-6 py-4 space-y-4">
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Comparte el enlace manualmente:
-              </p>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Input 
-                    readOnly
-                    value={portalUrl}
-                    className="pr-10 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center">
-                    <Send className="h-4 w-4 text-slate-400" />
+          {dialogState.type !== 'success' && (
+            <div className="px-6 py-4 space-y-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Comparte el enlace manualmente:
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Input 
+                      readOnly
+                      value={portalUrl}
+                      className="pr-10 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-mono text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center">
+                      <Send className="h-4 w-4 text-slate-400" />
+                    </div>
                   </div>
+                  <Button 
+                    onClick={handleCopy}
+                    variant={copied ? "default" : "secondary"}
+                    size="icon"
+                    className={`shrink-0 transition-all ${copied ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-500/25 shadow-lg' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                    title="Copiar enlace"
+                  >
+                    {copied ? <CheckCircle2 className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                  </Button>
                 </div>
-                <Button 
-                  onClick={handleCopy}
-                  variant={copied ? "default" : "secondary"}
-                  size="icon"
-                  className={`shrink-0 transition-all ${copied ? 'bg-green-500 hover:bg-green-600 text-white shadow-green-500/25 shadow-lg' : 'hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                  title="Copiar enlace"
-                >
-                  {copied ? <CheckCircle2 className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 text-center">
+                  Envía este enlace directo al cliente para que vea y apruebe su cotización de inmediato.
+                </p>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 text-center">
-                Envía este enlace directo al cliente para que vea y apruebe su cotización de inmediato.
-              </p>
             </div>
-          </div>
+          )}
 
           <DialogFooter className="px-6 pb-6 pt-2 sm:justify-center">
             <Button 
