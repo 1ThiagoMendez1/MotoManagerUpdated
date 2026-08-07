@@ -68,6 +68,8 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
     }
 
     const { make, model, year, plate, vin, engineDisplacementCc, color, currentMileage, engineNumber, chassisNumber, customerEmail, customerName, customerPhone, customerCedula, issueDescription } = validatedFields.data;
+    const createWorkOrderFlag = formData.get('createWorkOrder') === 'true';
+    const technicianId = formData.get('technicianId') as string;
 
     const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
     const supabaseAdmin = createSupabaseClient(
@@ -81,11 +83,10 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
         .select('id, organization_id')
         .ilike('license_plate', plate.trim());
 
+    let existingMotoInWorkshop = null;
     if (existingPlates && existingPlates.length > 0) {
-        const inSameWorkshop = existingPlates.find(p => p.organization_id === user.workshopId);
-        if (inSameWorkshop) {
-            return { message: 'Ya existe una motocicleta con esta placa en el taller.' };
-        } else {
+        existingMotoInWorkshop = existingPlates.find(p => p.organization_id === user.workshopId);
+        if (!existingMotoInWorkshop) {
             return { message: 'Esta motocicleta ya está registrada en otro taller.' };
         }
     }
@@ -147,28 +148,70 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
 
     if (!customer) return { message: 'No se pudo asignar el cliente' };
 
-    // 2. Create Motorcycle
-    const { error: motoError } = await supabase
-        .from('motorcycles')
-        .insert({
-            organization_id: user.workshopId,
-            customer_id: customer.id,
-            brand: make,
-            model,
-            model_year: year,
-            license_plate: plate,
-            vin: vin || null,
-            engine_displacement_cc: engineDisplacementCc || null,
-            color: color || null,
-            current_mileage: currentMileage || null,
-            engine_number: engineNumber || null,
-            chassis_number: chassisNumber || null,
-            notes: issueDescription
-        });
+    // 2. Create or Update Motorcycle
+    let motorcycleId = existingMotoInWorkshop?.id;
+    if (existingMotoInWorkshop) {
+        const { error: motoError } = await supabase
+            .from('motorcycles')
+            .update({
+                customer_id: customer.id,
+                brand: make,
+                model,
+                model_year: year,
+                vin: vin || null,
+                engine_displacement_cc: engineDisplacementCc || null,
+                color: color || null,
+                current_mileage: currentMileage || null,
+                engine_number: engineNumber || null,
+                chassis_number: chassisNumber || null,
+                notes: issueDescription
+            })
+            .eq('id', existingMotoInWorkshop.id)
+            .eq('organization_id', user.workshopId);
 
-    if (motoError) {
-        console.error('Error creating motorcycle:', motoError);
-        return { message: 'Error al crear motocicleta: ' + motoError.message };
+        if (motoError) {
+            console.error('Error updating motorcycle:', motoError);
+            return { message: 'Error al actualizar motocicleta: ' + motoError.message };
+        }
+    } else {
+        const { data: motoData, error: motoError } = await supabase
+            .from('motorcycles')
+            .insert({
+                organization_id: user.workshopId,
+                customer_id: customer.id,
+                brand: make,
+                model,
+                model_year: year,
+                license_plate: plate,
+                vin: vin || null,
+                engine_displacement_cc: engineDisplacementCc || null,
+                color: color || null,
+                current_mileage: currentMileage || null,
+                engine_number: engineNumber || null,
+                chassis_number: chassisNumber || null,
+                notes: issueDescription
+            })
+            .select('id')
+            .single();
+
+        if (motoError) {
+            console.error('Error creating motorcycle:', motoError);
+            return { message: 'Error al crear motocicleta: ' + motoError.message };
+        }
+        motorcycleId = motoData.id;
+    }
+
+    if (createWorkOrderFlag && technicianId && motorcycleId) {
+        const { createWorkOrder } = await import('@/lib/actions/work-orders');
+        const woFormData = new FormData();
+        woFormData.append('motorcycleId', motorcycleId);
+        woFormData.append('technicianId', technicianId);
+        
+        const woResult = await createWorkOrder(null, woFormData);
+        if (woResult?.errors || woResult?.message) {
+            console.error('Error creating work order from motorcycle:', woResult);
+            return { message: 'Motocicleta guardada, pero hubo un error al crear la orden: ' + (woResult?.message || 'Error de validación') };
+        }
     }
 
     revalidatePath('/motorcycles');

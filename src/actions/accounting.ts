@@ -312,7 +312,7 @@ export async function getOrganizationTechnicians(organizationId: string) {
       `)
       .eq('organization_id', organizationId)
       .eq('status', 'active')
-      .in('role', ['mechanic', 'admin', 'owner']); // Include those who might do tech work
+      .eq('role', 'mechanic');
 
     if (error) {
       console.error('Error fetching technicians:', error);

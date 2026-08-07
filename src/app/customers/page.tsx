@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { AddCustomer } from '@/components/forms/AddCustomer';
 import { EditCustomer } from '@/components/forms/EditCustomer';
 import { DeleteCustomer } from '@/components/forms/DeleteCustomer';
+import { CustomerDetails } from '@/components/details/CustomerDetails';
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SearchCustomers } from '@/components/forms/SearchCustomers';
@@ -110,6 +111,7 @@ export default async function CustomersPage({
                     </TableCell>
                     <TableCell className="text-right py-4">
                       <div className="flex gap-1 sm:gap-2 justify-end">
+                        <CustomerDetails customer={customer} />
                         <EditCustomer customer={customer} />
                         <DeleteCustomer customer={customer} />
                       </div>

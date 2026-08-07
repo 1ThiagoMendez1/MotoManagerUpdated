@@ -5,8 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { Loader2, PlusCircle, Check, ChevronsUpDown, AlertTriangle } from 'lucide-react';
+import { Loader2, PlusCircle, Check, ChevronsUpDown, AlertTriangle, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -109,6 +110,8 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [openBrand, setOpenBrand] = useState(false);
+  const [createOrder, setCreateOrder] = useState(false);
+  const [selectedTech, setSelectedTech] = useState<string>('');
   const { toast } = useToast();
   const router = useRouter();
 
@@ -140,6 +143,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   // Refs to prevent circular trigger loop between search hooks
   const skipNextNameSearch = useRef(false);
   const skipNextCedulaSearch = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-complete customer data when cedula changes
   useEffect(() => {
@@ -164,6 +168,30 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
             }
             if (form.getValues('customerPhone') !== customer.phone) {
               form.setValue('customerPhone', customer.phone || '');
+            }
+            
+            // @ts-ignore
+            if (customer.motorcycle) {
+                // @ts-ignore
+                form.setValue('make', customer.motorcycle.brand || '');
+                // @ts-ignore
+                form.setValue('model', customer.motorcycle.model || '');
+                // @ts-ignore
+                if (customer.motorcycle.model_year) form.setValue('year', customer.motorcycle.model_year);
+                // @ts-ignore
+                form.setValue('plate', customer.motorcycle.license_plate || '');
+                // @ts-ignore
+                if (customer.motorcycle.vin) form.setValue('vin', customer.motorcycle.vin);
+                // @ts-ignore
+                if (customer.motorcycle.engine_displacement_cc) form.setValue('engineDisplacementCc', customer.motorcycle.engine_displacement_cc);
+                // @ts-ignore
+                if (customer.motorcycle.color) form.setValue('color', customer.motorcycle.color);
+                // @ts-ignore
+                if (customer.motorcycle.current_mileage) form.setValue('currentMileage', customer.motorcycle.current_mileage);
+                // @ts-ignore
+                if (customer.motorcycle.engine_number) form.setValue('engineNumber', customer.motorcycle.engine_number);
+                // @ts-ignore
+                if (customer.motorcycle.chassis_number) form.setValue('chassisNumber', customer.motorcycle.chassis_number);
             }
           }
         } catch (error) {
@@ -202,6 +230,30 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
             if (form.getValues('customerPhone') !== customer.phone) {
               form.setValue('customerPhone', customer.phone || '');
             }
+
+            // @ts-ignore
+            if (customer.motorcycle) {
+                // @ts-ignore
+                form.setValue('make', customer.motorcycle.brand || '');
+                // @ts-ignore
+                form.setValue('model', customer.motorcycle.model || '');
+                // @ts-ignore
+                if (customer.motorcycle.model_year) form.setValue('year', customer.motorcycle.model_year);
+                // @ts-ignore
+                form.setValue('plate', customer.motorcycle.license_plate || '');
+                // @ts-ignore
+                if (customer.motorcycle.vin) form.setValue('vin', customer.motorcycle.vin);
+                // @ts-ignore
+                if (customer.motorcycle.engine_displacement_cc) form.setValue('engineDisplacementCc', customer.motorcycle.engine_displacement_cc);
+                // @ts-ignore
+                if (customer.motorcycle.color) form.setValue('color', customer.motorcycle.color);
+                // @ts-ignore
+                if (customer.motorcycle.current_mileage) form.setValue('currentMileage', customer.motorcycle.current_mileage);
+                // @ts-ignore
+                if (customer.motorcycle.engine_number) form.setValue('engineNumber', customer.motorcycle.engine_number);
+                // @ts-ignore
+                if (customer.motorcycle.chassis_number) form.setValue('chassisNumber', customer.motorcycle.chassis_number);
+            }
           }
         } catch (error) {
           console.error('Error looking up customer by name:', error);
@@ -234,6 +286,15 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
       if (values.chassisNumber) formData.append('chassisNumber', values.chassisNumber);
       formData.append('issueDescription', values.issueDescription);
 
+      if (createOrder) {
+          if (!selectedTech) {
+              setErrorMsg('Debes seleccionar un técnico para crear la orden de trabajo.');
+              return;
+          }
+          formData.append('createWorkOrder', 'true');
+          formData.append('technicianId', selectedTech);
+      }
+
       console.log('Submitting form with values:', values);
 
       const result = await createMotorcycle(null, formData);
@@ -244,13 +305,20 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
         setErrorMsg(null);
         toast({ title: 'Motocicleta registrada', description: 'La motocicleta ha sido guardada exitosamente.' });
         router.refresh();
-      } else if (result?.message) {
-        setErrorMsg(result.message);
-      } else if (result?.errors) {
-        setErrorMsg("Error de validación, revisa los campos.");
       } else {
-        setErrorMsg("Ocurrió un error inesperado al crear la motocicleta.");
-        console.error('Error creating motorcycle:', result);
+        if (result?.message) {
+          setErrorMsg(result.message);
+        } else if (result?.errors) {
+          setErrorMsg("Error de validación, revisa los campos.");
+        } else {
+          setErrorMsg("Ocurrió un error inesperado al crear la motocicleta.");
+          console.error('Error creating motorcycle:', result);
+        }
+        
+        // Scroll to top to show error message
+        setTimeout(() => {
+          scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
       }
     } catch (error) {
       console.error('Error in onSubmit:', error);
@@ -274,7 +342,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="max-h-[60vh] overflow-y-auto px-1 space-y-4">
+            <div className="max-h-[60vh] overflow-y-auto px-1 space-y-4" ref={scrollRef}>
               {errorMsg && (
                 <div className="bg-red-500/10 border-l-4 border-red-500 text-red-500 p-4 rounded-md flex items-start gap-3 shadow-sm my-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
@@ -613,6 +681,41 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
                   </FormItem>
                 )}
               />
+              
+              <div className="border border-border rounded-md p-4 bg-foreground/[0.02] space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="createOrder" 
+                    checked={createOrder} 
+                    onCheckedChange={(checked) => setCreateOrder(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="createOrder"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-foreground cursor-pointer flex items-center gap-2"
+                  >
+                    <PenTool className="w-4 h-4 text-emerald-500" />
+                    Ingresar de una vez a nueva Orden de Trabajo
+                  </label>
+                </div>
+                
+                {createOrder && (
+                  <div className="pl-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <label className="text-sm font-medium text-foreground mb-1.5 block">Técnico Asignado</label>
+                    <Select value={selectedTech} onValueChange={setSelectedTech} required={createOrder}>
+                      <SelectTrigger className="bg-card text-card-foreground border-border w-full">
+                        <SelectValue placeholder="Asigna un técnico" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {technicians?.map(tech => (
+                          <SelectItem key={tech.id} value={tech.id}>
+                            {tech.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
             </div>
 
             <DialogFooter className="pt-2">

@@ -224,12 +224,27 @@ export async function getCustomerByCedula(cedula: string) {
 
     const { data } = await supabase
         .from('customers')
-        .select('id, first_name, last_name, email, phone, document_number')
+        .select(`
+            id, first_name, last_name, email, phone, document_number,
+            motorcycles (
+                id, brand, model, model_year, license_plate, vin, engine_displacement_cc, color, current_mileage, engine_number, chassis_number, created_at
+            )
+        `)
         .eq('document_number', cedula)
         .eq('organization_id', user.workshopId)
         .maybeSingle();
 
     if (!data) return null;
+
+    // Obtener la moto más reciente si tiene
+    let latestMotorcycle = null;
+    if (data.motorcycles && data.motorcycles.length > 0) {
+        // Ordenar por created_at desc (más reciente primero)
+        const sorted = data.motorcycles.sort((a: any, b: any) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        latestMotorcycle = sorted[0];
+    }
 
     // Mapeo al frontend
     return {
@@ -237,7 +252,20 @@ export async function getCustomerByCedula(cedula: string) {
         name: `${data.first_name} ${data.last_name}`.trim(),
         email: data.email,
         phone: data.phone,
-        cedula: data.document_number
+        cedula: data.document_number,
+        motorcycle: latestMotorcycle ? {
+            id: latestMotorcycle.id,
+            brand: latestMotorcycle.brand,
+            model: latestMotorcycle.model,
+            model_year: latestMotorcycle.model_year,
+            license_plate: latestMotorcycle.license_plate,
+            vin: latestMotorcycle.vin,
+            engine_displacement_cc: latestMotorcycle.engine_displacement_cc,
+            color: latestMotorcycle.color,
+            current_mileage: latestMotorcycle.current_mileage,
+            engine_number: latestMotorcycle.engine_number,
+            chassis_number: latestMotorcycle.chassis_number
+        } : null
     };
 }
 
@@ -252,7 +280,12 @@ export async function getCustomerByName(name: string) {
 
     let query = supabase
         .from('customers')
-        .select('id, first_name, last_name, email, phone, document_number')
+        .select(`
+            id, first_name, last_name, email, phone, document_number,
+            motorcycles (
+                id, brand, model, model_year, license_plate, vin, engine_displacement_cc, color, current_mileage, engine_number, chassis_number, created_at
+            )
+        `)
         .eq('organization_id', user.workshopId);
 
     if (searchLast) {
@@ -265,11 +298,115 @@ export async function getCustomerByName(name: string) {
 
     if (!data) return null;
 
+    let latestMotorcycle = null;
+    if (data.motorcycles && data.motorcycles.length > 0) {
+        const sorted = data.motorcycles.sort((a: any, b: any) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        latestMotorcycle = sorted[0];
+    }
+
     return {
         id: data.id,
         name: `${data.first_name} ${data.last_name}`.trim(),
         email: data.email,
         phone: data.phone,
-        cedula: data.document_number
+        cedula: data.document_number,
+        motorcycle: latestMotorcycle ? {
+            id: latestMotorcycle.id,
+            brand: latestMotorcycle.brand,
+            model: latestMotorcycle.model,
+            model_year: latestMotorcycle.model_year,
+            license_plate: latestMotorcycle.license_plate,
+            vin: latestMotorcycle.vin,
+            engine_displacement_cc: latestMotorcycle.engine_displacement_cc,
+            color: latestMotorcycle.color,
+            current_mileage: latestMotorcycle.current_mileage,
+            engine_number: latestMotorcycle.engine_number,
+            chassis_number: latestMotorcycle.chassis_number
+        } : null
+    };
+}
+
+export async function getCustomerFullHistory(id: string) {
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+
+    const { data: customer } = await supabase
+        .from('customers')
+        .select(`
+            id, first_name, last_name, email, phone, document_number, created_at,
+            motorcycles (
+                id, brand, model, model_year, license_plate, current_mileage, created_at,
+                work_orders (
+                    id, order_number, status, created_at, reported_symptoms
+                )
+            ),
+            sales (
+                id, sale_number, total, created_at, status, payment_method,
+                sale_items ( id, quantity, unit_price, inventory_items(name) )
+            )
+        `)
+        .eq('id', id)
+        .eq('organization_id', user.workshopId)
+        .single();
+
+    if (!customer) return null;
+
+    const motorcycles = (customer.motorcycles || []).map((m: any) => ({
+        id: m.id,
+        brand: m.brand,
+        model: m.model,
+        year: m.model_year,
+        plate: m.license_plate,
+        mileage: m.current_mileage,
+        createdAt: m.created_at
+    }));
+
+    const workOrders: any[] = [];
+    (customer.motorcycles || []).forEach((m: any) => {
+        if (m.work_orders && m.work_orders.length > 0) {
+            m.work_orders.forEach((wo: any) => {
+                workOrders.push({
+                    id: wo.id,
+                    orderNumber: `WO-${wo.order_number}`,
+                    status: wo.status,
+                    createdAt: wo.created_at,
+                    issue: wo.reported_symptoms,
+                    motorcycle: `${m.brand} ${m.model} (${m.license_plate})`
+                });
+            });
+        }
+    });
+
+    const sales = (customer.sales || []).map((s: any) => ({
+        id: s.id,
+        saleNumber: `SALE-${s.sale_number || s.id.substring(0, 6)}`,
+        total: s.total,
+        createdAt: s.created_at,
+        status: s.status,
+        paymentMethod: s.payment_method,
+        itemsCount: s.sale_items?.length || 0
+    }));
+
+    workOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    sales.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return {
+        id: customer.id,
+        name: `${customer.first_name} ${customer.last_name}`.trim(),
+        email: customer.email,
+        phone: customer.phone,
+        cedula: customer.document_number,
+        createdAt: customer.created_at,
+        motorcycles,
+        workOrders,
+        sales,
+        summary: {
+            totalMotorcycles: motorcycles.length,
+            totalWorkOrders: workOrders.length,
+            totalSales: sales.length,
+            totalSpent: sales.reduce((sum: number, s: any) => sum + (Number(s.total) || 0), 0)
+        }
     };
 }

@@ -72,7 +72,7 @@ export default async function MotorcyclesPage({
         </div>
         <div className="flex gap-2">
           <ExportMotorcyclesButton motorcycles={motorcyclesInWorkshop} />
-          <AddMotorcycle />
+          <AddMotorcycle technicians={techResult.items} />
         </div>
       </div>
       <Card className="glass-card relative overflow-hidden group text-foreground">
