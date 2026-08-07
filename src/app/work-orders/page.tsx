@@ -29,7 +29,7 @@ import { SearchWorkOrders } from '@/components/forms/SearchWorkOrders';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { ClipboardList, PlusCircle, Wrench, Calendar, Bike, User, Eye, Search, AlertCircle, BellRing } from 'lucide-react';
 
 export default async function WorkOrdersPage({
   searchParams,
@@ -137,6 +137,14 @@ export default async function WorkOrdersPage({
                           {order.status === 'Entregado' && order.entregadoDate && `Entregado: ${formatExactDateTime(order.entregadoDate)}`}
                         </div>
                       )}
+                      {order.pendingPartRequestsCount && order.pendingPartRequestsCount > 0 ? (
+                        <div className="mt-2">
+                          <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20 text-xs py-0.5">
+                            <BellRing className="w-3 h-3 mr-1 inline-block animate-pulse" />
+                            {order.pendingPartRequestsCount} pendiente{order.pendingPartRequestsCount > 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                      ) : null}
                     </div>
                   </TableCell>
                   <TableCell className="text-center">

@@ -33,6 +33,9 @@ import { EvidenceManager } from '@/components/work-orders/EvidenceManager';
 import { AddServiceToWorkOrder } from '@/components/forms/AddServiceToWorkOrder';
 import { RemoveServiceFromWorkOrder } from '@/components/forms/RemoveServiceFromWorkOrder';
 import { getServices } from '@/actions/services';
+import { requireWorkshop } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
+import { PartRequestsSection } from '@/components/work-orders/PartRequestsSection';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +44,29 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   const workOrder = await getWorkOrderById(resolvedParams.id);
 
   if (!workOrder) return <div className="text-foreground p-8 flex flex-col items-center justify-center min-h-[50vh]"><AlertCircle className="w-12 h-12 text-red-500 mb-4" /><h2 className="text-2xl font-bold">Orden no encontrada</h2></div>;
+
+  const user = await requireWorkshop();
+  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+
+  const { data: partRequests, error: prError } = await supabaseAdmin
+    .from('part_requests')
+    .select(`
+        *,
+        inventory_items ( name, code ),
+        requester:profiles!part_requests_requested_by_fkey ( first_name, last_name ),
+        fulfiller:profiles!part_requests_fulfilled_by_fkey ( first_name, last_name )
+    `)
+    .eq('work_order_id', workOrder.id)
+    .order('created_at', { ascending: false });
+
+  if (prError) {
+      console.error('Error fetching part requests:', prError);
+  }
 
   const [inventory, { items: technicians }, reminders, services] = await Promise.all([
     getInventory({ page: 1 } as any),
@@ -341,9 +367,11 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
                 Agregar Nuevo Item
               </h3>
-              <AddItemToWorkOrder workOrderId={workOrder.id} inventory={inventory.items} />
+              <AddItemToWorkOrder workOrderId={workOrder.id} inventory={inventory.items} userRole={user.role} />
             </div>
           )}
+
+          <PartRequestsSection workOrderId={workOrder.id} requests={partRequests as any || []} userRole={user.role} />
 
           <div className="mt-8">
             <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wider flex items-center gap-2">

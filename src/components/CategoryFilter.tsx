@@ -36,6 +36,7 @@ export function CategoryFilter({ currentCategory }: CategoryFilterProps) {
       <option value="Repuestos">Repuestos</option>
       <option value="Llantas">Llantas</option>
       <option value="Accesorios">Accesorios</option>
+      <option value="Aceites">Aceites</option>
     </select>
   );
 }

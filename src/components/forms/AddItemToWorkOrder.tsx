@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { addItemToWorkOrder } from '@/lib/actions/work-orders';
+import { addItemToWorkOrder, requestPartForWorkOrder } from '@/lib/actions/work-orders';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -16,14 +16,17 @@ import {
 interface AddItemToWorkOrderProps {
   workOrderId: string;
   inventory: { id: string; name: string; sku: string; quantity: number }[];
+  userRole?: string;
 }
 
-export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrderProps) {
+export function AddItemToWorkOrder({ workOrderId, inventory, userRole = 'mechanic' }: AddItemToWorkOrderProps) {
   const [selectedItem, setSelectedItem] = useState('');
   const [quantity, setQuantity] = useState<number | ''>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isPending, setIsPending] = useState(false);
   const { toast } = useToast();
+
+  const isMechanic = userRole === 'mechanic' || userRole === 'technician';
 
   // Filter inventory based on search term
   const filteredInventory = searchTerm
@@ -59,27 +62,33 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
       formData.append('inventoryItemId', selectedItem);
       formData.append('quantity', quantity.toString());
 
-      const result = await addItemToWorkOrder(formData);
+      let result;
+      if (isMechanic) {
+          result = await requestPartForWorkOrder(formData);
+      } else {
+          result = await addItemToWorkOrder(formData);
+      }
+      
       if (result && !result.success) {
         toast({
-          title: "Error al agregar artículo",
-          description: result.error || "No se pudo agregar el repuesto a la orden.",
+          title: isMechanic ? "Error al solicitar repuesto" : "Error al agregar artículo",
+          description: result.error || "No se pudo procesar la solicitud.",
           variant: "destructive"
         });
       } else {
         toast({
-          title: "Artículo agregado",
-          description: "El repuesto se agregó correctamente a la orden.",
+          title: isMechanic ? "Repuesto solicitado" : "Artículo agregado",
+          description: isMechanic ? "Se ha enviado la solicitud al administrador para su alistamiento." : "El repuesto se agregó correctamente a la orden.",
         });
         setSelectedItem('');
         setQuantity('');
         setSearchTerm('');
       }
     } catch (error: any) {
-      console.error("Error al agregar repuesto:", error);
+      console.error("Error al procesar repuesto:", error);
       toast({
         title: "Error de red",
-        description: "No se pudo conectar con el servidor para agregar el repuesto.",
+        description: "No se pudo conectar con el servidor.",
         variant: "destructive"
       });
     } finally {
@@ -150,10 +159,10 @@ export function AddItemToWorkOrder({ workOrderId, inventory }: AddItemToWorkOrde
       <div className="flex justify-end mt-2">
         <Button 
           type="submit" 
-          className="bg-green-600 hover:bg-green-700"
+          className={isMechanic ? "bg-yellow-600 hover:bg-yellow-700 text-white" : "bg-green-600 hover:bg-green-700"}
           disabled={isPending || !selectedItem || !quantity}
         >
-          {isPending ? "Agregando..." : "Agregar"}
+          {isPending ? "Procesando..." : (isMechanic ? "Solicitar Repuesto" : "Agregar")}
         </Button>
       </div>
     </form>

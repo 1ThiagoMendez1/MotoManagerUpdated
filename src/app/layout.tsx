@@ -42,6 +42,8 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 
 import { getWorkshopDetails, getCurrentUserServer } from '@/lib/auth-server';
 import { LayoutWrapper } from '@/components/LayoutWrapper';
+import { PartRequestsNotifier } from '@/components/work-orders/PartRequestsNotifier';
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -74,6 +76,10 @@ export default async function RootLayout({
                 userName={workshop.user_name}
                 userRole={workshop.user_role}
                 workshopName={workshop.name}
+              />
+              <PartRequestsNotifier 
+                userRole={workshop.user_role as string}
+                organizationId={workshop.id as string}
               />
             </>
           )}

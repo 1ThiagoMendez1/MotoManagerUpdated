@@ -792,3 +792,157 @@ export async function deleteWorkOrderEvidence(formData: FormData) {
     revalidatePath('/work-orders');
     return { success: true };
 }
+
+export async function requestPartForWorkOrder(formData: FormData) {
+    try {
+        const user = await requireWorkshop();
+        const supabase = await createClient();
+
+        const workOrderId = formData.get('workOrderId') as string;
+        const itemId = formData.get('inventoryItemId') as string;
+        const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
+
+        if (!workOrderId || !itemId) {
+            return { success: false, error: 'Datos incompletos.' };
+        }
+
+        const { error } = await supabase
+            .from('part_requests')
+            .insert({
+                organization_id: user.workshopId,
+                work_order_id: workOrderId,
+                inventory_item_id: itemId,
+                requested_by: user.userId,
+                quantity: quantity,
+                status: 'pending'
+            });
+
+        if (error) {
+            console.error('Error creating part request:', error);
+            return { success: false, error: 'Error al solicitar el repuesto.' };
+        }
+
+        revalidatePath('/work-orders/' + workOrderId);
+        return { success: true };
+    } catch (e: any) {
+        console.error('Error in requestPartForWorkOrder:', e);
+        return { success: false, error: e.message || 'Error inesperado.' };
+    }
+}
+
+export async function fulfillPartRequest(requestId: string, workOrderId: string) {
+    try {
+        const user = await requireWorkshop();
+        const supabase = await createClient();
+
+        // 1. Get request details
+        const { data: request, error: reqError } = await supabase
+            .from('part_requests')
+            .select('*, inventory_items(*)')
+            .eq('id', requestId)
+            .eq('organization_id', user.workshopId)
+            .single();
+
+        if (reqError || !request) return { success: false, error: 'Solicitud no encontrada.' };
+        if (request.status !== 'pending') return { success: false, error: 'La solicitud ya fue procesada.' };
+
+        // 2. Add to sale_items
+        let { data: sale } = await supabase
+            .from('sales')
+            .select('id')
+            .eq('work_order_id', workOrderId)
+            .maybeSingle();
+
+        if (!sale) {
+            const { data: newSale, error: saleError } = await supabase
+                .from('sales')
+                .insert({
+                    organization_id: user.workshopId,
+                    work_order_id: workOrderId,
+                    status: 'pending',
+                    total: 0
+                })
+                .select()
+                .single();
+            if (saleError || !newSale) return { success: false, error: 'Error al crear venta.' };
+            sale = newSale;
+        }
+
+        const invItem = request.inventory_items;
+
+        const { error: itemError } = await supabase
+            .from('sale_items')
+            .insert({
+                sale_id: sale!.id,
+                item_type: 'inventory',
+                inventory_item_id: request.inventory_item_id,
+                description: invItem.name,
+                quantity: request.quantity,
+                unit_price: invItem.unit_price,
+                total: request.quantity * invItem.unit_price
+            });
+
+        if (itemError) return { success: false, error: 'Error al agregar a la factura.' };
+
+        // 3. Deduct inventory if order is approved or beyond
+        const { data: orderData } = await supabase
+            .from('work_orders')
+            .select('status')
+            .eq('id', workOrderId)
+            .single();
+            
+        const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
+
+        if (isApproved) {
+            const { error: decrementError } = await supabase.rpc('decrement_inventory', {
+                item_id: request.inventory_item_id,
+                amount: request.quantity
+            });
+            if (decrementError) {
+                console.error('Error al descontar inventario en orden aprobada:', decrementError);
+                return { success: false, error: 'Stock insuficiente o error al descontar del inventario.' };
+            }
+        }
+
+        // 4. Mark request as fulfilled
+        await supabase
+            .from('part_requests')
+            .update({
+                status: 'fulfilled',
+                fulfilled_by: user.userId,
+                fulfilled_at: new Date().toISOString()
+            })
+            .eq('id', requestId);
+
+        revalidatePath('/work-orders/' + workOrderId);
+        return { success: true };
+    } catch (e: any) {
+        console.error('Error in fulfillPartRequest:', e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function rejectPartRequest(requestId: string, workOrderId: string) {
+    try {
+        const user = await requireWorkshop();
+        const supabase = await createClient();
+
+        const { error } = await supabase
+            .from('part_requests')
+            .update({
+                status: 'rejected',
+                fulfilled_by: user.userId,
+                fulfilled_at: new Date().toISOString()
+            })
+            .eq('id', requestId)
+            .eq('organization_id', user.workshopId);
+
+        if (error) return { success: false, error: 'Error al rechazar.' };
+
+        revalidatePath('/work-orders/' + workOrderId);
+        return { success: true };
+    } catch (e: any) {
+        console.error('Error in rejectPartRequest:', e);
+        return { success: false, error: e.message };
+    }
+}

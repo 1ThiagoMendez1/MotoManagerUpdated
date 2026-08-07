@@ -8,7 +8,7 @@ import { sendLowStockNotification } from '@/lib/whatsapp';
 const inventorySchema = z.object({
     name: z.string().min(3, { message: "El nombre debe tener al menos 3 caracteres." }),
     sku: z.string().min(3, { message: "El SKU debe tener al menos 3 caracteres." }).transform(val => val.toUpperCase()),
-    category: z.enum(['Lubricantes', 'Repuestos', 'Llantas', 'Accesorios']),
+    category: z.enum(['Lubricantes', 'Repuestos', 'Llantas', 'Accesorios', 'Aceites']),
     location: z.string().min(1, "La ubicación es requerida."),
     supplier: z.string().min(1, "El proveedor es requerido."),
     quantity: z.coerce.number().int().positive("La cantidad debe ser un número positivo."),

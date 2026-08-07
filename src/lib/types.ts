@@ -28,7 +28,7 @@ export type Technician = {
   workOrders?: WorkOrder[];
 };
 
-export type InventoryCategory = 'Lubricantes' | 'Repuestos' | 'Llantas' | 'Accesorios';
+export type InventoryCategory = 'Lubricantes' | 'Repuestos' | 'Llantas' | 'Accesorios' | 'Aceites';
 
 export type InventoryItem = {
   id: string;
@@ -59,6 +59,7 @@ export type WorkOrder = {
   solutionDescription?: string | null;
   /** Monto total de abonos realizados por el cliente para esta orden */
   depositAmount?: number;
+  pendingPartRequestsCount?: number;
   createdDate: string;
   diagnosticandoDate?: string;
   reparadoDate?: string;

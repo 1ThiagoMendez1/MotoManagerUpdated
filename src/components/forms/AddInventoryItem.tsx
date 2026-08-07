@@ -28,7 +28,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { createInventoryItem } from '@/lib/actions/inventory';
 import type { InventoryCategory } from '@/lib/types';
 
-const inventoryCategories: InventoryCategory[] = ['Repuestos', 'Lubricantes', 'Llantas', 'Accesorios'];
+const inventoryCategories: InventoryCategory[] = ['Repuestos', 'Lubricantes', 'Llantas', 'Accesorios', 'Aceites'];
 
 function SubmitButton() {
   return (

@@ -167,7 +167,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
   const offset = (page - 1) * limit;
 
   let q = supabase.from('work_orders')
-    .select('*, motorcycles(*), customers(*), sales(id, status)', { count: 'exact' })
+    .select('*, motorcycles(*), customers(*), sales(id, status), part_requests(id, status)', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
@@ -190,6 +190,8 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
   const items: WorkOrder[] = data.map((wo: any) => {
     const hasCompletedSale = wo.sales && wo.sales.some((s: any) => s.status === 'paid');
     
+    const pendingPartRequestsCount = wo.part_requests ? wo.part_requests.filter((pr: any) => pr.status === 'pending').length : 0;
+
     return {
     id: wo.id,
     workOrderNumber: `WO-${wo.order_number}`,
@@ -221,6 +223,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     quoteStatus: wo.quote_status === 'approved' ? 'Aprobada' : (wo.quote_status === 'rejected' ? 'Rechazada' : 'Pendiente'),
     quote_status: wo.quote_status,
     customerObservations: wo.customer_observations || '',
+    pendingPartRequestsCount,
     depositAmount: (() => {
       let parsed = 0;
       if (wo.customer_observations) {
