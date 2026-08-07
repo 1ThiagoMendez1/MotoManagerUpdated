@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPlanLimits } from '@/lib/constants/plans';
 import { Lock, PieChart, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, ArrowUpRight, ArrowDownRight, Rocket, Loader2, Percent } from 'lucide-react';
-import { getDailyClosings } from '@/actions/accounting';
+import { getRealtimeFinancialDataRaw, RealtimeFinancialData } from '@/actions/accounting';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -44,7 +44,7 @@ const supplierData = [
 export default function AccountingClient({ subscriptionPlan, organizationId }: AccountingClientProps) {
   const [activeTab, setActiveTab] = useState<'resumen' | 'flujo' | 'compras' | 'proveedores' | 'categorias' | 'nomina' | 'cierre'>('resumen');
   const [periodFilter, setPeriodFilter] = useState<'day' | 'month' | 'year'>('day');
-  const [closings, setClosings] = useState<any[]>([]);
+  const [realtimeData, setRealtimeData] = useState<RealtimeFinancialData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const planLimits = getPlanLimits(subscriptionPlan || 'basic');
@@ -54,77 +54,146 @@ export default function AccountingClient({ subscriptionPlan, organizationId }: A
   const isComplete = planLimits.accounting_level === 'complete';
 
   useEffect(() => {
-    async function fetchClosings() {
+    async function fetchRealtime() {
+      if (activeTab !== 'resumen' && activeTab !== 'flujo') return;
       setLoading(true);
       try {
-        const data = await getDailyClosings(organizationId, 365); // Fetch up to a year of closings
-        setClosings(data || []);
+        const now = new Date();
+        let start = new Date();
+        let end = new Date();
+
+        if (periodFilter === 'day') {
+          start.setHours(0,0,0,0);
+          end.setHours(23,59,59,999);
+        } else if (periodFilter === 'month') {
+          start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+          end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        } else if (periodFilter === 'year') {
+          start = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+          end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+        }
+
+        const data = await getRealtimeFinancialDataRaw(organizationId, start.toISOString(), end.toISOString());
+        setRealtimeData(data);
       } catch (err) {
-        console.error('Error fetching closings:', err);
+        console.error('Error fetching realtime data:', err);
       } finally {
         setLoading(false);
       }
     }
-    fetchClosings();
-  }, [organizationId]);
+    fetchRealtime();
+  }, [organizationId, periodFilter, activeTab]);
 
-  const { chartData, metrics } = useMemo(() => {
-    let aggregated: Record<string, { ingresos: number, egresos: number, utilidad: number }> = {};
+  const { chartData, metrics, paymentMethodsData, cashFlowData } = useMemo(() => {
+    if (!realtimeData) return { chartData: [], metrics: { ingresos: 0, gastos: 0, utilidad: 0, margen: 0, totalVentas: 0, label: '' }, paymentMethodsData: [], cashFlowData: { efectivoIngresado: 0, efectivoNeto: 0, otrosMetodos: 0, categorias: [] } };
+    
+    let aggregated: Record<string, { ingresos: number, egresos: number, utilidad: number, ventas: number }> = {};
     let totalIngresos = 0;
     let totalEgresos = 0;
-    let totalUtilidad = 0;
+    let totalVentas = 0;
+    
+    const methodsMap: Record<string, number> = {};
+    const categoriesMap: Record<string, number> = {};
 
-    const sortedClosings = [...closings].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    sortedClosings.forEach(c => {
-      const d = new Date(c.date);
-      // Ajuste timezone para no desfasar
-      const localDate = new Date(d.getTime() + d.getTimezoneOffset() * 60000); 
+    realtimeData.sales.forEach(sale => {
+      const d = new Date(sale.created_at);
       let key = '';
-      
       if (periodFilter === 'day') {
-        key = localDate.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+        key = `${d.getHours().toString().padStart(2, '0')}:00`;
       } else if (periodFilter === 'month') {
-        key = localDate.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' });
-      } else if (periodFilter === 'year') {
-        key = localDate.getFullYear().toString();
+        key = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+      } else {
+        key = d.toLocaleDateString('es-CO', { month: 'short' });
       }
 
-      if (!aggregated[key]) {
-        aggregated[key] = { ingresos: 0, egresos: 0, utilidad: 0 };
-      }
-      aggregated[key].ingresos += Number(c.total_income || 0);
-      aggregated[key].egresos += Number(c.total_expenses || 0);
-      aggregated[key].utilidad += Number(c.net_balance || 0);
+      if (!aggregated[key]) aggregated[key] = { ingresos: 0, egresos: 0, utilidad: 0, ventas: 0 };
+      
+      const amount = Number(sale.total) || 0;
+      aggregated[key].ingresos += amount;
+      aggregated[key].utilidad += amount;
+      aggregated[key].ventas += 1;
+      
+      totalIngresos += amount;
+      totalVentas += 1;
+
+      const method = sale.payment_method || 'Efectivo';
+      methodsMap[method] = (methodsMap[method] || 0) + amount;
+
+      sale.sale_items?.forEach((item: any) => {
+        let cat = 'Otros';
+        if (item.item_type === 'inventory' && item.inventory_items?.category) cat = item.inventory_items.category;
+        else if (item.item_type === 'service' && item.service_catalog?.category) cat = item.service_catalog.category;
+        categoriesMap[cat] = (categoriesMap[cat] || 0) + Number(item.total);
+      });
     });
 
-    let entries = Object.entries(aggregated);
-    if (periodFilter === 'day' && entries.length > 14) {
-      entries = entries.slice(entries.length - 14);
-    } else if (periodFilter === 'month' && entries.length > 12) {
-      entries = entries.slice(entries.length - 12);
+    const addExpense = (dateStr: string, amount: number) => {
+      const d = new Date(dateStr);
+      let key = '';
+      if (periodFilter === 'day') {
+        key = `${d.getHours().toString().padStart(2, '0')}:00`;
+      } else if (periodFilter === 'month') {
+        key = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+      } else {
+        key = d.toLocaleDateString('es-CO', { month: 'short' });
+      }
+
+      if (!aggregated[key]) aggregated[key] = { ingresos: 0, egresos: 0, utilidad: 0, ventas: 0 };
+      aggregated[key].egresos += amount;
+      aggregated[key].utilidad -= amount;
+      totalEgresos += amount;
+    };
+
+    realtimeData.expenses.forEach(exp => addExpense(exp.date, Number(exp.amount) || 0));
+    realtimeData.payroll.forEach(pay => addExpense(pay.created_at, Number(pay.total_paid) || 0));
+
+    let chartData = [];
+    if (periodFilter === 'day') {
+      for (let i = 6; i <= 22; i++) {
+        const k = `${i.toString().padStart(2, '0')}:00`;
+        chartData.push({ label: k, ... (aggregated[k] || { ingresos: 0, egresos: 0, utilidad: 0, ventas: 0 }) });
+      }
+    } else if (periodFilter === 'month') {
+      const now = new Date();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      for (let i = 1; i <= daysInMonth; i++) {
+        const tempD = new Date(now.getFullYear(), now.getMonth(), i);
+        const k = tempD.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+        chartData.push({ label: k, ... (aggregated[k] || { ingresos: 0, egresos: 0, utilidad: 0, ventas: 0 }) });
+      }
+    } else {
+      for (let i = 0; i < 12; i++) {
+        const tempD = new Date(new Date().getFullYear(), i, 1);
+        const k = tempD.toLocaleDateString('es-CO', { month: 'short' });
+        chartData.push({ label: k, ... (aggregated[k] || { ingresos: 0, egresos: 0, utilidad: 0, ventas: 0 }) });
+      }
     }
 
-    const finalChartData = entries.map(([label, data]) => {
-      totalIngresos += data.ingresos;
-      totalEgresos += data.egresos;
-      totalUtilidad += data.utilidad;
-      return { label, ...data };
-    });
-
-    const margen = totalIngresos > 0 ? (totalUtilidad / totalIngresos) * 100 : 0;
+    const paymentMethodsData = Object.keys(methodsMap).map(k => ({ method: k, amount: methodsMap[k] })).sort((a,b) => b.amount - a.amount);
+    const efectivoIngresado = methodsMap['Efectivo'] || 0;
+    const efectivoNeto = efectivoIngresado - totalEgresos; // Asumimos gastos pagados en efectivo
     
+    const cashFlowData = {
+      efectivoIngresado,
+      efectivoNeto,
+      otrosMetodos: paymentMethodsData.filter(p => p.method !== 'Efectivo').reduce((sum, p) => sum + p.amount, 0),
+      categorias: Object.keys(categoriesMap).map(k => ({ category: k, amount: categoriesMap[k] })).sort((a,b) => b.amount - a.amount)
+    };
+
     return {
-      chartData: finalChartData,
+      chartData,
+      paymentMethodsData,
+      cashFlowData,
       metrics: {
         ingresos: totalIngresos,
         gastos: totalEgresos,
-        utilidad: totalUtilidad,
-        margen: margen,
-        label: periodFilter === 'day' ? '(Últimos 14 cierres)' : periodFilter === 'month' ? '(Últimos 12 meses)' : '(Histórico)'
+        utilidad: totalIngresos - totalEgresos,
+        margen: totalIngresos > 0 ? ((totalIngresos - totalEgresos) / totalIngresos) * 100 : 0,
+        totalVentas,
+        label: periodFilter === 'day' ? '(Hoy)' : periodFilter === 'month' ? '(Este Mes)' : '(Este Año)'
       }
     };
-  }, [closings, periodFilter]);
+  }, [realtimeData, periodFilter]);
 
   if (isLocked) {
     return (
@@ -269,7 +338,17 @@ export default function AccountingClient({ subscriptionPlan, organizationId }: A
                   </div>
                 ) : (
                   <>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                      <Card className="bg-card border-border/50 shadow-sm">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Total Ventas {metrics.label}</CardTitle>
+                          <ShoppingCart className="h-4 w-4 text-orange-500" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-foreground">{metrics.totalVentas}</div>
+                        </CardContent>
+                      </Card>
+
                       <Card className="bg-card border-border/50 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                           <CardTitle className="text-sm font-medium text-muted-foreground">Utilidad Neta {metrics.label}</CardTitle>
@@ -363,40 +442,81 @@ export default function AccountingClient({ subscriptionPlan, organizationId }: A
 
             {activeTab === 'flujo' && isComplete && (
               <div className="space-y-6">
-                <Card className="bg-card border-border/50">
-                  <CardHeader>
-                    <CardTitle>Flujo de Caja de Operaciones</CardTitle>
-                    <CardDescription>Análisis detallado de entradas y salidas de efectivo para el periodo seleccionado.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[400px] w-full">
-                      {loading ? (
-                        <div className="flex justify-center items-center h-full">
-                          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-                        </div>
-                      ) : chartData.length === 0 ? (
-                        <div className="flex justify-center items-center h-full text-muted-foreground">
-                          No hay datos de flujo de caja para este periodo.
-                        </div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
-                            <XAxis dataKey="label" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value/1000000}M`} />
-                            <Tooltip 
-                              contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                              cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                            />
-                            <Legend />
-                            <Bar dataKey="ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="egresos" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* EFECTIVO NETO */}
+                  <Card className="bg-card border-border/50 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Efectivo en Caja (Neto)</CardTitle>
+                      <CardDescription>Efectivo recibido menos gastos operativos pagados</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className={`text-3xl font-bold ${cashFlowData.efectivoNeto >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {formatCurrency(cashFlowData.efectivoNeto)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Ingresos efectivo: {formatCurrency(cashFlowData.efectivoIngresado)} <br/>
+                        Gastos deducidos: {formatCurrency(metrics.gastos)}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* OTROS MÉTODOS */}
+                  <Card className="bg-card border-border/50 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Bancos / Otros Métodos</CardTitle>
+                      <CardDescription>Transferencias, tarjetas, etc.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-indigo-500">
+                        {formatCurrency(cashFlowData.otrosMetodos)}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card className="bg-card border-border/50">
+                    <CardHeader>
+                      <CardTitle>Ingresos por Método de Pago</CardTitle>
+                      <CardDescription>Desglose de cómo pagaron tus clientes</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {paymentMethodsData.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">No hay ingresos registrados.</p>
+                        ) : (
+                          paymentMethodsData.map((p, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 bg-muted/20 border border-border/50 rounded-lg">
+                              <span className="font-medium text-sm">{p.method}</span>
+                              <span className="font-bold text-emerald-500">{formatCurrency(p.amount)}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border-border/50">
+                    <CardHeader>
+                      <CardTitle>Ventas por Categoría</CardTitle>
+                      <CardDescription>De dónde provienen tus ingresos</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {cashFlowData.categorias.length === 0 ? (
+                          <p className="text-sm text-muted-foreground italic">No hay categorías registradas.</p>
+                        ) : (
+                          cashFlowData.categorias.map((c, i) => (
+                            <div key={i} className="flex justify-between items-center p-3 bg-muted/20 border border-border/50 rounded-lg">
+                              <span className="font-medium text-sm">{c.category}</span>
+                              <span className="font-bold text-indigo-500">{formatCurrency(c.amount)}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             )}
 

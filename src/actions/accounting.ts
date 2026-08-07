@@ -646,3 +646,65 @@ export async function getDailyClosings(organizationId: string, limit = 30) {
     };
   });
 }
+
+export interface RealtimeFinancialData {
+  sales: any[];
+  expenses: any[];
+  payroll: any[];
+}
+
+export async function getRealtimeFinancialDataRaw(
+  organizationId: string, 
+  startIso: string, 
+  endIso: string
+): Promise<RealtimeFinancialData> {
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+
+  // 1. Fetch sales
+  const { data: sales, error: salesError } = await supabaseAdmin
+    .from('sales')
+    .select('id, total, status, created_at, payment_method, sale_items(item_type, total, inventory_items(category), service_catalog(category))')
+    .eq('organization_id', organizationId)
+    .in('status', ['paid', 'completed'])
+    .gte('created_at', startIso)
+    .lte('created_at', endIso);
+
+  if (salesError) {
+    console.error('Error fetching realtime sales:', salesError);
+  }
+
+  // 2. Fetch expenses
+  const { data: expenses, error: expensesError } = await supabaseAdmin
+    .from('expenses')
+    .select('id, amount, category, date')
+    .eq('organization_id', organizationId)
+    .gte('date', startIso)
+    .lte('date', endIso);
+
+  if (expensesError) {
+    console.error('Error fetching realtime expenses:', expensesError);
+  }
+  
+  // 3. Fetch payroll
+  const { data: payroll, error: payrollError } = await supabaseAdmin
+    .from('payroll_payments')
+    .select('id, total_paid, created_at')
+    .eq('organization_id', organizationId)
+    .eq('status', 'paid')
+    .gte('created_at', startIso)
+    .lte('created_at', endIso);
+
+  if (payrollError) {
+    console.error('Error fetching realtime payroll:', payrollError);
+  }
+
+  return {
+    sales: sales || [],
+    expenses: expenses || [],
+    payroll: payroll || []
+  };
+}
