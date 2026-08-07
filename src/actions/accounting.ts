@@ -76,6 +76,52 @@ export async function getSalesByCategory(organizationId: string, startDate?: str
   return result.sort((a, b) => b.total - a.total);
 }
 
+export async function getSalesByPaymentMethod(organizationId: string, startDate?: string, endDate?: string): Promise<{ method: string; total: number }[]> {
+  const supabase = await createClient();
+  let query = supabase
+    .from('sales')
+    .select('payment_method, total')
+    .eq('organization_id', organizationId)
+    .eq('status', 'paid');
+
+  if (startDate) {
+    query = query.gte('created_at', startDate);
+  }
+  if (endDate) {
+    query = query.lte('created_at', endDate);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('Error fetching sales by payment method:', error);
+    return [];
+  }
+
+  const methodTotals: Record<string, number> = {};
+  data?.forEach((sale: any) => {
+    const method = sale.payment_method || 'other';
+    if (!methodTotals[method]) {
+      methodTotals[method] = 0;
+    }
+    methodTotals[method] += Number(sale.total);
+  });
+
+  const uiMethods: Record<string, string> = {
+    'cash': 'Efectivo',
+    'credit_card': 'Tarjeta de Crédito',
+    'debit_card': 'Tarjeta de Débito',
+    'transfer': 'Transferencia / Nequi',
+    'other': 'Otro'
+  };
+
+  const result = Object.keys(methodTotals).map(key => ({
+    method: uiMethods[key] || key,
+    total: methodTotals[key]
+  }));
+
+  return result.sort((a, b) => b.total - a.total);
+}
+
 export interface TechnicianWorkSummary {
   id: string; // work order service id
   work_order_id: string;
@@ -355,21 +401,34 @@ export interface DailyClosingSummary {
   totalIncome: number;
   totalExpenses: number;
   incomeByCategory: CategorySaleSummary[];
+  incomeByPaymentMethod: { method: string; total: number }[];
   expensesByCategory: { category: string; total: number }[];
   technicianSummary: { name: string; totalServices: number; totalAmount: number }[];
   pendingOrdersCount: number;
   detailedExpenses: { id: string; category: string; description: string; amount: number }[];
 }
 
-export async function getDailyClosingSummary(organizationId: string, date: string): Promise<DailyClosingSummary> {
+export async function getDailyClosingSummary(
+  organizationId: string, 
+  date: string,
+  clientStartIso?: string,
+  clientEndIso?: string
+): Promise<DailyClosingSummary> {
   // Query sales
-  const startDate = new Date(date);
-  startDate.setHours(0, 0, 0, 0);
-  const startIso = startDate.toISOString();
+  let startIso, endIso;
+  
+  if (clientStartIso && clientEndIso) {
+    startIso = clientStartIso;
+    endIso = clientEndIso;
+  } else {
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    startIso = startDate.toISOString();
 
-  const endDate = new Date(date);
-  endDate.setHours(23, 59, 59, 999);
-  const endIso = endDate.toISOString();
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+    endIso = endDate.toISOString();
+  }
 
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -377,8 +436,9 @@ export async function getDailyClosingSummary(organizationId: string, date: strin
     { auth: { persistSession: false } }
   );
 
-  const [incomeByCategory, expenses, technicians, { data: payrollData }] = await Promise.all([
+  const [incomeByCategory, incomeByPaymentMethod, expenses, technicians, { data: payrollData }] = await Promise.all([
     getSalesByCategory(organizationId, startIso, endIso),
+    getSalesByPaymentMethod(organizationId, startIso, endIso),
     getExpenses(organizationId, startIso, endIso),
     getOrganizationTechnicians(organizationId),
     supabaseAdmin
@@ -505,6 +565,7 @@ export async function getDailyClosingSummary(organizationId: string, date: strin
     totalIncome,
     totalExpenses,
     incomeByCategory,
+    incomeByPaymentMethod,
     expensesByCategory,
     technicianSummary,
     pendingOrdersCount: pendingOrdersCount || 0,

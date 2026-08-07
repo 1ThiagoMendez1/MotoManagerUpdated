@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   Loader2, DollarSign, TrendingUp, TrendingDown, 
-  Search, Calendar, Receipt, ChevronDown, ChevronUp, Lock, Target, Calculator, Info, CheckCircle2, AlertCircle, Users
+  Search, Calendar, Receipt, ChevronDown, ChevronUp, Lock, Target, Calculator, Info, CheckCircle2, AlertCircle, Users, CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
@@ -35,7 +35,27 @@ const EXPENSE_CATEGORIES = [
 
 export default function DailyClosingDashboard({ organizationId }: DailyClosingDashboardProps) {
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Use a lazy initial state or effect to set local date safely
+  const [date, setDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const d = new Date();
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  });
+  
+  useEffect(() => {
+    // Ensure on client we match local timezone
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    const local = d.toISOString().split('T')[0];
+    if (date !== local && !isClosed) {
+      setDate(local);
+    }
+  }, []);
+
   const [summary, setSummary] = useState<DailyClosingSummary | null>(null);
   const [closings, setClosings] = useState<any[]>([]);
   
@@ -50,11 +70,20 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
 
   const isClosed = closings.some(c => c.date === date);
 
+  const getLocalBounds = (dateStr: string) => {
+    if (!dateStr) return { startIso: '', endIso: '' };
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+    return { startIso: start.toISOString(), endIso: end.toISOString() };
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
+      const { startIso, endIso } = getLocalBounds(date);
       const [sumData, closingsData] = await Promise.all([
-        getDailyClosingSummary(organizationId, date),
+        getDailyClosingSummary(organizationId, date, startIso, endIso),
         getDailyClosings(organizationId)
       ]);
       setSummary(sumData);
@@ -261,7 +290,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* DESGLOSE CAJA */}
                   <div className="border border-border/50 rounded-xl p-4 bg-muted/20">
                     <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
@@ -281,6 +310,26 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                         <span className="text-muted-foreground font-bold">Margen del Día</span>
                         <span className={`font-black ${balance >= 0 ? 'text-indigo-500' : 'text-rose-500'}`}>{margin.toFixed(1)}%</span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* MÉTODOS DE PAGO */}
+                  <div className="border border-border/50 rounded-xl p-4 bg-muted/20">
+                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-indigo-500" />
+                      Métodos de Pago
+                    </h4>
+                    <div className="space-y-2">
+                      {summary.incomeByPaymentMethod?.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No hay ingresos registrados.</p>
+                      ) : (
+                        summary.incomeByPaymentMethod?.map((method, i) => (
+                          <div key={i} className="flex justify-between items-center text-sm p-2 bg-background border border-border/50 rounded-lg">
+                            <span className="font-medium capitalize">{method.method}</span>
+                            <span className="font-bold text-emerald-500">{formatCurrency(method.total)}</span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -562,6 +611,21 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                                   <span className="text-sm font-bold">{formatCurrency(ic.total)}</span>
                                 </div>
                               )) : <div className="p-3 text-sm text-muted-foreground italic">Sin ingresos.</div>}
+                            </div>
+                          </div>
+
+                          {/* Detalles de Métodos de Pago */}
+                          <div>
+                            <h4 className="text-xs font-bold text-indigo-500 flex items-center gap-2 mb-3 uppercase tracking-wider">
+                              <CreditCard className="w-4 h-4" /> Métodos de Pago
+                            </h4>
+                            <div className="bg-card border border-border/50 rounded-lg divide-y divide-border/50">
+                              {c.details?.incomeByPaymentMethod?.length > 0 ? c.details.incomeByPaymentMethod.map((pm: any, idx: number) => (
+                                <div key={idx} className="flex justify-between items-center p-3">
+                                  <span className="text-sm font-medium capitalize">{pm.method}</span>
+                                  <span className="text-sm font-bold text-emerald-500">{formatCurrency(pm.total)}</span>
+                                </div>
+                              )) : <div className="p-3 text-sm text-muted-foreground italic">No especificado en este cierre.</div>}
                             </div>
                           </div>
 
