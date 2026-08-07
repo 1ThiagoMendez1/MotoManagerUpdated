@@ -36,6 +36,7 @@ import { getServices } from '@/actions/services';
 import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { PartRequestsSection } from '@/components/work-orders/PartRequestsSection';
+import WorkOrdersRealtime from '../WorkOrdersRealtime';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +94,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
   return (
     <div className="w-full max-w-6xl mx-auto text-foreground py-8 px-4 sm:px-6 lg:px-8">
+      <WorkOrdersRealtime />
       {/* Header Section */}
       <div className="mb-8 flex flex-col gap-6">
         <div className="flex items-center gap-4">

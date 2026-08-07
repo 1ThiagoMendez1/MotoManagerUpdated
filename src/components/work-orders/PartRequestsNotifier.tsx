@@ -172,17 +172,21 @@ export function PartRequestsNotifier({ userRole, organizationId }: PartRequestsN
                 {
                     event: 'INSERT',
                     schema: 'public',
-                    table: 'part_requests',
-                    filter: `organization_id=eq.${organizationId}`
+                    table: 'part_requests'
                 },
                 (payload) => {
                     const newRequest = payload.new;
-                    if (newRequest.status === 'pending') {
+                    // Filtrar por organización en el cliente para evitar problemas con los filtros de Supabase Realtime
+                    if (newRequest.organization_id === organizationId && newRequest.status === 'pending') {
                         triggerAlert(newRequest.work_order_id, false);
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status, err) => {
+                if (status !== 'SUBSCRIBED') {
+                    console.error('Supabase Realtime subscription error:', status, err);
+                }
+            });
 
         // Check on mount with a small delay to ensure Toaster is mounted
         setTimeout(() => {

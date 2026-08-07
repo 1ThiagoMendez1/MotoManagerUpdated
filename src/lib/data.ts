@@ -171,6 +171,10 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
+  if (user.role === 'mechanic') {
+    q = q.eq('assigned_mechanic_id', user.userId);
+  }
+
   if (params.statusFilter === 'active') {
     q = q.neq('status', 'delivered').neq('status', 'delivered_quote_rejected');
   } else if (params.statusFilter === 'completed') {
@@ -250,11 +254,16 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     { auth: { persistSession: false } }
   );
 
-  const { data: _wo } = await supabaseAdmin.from('work_orders')
+  let query = supabaseAdmin.from('work_orders')
     .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*))), work_order_services(*, service_catalog(*)), organizations(name)')
     .eq('id', id)
-    .eq('organization_id', user.workshopId)
-    .single();
+    .eq('organization_id', user.workshopId);
+
+  if (user.role === 'mechanic') {
+    query = query.eq('assigned_mechanic_id', user.userId);
+  }
+
+  const { data: _wo } = await query.single();
 
   const wo = _wo as any;
 

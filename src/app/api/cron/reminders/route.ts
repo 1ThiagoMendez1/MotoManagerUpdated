@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         organization_id,
         customer_id,
         motorcycle_id,
-        organizations ( name, address ),
+        organizations ( name, settings ),
         customers ( first_name, last_name, phone ),
         motorcycles ( brand, model, license_plate )
       `)
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
         const motorcycleMakeModel = `${motorcycle.brand || ''} ${motorcycle.model || ''}`.trim() || 'Motocicleta';
         const motorcyclePlate = motorcycle.license_plate || 'Sin Placa';
         const workshopName = org.name || 'nuestro taller';
-        const workshopAddress = org.address || 'Dirección no especificada';
+        const workshopAddress = org.settings?.address || 'Dirección no especificada';
 
         // Buscar la fecha de la última orden de trabajo para esta moto
         const { data: lastWo } = await supabaseAdmin

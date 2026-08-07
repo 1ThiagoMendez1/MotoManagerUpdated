@@ -30,6 +30,7 @@ import { formatExactDateTime } from '@/lib/dateUtils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ClipboardList, PlusCircle, Wrench, Calendar, Bike, User, Eye, Search, AlertCircle, BellRing } from 'lucide-react';
+import WorkOrdersRealtime from './WorkOrdersRealtime';
 
 export default async function WorkOrdersPage({
   searchParams,
@@ -80,6 +81,7 @@ export default async function WorkOrdersPage({
 
   return (
     <div className="w-full">
+      <WorkOrdersRealtime />
       <div className="flex items-center justify-between mb-8 gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Órdenes de Trabajo</h1>

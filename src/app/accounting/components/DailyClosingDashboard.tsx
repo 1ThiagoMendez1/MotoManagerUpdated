@@ -211,7 +211,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                     1. Pre-Cierre — Revisión Automática
                   </DialogTitle>
                   <DialogDescription className="text-muted-foreground font-medium uppercase tracking-wider text-xs pt-1">
-                    Revise el estado de la operación antes de cerrar el día ({new Date(date).toLocaleDateString()})
+                    Revise el estado de la operación antes de cerrar el día ({new Date(date + 'T00:00:00').toLocaleDateString()})
                   </DialogDescription>
                 </DialogHeader>
               </div>
@@ -417,7 +417,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                       <CardDescription>Registre egresos y salidas de caja del día operativo activo.</CardDescription>
                     </div>
                     <div className="px-3 py-1 bg-muted text-xs font-medium rounded-full">
-                      Fecha: {new Date(date).toLocaleDateString()}
+                      Fecha: {new Date(date + 'T00:00:00').toLocaleDateString()}
                     </div>
                   </div>
                 </CardHeader>
@@ -548,7 +548,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
               <div className="space-y-3">
                 {closings.map((c: any) => {
                   const isExpanded = expandedId === c.id;
-                  const cdate = new Date(c.date).toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                  const cdate = new Date(c.date + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                   
                   return (
                     <div key={c.id} className="border border-border/50 rounded-xl bg-card overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md">
