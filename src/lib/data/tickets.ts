@@ -2,9 +2,10 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { requireWorkshop } from '@/lib/auth-server';
 
 const getSupabaseAdmin = () => createSupabaseClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
 const mapTicketData = (t: any) => ({
     ...t,

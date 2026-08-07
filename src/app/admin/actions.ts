@@ -11,9 +11,10 @@ export async function updateUserPassword(userId: string, newPassword: string) { 
 
 export async function createUser(data: any) {
     const supabaseAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
     
     const nameParts = data.name.trim().split(' ');
     const firstName = nameParts[0] || '';
@@ -51,9 +52,10 @@ export async function createUser(data: any) {
 
 export async function deleteUser(userId: string) {
     const supabaseAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
     
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (error) throw new Error(error.message);
@@ -64,9 +66,10 @@ export async function deleteUser(userId: string) {
 
 export async function updateUser(userId: string, data: any) {
     const supabaseAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
     const nameParts = data.name.trim().split(' ');
     const firstName = nameParts[0] || '';

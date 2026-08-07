@@ -33,9 +33,10 @@ export async function createTicket(prevState: any, formData: FormData) {
     const { subject, description } = validatedFields.data
 
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 
     const { error } = await supabaseAdmin
         .from('tickets')
@@ -58,9 +59,10 @@ export async function createTicket(prevState: any, formData: FormData) {
 
 export async function addTicketMessage(prevState: any, formData: FormData) {
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
     
     const ticketId = formData.get('ticketId') as string;
     const text = formData.get('message') as string;
@@ -97,9 +99,10 @@ export async function addTicketMessage(prevState: any, formData: FormData) {
 
 export async function updateAdminTicketStatus(ticketId: string, newStatus: string) {
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 
     const { error } = await supabaseAdmin
         .from('tickets')
@@ -133,9 +136,10 @@ export async function updateAdminTicketStatus(ticketId: string, newStatus: strin
 
 export async function replyToTicketAdmin(ticketId: string, message: string) {
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 
     const messagePayload = {
       text: message,
@@ -165,7 +169,8 @@ export async function replyToTicketAdmin(ticketId: string, message: string) {
 export async function getTicketMessagesAdmin(ticketId: string) {
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
   );
 
   const { data, error } = await supabaseAdmin
@@ -272,9 +277,10 @@ export async function getTicketMessagesWorkshop(ticketId: string) {
     }
 
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
     const { data, error } = await supabaseAdmin
         .from('ticket_messages')
@@ -312,9 +318,10 @@ export async function getTicketMessagesWorkshop(ticketId: string) {
 
 export async function updateTicketStatus(prevState: any, formData: FormData) {
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
     const id = formData.get('id') as string;
     let updateData: any = {};
     if (formData.has('status')) updateData.status = formData.get('status');

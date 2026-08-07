@@ -13,12 +13,18 @@ export default async function WorkOrderBillingPage({ params }: { params: Promise
 
   if (!workOrder) return <div className="text-foreground">Orden no encontrada</div>;
 
-  // Calculate total cost of items
-  const totalCost = (workOrder.sales || []).reduce((total: number, sale: any) => {
+  // Calculate total cost of items and services
+  const itemsCost = (workOrder.sales || []).reduce((total: number, sale: any) => {
     return total + (sale.saleItems || []).reduce((saleTotal: number, item: any) => {
       return saleTotal + (item.price * item.quantity);
     }, 0);
   }, 0);
+
+  const servicesCost = (workOrder.work_order_services || []).reduce((total: number, service: any) => {
+    return total + service.total;
+  }, 0);
+
+  const totalCost = itemsCost + servicesCost;
 
   return (
     <div className="w-full max-w-5xl mx-auto text-foreground py-8">
@@ -115,6 +121,29 @@ export default async function WorkOrderBillingPage({ params }: { params: Promise
                     </div>
                   ))
                 )}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-8">
+            <h3 className="text-lg font-medium mb-4">Servicios Realizados (Mano de Obra)</h3>
+            {(!workOrder.work_order_services || workOrder.work_order_services.length === 0) ? (
+              <div className="text-center py-8 text-muted-foreground border border-dashed border-border/50 rounded-lg">
+                No hay servicios registrados para esta orden.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {workOrder.work_order_services.map((service: any) => (
+                  <div key={service.id} className="flex justify-between items-center bg-card/30 p-3 rounded-lg border border-border/30">
+                    <div className="flex-1">
+                      <p className="font-medium">{service.description}</p>
+                      <p className="text-sm text-muted-foreground">Categoría: {service.service_catalog?.category || 'N/A'} | Precio Unitario: ${service.unit_price.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">${service.total.toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

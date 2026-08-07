@@ -7,5 +7,5 @@ export default async function AccountingPage() {
   await authorize('/accounting');
   const workshop = await getWorkshopDetails();
   
-  return <AccountingClient subscriptionPlan={workshop?.subscription_plan} />;
+  return <AccountingClient subscriptionPlan={workshop?.subscription_plan} organizationId={workshop?.id || ''} />;
 }

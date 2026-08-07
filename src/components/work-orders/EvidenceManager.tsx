@@ -18,7 +18,6 @@ export function EvidenceManager({ workOrderId, organizationId, evidences }: { wo
     const [preview, setPreview] = useState<string | null>(null)
     const [description, setDescription] = useState('')
     const fileInputRef = useRef<HTMLInputElement>(null)
-    const supabase = createClient();
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -48,6 +47,7 @@ export function EvidenceManager({ workOrderId, organizationId, evidences }: { wo
         try {
             if (!organizationId) throw new Error('No se pudo determinar la organización')
             
+            const supabase = createClient();
             // Upload to Supabase Storage
             const fileExt = file.name.split('.').pop()
             const fileName = `${organizationId}/${workOrderId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`

@@ -1,6 +1,18 @@
 process.env.TZ = 'America/Bogota';
 import type {NextConfig} from 'next';
 
+// Polyfill for Node.js v22 experimental localStorage
+// Node 22 creates globalThis.localStorage but its methods are missing if --localstorage-file is not valid
+// This causes Next.js Dev Tools and Supabase to crash during SSR.
+// Since Node 22's localStorage is a Proxy, we cannot monkey-patch its methods.
+// The safest approach is to delete it globally so libraries fallback gracefully.
+if (typeof globalThis !== 'undefined' && globalThis.localStorage) {
+  try {
+    delete (globalThis as any).localStorage;
+  } catch (e) {
+    // Ignore if deletion fails
+  }
+}
 
 
 const nextConfig: NextConfig = {

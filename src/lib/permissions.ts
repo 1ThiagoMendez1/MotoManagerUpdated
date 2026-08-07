@@ -1,4 +1,4 @@
-export type Role = 'owner' | 'admin' | 'mechanic' | 'receptionist' | 'service_advisor' | 'user';
+export type Role = 'owner' | 'admin' | 'mechanic' | 'receptionist' | 'service_advisor' | 'user' | 'recepcionista';
 
 export const rolePermissions: Record<Role, string[]> = {
   'owner': ['*'],
@@ -12,6 +12,7 @@ export const rolePermissions: Record<Role, string[]> = {
     '/sales',
     '/appointments',
     '/accounting',
+    '/services',
   ], // Excludes /team (Usuarios y Permisos)
   'mechanic': [
     '/work-orders',
@@ -24,6 +25,8 @@ export const rolePermissions: Record<Role, string[]> = {
     '/work-orders',
     '/motorcycles',
     '/appointments',
+    '/accounting',
+    '/services',
   ],
   'service_advisor': [
     '/sales',
@@ -31,12 +34,23 @@ export const rolePermissions: Record<Role, string[]> = {
     '/work-orders',
     '/motorcycles',
     '/appointments',
+    '/accounting',
+    '/services',
   ],
   'user': [],
+  'recepcionista': [
+    '/sales',
+    '/customers',
+    '/work-orders',
+    '/motorcycles',
+    '/appointments',
+    '/accounting',
+    '/services',
+  ],
 };
 
-export function hasPermission(role: string, path: string) {
-  const perms = rolePermissions[role as Role] || [];
+export function hasPermission(role: string, path: string, customPermissions?: string[] | null) {
+  const perms = customPermissions ? customPermissions : (rolePermissions[role as Role] || []);
   if (perms.includes('*')) return true;
   // Let the root path through always so they can see the menu
   if (path === '/') return true;

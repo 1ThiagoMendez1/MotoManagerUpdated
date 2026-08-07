@@ -29,9 +29,10 @@ export async function inviteUser(data: {
     const planLimits = getPlanLimits(workshopDetails.subscription_plan || 'basic');
     if (planLimits.users_limit !== -1) {
       const supabaseAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
       const { count } = await supabaseAdmin
         .from('organization_members')
         .select('*', { count: 'exact', head: true })
@@ -44,9 +45,10 @@ export async function inviteUser(data: {
 
     // Create Supabase Admin client to bypass RLS and create users
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
     // Generar contraseña temporal
     const tempPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
@@ -131,14 +133,16 @@ export async function getTeamMembers() {
     }
 
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
     const { data: members, error } = await supabaseAdmin
       .from('organization_members')
       .select(`
         role,
+        custom_permissions,
         user_id,
         profiles (
           id,
@@ -169,6 +173,7 @@ export async function getTeamMembers() {
         email: usersMap.get(member.user_id) || '',
         phone: profile.phone || '',
         role: member.role,
+        customPermissions: member.custom_permissions || null,
         avatar: profile.avatar_path || '',
         status: 'active'
       };
@@ -194,9 +199,10 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
     }
 
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
     const dbRole = newRole === 'receptionist' ? 'service_advisor' : newRole;
 
@@ -213,6 +219,40 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
     return { success: true };
   } catch (error: any) {
     console.error('Error in updateUserRole:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateUserPermissions(userIdToUpdate: string, permissions: string[] | null) {
+  try {
+    const currentUser = await getCurrentUserServer();
+    if (!currentUser || !currentUser.workshopId) {
+      throw new Error('No estás autenticado o no estás asociado a ningún taller');
+    }
+
+    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+      throw new Error('No tienes permisos para cambiar permisos de usuario');
+    }
+
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const { error } = await supabaseAdmin
+      .from('organization_members')
+      .update({ custom_permissions: permissions })
+      .eq('user_id', userIdToUpdate)
+      .eq('organization_id', currentUser.workshopId);
+
+    if (error) {
+      throw new Error('Error al actualizar permisos: ' + error.message);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in updateUserPermissions:', error);
     return { success: false, error: error.message };
   }
 }

@@ -41,7 +41,8 @@ export async function submitCustomerTicket(prevState: any, formData: FormData) {
   const { createClient: createSupabaseClient } = await Promise.resolve({ createClient: (...args: any[]) => ({} as any) });
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
   );
 
   const { data: workshop } = await supabaseAdmin

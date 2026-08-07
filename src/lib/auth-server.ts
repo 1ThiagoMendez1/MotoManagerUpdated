@@ -12,12 +12,13 @@ export async function getCurrentUserServer() {
       // Use admin client to bypass RLS issues (e.g. infinite recursion in policies)
       // Safe because we explicitly filter by user.id
       const supabaseAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
       const { data: _orgMembers, error: orgError } = await supabaseAdmin
         .from('organization_members')
-        .select('organization_id, role')
+        .select('organization_id, role, custom_permissions')
         .eq('user_id', user.id)
         .limit(1);
       
@@ -35,6 +36,7 @@ export async function getCurrentUserServer() {
         email: user.email,
         user_metadata: user.user_metadata,
         role: orgMember?.role || 'viewer',
+        custom_permissions: orgMember?.custom_permissions || null,
         workshopId: orgMember?.organization_id || null,
         availableWorkshops: orgMember ? [orgMember.organization_id] : []
       };
@@ -76,7 +78,7 @@ export async function authorize(path: string) {
     redirect('/no-workshop');
   }
   
-  if (!hasPermission(user.role, path)) {
+  if (!hasPermission(user.role, path, user.custom_permissions)) {
     const workshopDetails = await getWorkshopDetails(user);
     if (workshopDetails) {
        redirect(`/${workshopDetails.slug}`);
@@ -97,23 +99,26 @@ export async function getWorkshopDetails(knownUser?: any) {
 
   try {
     const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
     
     // If we only have knownUser from auth but not the workshopId, fetch it
     let workshopId = user.workshopId;
     let userRole = user.role;
+    let customPermissions = user.custom_permissions;
     const actualUserId = user.userId || user.id;
     if (!workshopId && actualUserId) {
        const { data: _orgMembers } = await supabaseAdmin
         .from('organization_members')
-        .select('organization_id, role')
+        .select('organization_id, role, custom_permissions')
         .eq('user_id', actualUserId)
         .limit(1);
        if (_orgMembers && _orgMembers.length > 0) {
            workshopId = _orgMembers[0].organization_id;
            userRole = _orgMembers[0].role;
+           customPermissions = _orgMembers[0].custom_permissions;
        }
     }
 
@@ -137,6 +142,7 @@ export async function getWorkshopDetails(knownUser?: any) {
     if (org) {
       const settings = org.settings || {};
       return {
+        id: org.id,
         name: org.name,
         slug: org.slug,
         subscription_status: settings.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
@@ -145,7 +151,8 @@ export async function getWorkshopDetails(knownUser?: any) {
         created_at: org.created_at,
         has_seen_welcome: true,
         user_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Usuario',
-        user_role: userRole
+        user_role: userRole,
+        custom_permissions: customPermissions
       };
     } else {
        console.warn(`[auth-server] getWorkshopDetails - No org found for id ${workshopId}`);
@@ -171,7 +178,7 @@ export async function createAdminClient() {
   const { createClient } = await import('@supabase/supabase-js');
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
+  return createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 }
 
 export async function getScopedClient() {

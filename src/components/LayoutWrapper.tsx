@@ -24,7 +24,7 @@ export function LayoutWrapper({ children, header, footer }: LayoutWrapperProps) 
     <>
       {!isPublicRoute && header}
       
-      <main className={!isPublicRoute ? "relative flex-1 pt-[5.5rem] px-4 md:px-6 lg:px-8 overflow-auto flex flex-col" : "relative flex-1 flex flex-col min-h-screen bg-background"}>
+      <main className={!isPublicRoute ? "relative flex-1 pt-[5.5rem] px-4 md:px-6 lg:px-8 flex flex-col min-h-[100dvh]" : "relative flex-1 flex flex-col min-h-screen bg-background"}>
         {!isPublicRoute && (
           <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/5 via-background to-background dark:from-blue-900/10 dark:via-background dark:to-background"></div>
         )}

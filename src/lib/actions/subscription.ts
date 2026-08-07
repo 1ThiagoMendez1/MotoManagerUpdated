@@ -17,9 +17,10 @@ export async function updateSubscriptionPlan(formData: FormData) {
   }
 }) as any;
     const supabaseAdmin = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  )
 
     const newPlan = formData.get('plan') as string
 

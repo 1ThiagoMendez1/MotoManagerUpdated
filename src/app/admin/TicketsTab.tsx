@@ -39,8 +39,6 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
   const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const supabase = createClient();
-
   // Load initial messages when ticket is selected
   useEffect(() => {
     if (!selectedTicket) return;
@@ -66,6 +64,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
 
   // Supabase Realtime subscriptions
   useEffect(() => {
+    const supabase = createClient();
     // Escuchar nuevos tickets o cambios de estado
     const ticketsChannel = supabase
       .channel('public:tickets')
@@ -117,7 +116,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
       supabase.removeChannel(ticketsChannel);
       supabase.removeChannel(messagesChannel);
     };
-  }, [supabase, selectedTicket, toast]);
+  }, [selectedTicket, toast]);
 
   const handleStatusChange = async (newStatus: string) => {
     if (!selectedTicket) return;

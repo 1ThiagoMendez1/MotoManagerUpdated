@@ -49,7 +49,8 @@ export const getTechnicians = async (params: { page?: number } = {}): Promise<{ 
   const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
   );
 
   const page = params.page || 1;
@@ -242,11 +243,12 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
   );
 
   const { data: _wo } = await supabaseAdmin.from('work_orders')
-    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*))), organizations(name)')
+    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*))), work_order_services(*, service_catalog(*)), organizations(name)')
     .eq('id', id)
     .eq('organization_id', user.workshopId)
     .single();
@@ -316,6 +318,19 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
                 name: si.inventory_items.name
             } : { id: '', name: 'Desconocido' }
         })) : []
+    })) : [],
+    work_order_services: wo.work_order_services ? wo.work_order_services.map((s: any) => ({
+      id: s.id,
+      service_id: s.service_id,
+      description: s.description,
+      quantity: s.quantity,
+      unit_price: s.unit_price,
+      total: s.total,
+      service_catalog: s.service_catalog ? {
+        id: s.service_catalog.id,
+        name: s.service_catalog.name,
+        category: s.service_catalog.category
+      } : null
     })) : []
   };
 };

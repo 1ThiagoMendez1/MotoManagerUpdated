@@ -49,11 +49,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { inviteUser, getTeamMembers, updateUserRole } from '@/lib/actions/team';
+import { inviteUser, getTeamMembers, updateUserRole, updateUserPermissions } from '@/lib/actions/team';
+import { rolePermissions } from '@/lib/permissions';
 
 
 // Real data will be fetched from DB
@@ -81,6 +83,21 @@ const permissionsInfo: Record<string, string> = {
   service_advisor: 'Acceso a Ventas, Clientes y Órdenes de Trabajo.'
 };
 
+const AVAILABLE_MODULES = [
+  { id: '/dashboard', label: 'Dashboard Principal' },
+  { id: '/work-orders', label: 'Órdenes de Trabajo' },
+  { id: '/customers', label: 'Clientes' },
+  { id: '/motorcycles', label: 'Motocicletas' },
+  { id: '/inventory', label: 'Inventario' },
+  { id: '/technicians', label: 'Técnicos' },
+  { id: '/sales', label: 'Ventas y Cotizaciones' },
+  { id: '/services', label: 'Servicios' },
+  { id: '/appointments', label: 'Citas (Agenda)' },
+  { id: '/accounting', label: 'Contabilidad' },
+  { id: '/team', label: 'Usuarios y Permisos' },
+  { id: '/tickets', label: 'Tickets de Soporte' },
+];
+
 export default function TeamPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -91,6 +108,12 @@ export default function TeamPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [successCredentials, setSuccessCredentials] = useState<{ email: string, password: string, loginUrl: string } | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Permissions Modal state
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
+  const [selectedUserForPerms, setSelectedUserForPerms] = useState<any>(null);
+  const [currentPermissions, setCurrentPermissions] = useState<string[]>([]);
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
 
   React.useEffect(() => {
     const supabase = new Proxy({}, {
@@ -218,6 +241,57 @@ export default function TeamPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleOpenPermissions = (user: any) => {
+    setSelectedUserForPerms(user);
+    const defaults = rolePermissions[user.role as keyof typeof rolePermissions] || [];
+    setCurrentPermissions(user.customPermissions ? user.customPermissions : defaults);
+    setIsPermissionsOpen(true);
+  };
+
+  const handleSavePermissions = async () => {
+    if (!selectedUserForPerms) return;
+    setIsSavingPerms(true);
+    
+    try {
+      const res = await updateUserPermissions(selectedUserForPerms.id, currentPermissions);
+      if (!res.success) {
+        toast({
+          title: "Error al actualizar permisos",
+          description: res.error || "No se pudo guardar la configuración.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Permisos actualizados",
+          description: "Se han guardado los permisos del usuario correctamente.",
+        });
+        
+        setIsPermissionsOpen(false);
+        // Wait for Radix UI dialog exit animation to avoid pointer-events lock
+        setTimeout(() => {
+          setUsers(users.map(u => u.id === selectedUserForPerms.id ? { ...u, customPermissions: currentPermissions } : u));
+          document.body.style.pointerEvents = '';
+        }, 300);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Ocurrió un error inesperado al guardar los permisos.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingPerms(false);
+    }
+  };
+
+  const handleTogglePermission = (moduleId: string) => {
+    setCurrentPermissions(prev => 
+      prev.includes(moduleId) 
+        ? prev.filter(p => p !== moduleId)
+        : [...prev, moduleId]
+    );
   };
 
   return (
@@ -479,6 +553,16 @@ export default function TeamPage() {
                               </DropdownMenuItem>
                             ))}
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="cursor-pointer"
+                              onSelect={(e) => {
+                                e.preventDefault();
+                                setTimeout(() => handleOpenPermissions(user), 0);
+                              }}
+                            >
+                              Personalizar Permisos
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer">
                               Revocar Acceso
                             </DropdownMenuItem>
@@ -535,6 +619,43 @@ export default function TeamPage() {
 
         </div>
       </div>
+
+      {/* Permissions Dialog */}
+      <Dialog open={isPermissionsOpen} onOpenChange={setIsPermissionsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Personalizar Permisos</DialogTitle>
+            <DialogDescription>
+              Selecciona a qué módulos tendrá acceso {selectedUserForPerms?.name}. Esto sobreescribirá los permisos por defecto de su rol.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {AVAILABLE_MODULES.map((module) => (
+              <div key={module.id} className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm hover:bg-muted/50 transition-colors">
+                <Checkbox 
+                  id={module.id} 
+                  checked={currentPermissions.includes(module.id) || currentPermissions.includes('*')}
+                  onCheckedChange={() => handleTogglePermission(module.id)}
+                  disabled={currentPermissions.includes('*')}
+                />
+                <div className="space-y-1 leading-none">
+                  <Label htmlFor={module.id} className="font-medium cursor-pointer">
+                    {module.label}
+                  </Label>
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPermissionsOpen(false)} disabled={isSavingPerms}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePermissions} disabled={isSavingPerms}>
+              {isSavingPerms ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

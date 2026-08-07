@@ -38,20 +38,22 @@ import { useToast } from '@/hooks/use-toast';
 
 interface DashboardMenuProps {
   role: string;
-  userName?: string;
-  workshopName?: string;
-  subscriptionPlan?: string | null;
-  motorcycles?: Motorcycle[];
-  technicians?: Technician[];
+  customPermissions?: string[] | null;
+  userName: string;
+  workshopName: string;
+  subscriptionPlan?: string;
+  motorcycles: Motorcycle[];
+  technicians: Technician[];
 }
 
 export function DashboardMenu({ 
   role, 
-  userName = 'Usuario', 
-  workshopName = 'Tu Taller',
-  subscriptionPlan,
-  motorcycles = [],
-  technicians = []
+  customPermissions,
+  userName, 
+  workshopName, 
+  subscriptionPlan = 'monthly',
+  motorcycles,
+  technicians
 }: DashboardMenuProps) {
   const { toast } = useToast();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -82,20 +84,21 @@ export function DashboardMenu({
   }
 
   // Módulos (se mantienen los permisos)
-  const canAccessWorkOrders = hasPermission(role, '/work-orders');
-  const canAccessCustomers = hasPermission(role, '/customers');
-  const canAccessMotorcycles = hasPermission(role, '/motorcycles');
-  const canAccessDashboard = hasPermission(role, '/dashboard');
-  const canAccessInventory = hasPermission(role, '/inventory');
-  const canAccessTechnicians = hasPermission(role, '/technicians');
-  const canAccessSales = hasPermission(role, '/sales');
-  const canAccessTeam = hasPermission(role, '/team');
-  const canAccessTickets = hasPermission(role, '/tickets');
-  const canAccessAppointments = hasPermission(role, '/appointments');
-  const canAccessAccounting = hasPermission(role, '/accounting');
+  const canAccessWorkOrders = hasPermission(role, '/work-orders', customPermissions);
+  const canAccessCustomers = hasPermission(role, '/customers', customPermissions);
+  const canAccessMotorcycles = hasPermission(role, '/motorcycles', customPermissions);
+  const canAccessDashboard = hasPermission(role, '/dashboard', customPermissions);
+  const canAccessInventory = hasPermission(role, '/inventory', customPermissions);
+  const canAccessTechnicians = hasPermission(role, '/technicians', customPermissions);
+  const canAccessSales = hasPermission(role, '/sales', customPermissions);
+  const canAccessTeam = hasPermission(role, '/team', customPermissions);
+  const canAccessTickets = hasPermission(role, '/tickets', customPermissions);
+  const canAccessAppointments = hasPermission(role, '/appointments', customPermissions);
+  const canAccessAccounting = hasPermission(role, '/accounting', customPermissions);
+  const canAccessServices = hasPermission(role, '/services', customPermissions);
 
   // Calcular cantidad de tarjetas para sub-grids dinámicos
-  const secondaryCardsCount = [canAccessCustomers, canAccessMotorcycles, canAccessInventory, canAccessSales, canAccessAppointments, canAccessAccounting].filter(Boolean).length;
+  const secondaryCardsCount = [canAccessCustomers, canAccessMotorcycles, canAccessInventory, canAccessServices, canAccessSales, canAccessAppointments, canAccessAccounting].filter(Boolean).length;
   const tertiaryCardsCount = [canAccessTechnicians, canAccessTeam, canAccessTickets].filter(Boolean).length;
 
   return (
@@ -237,6 +240,19 @@ export function DashboardMenu({
                       setUpgradeModule({ title: 'Inventario', description: 'Control de repuestos y stock.' });
                       setShowUpgradeModal(true);
                     }}
+                  />
+                </div>
+              )}
+
+              {/* Catálogo de Servicios */}
+              {canAccessServices && (
+                <div id="tour-services">
+                  <AppleGlassCard 
+                    href="/services"
+                    icon={Sparkles}
+                    title="Servicios"
+                    description="Catálogo, precios y categorías."
+                    iconBg="bg-fuchsia-500"
                   />
                 </div>
               )}

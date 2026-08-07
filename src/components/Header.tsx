@@ -245,7 +245,7 @@ export default function Header({
                 const authParam = searchParams.get('auth');
                 router.push(authParam ? `/clientes?auth=${authParam}` : '/clientes');
               } else {
-                router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/'));
+                router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/dashboard'));
               }
             }}
             variant="ghost"
@@ -265,7 +265,7 @@ export default function Header({
               const authParam = searchParams.get('auth');
               router.push(authParam ? `/clientes?auth=${authParam}` : '/clientes');
             } else {
-              router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/'));
+              router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/dashboard'));
             }
           }}
           className="flex items-center gap-3 font-semibold hover:opacity-80 transition-opacity"

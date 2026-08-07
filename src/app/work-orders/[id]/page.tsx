@@ -28,6 +28,11 @@ import { WorkOrderStepper } from '@/components/WorkOrderStepper';
 import { QuoteStatusWidget } from '@/components/work-orders/QuoteStatusWidget';
 import { SaveAndSendButton } from '@/components/work-orders/SaveAndSendButton';
 import { EvidenceManager } from '@/components/work-orders/EvidenceManager';
+// import { OrderWhatsAppChat } from './OrderWhatsAppChat';
+
+import { AddServiceToWorkOrder } from '@/components/forms/AddServiceToWorkOrder';
+import { RemoveServiceFromWorkOrder } from '@/components/forms/RemoveServiceFromWorkOrder';
+import { getServices } from '@/actions/services';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,12 +42,28 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
 
   if (!workOrder) return <div className="text-foreground p-8 flex flex-col items-center justify-center min-h-[50vh]"><AlertCircle className="w-12 h-12 text-red-500 mb-4" /><h2 className="text-2xl font-bold">Orden no encontrada</h2></div>;
 
-  const [inventory, { items: technicians }, reminders] = await Promise.all([
+  const [inventory, { items: technicians }, reminders, services] = await Promise.all([
     getInventory({ page: 1 } as any),
     getTechnicians(),
-    getRemindersByMotorcycleId(workOrder.motorcycle.id)
+    getRemindersByMotorcycleId(workOrder.motorcycle.id),
+    getServices(workOrder.organizationId || '')
   ]);
   const isCompleted = workOrder.status === 'Entregado';
+
+  // Calculate totals
+  const itemsCost = (workOrder.sales || []).reduce((total: number, sale: any) => {
+    return total + (sale.saleItems || []).reduce((saleTotal: number, item: any) => {
+      return saleTotal + (item.price * item.quantity);
+    }, 0);
+  }, 0);
+
+  const servicesCost = (workOrder.work_order_services || []).reduce((total: number, service: any) => {
+    return total + service.total;
+  }, 0);
+
+  const totalCost = itemsCost + servicesCost;
+  const depositAmount = (workOrder as any).depositAmount ?? 0;
+  const pendingBalance = Math.max(0, totalCost - depositAmount);
 
   return (
     <div className="w-full max-w-6xl mx-auto text-foreground py-8 px-4 sm:px-6 lg:px-8">
@@ -356,6 +377,72 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
                     </div>
                   ))
                 )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Servicios Realizados Section */}
+      <Card className="bg-card/40 border-border/50 backdrop-blur-md overflow-hidden shadow-lg mb-8 relative group transition-all duration-300 hover:border-border mt-8">
+        <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+        <CardHeader className="border-b border-border/50 bg-muted/20">
+          <CardTitle className="text-xl font-medium flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-fuchsia-500 dark:text-fuchsia-400" />
+            Servicios Realizados (Mano de Obra)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6 relative z-10">
+          {isCompleted ? (
+            <div className="mb-8 bg-fuchsia-500/10 p-5 rounded-xl border border-fuchsia-500/20 flex gap-4 items-start">
+              <AlertCircle className="w-6 h-6 text-fuchsia-500 dark:text-fuchsia-400 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-lg font-medium mb-1 text-fuchsia-900 dark:text-fuchsia-100">Orden Finalizada</h3>
+                <p className="text-sm text-fuchsia-800/80 dark:text-fuchsia-200/70">
+                  No es posible agregar nuevos servicios porque la orden ya fue finalizada y facturada.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-8 bg-muted/50 p-6 rounded-2xl border border-border/50 shadow-inner">
+              <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500"></span>
+                Agregar Nuevo Servicio
+              </h3>
+              <AddServiceToWorkOrder workOrderId={workOrder.id} services={services} />
+            </div>
+          )}
+
+          <div className="mt-8">
+            <h3 className="text-sm font-medium mb-4 text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              Servicios Actuales
+            </h3>
+            
+            {!workOrder.work_order_services || workOrder.work_order_services.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 bg-muted/20 border border-dashed border-border/50 rounded-2xl">
+                <Wrench className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground font-medium">No hay servicios registrados</p>
+                <p className="text-sm text-muted-foreground/70">Selecciona un servicio del catálogo en la sección superior.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(workOrder.work_order_services || []).map((wos: any) => (
+                  <div key={wos.id} className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-muted/30 hover:bg-muted/50 p-4 rounded-xl border border-border/50 transition-colors group">
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground mb-1">{wos.description}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-sm">
+                        <span className="bg-background/80 px-2 py-0.5 rounded text-muted-foreground">Categoría: <span className="text-foreground font-medium">{wos.service_catalog?.category || 'N/A'}</span></span>
+                        <span className="bg-background/80 px-2 py-0.5 rounded text-muted-foreground">Precio: <span className="text-foreground font-medium">${wos.total.toLocaleString('es-CO')}</span></span>
+                      </div>
+                    </div>
+                    {!isCompleted && (
+                      <div className="shrink-0 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <RemoveServiceFromWorkOrder workOrderId={workOrder.id} workOrderServiceId={wos.id} />
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

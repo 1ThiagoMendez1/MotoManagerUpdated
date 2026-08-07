@@ -39,6 +39,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
     <>
       <DashboardMenu 
         role={user.role} 
+        customPermissions={user.custom_permissions}
         userName={workshopDetails?.user_name || 'Usuario'}
         workshopName={workshopDetails?.slug || 'tu-taller'}
         subscriptionPlan={workshopDetails?.subscription_plan}
@@ -47,7 +48,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
       />
       <Suspense fallback={null}>
         <FirstLoginPasswordChangeModal />
-        <TourHandler role={user.role} />
+        <TourHandler role={user.role} customPermissions={user.custom_permissions} />
       </Suspense>
     </>
   );

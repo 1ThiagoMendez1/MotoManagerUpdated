@@ -7,6 +7,7 @@ import { X, ChevronLeft, ChevronRight, CheckCheck, Sparkles } from 'lucide-react
 
 interface TourHandlerProps {
   role?: string;
+  customPermissions?: string[] | null;
 }
 
 interface Step {
@@ -184,7 +185,7 @@ function computeLayout(rect: DOMRect, preferredSide: string) {
   return { side, popTop, popLeft, arrowFrom, arrowTo };
 }
 
-export function TourHandler({ role = 'owner' }: TourHandlerProps) {
+export function TourHandler({ role, customPermissions }: TourHandlerProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const hasRunTour = useRef(false);
@@ -232,7 +233,7 @@ export function TourHandler({ role = 'owner' }: TourHandlerProps) {
 
       const filtered = ALL_STEPS.filter(s => {
         if (!s.requiredPermission) return true;
-        return hasPermission(role, s.requiredPermission);
+        return hasPermission(role || '', s.requiredPermission, customPermissions);
       });
 
       setSteps(filtered);
