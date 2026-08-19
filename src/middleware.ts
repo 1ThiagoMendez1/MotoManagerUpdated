@@ -48,6 +48,18 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Forzar cambio de contraseña si es requerido
+  if (user && user.user_metadata?.needs_password_change === true) {
+    const isChangePasswordRoute = request.nextUrl.pathname === '/change-password';
+    const isApiRoute = request.nextUrl.pathname.startsWith('/api/');
+    
+    if (!isChangePasswordRoute && !isApiRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/change-password';
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'

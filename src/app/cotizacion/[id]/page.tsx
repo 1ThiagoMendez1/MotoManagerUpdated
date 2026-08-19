@@ -54,6 +54,16 @@ export default async function QuotePage({
       ),
       images:work_order_evidences (
         id, image_url, description
+      ),
+      services:work_order_services (
+        id,
+        description,
+        unit_price,
+        total,
+        service_catalog (
+          description,
+          category
+        )
       )
     `)
     .eq('id', resolvedParams.id)
@@ -162,7 +172,12 @@ export default async function QuotePage({
     return acc + ((Number(item.unit_price) || 0) * (Number(item.quantity) || 0));
   }, 0);
   
-  const totalCost = calculatedTotalCost > 0 ? calculatedTotalCost : ((saleData || []).reduce((acc, sale) => acc + (sale.total || 0), 0));
+  const servicesCost = (workOrder.services || []).reduce((acc: number, service: any) => {
+    return acc + (Number(service.total) || 0);
+  }, 0);
+
+  const partsCost = calculatedTotalCost > 0 ? calculatedTotalCost : ((saleData || []).reduce((acc, sale) => acc + (sale.total || 0), 0));
+  const totalCost = partsCost + servicesCost;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500/30">
@@ -334,6 +349,40 @@ export default async function QuotePage({
                 </div>
               )}
             </CardContent>
+
+            {/* Servicios List */}
+            <div className="border-t border-slate-800/60">
+              <CardHeader className="bg-slate-800/20">
+                <CardTitle className="text-lg font-medium flex items-center gap-2 text-slate-200">
+                  <Wrench className="w-5 h-5 text-fuchsia-400" />
+                  Servicios Realizados (Mano de Obra)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 pb-0 px-0">
+                {!(workOrder.services && workOrder.services.length > 0) ? (
+                  <div className="p-8 text-center text-slate-500">
+                    No hay servicios registrados en esta cotización.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-800/60">
+                    {workOrder.services.map((service: any) => (
+                      <div key={service.id} className="flex items-center justify-between p-5 hover:bg-slate-800/30 transition-colors">
+                        <div className="flex-1">
+                          <p className="font-medium text-slate-200 mb-1">
+                            {service.description || service.service_catalog?.description || 'Servicio'}
+                          </p>
+                          <p className="text-xs text-slate-500">Categoría: {service.service_catalog?.category || 'General'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-slate-200">${(service.total || 0).toLocaleString('es-CO')}</p>
+                          <p className="text-xs text-slate-500">${(service.unit_price || 0).toLocaleString('es-CO')} c/u</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </div>
             
             <div className="border-t border-slate-800/60 bg-slate-800/40 p-5 space-y-3">
               <div className="flex items-center justify-between text-sm">
@@ -360,7 +409,7 @@ export default async function QuotePage({
               <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400/90 text-sm text-center flex items-start sm:items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 sm:mt-0" />
                 <p className="text-left sm:text-center leading-tight">
-                  <strong className="font-semibold text-blue-300">Nota importante:</strong> El costo de la mano de obra no está incluido en este valor y será determinado por el taller.
+                  <strong className="font-semibold text-blue-300">Nota importante:</strong> El valor total de la cotización ya incluye repuestos e insumos y mano de obra.
                 </p>
               </div>
             </div>
