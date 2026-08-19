@@ -23,6 +23,7 @@ interface SaveAndSendButtonProps {
   workshopName?: string
   orderNumber?: string
   technicianName?: string
+  quoteStatus?: string
 }
 
 export function SaveAndSendButton({
@@ -31,13 +32,17 @@ export function SaveAndSendButton({
   customerName,
   workshopName,
   orderNumber,
-  technicianName
+  technicianName,
+  quoteStatus
 }: SaveAndSendButtonProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [isSending, setIsSending] = useState(false)
   const [copied, setCopied] = useState(false)
   const [baseUrl, setBaseUrl] = useState('')
+  const [hasJustSent, setHasJustSent] = useState(false)
+  
+  const effectivelySent = !!quoteStatus || hasJustSent;
   
   const [dialogState, setDialogState] = useState<{
     isOpen: boolean;
@@ -144,6 +149,7 @@ export function SaveAndSendButton({
     }
 
     // Mostrar alerta de éxito en lugar de redireccionar
+    setHasJustSent(true)
     setDialogState({
       isOpen: true,
       title: 'Cliente ya informado',
@@ -159,14 +165,27 @@ export function SaveAndSendButton({
 
   return (
     <>
-      <Button 
-        onClick={handleSaveAndSend}
-        disabled={isSending}
-        className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-base md:text-lg px-8 py-6 h-auto rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-      >
-        <Save className="w-5 h-5" />
-        {isSending ? 'Enviando...' : 'Guardar y enviar'}
-      </Button>
+      <div className="flex flex-col-reverse sm:flex-row gap-4 w-full sm:w-auto">
+        <Button 
+          variant="outline"
+          onClick={() => router.back()}
+          className="w-full sm:w-auto text-base md:text-lg px-8 py-6 h-auto rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
+        >
+          Volver atrás
+        </Button>
+        <Button 
+          onClick={handleSaveAndSend}
+          disabled={isSending}
+          className={`w-full sm:w-auto text-white text-base md:text-lg px-8 py-6 h-auto rounded-xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 ${
+            effectivelySent
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-500/25'
+              : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-500/25'
+          }`}
+        >
+          {effectivelySent && !isSending ? <CheckCircle2 className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+          {isSending ? 'Enviando...' : (effectivelySent ? 'Reenviar nuevamente' : 'Enviar al cliente')}
+        </Button>
+      </div>
 
       <Dialog open={dialogState.isOpen} onOpenChange={(open) => {
         if (!open) handleCloseDialog()

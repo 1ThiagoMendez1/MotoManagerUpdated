@@ -234,9 +234,9 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
                   return (
                     <div key={index} className="flex justify-between items-center bg-background p-3 rounded border">
                       <div className="flex-1">
-                        <div className="font-medium">{inventoryItem?.name || 'Artículo no encontrado'}</div>
+                        <div className="font-medium">{item.name || inventoryItem?.name || 'Artículo no encontrado'}</div>
                         <div className="text-sm text-muted-foreground">
-                          SKU: {inventoryItem?.sku || item.inventoryItemId} | Cantidad: {item.quantity}
+                          SKU: {item.sku || inventoryItem?.sku || item.inventoryItemId} | Cantidad: {item.quantity}
                         </div>
                       </div>
                       <div className="text-right">

@@ -46,6 +46,8 @@ import { useRouter } from 'next/navigation';
 const saleItemSchema = z.object({
   inventoryItemId: z.string().min(1, "Selecciona un producto"),
   sku: z.string().optional(),
+  name: z.string().optional(),
+  type: z.string().optional(),
   quantity: z.coerce.number().int().min(1, "Mínimo 1"),
   price: z.coerce.number(),
   // Marca si el ítem viene precargado desde la orden de trabajo
@@ -129,10 +131,21 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
           quantity: item.quantity,
           price: item.price,
           total: item.total,
+          type: item.type,
           fromWorkOrder: true,
         }));
 
         form.setValue('items', mappedItems, { shouldValidate: true });
+
+        // Calculate labor cost from services
+        const servicesTotal = mappedItems
+          .filter((item: any) => item.type === 'service')
+          .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+        
+        if (servicesTotal > 0) {
+          form.setValue('laborCost', servicesTotal, { shouldValidate: true });
+        }
+
       } catch (error) {
         console.error('Unexpected error loading work order items for service sale:', error);
       } finally {
@@ -155,7 +168,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
     }
   }, [watchWorkOrderId, form, workOrders]);
 
-  const itemsTotal = watchItems?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
+  const itemsTotal = watchItems?.filter(i => i.type !== 'service').reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
   const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
   // Subtotal general (productos + mano de obra)
   const subtotal = itemsTotal + laborCostValue;
@@ -450,33 +463,48 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                             <FormField
                               control={form.control}
                               name={`items.${index}.inventoryItemId`}
-                              render={({ field: selectField }) => (
-                                <FormItem>
-                                  <Select
-                                    onValueChange={(value) => handleProductChange(value, index)}
-                                    value={selectField.value}
-                                    disabled={isFromWorkOrder}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger className={`bg-background border-input ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''} ${isFromWorkOrder ? 'opacity-70 cursor-not-allowed' : ''}`}>
-                                        <SelectValue placeholder="Selecciona un producto" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {inventory.map(item => (
-                                        <SelectItem
-                                          key={item.id}
-                                          value={item.id}
-                                          disabled={item.quantity === 0}
-                                          className={item.quantity === 0 ? 'text-red-500' : ''}
-                                        >
-                                          {item.name} - ${item.price.toLocaleString('es-CO')} (Disp: {item.quantity})
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </FormItem>
-                              )}
+                              render={({ field: selectField }) => {
+                                if (currentItem?.type === 'service') {
+                                  return (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          disabled
+                                          value={currentItem?.name || 'Servicio'}
+                                          className="bg-background border-input opacity-70 cursor-not-allowed"
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  );
+                                }
+                                return (
+                                  <FormItem>
+                                    <Select
+                                      onValueChange={(value) => handleProductChange(value, index)}
+                                      value={selectField.value}
+                                      disabled={isFromWorkOrder}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger className={`bg-background border-input ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''} ${isFromWorkOrder ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                                          <SelectValue placeholder="Selecciona un producto" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {inventory.map(item => (
+                                          <SelectItem
+                                            key={item.id}
+                                            value={item.id}
+                                            disabled={item.quantity === 0}
+                                            className={item.quantity === 0 ? 'text-red-500' : ''}
+                                          >
+                                            {item.name} - ${item.price.toLocaleString('es-CO')} (Disp: {item.quantity})
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </FormItem>
+                                );
+                              }}
                             />
                             <FormField
                               control={form.control}

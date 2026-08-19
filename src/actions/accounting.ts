@@ -495,8 +495,26 @@ export async function getDailyClosingSummary(
     total: expenseTotals[key]
   })).sort((a, b) => b.total - a.total);
 
-  // Total income
-  const totalIncome = incomeByCategory.reduce((sum, cat) => sum + cat.total, 0);
+  // Total income based on payment methods (this is the actual money received)
+  const totalIncome = incomeByPaymentMethod.reduce((sum, method) => sum + method.total, 0);
+
+  // Fetch discounts to adjust incomeByCategory
+  const { data: salesForDiscount } = await supabaseAdmin
+    .from('sales')
+    .select('discount_total')
+    .eq('organization_id', organizationId)
+    .eq('status', 'paid')
+    .gte('created_at', startIso)
+    .lte('created_at', endIso);
+
+  const totalDiscount = salesForDiscount?.reduce((sum, sale) => sum + Number(sale.discount_total || 0), 0) || 0;
+
+  if (totalDiscount > 0) {
+      incomeByCategory.push({
+          category: 'Descuentos',
+          total: -totalDiscount
+      });
+  }
 
   // For tech work, we query sale_items linked to paid sales in this date range,
   // where the sale is linked to a work order assigned to a mechanic, and item_type = 'service'.

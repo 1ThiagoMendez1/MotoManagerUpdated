@@ -1615,10 +1615,7 @@ export async function sendVentaPorOrdenNotification(
   const formattedTotal = total.toLocaleString('es-CO');
 
   const formattedItemsList = items && items.length > 0
-    ? [
-        ...items.map(item => `• ${item.name} ×${item.quantity} — $${item.price.toLocaleString('es-CO')}`),
-        ...(laborCost && laborCost > 0 ? [`• Mano de Obra ×1 — $${laborCost.toLocaleString('es-CO')}`] : [])
-      ].join('   ')
+    ? items.map(item => `• ${item.name} ×${item.quantity} — $${item.price.toLocaleString('es-CO')}`).join('   ')
     : 'Servicios de taller';
 
   // Get formatted date as DD-MM-YYYY
@@ -1640,7 +1637,6 @@ export async function sendVentaPorOrdenNotification(
         {
           header: [{ type: 'text', text: workshopName }],
           body: [
-            { type: 'text', text: customerName },
             { type: 'text', text: orderNumber },
             { type: 'text', text: motorcycleInfo },
             { type: 'text', text: plate },
@@ -1730,9 +1726,10 @@ export async function sendVentaPorOrdenNotification(
   // 2. Fallback: Evolution API (si Meta no está configurada o falló)
   if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
     try {
-      const textMessage = `!Resumen de tu compra con servicio en: ${workshopName} ✅¡
+      const textMessage = `*!Resumen de tu compra con servicio en: ${workshopName}¡*
 ________________________
 
+¡Hola ${customerName}!
 😀Te informamos que los servicios y/o repuestos asociados a la reparación de tu moto han sido registrados correctamente.
 
 📋 Resumen de la orden de servicio

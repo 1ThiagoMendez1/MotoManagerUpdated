@@ -298,13 +298,13 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         if (!workshop || !workshop.name) {
             const { data: orgData } = await supabase
                 .from('organizations')
-                .select('name')
+                .select('name, settings')
                 .eq('id', user.workshopId)
                 .single();
             if (orgData) {
                 workshop = {
                     name: orgData.name,
-                    address: workshop?.address || ''
+                    address: workshop?.address || (orgData.settings as any)?.address || ''
                 };
             }
         }

@@ -22,6 +22,9 @@ const serviceSaleSchema = z.object({
         quantity: z.coerce.number().int().min(1, "Mínimo 1"),
         price: z.coerce.number(),
         fromWorkOrder: z.boolean().optional(),
+        type: z.string().optional(),
+        name: z.string().optional(),
+        sku: z.string().optional(),
     })).optional(),
     discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
     depositAmount: z.coerce.number().min(0).optional(),
@@ -154,12 +157,27 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         }
 
         // 3. Calculate Totals
-        const itemsTotal = (data.items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const productItemsForTotal = (data.items || []).filter(item => item.type !== 'service');
+        const itemsTotal = productItemsForTotal.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const subtotal = itemsTotal + data.laborCost;
         const discountAmount = itemsTotal * ((data.discountPercentage || 0) / 100);
         const total = subtotal - discountAmount;
 
         // 4. Create or Update Sale Record
+        // Check if there is already a paid/completed sale for this work order to prevent duplicates
+        const { data: alreadyPaid } = await supabase
+            .from('sales')
+            .select('id')
+            .eq('work_order_id', data.workOrderId)
+            .eq('organization_id', user.workshopId)
+            .neq('status', 'pending')
+            .limit(1)
+            .maybeSingle();
+
+        if (alreadyPaid) {
+            return { success: false, message: 'Esta orden de trabajo ya tiene una venta registrada y pagada. Por favor recarga la página.' };
+        }
+
         let sale;
         const { data: existingSale } = await supabase
             .from('sales')
@@ -192,6 +210,11 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             }
             sale = updatedSale;
         } else {
+            // If no pending sale exists, but the UI sent items from the work order, it's an inconsistent state
+            if ((data.items || []).some((i: any) => i.fromWorkOrder)) {
+                 return { success: false, message: 'La orden de trabajo no tiene una venta pendiente válida, pero contiene productos. Intenta recargar la página o contactar soporte.' };
+            }
+
             const { data: newSale, error: saleError } = await supabase
                 .from('sales')
                 .insert({
@@ -217,7 +240,10 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         }
 
         // 5. Create Sale Items & Update Inventory
-        for (const item of data.items || []) {
+        const serviceItems = (data.items || []).filter(item => item.type === 'service' && item.fromWorkOrder);
+        const productItems = (data.items || []).filter(item => item.type !== 'service');
+
+        for (const item of productItems) {
             if (item.fromWorkOrder) {
                 // El item ya fue insertado en sale_items y ya se le descontó el stock cuando se agregó a la orden.
                 continue;
@@ -229,7 +255,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     sale_id: sale.id,
                     item_type: 'inventory',
                     inventory_item_id: item.inventoryItemId,
-                    description: 'Producto', // Fallback temporal
+                    description: item.name || 'Producto',
                     quantity: item.quantity,
                     unit_price: item.price,
                     total: item.price * item.quantity
@@ -246,17 +272,36 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             if (updateError) throw new Error(`Error al descontar inventario del producto.`);
         }
 
-        // Registrar mano de obra como item de servicio si aplica
-        if (data.laborCost > 0) {
+        // 5.1 Registrar servicios detallados de la orden de trabajo
+        let detailedServicesSum = 0;
+        for (const srv of serviceItems) {
+             const serviceTotal = srv.price * srv.quantity;
+             detailedServicesSum += serviceTotal;
+             
              await supabase
                 .from('sale_items')
                 .insert({
                     sale_id: sale.id,
                     item_type: 'service',
-                    description: 'Mano de Obra / Servicio',
+                    description: srv.name || 'Servicio',
+                    quantity: srv.quantity,
+                    unit_price: srv.price,
+                    total: serviceTotal
+                });
+        }
+
+        // 5.2 Registrar diferencia de mano de obra como genérica si aplica
+        const genericLaborCost = data.laborCost - detailedServicesSum;
+        if (genericLaborCost > 0) {
+             await supabase
+                .from('sale_items')
+                .insert({
+                    sale_id: sale.id,
+                    item_type: 'service',
+                    description: 'Mano de Obra adicional',
                     quantity: 1,
-                    unit_price: data.laborCost,
-                    total: data.laborCost
+                    unit_price: genericLaborCost,
+                    total: genericLaborCost
                 });
         }
 
@@ -369,12 +414,15 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             }
         }
 
-        const formattedItems = saleItems ? saleItems.filter((i:any) => i.item_type === 'inventory').map((item: any) => ({
-            name: item.inventory_items?.name || item.description || 'Producto',
-            sku: item.inventory_items?.code || '-',
+        const formattedItems = saleItems ? saleItems.map((item: any) => ({
+            name: item.item_type === 'service' 
+                ? (item.description?.startsWith('Mano de Obra') ? item.description : `Mano de Obra - ${item.description || 'Servicio'}`)
+                : (item.inventory_items?.name || item.description || 'Producto'),
+            sku: item.inventory_items?.code || (item.item_type === 'service' ? 'SRV' : '-'),
             quantity: item.quantity,
             price: item.unit_price,
             total: item.total || (item.quantity * item.unit_price),
+            type: item.item_type
         })) : (data.items || []).map((item: any) => ({
             name: item.name || 'Producto',
             sku: item.sku || '-',

@@ -46,8 +46,28 @@ export async function GET(
         sku: item.inventory_items?.code || '',
         quantity: item.quantity,
         price: item.unit_price,
-        total: item.total || (item.quantity * item.unit_price)
+        total: item.total || (item.quantity * item.unit_price),
+        type: 'inventory'
       }));
+
+    // 4. Fetch work_order_services (Mano de obra)
+    const { data: services, error: servicesError } = await supabase
+      .from('work_order_services')
+      .select('*')
+      .eq('work_order_id', workOrderId);
+
+    if (!servicesError && services && services.length > 0) {
+       const mappedServices = services.map((service: any) => ({
+         inventoryItemId: service.id, // Using service ID here to satisfy UI requirements
+         name: service.description || 'Servicio',
+         sku: 'SRV',
+         quantity: service.quantity || 1,
+         price: service.unit_price || 0,
+         total: service.total || ((service.quantity || 1) * (service.unit_price || 0)),
+         type: 'service'
+       }));
+       mappedItems.push(...mappedServices);
+    }
       
     return NextResponse.json({ items: mappedItems });
   } catch (error) {

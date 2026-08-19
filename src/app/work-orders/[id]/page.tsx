@@ -329,7 +329,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
             </div>
 
             {!isCompleted ? (
-              <div className="w-full md:w-auto min-w-[300px]">
+              <div className="w-full md:w-auto md:min-w-[300px]">
                 <AddDepositForm workOrderId={workOrder.id} currentDeposit={(workOrder as any).depositAmount ?? 0} />
               </div>
             ) : (
@@ -489,6 +489,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
             workshopName={(workOrder as any).workshop?.name}
             orderNumber={workOrder.workOrderNumber?.toString()}
             technicianName={workOrder.technician?.name}
+            quoteStatus={(workOrder as any).quote_status}
           />
         </div>
       </div>

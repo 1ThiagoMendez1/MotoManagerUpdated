@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { fulfillPartRequest, rejectPartRequest } from '@/lib/actions/work-orders';
@@ -41,10 +41,14 @@ interface PartRequestsSectionProps {
 export function PartRequestsSection({ workOrderId, requests, userRole }: PartRequestsSectionProps) {
     const { toast } = useToast();
     const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+    const processingRef = useRef<Set<string>>(new Set());
 
     const isManager = userRole === 'owner' || userRole === 'admin';
 
     const handleAction = async (requestId: string, action: 'fulfill' | 'reject') => {
+        if (processingRef.current.has(requestId)) return;
+        processingRef.current.add(requestId);
+
         setLoadingIds((prev) => {
             const next = new Set(prev);
             next.add(requestId);
@@ -78,6 +82,7 @@ export function PartRequestsSection({ workOrderId, requests, userRole }: PartReq
                 variant: "destructive"
             });
         } finally {
+            processingRef.current.delete(requestId);
             setLoadingIds((prev) => {
                 const next = new Set(prev);
                 next.delete(requestId);

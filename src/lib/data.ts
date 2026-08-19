@@ -472,13 +472,14 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
       discountTotal,
       laborCost,
       paymentMethod: mapPaymentMethodToUi(s.payment_method),
-      items: s.sale_items?.filter((si: any) => si.item_type === 'inventory').map((si: any) => ({
+      items: s.sale_items?.map((si: any) => ({
           id: si.id,
-          inventoryItemId: si.inventory_item_id,
+          inventoryItemId: si.inventory_item_id || si.id,
           quantity: si.quantity,
           price: Number(si.unit_price),
-          name: si.inventory_items?.name || si.description || 'Producto',
-          sku: si.inventory_items?.code || '-'
+          name: si.inventory_items?.name || si.description || 'Producto/Servicio',
+          sku: si.inventory_items?.code || (si.item_type === 'service' ? 'SRV' : '-'),
+          type: si.item_type
       })) || []
     };
   });

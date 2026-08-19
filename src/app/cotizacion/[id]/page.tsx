@@ -8,6 +8,7 @@ import { Bike, CheckCircle2, AlertCircle, Wrench, Package, Clock, Camera, Image 
 import Image from 'next/image'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { QuoteImageGallery } from './QuoteImageGallery'
 
 export const dynamic = 'force-dynamic'
 
@@ -295,24 +296,7 @@ export default async function QuotePage({
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {workOrder.images.map((img: any) => (
-                    <div key={img.id} className="relative group rounded-xl overflow-hidden border border-slate-800/50 bg-slate-950/50 aspect-video shadow-sm">
-                      <Image
-                        src={img.image_url}
-                        alt={img.description || 'Evidencia'}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                        <p className="text-slate-200 text-sm font-medium leading-relaxed drop-shadow-md">
-                          {img.description || 'Sin descripción'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <QuoteImageGallery images={workOrder.images} />
               </CardContent>
             </Card>
           )}
