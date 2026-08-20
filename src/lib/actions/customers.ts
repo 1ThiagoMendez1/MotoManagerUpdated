@@ -410,3 +410,120 @@ export async function getCustomerFullHistory(id: string) {
         }
     };
 }
+
+export async function importCustomers(records: any[]) {
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        try {
+            // 1. Find or create customer
+            let customerId = null;
+            const { firstName, lastName } = splitName(record.customerName || 'Sin Nombre');
+            
+            if (record.customerCedula) {
+                const { data } = await supabase
+                    .from('customers')
+                    .select('id')
+                    .eq('organization_id', user.workshopId)
+                    .eq('document_number', record.customerCedula)
+                    .maybeSingle();
+                if (data) customerId = data.id;
+            }
+
+            if (!customerId && record.customerEmail) {
+                const { data } = await supabase
+                    .from('customers')
+                    .select('id')
+                    .eq('organization_id', user.workshopId)
+                    .eq('email', record.customerEmail)
+                    .maybeSingle();
+                if (data) customerId = data.id;
+            }
+
+            if (customerId) {
+                // Update customer
+                await supabase.from('customers').update({
+                    first_name: firstName,
+                    last_name: lastName,
+                    ...(record.customerEmail ? { email: record.customerEmail } : {}),
+                    ...(record.customerPhone ? { phone: record.customerPhone } : {}),
+                    ...(record.customerCedula ? { document_number: record.customerCedula } : {})
+                }).eq('id', customerId);
+            } else {
+                // Create customer
+                const { data: newCustomer, error: createCustError } = await supabase
+                    .from('customers')
+                    .insert({
+                        organization_id: user.workshopId,
+                        first_name: firstName,
+                        last_name: lastName,
+                        email: record.customerEmail || null,
+                        document_number: record.customerCedula || null,
+                        phone: record.customerPhone || null,
+                        created_by: user.userId || null
+                    })
+                    .select('id')
+                    .single();
+                
+                if (createCustError) throw new Error(`Error creando cliente: ${createCustError.message}`);
+                customerId = newCustomer.id;
+            }
+
+            // 2. Find or create motorcycle
+            if (!record.motoPlate) {
+                throw new Error("La placa de la moto es obligatoria.");
+            }
+
+            const { data: existingMoto } = await supabase
+                .from('motorcycles')
+                .select('id')
+                .eq('organization_id', user.workshopId)
+                .ilike('license_plate', record.motoPlate.trim())
+                .maybeSingle();
+
+            if (existingMoto) {
+                // Update moto
+                const { error: updateMotoError } = await supabase
+                    .from('motorcycles')
+                    .update({
+                        customer_id: customerId,
+                        brand: record.motoBrand || 'Desconocida',
+                        model: record.motoModel || 'Desconocido',
+                        model_year: record.motoYear || new Date().getFullYear(),
+                    })
+                    .eq('id', existingMoto.id);
+                if (updateMotoError) throw new Error(`Error actualizando moto: ${updateMotoError.message}`);
+            } else {
+                // Create moto
+                const { error: createMotoError } = await supabase
+                    .from('motorcycles')
+                    .insert({
+                        organization_id: user.workshopId,
+                        customer_id: customerId,
+                        brand: record.motoBrand || 'Desconocida',
+                        model: record.motoModel || 'Desconocido',
+                        model_year: record.motoYear || new Date().getFullYear(),
+                        license_plate: record.motoPlate.trim(),
+                    });
+                if (createMotoError) throw new Error(`Error creando moto: ${createMotoError.message}`);
+            }
+
+            successCount++;
+        } catch (err: any) {
+            console.error(`Error importando registro de ${record.customerName}:`, err);
+            errorCount++;
+            errors.push(`Fila ${i + 2} (${record.customerName}): ${err.message}`);
+        }
+    }
+
+    revalidatePath('/customers');
+    revalidatePath('/customers', 'page');
+    revalidatePath('/motorcycles');
+    return { success: true, successCount, errorCount, errors };
+}

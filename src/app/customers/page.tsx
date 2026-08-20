@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AddCustomer } from '@/components/forms/AddCustomer';
+import { ImportCustomers } from '@/components/forms/ImportCustomers';
 import { EditCustomer } from '@/components/forms/EditCustomer';
 import { DeleteCustomer } from '@/components/forms/DeleteCustomer';
 import { CustomerDetails } from '@/components/details/CustomerDetails';
@@ -60,6 +61,7 @@ export default async function CustomersPage({
         </div>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           <SearchCustomers />
+          <ImportCustomers />
           <AddCustomer />
         </div>
       </div>
