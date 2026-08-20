@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
 
 // Tipos para las ventas por categoría
 export interface CategorySaleSummary {
@@ -368,6 +368,7 @@ export async function addExpense(
 }
 
 export async function getExpenses(organizationId: string, startDate?: string, endDate?: string) {
+  noStore();
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -414,6 +415,7 @@ export async function getDailyClosingSummary(
   clientStartIso?: string,
   clientEndIso?: string
 ): Promise<DailyClosingSummary> {
+  noStore();
   // Query sales
   let startIso, endIso;
   
@@ -676,6 +678,7 @@ export async function getRealtimeFinancialDataRaw(
   startIso: string, 
   endIso: string
 ): Promise<RealtimeFinancialData> {
+  noStore();
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
