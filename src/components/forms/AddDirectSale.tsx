@@ -415,7 +415,7 @@ export function AddDirectSale({ inventory, customers, services = [] }: AddDirect
                       return (
                         <Card key={field.id} className="p-3 border-border/50 bg-background/50 hover:bg-muted/10 transition-colors">
                             {currentItem?.type === 'service' ? (
-                              <div className="grid grid-cols-[1fr,2fr,120px,120px,auto] items-start gap-4">
+                              <div className="grid grid-cols-[1fr,2fr,120px,auto] items-start gap-4">
                                 <FormField
                                   control={form.control}
                                   name={`items.${index}.sku`}
@@ -482,27 +482,7 @@ export function AddDirectSale({ inventory, customers, services = [] }: AddDirect
                                     </FormItem>
                                   )}
                                 />
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.quantity`}
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormControl>
-                                        <div className="relative">
-                                          <Input
-                                            type="number"
-                                            {...field}
-                                            min={1}
-                                            className="bg-background border-input pr-8"
-                                          />
-                                          <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">
-                                            und
-                                          </span>
-                                        </div>
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
+
                                 <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                                   <Trash2 className="h-5 w-5" />
                                 </Button>
