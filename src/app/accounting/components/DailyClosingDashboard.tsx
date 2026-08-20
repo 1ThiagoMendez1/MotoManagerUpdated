@@ -201,12 +201,12 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
           {/* PRE-CIERRE MODAL */}
           <Dialog open={preClosingOpen} onOpenChange={setPreClosingOpen}>
             <DialogContent className="max-w-4xl bg-card border-border/50 shadow-2xl p-0 overflow-hidden">
-              <div className="bg-slate-50 border-b border-border/50 p-6 relative">
-                <div className="absolute top-6 right-6 opacity-5">
-                  <Calculator className="w-24 h-24 text-slate-900" />
+              <div className="bg-muted/30 border-b border-border/50 p-6 relative">
+                <div className="absolute top-6 right-6 opacity-10">
+                  <Calculator className="w-24 h-24 text-foreground" />
                 </div>
                 <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-slate-900">
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-foreground">
                     <div className="p-2 bg-indigo-500 rounded-lg shadow-md shadow-indigo-500/20">
                       <Calculator className="w-6 h-6 text-white" />
                     </div>
