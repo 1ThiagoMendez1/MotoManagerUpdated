@@ -360,7 +360,7 @@ export async function addExpense(
 
   if (error) {
     console.error('Error adding expense:', error);
-    throw new Error('No se pudo registrar el gasto.');
+    throw new Error(`No se pudo registrar el gasto: ${error.message}`);
   }
 
   revalidatePath('/accounting');
