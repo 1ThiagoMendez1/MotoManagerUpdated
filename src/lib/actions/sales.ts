@@ -11,7 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 const serviceSaleSchema = z.object({
     workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
     laborCost: z.coerce.number().min(0, "El costo no puede ser negativo."),
-    paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
+    paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros', 'Wompi'], {
         required_error: "Se requiere seleccionar un medio de pago.",
     }),
     date: z.string({
@@ -35,7 +35,7 @@ const directSaleSchema = z.object({
     cedula: z.string().optional(),
     customerName: z.string().optional(),
     phone: z.string().optional(),
-    paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
+    paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros', 'Wompi'], {
         required_error: "Se requiere seleccionar un medio de pago.",
     }),
     date: z.string({ required_error: "Se requiere una fecha." }),
