@@ -45,19 +45,24 @@ import { Card } from '@/components/ui/card';
 import { Search } from 'lucide-react';
 
 const saleItemSchema = z.object({
-  inventoryItemId: z.string().min(1, "Selecciona un producto"),
+  inventoryItemId: z.string().optional(),
+  type: z.string().optional(),
+  name: z.string().optional(),
   sku: z.string().optional(),
   quantity: z.coerce.number().int().min(1, "Mínimo 1"),
   price: z.coerce.number(),
-});
+}).refine(data => {
+  if (data.type === 'service') return !!data.name;
+  return !!data.inventoryItemId;
+}, { message: "Selecciona un producto o ingresa un servicio", path: ["inventoryItemId"] });
 
 const formSchema = z.object({
   customerId: z.string().optional(),
   cedula: z.string().optional(),
   customerName: z.string().optional(),
   phone: z.string().optional(),
-  paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta'], {
-    required_error: "Se requiere seleccionar un medio de pago.",
+  paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
+    required_error: "Selecciona un medio de pago.",
   }),
   date: z.date({ required_error: "Se requiere una fecha." }),
   items: z.array(saleItemSchema).min(1, "Agrega al menos un producto."),
@@ -67,9 +72,10 @@ const formSchema = z.object({
 type AddDirectSaleProps = {
   inventory: InventoryItem[];
   customers: Customer[];
+  services?: any[];
 };
 
-export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
+export function AddDirectSale({ inventory, customers, services = [] }: AddDirectSaleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
@@ -80,7 +86,7 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      items: [{ inventoryItemId: "", sku: "", quantity: 1, price: 0 }],
+      items: [{ type: 'product', inventoryItemId: "", sku: "", quantity: 1, price: 0 }],
       paymentMethod: 'Efectivo',
       date: new Date(),
       cedula: "",
@@ -165,6 +171,15 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
       form.setValue(`items.${index}.price`, selectedProduct.price);
       form.setValue(`items.${index}.inventoryItemId`, selectedProduct.id);
       form.setValue(`items.${index}.sku`, selectedProduct.sku);
+    }
+  }
+
+  function handleServiceChange(value: string, index: number) {
+    const selectedService = services.find(item => item.id === value);
+    if (selectedService) {
+      form.setValue(`items.${index}.price`, selectedService.default_price || 0);
+      form.setValue(`items.${index}.name`, selectedService.name);
+      // Also clear search term so it's clean if needed, or leave it
     }
   }
 
@@ -344,16 +359,28 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                       <span className="w-6 h-px bg-border"></span>
                       Artículos
                     </h3>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
-                      onClick={() => append({ inventoryItemId: '', sku: '', quantity: 1, price: 0 })}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Agregar Producto
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                        onClick={() => append({ type: 'service', name: '', inventoryItemId: '', sku: '', quantity: 1, price: 0 })}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Servicio
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                        onClick={() => append({ type: 'product', inventoryItemId: '', sku: '', quantity: 1, price: 0 })}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Producto
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="space-y-3">
@@ -374,104 +401,210 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                         : inventory;
                       const placeholderText = currentSku && filteredInventory.length === 0 ? "No coincidencias" : "Selecciona un producto";
 
+                      // For services search, we can use sku field as a temporary search field or a new one. 
+                      // Let's use currentSku to store the service search term as well to avoid changing schema.
+                      const currentServiceSearch = currentItem?.sku || '';
+                      const filteredServices = currentServiceSearch
+                        ? services.filter(item =>
+                            item.name.toLowerCase().includes(currentServiceSearch.toLowerCase()) ||
+                            (item.category && item.category.toLowerCase().includes(currentServiceSearch.toLowerCase()))
+                          )
+                        : services;
+                      const servicePlaceholder = currentServiceSearch && filteredServices.length === 0 ? "No coincidencias" : "Selecciona un servicio";
+
                       return (
                         <Card key={field.id} className="p-3 border-border/50 bg-background/50 hover:bg-muted/10 transition-colors">
-                          <div className="grid grid-cols-[1fr,2fr,120px,auto] items-start gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.sku`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="SKU..." {...field}
-                                      className="bg-background border-input focus:ring-primary/20"
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        handleSkuChange(e.target.value, index);
-                                      }}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.inventoryItemId`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <Select onValueChange={(value) => handleProductChange(value, index)} value={field.value}>
-                                    <FormControl>
-                                      <SelectTrigger className={`bg-background border-input ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''}`}>
-                                        <SelectValue placeholder={placeholderText} />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {filteredInventory.map(item => (
-                                        <SelectItem
-                                          key={item.id}
-                                          value={item.id}
-                                          disabled={item.quantity === 0}
-                                          className={item.quantity === 0 ? 'text-red-500' : ''}
-                                        >
-                                          {item.name} - ${item.price.toLocaleString('es-CO')} (Disp: {item.quantity})
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.quantity`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <div className="relative">
-                                      <Input
-                                        type="number"
-                                        {...field}
-                                        min={1}
-                                        max={selectedItem?.quantity || 9999}
-                                        className={`bg-background border-input pr-8 ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''}`}
-                                        disabled={isOutOfStock}
-                                        placeholder={isOutOfStock ? "0" : undefined}
-                                        onChange={(e) => {
-                                          const val = parseInt(e.target.value);
-                                          if (selectedItem && val > selectedItem.quantity) {
-                                            toast({
-                                              title: "Stock insuficiente",
-                                              description: `Solo hay ${selectedItem.quantity} unidades de ${selectedItem.name}.`,
-                                              variant: "destructive"
-                                            });
-                                            field.onChange(selectedItem.quantity);
-                                          } else {
-                                            field.onChange(e);
+                            {currentItem?.type === 'service' ? (
+                              <div className="grid grid-cols-[1fr,2fr,120px,120px,auto] items-start gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.sku`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          placeholder="Buscar servicio..." {...field}
+                                          className="bg-background border-input focus:ring-primary/20"
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.name`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <Select 
+                                        onValueChange={(val) => {
+                                          if (val !== 'custom') {
+                                            handleServiceChange(val, index);
                                           }
                                         }}
-                                      />
-                                      <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">
-                                        und
-                                      </span>
-                                    </div>
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                              <Trash2 className="h-5 w-5" />
-                            </Button>
-                          </div>
+                                        value={services.some(s => s.name === field.value) ? services.find(s => s.name === field.value)?.id : (field.value ? 'custom' : '')}
+                                      >
+                                        <FormControl>
+                                          <SelectTrigger className="bg-background border-input">
+                                            <SelectValue placeholder={servicePlaceholder} />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {filteredServices.map(item => (
+                                            <SelectItem key={item.id} value={item.id}>
+                                              {item.name} - ${item.default_price?.toLocaleString('es-CO') || 0}
+                                            </SelectItem>
+                                          ))}
+                                          {field.value && !services.some(s => s.name === field.value) && (
+                                            <SelectItem value="custom">{field.value} (Personalizado)</SelectItem>
+                                          )}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.price`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                                          <Input
+                                            type="number"
+                                            placeholder="Precio" {...field}
+                                            className="bg-background border-input focus:ring-primary/20 pl-7"
+                                          />
+                                        </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Input
+                                            type="number"
+                                            {...field}
+                                            min={1}
+                                            className="bg-background border-input pr-8"
+                                          />
+                                          <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">
+                                            und
+                                          </span>
+                                        </div>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                                  <Trash2 className="h-5 w-5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-[1fr,2fr,120px,auto] items-start gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.sku`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          placeholder="SKU..." {...field}
+                                          className="bg-background border-input focus:ring-primary/20"
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            handleSkuChange(e.target.value, index);
+                                          }}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.inventoryItemId`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <Select onValueChange={(value) => handleProductChange(value, index)} value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger className={`bg-background border-input ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''}`}>
+                                            <SelectValue placeholder={placeholderText} />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {filteredInventory.map(item => (
+                                            <SelectItem
+                                              key={item.id}
+                                              value={item.id}
+                                              disabled={item.quantity === 0}
+                                              className={item.quantity === 0 ? 'text-red-500' : ''}
+                                            >
+                                              {item.name} - ${item.price.toLocaleString('es-CO')} (Disp: {item.quantity})
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`items.${index}.quantity`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <div className="relative">
+                                          <Input
+                                            type="number"
+                                            {...field}
+                                            min={1}
+                                            max={selectedItem?.quantity || 9999}
+                                            className={`bg-background border-input pr-8 ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''}`}
+                                            disabled={isOutOfStock}
+                                            placeholder={isOutOfStock ? "0" : undefined}
+                                            onChange={(e) => {
+                                              const val = parseInt(e.target.value);
+                                              if (selectedItem && val > selectedItem.quantity) {
+                                                toast({
+                                                  title: "Stock insuficiente",
+                                                  description: `Solo hay ${selectedItem.quantity} unidades de ${selectedItem.name}.`,
+                                                  variant: "destructive"
+                                                });
+                                                field.onChange(selectedItem.quantity);
+                                              } else {
+                                                field.onChange(e);
+                                              }
+                                            }}
+                                          />
+                                          <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">
+                                            und
+                                          </span>
+                                        </div>
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                                  <Trash2 className="h-5 w-5" />
+                                </Button>
+                              </div>
+                            )}
                           
                           {/* Item Subtotal Line */}
-                          {watchItems[index]?.inventoryItemId && (
+                          {(watchItems[index]?.inventoryItemId || watchItems[index]?.type === 'service') && (
                             <div className="mt-3 flex justify-between items-center text-sm">
-                              <div className={isOutOfStock ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
-                                {isOutOfStock ? "⚠️ Producto sin stock" : `Precio unitario: $${itemPrice.toLocaleString('es-CO')}`}
+                              <div className={isOutOfStock && watchItems[index]?.type !== 'service' ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
+                                {isOutOfStock && watchItems[index]?.type !== 'service' ? "⚠️ Producto sin stock" : `Precio unitario: $${itemPrice.toLocaleString('es-CO')}`}
                               </div>
-                              {!isOutOfStock && (
+                              {(!isOutOfStock || watchItems[index]?.type === 'service') && (
                                 <div className="font-medium text-foreground">
                                   Subtotal: ${itemSubtotal.toLocaleString('es-CO')}
                                 </div>
@@ -534,6 +667,12 @@ export function AddDirectSale({ inventory, customers }: AddDirectSaleProps) {
                                 <div className="flex items-center gap-2">
                                   <CreditCard className="w-4 h-4 text-purple-500" />
                                   <span>Tarjeta Crédito/Débito</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Otros">
+                                <div className="flex items-center gap-2">
+                                  <Banknote className="w-4 h-4 text-gray-500" />
+                                  <span>Otros</span>
                                 </div>
                               </SelectItem>
                             </SelectContent>

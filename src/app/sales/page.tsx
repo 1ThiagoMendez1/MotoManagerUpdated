@@ -42,6 +42,27 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+function getPaymentMethodBadge(method?: string) {
+  if (!method) return <Badge variant="outline" className="text-xs">Otros</Badge>;
+  
+  const m = method.toLowerCase();
+  if (m === 'cash' || m === 'efectivo') {
+    return <Badge variant="outline" className="text-xs border-green-500/30 text-green-500 bg-green-500/10">Efectivo</Badge>;
+  }
+  if (m === 'credit_card' || m === 'debit_card' || m === 'tarjeta') {
+    return <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-500 bg-purple-500/10">Tarjeta</Badge>;
+  }
+  if (m === 'transfer' || m === 'transferencia' || m === 'nequi' || m === 'daviplata') {
+    return <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-500 bg-blue-500/10">Transferencia</Badge>;
+  }
+  if (m === 'wompi') {
+    return <Badge variant="outline" className="text-xs border-indigo-500/30 text-indigo-500 bg-indigo-500/10">Wompi</Badge>;
+  }
+  
+  return <Badge variant="outline" className="text-xs">{method}</Badge>;
+}
+
+
 // Loading component
 function SalesPageSkeleton() {
   return (
@@ -109,20 +130,24 @@ export default async function SalesPage({
     page?: string;
   }>;
 }) {
-  await authorize('/sales');
+  const user = await authorize('/sales');
   const resolvedSearchParams = await searchParams;
   const dateFrom = resolvedSearchParams.dateFrom || '';
   const dateTo = resolvedSearchParams.dateTo || '';
   const type = resolvedSearchParams.type as 'direct' | 'service' | 'all' || 'all';
   const currentPage = Number(resolvedSearchParams.page) || 1;
 
+  // Needed for getServices
+  const { getServices } = await import('@/actions/services');
+
   try {
-    const [sls, wos, inv, custs, allSales] = await Promise.all([
+    const [sls, wos, inv, custs, allSales, servicesResult] = await Promise.all([
       getSales({ dateFrom, dateTo, type, page: currentPage, limit: 10 } as any),
       getWorkOrders({ limit: 200 }), // Get all work orders for forms
       getInventory({ limit: 200 } as any),
       getCustomers(),
       getSales({ dateFrom, dateTo, type, limit: 1000 } as any), // For export
+      getServices(user.workshopId),
     ]);
 
     const sales = sls.items;
@@ -131,6 +156,7 @@ export default async function SalesPage({
     const inventoryItems = inv.items as InventoryItem[];
     const customers = (custs as any).items || custs;
     const allFilteredSales = allSales.items;
+    const services = servicesResult || [];
 
     const getSaleDetails = (sale: Sale) => {
       if (sale.workOrderId && sale.workOrder) {
@@ -159,7 +185,7 @@ export default async function SalesPage({
           <div className="flex flex-wrap gap-2 items-center">
               <SalesFilters currentDateFrom={dateFrom} currentDateTo={dateTo} currentType={type} />
               <AddSale workOrders={workOrders} inventory={inventoryItems} />
-              <AddDirectSale inventory={inventoryItems} customers={customers} />
+              <AddDirectSale inventory={inventoryItems} customers={customers} services={services} />
               <ExportDirectSalesButton sales={allFilteredSales.filter(s => !s.workOrderId)} />
               <ExportServiceSalesButton sales={allFilteredSales.filter(s => s.workOrderId)} />
           </div>
@@ -182,7 +208,7 @@ export default async function SalesPage({
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Cliente / Vehículo</TableHead>
                     <TableHead className="hidden md:table-cell text-foreground/90 text-xs sm:text-sm">Detalles</TableHead>
                     <TableHead className="text-foreground/90 text-xs sm:text-sm">Fecha</TableHead>
-
+                    <TableHead className="hidden sm:table-cell text-foreground/90 text-xs sm:text-sm">Pago</TableHead>
                     <TableHead className="text-right text-foreground/90 text-xs sm:text-sm">Total</TableHead>
                     <TableHead className="text-center text-foreground/90 text-xs sm:text-sm">Detalle</TableHead>
                   </TableRow>
@@ -214,6 +240,10 @@ export default async function SalesPage({
                         {getSaleDetails(sale)}
                       </TableCell>
                       <TableCell className="text-xs sm:text-sm">{formatExactDateTime(sale.date)}</TableCell>
+                      
+                      <TableCell className="hidden sm:table-cell">
+                        {getPaymentMethodBadge(sale.paymentMethod)}
+                      </TableCell>
 
                       <TableCell className="text-right font-medium text-xs sm:text-sm">{formatCurrency(sale.total)}</TableCell>
                       <TableCell className="text-center">

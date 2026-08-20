@@ -11,7 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 const serviceSaleSchema = z.object({
     workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
     laborCost: z.coerce.number().min(0, "El costo no puede ser negativo."),
-    paymentMethod: z.enum(['DaviPlata', 'Nequi', 'Efectivo', 'Tarjeta', 'Addi', 'Wompi', 'Otros'], {
+    paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
         required_error: "Se requiere seleccionar un medio de pago.",
     }),
     date: z.string({
@@ -35,15 +35,17 @@ const directSaleSchema = z.object({
     cedula: z.string().optional(),
     customerName: z.string().optional(),
     phone: z.string().optional(),
-    paymentMethod: z.enum(['DaviPlata', 'Nequi', 'Efectivo', 'Tarjeta', 'Addi', 'Wompi', 'Otros'], {
+    paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
         required_error: "Se requiere seleccionar un medio de pago.",
     }),
     date: z.string({ required_error: "Se requiere una fecha." }),
     items: z.array(z.object({
-        inventoryItemId: z.string().min(1, "Selecciona un producto"),
+        inventoryItemId: z.string().optional(),
+        type: z.string().optional(),
+        name: z.string().optional(),
         quantity: z.coerce.number().int().min(1, "Mínimo 1"),
         price: z.coerce.number(),
-    })).min(1, "Agrega al menos un producto."),
+    })).min(1, "Agrega al menos un producto o servicio."),
     discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
 });
 
@@ -52,7 +54,7 @@ const directSaleSchema = z.object({
 function mapPaymentMethodToDb(uiMethod: string) {
     if (uiMethod === 'Efectivo') return 'cash';
     if (uiMethod === 'Tarjeta') return 'credit_card';
-    if (uiMethod === 'Nequi' || uiMethod === 'DaviPlata' || uiMethod === 'transfer') return 'transfer';
+    if (uiMethod === 'Nequi' || uiMethod === 'DaviPlata' || uiMethod === 'transfer' || uiMethod === 'Transferencia') return 'transfer';
     return 'other'; // Addi, Wompi, Otros
 }
 
@@ -175,7 +177,19 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             .maybeSingle();
 
         if (alreadyPaid) {
-            return { success: false, message: 'Esta orden de trabajo ya tiene una venta registrada y pagada. Por favor recarga la página.' };
+            // Auto-sanación: Si ya está pagada pero el usuario pudo abrir el modal,
+            // probablemente la orden quedó con estado 'Reparado' (completed) en lugar de 'Entregado' (delivered).
+            const supabaseAdmin = createAdminClient();
+            await supabaseAdmin.from('work_orders').update({
+                status: 'delivered',
+                completed_at: new Date().toISOString()
+            }).eq('id', data.workOrderId).eq('organization_id', user.workshopId);
+
+            revalidatePath('/sales');
+            revalidatePath('/work-orders');
+            revalidatePath('/', 'layout');
+
+            return { success: true, message: 'La venta ya estaba registrada correctamente. Se actualizó el estado de la orden.' };
         }
 
         let sale;
@@ -463,23 +477,11 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     
                     console.log('[Sales Action] Notification result:', JSON.stringify(notifyResult, null, 2));
                     
-                    const fs = require('fs');
-                    fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
-                        date: new Date().toISOString(),
-                        customerPhone: formattedCustomer.phone,
-                        result: notifyResult
-                    }, null, 2));
                 } else {
                     console.warn(`WhatsApp limit reached for org ${user.workshopId}. Skipping sale notification.`);
                 }
             } catch (notifyError: any) {
                 console.error('[Sales Action] Service sale notification error:', notifyError);
-                const fs = require('fs');
-                fs.writeFileSync('public/last_whatsapp_error.txt', JSON.stringify({
-                    date: new Date().toISOString(),
-                    error: notifyError.message,
-                    stack: notifyError.stack
-                }, null, 2));
             }
         } else {
             console.log('[Sales Action] Notification skipped because customer has no phone or payment method is Wompi.');
@@ -610,6 +612,8 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         
         // 3. Check Inventory
         for (const item of data.items || []) {
+            if (item.type === 'service') continue;
+            
             const { data: invItem } = await supabase
                 .from('inventory_items')
                 .select('quantity, name')
@@ -649,23 +653,36 @@ export async function createDirectSale(prevState: any, formData: FormData) {
 
         // 6. Items & Inventory
         for (const item of data.items) {
-            await supabase
-                .from('sale_items')
-                .insert({
-                    sale_id: sale.id,
-                    item_type: 'inventory',
-                    inventory_item_id: item.inventoryItemId,
-                    description: 'Producto directo',
-                    quantity: item.quantity,
-                    unit_price: item.price,
-                    total: item.price * item.quantity
-                });
+            if (item.type === 'service') {
+                await supabase
+                    .from('sale_items')
+                    .insert({
+                        sale_id: sale.id,
+                        item_type: 'service',
+                        description: item.name || 'Servicio',
+                        quantity: item.quantity,
+                        unit_price: item.price,
+                        total: item.price * item.quantity
+                    });
+            } else {
+                await supabase
+                    .from('sale_items')
+                    .insert({
+                        sale_id: sale.id,
+                        item_type: 'inventory',
+                        inventory_item_id: item.inventoryItemId,
+                        description: 'Producto directo',
+                        quantity: item.quantity,
+                        unit_price: item.price,
+                        total: item.price * item.quantity
+                    });
 
-            const { error: updateError } = await supabase.rpc('decrement_inventory', {
-                item_id: item.inventoryItemId,
-                amount: item.quantity
-            });
-            if (updateError) throw new Error(`Error al descontar inventario.`);
+                const { error: updateError } = await supabase.rpc('decrement_inventory', {
+                    item_id: item.inventoryItemId,
+                    amount: item.quantity
+                });
+                if (updateError) throw new Error(`Error al descontar inventario.`);
+            }
         }
 
         // 7. Return formatted sale

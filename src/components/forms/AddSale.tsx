@@ -57,8 +57,8 @@ const saleItemSchema = z.object({
 const formSchema = z.object({
   workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
   laborCost: z.coerce.number().min(0, "El costo no puede ser negativo."),
-  paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta'], {
-    required_error: "Se requiere seleccionar un medio de pago.",
+  paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
+    required_error: "Selecciona un medio de pago.",
   }),
   date: z.date({
     required_error: "Se requiere una fecha.",
@@ -621,6 +621,12 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                                 <div className="flex items-center gap-2">
                                   <CreditCard className="w-4 h-4 text-purple-500" />
                                   <span>Tarjeta Crédito/Débito</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Otros">
+                                <div className="flex items-center gap-2">
+                                  <Banknote className="w-4 h-4 text-gray-500" />
+                                  <span>Otros</span>
                                 </div>
                               </SelectItem>
                             </SelectContent>

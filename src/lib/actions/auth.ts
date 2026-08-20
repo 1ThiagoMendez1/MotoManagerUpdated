@@ -26,23 +26,6 @@ export async function loginAction(formData: FormData) {
   }
 
   const user = data?.user;
-  
-  if (user) {
-    const deviceId = crypto.randomUUID();
-    
-    await supabase.auth.updateUser({
-      data: { active_device_id: deviceId }
-    });
-
-    const { cookies } = await import('next/headers');
-    const cookieStore = await cookies();
-    cookieStore.set('device_id', deviceId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/'
-    });
-  }
 
   revalidatePath('/', 'layout');
   

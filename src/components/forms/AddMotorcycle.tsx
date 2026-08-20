@@ -342,7 +342,7 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="max-h-[60vh] overflow-y-auto px-1 space-y-4" ref={scrollRef}>
+            <div className="px-1 space-y-4" ref={scrollRef}>
               {errorMsg && (
                 <div className="bg-red-500/10 border-l-4 border-red-500 text-red-500 p-4 rounded-md flex items-start gap-3 shadow-sm my-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />

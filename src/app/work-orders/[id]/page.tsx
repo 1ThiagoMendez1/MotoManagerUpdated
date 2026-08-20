@@ -1,4 +1,4 @@
-import { updateWorkOrderSolution } from '@/lib/actions/work-orders';
+import { SolutionForm } from '@/components/forms/SolutionForm';
 import { getWorkOrderById, getInventory, getTechnicians, getRemindersByMotorcycleId } from '@/lib/data';
 import { AddItemToWorkOrder } from '@/components/forms/AddItemToWorkOrder';
 import { RemoveItemFromWorkOrder } from '@/components/forms/RemoveItemFromWorkOrder';
@@ -276,25 +276,10 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               />
             </div>
           ) : (
-            <form action={updateWorkOrderSolution} className="space-y-5">
-              <input type="hidden" name="workOrderId" value={workOrder.id} />
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">
-                  Descripción de la solución
-                </label>
-                <Textarea
-                  name="solutionDescription"
-                  defaultValue={(workOrder as any).solutionDescription ?? ''}
-                  placeholder="Ejemplo: Se reemplazó la bomba de gasolina y se ajustó el carburador..."
-                  className="bg-muted text-foreground border-border/50 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 min-h-[120px] transition-all resize-y placeholder:text-muted-foreground/50"
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25 transition-all">
-                  Guardar solución
-                </Button>
-              </div>
-            </form>
+            <SolutionForm 
+              workOrderId={workOrder.id} 
+              defaultValue={(workOrder as any).solutionDescription} 
+            />
           )}
         </CardContent>
       </Card>
