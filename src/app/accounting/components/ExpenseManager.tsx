@@ -74,7 +74,9 @@ export default function ExpenseManager({ organizationId }: ExpenseManagerProps) 
 
     setSubmitting(true);
     try {
-      const expenseDate = new Date(date).toISOString();
+      const [year, month, day] = date.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day, 12, 0, 0);
+      const expenseDate = localDate.toISOString();
       await addExpense(organizationId, category, description, Number(amount), expenseDate);
       toast.success('Gasto registrado con éxito');
       setDescription('');

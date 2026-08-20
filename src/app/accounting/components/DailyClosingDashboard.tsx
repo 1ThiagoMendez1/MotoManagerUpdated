@@ -113,7 +113,9 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
 
     setSubmittingExpense(true);
     try {
-      await addExpense(organizationId, expenseCat, expenseDesc, Number(expenseVal), new Date(date).toISOString());
+      const [year, month, day] = date.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day, 12, 0, 0);
+      await addExpense(organizationId, expenseCat, expenseDesc, Number(expenseVal), localDate.toISOString());
       toast.success('Gasto registrado');
       setExpenseDesc('');
       setExpenseVal('');
