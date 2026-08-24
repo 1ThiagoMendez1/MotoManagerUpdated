@@ -34,13 +34,16 @@ export type InventoryItem = {
   id: string;
   name: string;
   sku: string;
-  quantity: number;
+  quantity: number; // Total quantity across all locations
   price: number;
   minimumQuantity: number;
   location: string;
   category: InventoryCategory;
   supplierPrice: number;
   supplier: string;
+  trackInventory?: boolean;
+  lastCost?: number;
+  stockDetails?: { locationId: string, locationName: string, quantity: number, type: string }[];
 };
 export type WorkOrderImage = {
   id: string;

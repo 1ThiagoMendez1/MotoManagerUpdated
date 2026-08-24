@@ -91,14 +91,18 @@ export async function getNotificationsForUser() {
       // Alertas de Stock Crítico (bajo el mínimo)
       const { data: inventory, error: invError } = await supabase
         .from('inventory_items')
-        .select('id, quantity, min_quantity')
+        .select('id, min_quantity, inventory_item_stock(quantity), track_inventory')
         .eq('organization_id', user.workshopId);
 
       if (invError) {
         console.error('Error fetching inventory for notifications:', invError);
       }
 
-      const stockCriticoCount = (inventory || []).filter(item => item.quantity <= (item.min_quantity || 5)).length;
+      const stockCriticoCount = (inventory || []).filter(item => {
+        if (item.track_inventory === false) return false;
+        const totalQty = item.inventory_item_stock?.reduce((acc, stock) => acc + (stock.quantity || 0), 0) || 0;
+        return totalQty <= (item.min_quantity || 5);
+      }).length;
 
       if (stockCriticoCount > 0) {
         notifications.push({

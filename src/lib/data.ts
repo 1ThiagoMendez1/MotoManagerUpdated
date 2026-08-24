@@ -16,7 +16,7 @@ export const getCustomers = async (params: { query?: string, page?: number } = {
   const supabase = await createClient();
   
   const page = params.page || 1;
-  const limit = 10;
+  const limit = params.limit || 10;
   const offset = (page - 1) * limit;
 
   let q = supabase.from('customers')
@@ -54,7 +54,7 @@ export const getTechnicians = async (params: { page?: number } = {}): Promise<{ 
   );
 
   const page = params.page || 1;
-  const limit = 10;
+  const limit = params.limit || 10;
   const offset = (page - 1) * limit;
 
   const { data, count } = await supabaseAdmin.from('organization_members')
@@ -87,7 +87,7 @@ export const getMotorcycles = async (params: { query?: string, page?: number } =
   const supabase = await createClient();
   
   const page = params.page || 1;
-  const limit = 10;
+  const limit = params.limit || 10;
   const offset = (page - 1) * limit;
 
   let q = supabase.from('motorcycles')
@@ -123,16 +123,16 @@ export const getMotorcycles = async (params: { query?: string, page?: number } =
   return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getInventory = async (params: { query?: string, page?: number } = {}): Promise<{ items: InventoryItem[], totalPages: number }> => {
+export const getInventory = async (params: { query?: string, page?: number, limit?: number } = {}): Promise<{ items: InventoryItem[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
   
   const page = params.page || 1;
-  const limit = 10;
+  const limit = params.limit || 10;
   const offset = (page - 1) * limit;
 
   let q = supabase.from('inventory_items')
-    .select('*', { count: 'exact' })
+    .select('*, inventory_item_stock(*, inventory_locations(*))', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
@@ -143,18 +143,41 @@ export const getInventory = async (params: { query?: string, page?: number } = {
   const { data, count } = await q.range(offset, offset + limit - 1);
   if (!data) return { items: [], totalPages: 0 };
   
-  const items: InventoryItem[] = data.map((i: any) => ({
-    id: i.id,
-    name: i.name,
-    sku: i.code || i.id.substring(0,6),
-    quantity: i.quantity,
-    price: Number(i.unit_price) || 0,
-    minimumQuantity: i.min_quantity || 0,
-    location: i.description || '',
-    category: (i.category as any) || 'Repuestos',
-    supplierPrice: 0,
-    supplier: ''
-  }));
+  const items: InventoryItem[] = data.map((i: any) => {
+    // Calculate total quantity across all locations
+    const stockDetails = i.inventory_item_stock?.map((s: any) => ({
+      locationId: s.location_id,
+      locationName: s.inventory_locations?.name || 'Desconocida',
+      quantity: Number(s.quantity) || 0,
+      type: s.inventory_locations?.type || 'storefront'
+    })) || [];
+    
+    // For older items that haven't been migrated, or if we fallback to i.quantity
+    let totalQty = 0;
+    if (i.track_inventory === false) {
+       totalQty = 99999; // Direct purchase items have infinite stock conceptually
+    } else {
+       totalQty = stockDetails.length > 0 
+        ? stockDetails.reduce((sum: number, s: any) => sum + s.quantity, 0)
+        : (Number(i.quantity) || 0); // fallback for unmigrated
+    }
+
+    return {
+      id: i.id,
+      name: i.name,
+      sku: i.code || i.id.substring(0,6),
+      quantity: totalQty,
+      price: Number(i.unit_price) || 0,
+      minimumQuantity: i.min_quantity || 0,
+      location: i.description || '',
+      category: (i.category as any) || 'Repuestos',
+      supplierPrice: Number(i.last_cost) || 0,
+      supplier: i.supplier_id || '',
+      trackInventory: i.track_inventory !== false,
+      lastCost: Number(i.last_cost) || 0,
+      stockDetails
+    };
+  });
   return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
@@ -493,4 +516,19 @@ export const getSalesDataForChart = async () => {
 
 export const getRemindersByMotorcycleId = async (id: string): Promise<Reminder[]> => {
     return []; // For now, mock
+};
+
+export const getPurchases = async (organizationId: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*, supplier:suppliers(name)')
+    .eq('organization_id', organizationId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching purchases:', error);
+    return [];
+  }
+  return data || [];
 };

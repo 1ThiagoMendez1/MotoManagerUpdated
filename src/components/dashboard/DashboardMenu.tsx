@@ -20,7 +20,7 @@ import {
   Sparkles,
   Lock,
   PieChart,
-} from 'lucide-react';
+ShoppingCart} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -91,6 +91,7 @@ export function DashboardMenu({
   const canAccessInventory = hasPermission(role, '/inventory', customPermissions);
   const canAccessTechnicians = hasPermission(role, '/technicians', customPermissions);
   const canAccessSales = hasPermission(role, '/sales', customPermissions);
+  const canAccessPurchases = hasPermission(role, '/purchases', customPermissions);
   const canAccessTeam = hasPermission(role, '/team', customPermissions);
   const canAccessTickets = hasPermission(role, '/tickets', customPermissions);
   const canAccessAppointments = hasPermission(role, '/appointments', customPermissions);

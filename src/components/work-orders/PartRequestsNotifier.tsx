@@ -184,7 +184,7 @@ export function PartRequestsNotifier({ userRole, organizationId }: PartRequestsN
             )
             .subscribe((status, err) => {
                 if (status !== 'SUBSCRIBED') {
-                    console.error('Supabase Realtime subscription error:', status, err);
+                    // console.warn('Supabase Realtime subscription error:', status);
                 }
             });
 

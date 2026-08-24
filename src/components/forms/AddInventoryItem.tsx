@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { createInventoryItem } from '@/lib/actions/inventory';
 import type { InventoryCategory } from '@/lib/types';
@@ -92,6 +93,20 @@ export function AddInventoryItem() {
             </div>
           </div>
 
+          <div className="flex items-center space-x-2 py-2">
+            <Switch id="trackInventory" name="trackInventory" defaultChecked={true} onCheckedChange={(checked) => {
+              const el = document.getElementById('track-inventory-input') as HTMLInputElement;
+              if (el) el.value = checked ? 'true' : 'false';
+              // Force state update to re-render optional fields
+              const event = new Event('change', { bubbles: true });
+              el?.dispatchEvent(event);
+            }} />
+            <label htmlFor="trackInventory" className="text-sm font-medium text-foreground cursor-pointer">
+              Controlar Stock (Desmarcar para compras directas o sin stock fijo)
+            </label>
+            <input type="hidden" id="track-inventory-input" name="trackInventoryVal" defaultValue="true" />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-foreground">Categoría</label>
@@ -109,34 +124,30 @@ export function AddInventoryItem() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Ubicación</label>
-              <Input name="location" placeholder="p. ej., Estante A-1" className="bg-card text-card-foreground border-border" required />
+              <label className="text-sm font-medium text-foreground">Precio Venta (COP)</label>
+              <CurrencyInput name="price" placeholder="35000" className="bg-card text-card-foreground border-border" required />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground">Proveedor</label>
-              <Input name="supplier" placeholder="p. ej., RepuestosExpress" className="bg-card text-card-foreground border-border" required />
+              <label className="text-sm font-medium text-foreground text-muted-foreground">Proveedor (Opcional)</label>
+              <Input name="supplier" placeholder="p. ej., RepuestosExpress" className="bg-card text-card-foreground border-border" />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Precio Proveedor (COP)</label>
-              <CurrencyInput name="supplierPrice" placeholder="22000" className="bg-card text-card-foreground border-border" required />
+              <label className="text-sm font-medium text-foreground">Último Costo / Precio Compra (COP)</label>
+              <CurrencyInput name="supplierPrice" placeholder="22000" className="bg-card text-card-foreground border-border" />
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground">Cantidad</label>
-              <Input name="quantity" type="number" placeholder="25" className="bg-card text-card-foreground border-border" required />
+              <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Inicial (Vitrina)</label>
+              <Input name="quantity" type="number" placeholder="25" className="bg-card text-card-foreground border-border" />
             </div>
             <div>
-              <label className="text-sm font-medium text-foreground">Precio Venta (COP)</label>
-              <CurrencyInput name="price" placeholder="35000" className="bg-card text-card-foreground border-border" required />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-foreground">Cantidad Mínima</label>
-              <Input name="minimumQuantity" type="number" placeholder="10" className="bg-card text-card-foreground border-border" required />
+              <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Mínima</label>
+              <Input name="minimumQuantity" type="number" placeholder="10" className="bg-card text-card-foreground border-border" />
             </div>
           </div>
 
