@@ -11,7 +11,7 @@ const mapPaymentMethodToUi = (dbMethod: string | null | undefined): string => {
   return dbMethod.charAt(0).toUpperCase() + dbMethod.slice(1);
 };
 
-export const getCustomers = async (params: { query?: string, page?: number } = {}): Promise<{ items: Customer[], totalPages: number }> => {
+export const getCustomers = async (params: { query?: string, page?: number, limit?: number } = {}): Promise<{ items: Customer[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
   
@@ -44,7 +44,7 @@ export const getCustomers = async (params: { query?: string, page?: number } = {
   return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getTechnicians = async (params: { page?: number } = {}): Promise<{ items: Technician[], totalPages: number }> => {
+export const getTechnicians = async (params: { page?: number, limit?: number } = {}): Promise<{ items: Technician[], totalPages: number }> => {
   const user = await requireWorkshop();
   const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
   const supabaseAdmin = createSupabaseClient(
@@ -82,7 +82,7 @@ export const getTechnicians = async (params: { page?: number } = {}): Promise<{ 
   return { items: allItems, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getMotorcycles = async (params: { query?: string, page?: number } = {}): Promise<{ items: Motorcycle[], totalPages: number }> => {
+export const getMotorcycles = async (params: { query?: string, page?: number, limit?: number } = {}): Promise<{ items: Motorcycle[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
   
