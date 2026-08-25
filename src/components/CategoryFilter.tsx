@@ -2,13 +2,10 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 
-interface CategoryFilterProps {
-  currentCategory: string;
-}
-
-export function CategoryFilter({ currentCategory }: CategoryFilterProps) {
+export function CategoryFilter() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const currentCategory = searchParams.get('category') || 'all';
 
   const handleCategoryChange = (category: string) => {
     const params = new URLSearchParams(searchParams.toString());

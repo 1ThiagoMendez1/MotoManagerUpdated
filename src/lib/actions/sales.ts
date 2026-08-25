@@ -637,28 +637,33 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         for (const item of data.items || []) {
             if (item.type === 'service') continue;
             
+            const itemId = item.inventoryItemId;
+            if (!itemId) {
+                return { message: 'El ID del producto es requerido.' };
+            }
+
             const { data: invItem, error: invError } = await supabase
                 .from('inventory_items')
                 .select('name, track_inventory')
-                .eq('id', item.inventoryItemId)
+                .eq('id', itemId)
                 .single();
 
             if (invError) {
-                console.error('Error fetching inventory item for sale. Item ID:', item.inventoryItemId, 'Error:', invError);
-                return { message: `Error BD: ${invError.message}. ID: ${item.inventoryItemId}` };
+                console.error('Error fetching inventory item for sale. Item ID:', itemId, 'Error:', invError);
+                return { message: `Error BD: ${invError.message}. ID: ${itemId}` };
             }
 
             if (!invItem) {
-                return { message: `Producto no encontrado. ID: ${item.inventoryItemId}` };
+                return { message: `Producto no encontrado. ID: ${itemId}` };
             }
 
             if (invItem.track_inventory !== false) {
-                itemsToTrack.add(item.inventoryItemId);
+                itemsToTrack.add(itemId);
                 
                 const { data: stockData } = await supabase
                     .from('inventory_item_stock')
                     .select('quantity')
-                    .eq('item_id', item.inventoryItemId);
+                    .eq('item_id', itemId);
                 
                 const totalStock = stockData && stockData.length > 0 
                     ? stockData.reduce((sum, s) => sum + Number(s.quantity), 0) 
@@ -710,12 +715,17 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                         total: item.price * item.quantity
                     });
             } else {
+                const itemId = item.inventoryItemId;
+                if (!itemId) {
+                    throw new Error('El ID del producto es requerido.');
+                }
+
                 const { error: itemError } = await supabase
                     .from('sale_items')
                     .insert({
                         sale_id: sale.id,
                         item_type: 'inventory',
-                        inventory_item_id: item.inventoryItemId,
+                        inventory_item_id: itemId,
                         description: item.name || 'Producto',
                         quantity: item.quantity,
                         unit_price: item.price,
@@ -728,9 +738,9 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                 }
 
                 // Decrement inventory only if tracked
-                if (itemsToTrack.has(item.inventoryItemId)) {
+                if (itemsToTrack.has(itemId)) {
                     const { error: updateError } = await supabase.rpc('decrement_inventory', {
-                        item_id: item.inventoryItemId,
+                        item_id: itemId,
                         amount: item.quantity
                     });
                     if (updateError) {

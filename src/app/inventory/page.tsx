@@ -24,7 +24,6 @@ export default async function InventoryPage({
   const currentPage = Number(resolvedSearchParams.page) || 1;
 
   const { items: inventory, totalPages } = await getInventory({
-    organizationId: user.workshopId,
     query,
     category,
     page: currentPage,

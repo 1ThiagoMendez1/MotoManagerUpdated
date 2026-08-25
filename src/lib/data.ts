@@ -123,7 +123,7 @@ export const getMotorcycles = async (params: { query?: string, page?: number, li
   return { items, totalPages: Math.ceil((count || 0) / limit) };
 };
 
-export const getInventory = async (params: { query?: string, page?: number, limit?: number } = {}): Promise<{ items: InventoryItem[], totalPages: number }> => {
+export const getInventory = async (params: { query?: string, category?: string, page?: number, limit?: number } = {}): Promise<{ items: InventoryItem[], totalPages: number }> => {
   const user = await requireWorkshop();
   const supabase = await createClient();
   
@@ -135,6 +135,10 @@ export const getInventory = async (params: { query?: string, page?: number, limi
     .select('*, inventory_item_stock(*, inventory_locations(*))', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
+
+  if (params.category && params.category !== 'all') {
+    q = q.eq('category', params.category);
+  }
 
   if (params.query) {
     q = q.or(`name.ilike.%${params.query}%,code.ilike.%${params.query}%`);

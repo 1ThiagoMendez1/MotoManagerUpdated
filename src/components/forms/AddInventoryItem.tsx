@@ -146,7 +146,10 @@ export function AddInventoryItem() {
             <div>
               <label className="text-sm font-medium text-foreground">Lugar (Destino Inicial)</label>
               <input type="hidden" id="destination-input" name="destination" defaultValue="storefront" />
-              <RadioGroup defaultValue="storefront" onValueChange={(val) => { document.getElementById('destination-input').value = val; }} className="flex flex-col space-y-1 mt-2">
+              <RadioGroup defaultValue="storefront" onValueChange={(val) => { 
+                const el = document.getElementById('destination-input') as HTMLInputElement | null;
+                if (el) el.value = val;
+              }} className="flex flex-col space-y-1 mt-2">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="storefront" id="add-storefront" />
                   <label htmlFor="add-storefront" className="text-sm font-medium leading-none cursor-pointer">
