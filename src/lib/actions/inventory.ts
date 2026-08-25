@@ -83,19 +83,20 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
         .single();
 
     if (!error && insertedItem && data.trackInventory !== false) {
-        // Insert initial stock in Vitrina
-        const { data: vitrinaLoc } = await supabase
+        // Find the requested location (Vitrina or Bodega)
+        const locationType = data.destination || 'storefront';
+        const { data: targetLoc } = await supabase
             .from('inventory_locations')
             .select('id')
             .eq('organization_id', user.workshopId)
-            .eq('type', 'storefront')
+            .eq('type', locationType)
             .limit(1)
             .maybeSingle();
 
-        if (vitrinaLoc) {
+        if (targetLoc) {
             await supabase.from('inventory_item_stock').insert({
                 item_id: insertedItem.id,
-                location_id: vitrinaLoc.id,
+                location_id: targetLoc.id,
                 quantity: data.quantity || 0
             });
             
@@ -104,10 +105,11 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
                     organization_id: user.workshopId,
                     item_id: insertedItem.id,
                     from_location_id: null,
-                    to_location_id: vitrinaLoc.id,
+                    to_location_id: targetLoc.id,
                     quantity: data.quantity,
-                    movement_type: 'purchase',
-                    created_by: user.userId
+                    movement_type: 'purchase', // initial stock treated as purchase
+                    created_by: user.userId,
+                    notes: `Stock inicial en ${locationType === 'warehouse' ? 'Bodega' : 'Vitrina'}`
                 });
             }
         }
