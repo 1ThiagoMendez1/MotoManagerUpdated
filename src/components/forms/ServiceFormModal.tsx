@@ -20,6 +20,7 @@ export default function ServiceFormModal({ open, onOpenChange, organizationId, i
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -29,12 +30,14 @@ export default function ServiceFormModal({ open, onOpenChange, organizationId, i
   useEffect(() => {
     if (open) {
       if (initialData) {
+        setCode(initialData.code || '');
         setName(initialData.name);
         setDescription(initialData.description || '');
         setPrice(initialData.default_price.toString());
         setDuration(initialData.default_duration_minutes ? initialData.default_duration_minutes.toString() : '');
         setCategory(initialData.category || '');
       } else {
+        setCode('');
         setName('');
         setDescription('');
         setPrice('');
@@ -53,6 +56,7 @@ export default function ServiceFormModal({ open, onOpenChange, organizationId, i
 
     setLoading(true);
     const payload = {
+      code: code.trim() || undefined,
       name,
       description,
       default_price: Number(price) || 0,
@@ -116,14 +120,24 @@ export default function ServiceFormModal({ open, onOpenChange, organizationId, i
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Nombre del servicio <span className="text-destructive">*</span></label>
-            <Input 
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej. Sincronización general"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2 sm:col-span-1">
+              <label className="text-sm font-medium">Código</label>
+              <Input 
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="Ej. T001"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-sm font-medium">Nombre del servicio <span className="text-destructive">*</span></label>
+              <Input 
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ej. Sincronización general"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

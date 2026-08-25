@@ -74,15 +74,55 @@ export async function updateService(id: string, organizationId: string, payload:
 export async function deleteService(id: string, organizationId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient();
   
-  // Soft delete by setting status to inactive
   const { error } = await supabase
     .from('service_catalog')
-    .update({ status: 'inactive' })
+    .delete()
     .eq('id', id)
     .eq('organization_id', organizationId);
 
   if (error) {
     console.error('Error deleting service:', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/services');
+  return { success: true };
+}
+
+export async function importServicesBulk(organizationId: string, services: Partial<ServiceItem>[]): Promise<{ success: boolean; error?: string; count?: number }> {
+  const supabase = await createClient();
+  
+  const payload = services.map(s => ({
+    ...s,
+    organization_id: organizationId,
+    status: 'active'
+  }));
+
+  const { error, count } = await supabase
+    .from('service_catalog')
+    .upsert(payload, { onConflict: 'organization_id,code', ignoreDuplicates: false })
+    .select('id');
+
+  if (error) {
+    console.error('Error importing services bulk:', error);
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath('/services');
+  return { success: true, count: count || payload.length };
+}
+
+export async function deleteServicesBulk(ids: string[], organizationId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  
+  const { error } = await supabase
+    .from('service_catalog')
+    .delete()
+    .in('id', ids)
+    .eq('organization_id', organizationId);
+
+  if (error) {
+    console.error('Error deleting multiple services:', error);
     return { success: false, error: error.message };
   }
 
