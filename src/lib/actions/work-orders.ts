@@ -521,8 +521,8 @@ export async function addItemToWorkOrder(formData: FormData) {
         // Descontar inventario inmediatamente si la cotización ya fue aprobada y tiene control de inventario
         if (isApproved && inventoryItem.track_inventory !== false) {
             const { error: decrementError } = await supabase.rpc('decrement_inventory', {
-                item_id: itemId,
-                amount: quantity
+                p_item_id: itemId,
+                p_amount: quantity
             });
             if (decrementError) {
                 console.error('Error al descontar inventario en orden aprobada:', decrementError);
@@ -685,7 +685,7 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
                 if (item.item_type === 'inventory' && item.inventory_item_id) {
                     const { data: invItem } = await supabase.from('inventory_items').select('track_inventory').eq('id', item.inventory_item_id).single();
                     if (invItem && invItem.track_inventory !== false) {
-                        await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+                        await supabase.rpc('decrement_inventory', { p_item_id: item.inventory_item_id, p_amount: item.quantity });
                     }
                 }
             }
@@ -928,8 +928,8 @@ export async function fulfillPartRequest(requestId: string, workOrderId: string)
 
         if (isApproved && invItem && invItem.track_inventory !== false) {
             const { error: decrementError } = await supabase.rpc('decrement_inventory', {
-                item_id: request.inventory_item_id,
-                amount: request.quantity
+                p_item_id: request.inventory_item_id,
+                p_amount: request.quantity
             });
             if (decrementError) {
                 console.error('Error al descontar inventario en orden aprobada:', decrementError);

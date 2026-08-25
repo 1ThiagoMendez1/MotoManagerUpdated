@@ -7,7 +7,10 @@ const mapPaymentMethodToUi = (dbMethod: string | null | undefined): string => {
   const method = dbMethod.toLowerCase();
   if (method === 'cash') return 'Efectivo';
   if (method === 'credit_card' || method === 'debit_card') return 'Tarjeta';
+  if (method === 'nequi') return 'Nequi';
+  if (method === 'daviplata') return 'DaviPlata';
   if (method === 'transfer') return 'Transferencia';
+  if (method === 'wompi') return 'Wompi';
   return dbMethod.charAt(0).toUpperCase() + dbMethod.slice(1);
 };
 

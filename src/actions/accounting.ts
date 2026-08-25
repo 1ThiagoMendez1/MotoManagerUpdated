@@ -110,7 +110,10 @@ export async function getSalesByPaymentMethod(organizationId: string, startDate?
     'cash': 'Efectivo',
     'credit_card': 'Tarjeta de Crédito',
     'debit_card': 'Tarjeta de Débito',
-    'transfer': 'Transferencia / Nequi',
+    'transfer': 'Transferencia Bancaria',
+    'nequi': 'Nequi',
+    'daviplata': 'DaviPlata',
+    'wompi': 'Wompi',
     'other': 'Otro'
   };
 

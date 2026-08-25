@@ -19,7 +19,8 @@ function mapWompiToDbMethod(type: string) {
   if (!type) return 'other';
   const t = type.toUpperCase();
   if (t === 'CARD') return 'credit_card';
-  if (t === 'NEQUI' || t === 'PSE' || t === 'BANCOLOMBIA') return 'transfer';
+  if (t === 'NEQUI') return 'nequi';
+  if (t === 'PSE' || t === 'BANCOLOMBIA') return 'transfer';
   return 'other'; // Efecty, etc.
 }
 

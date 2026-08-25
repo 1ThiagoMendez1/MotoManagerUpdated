@@ -36,8 +36,19 @@ export async function getDashboardData() {
     }
   });
 
+  const uiMethods: Record<string, string> = {
+    'cash': 'Efectivo',
+    'credit_card': 'Tarjeta de Crédito',
+    'debit_card': 'Tarjeta de Débito',
+    'transfer': 'Transferencia Bancaria',
+    'nequi': 'Nequi',
+    'daviplata': 'DaviPlata',
+    'wompi': 'Wompi',
+    'other': 'Otro'
+  };
+
   const incomeByMethodData = Object.entries(incomeByMethodMap)
-    .map(([method, amount]) => ({ name: method, amount }))
+    .map(([method, amount]) => ({ name: uiMethods[method] || method, amount }))
     .sort((a, b) => b.amount - a.amount);
 
   // 2. Motos en Taller & 3. Órdenes Activas

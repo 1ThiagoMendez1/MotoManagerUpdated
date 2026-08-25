@@ -60,7 +60,7 @@ export async function submitQuoteResponse(workOrderId: string, response: 'approv
   if (response === 'approved') {
       for (const item of quoteItems) {
           if (item.item_type === 'inventory' && item.inventory_item_id) {
-              await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+              await supabase.rpc('decrement_inventory', { p_item_id: item.inventory_item_id, p_amount: item.quantity });
           }
       }
       // Opcional: Actualizar el estado de la orden a 'diagnosis' para mantener sincronía con el dashboard

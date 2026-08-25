@@ -61,8 +61,8 @@ export function TransferStockDialog({ item }: { item: InventoryItem }) {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     try {
-      if (!bodegaStock || !vitrinaStock) {
-          toast({ title: "Error", description: "No se encontraron las ubicaciones.", variant: "destructive" });
+      if (!bodegaStock) {
+          toast({ title: "Error", description: "No hay stock en Bodega para trasladar.", variant: "destructive" });
           setIsSubmitting(false);
           return;
       }
@@ -75,7 +75,8 @@ export function TransferStockDialog({ item }: { item: InventoryItem }) {
       const formData = new FormData();
       formData.append('itemId', item.id);
       formData.append('fromLocationId', bodegaStock.locationId);
-      formData.append('toLocationId', vitrinaStock.locationId);
+      // Si no hay stock previo en vitrina, le enviamos 'storefront' para que el backend lo resuelva
+      formData.append('toLocationId', vitrinaStock?.locationId || 'storefront');
       formData.append('quantity', values.quantity.toString());
       
       const result = await transferStock(null, formData);

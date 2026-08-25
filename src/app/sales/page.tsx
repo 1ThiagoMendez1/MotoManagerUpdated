@@ -53,7 +53,9 @@ function getPaymentMethodBadge(method?: string) {
     return <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-500 bg-purple-500/10">Tarjeta</Badge>;
   }
   if (m === 'transfer' || m === 'transferencia' || m === 'nequi' || m === 'daviplata') {
-    return <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-500 bg-blue-500/10">Transferencia</Badge>;
+    // If it's a specific app, capitalize it, otherwise just show the method name
+    const label = m === 'nequi' ? 'Nequi' : m === 'daviplata' ? 'DaviPlata' : (m === 'transfer' ? 'Transferencia' : method);
+    return <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-500 bg-blue-500/10">{label}</Badge>;
   }
   if (m === 'wompi') {
     return <Badge variant="outline" className="text-xs border-indigo-500/30 text-indigo-500 bg-indigo-500/10">Wompi</Badge>;

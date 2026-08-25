@@ -54,14 +54,21 @@ const directSaleSchema = z.object({
 function mapPaymentMethodToDb(uiMethod: string) {
     if (uiMethod === 'Efectivo') return 'cash';
     if (uiMethod === 'Tarjeta') return 'credit_card';
-    if (uiMethod === 'Nequi' || uiMethod === 'DaviPlata' || uiMethod === 'transfer' || uiMethod === 'Transferencia') return 'transfer';
-    return 'other'; // Addi, Wompi, Otros
+    if (uiMethod === 'Nequi') return 'nequi';
+    if (uiMethod === 'DaviPlata') return 'daviplata';
+    if (uiMethod === 'Transferencia') return 'transfer';
+    if (uiMethod === 'Otros') return 'other';
+    if (uiMethod === 'Wompi') return 'wompi';
+    return 'other'; // Addi, Otros
 }
 
 function mapPaymentMethodToUi(dbMethod: string) {
     if (dbMethod === 'cash') return 'Efectivo';
     if (dbMethod === 'credit_card' || dbMethod === 'debit_card') return 'Tarjeta';
+    if (dbMethod === 'nequi') return 'Nequi';
+    if (dbMethod === 'daviplata') return 'DaviPlata';
     if (dbMethod === 'transfer') return 'Transferencia';
+    if (dbMethod === 'wompi') return 'Wompi';
     return 'Otros';
 }
 
@@ -144,7 +151,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const saleNumber = await generateSaleNumber(supabase, user.workshopId, 'VS');
 
         // 2. Check Inventory (skip items already deducted from approved quote)
-        const itemsToTrack = new Set<string>();
+        const itemsToTrack = new Map<string, { locationId: string, amount: number }[]>();
 
         for (const item of data.items || []) {
             if (item.fromWorkOrder) continue;
@@ -160,20 +167,32 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             }
 
             if (invItem.track_inventory !== false) {
-                itemsToTrack.add(item.inventoryItemId);
-                
                 const { data: stockData } = await supabase
                     .from('inventory_item_stock')
-                    .select('quantity')
-                    .eq('item_id', item.inventoryItemId);
+                    .select('quantity, location_id')
+                    .eq('item_id', item.inventoryItemId)
+                    .order('quantity', { ascending: false });
                 
-                const totalStock = stockData && stockData.length > 0 
-                    ? stockData.reduce((sum, s) => sum + Number(s.quantity), 0) 
-                    : 0;
+                let remainingToDeduct = item.quantity;
+                const plan: { locationId: string, amount: number }[] = [];
 
-                if (totalStock < item.quantity) {
+                if (stockData) {
+                    for (const stock of stockData) {
+                        if (remainingToDeduct <= 0) break;
+                        const available = Number(stock.quantity);
+                        if (available > 0) {
+                            const deduct = Math.min(available, remainingToDeduct);
+                            plan.push({ locationId: stock.location_id, amount: deduct });
+                            remainingToDeduct -= deduct;
+                        }
+                    }
+                }
+
+                if (remainingToDeduct > 0) {
                     return { message: `Stock insuficiente para ${invItem.name}.` };
                 }
+
+                itemsToTrack.set(item.inventoryItemId, plan);
             }
         }
 
@@ -297,13 +316,18 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             if (itemError) throw new Error('Error al registrar uno de los productos de la venta.');
 
             // Decrement stock using RPC only if tracked
-            if (itemsToTrack.has(item.inventoryItemId)) {
-                const { error: updateError } = await supabase.rpc('decrement_inventory', {
-                    item_id: item.inventoryItemId,
-                    amount: item.quantity
-                });
-                
-                if (updateError) throw new Error(`Error al descontar inventario del producto.`);
+            // Decrement stock using deduction plan
+            const plan = itemsToTrack.get(item.inventoryItemId);
+            if (plan) {
+                for (const deduction of plan) {
+                    const { error: updateError } = await supabase.rpc('decrement_inventory', {
+                        p_item_id: item.inventoryItemId,
+                        p_amount: deduction.amount,
+                        p_location_id: deduction.locationId
+                    });
+                    
+                    if (updateError) throw new Error(`Error al descontar inventario del producto.`);
+                }
             }
         }
 
@@ -632,7 +656,7 @@ export async function createDirectSale(prevState: any, formData: FormData) {
         const saleNumber = await generateSaleNumber(supabase, user.workshopId, 'V');
         
         // 3. Check Inventory
-        const itemsToTrack = new Set<string>();
+        const itemsToTrack = new Map<string, { locationId: string, amount: number }[]>();
 
         for (const item of data.items || []) {
             if (item.type === 'service') continue;
@@ -658,20 +682,32 @@ export async function createDirectSale(prevState: any, formData: FormData) {
             }
 
             if (invItem.track_inventory !== false) {
-                itemsToTrack.add(itemId);
-                
                 const { data: stockData } = await supabase
                     .from('inventory_item_stock')
-                    .select('quantity')
-                    .eq('item_id', itemId);
+                    .select('quantity, location_id')
+                    .eq('item_id', itemId)
+                    .order('quantity', { ascending: false });
                 
-                const totalStock = stockData && stockData.length > 0 
-                    ? stockData.reduce((sum, s) => sum + Number(s.quantity), 0) 
-                    : 0;
+                let remainingToDeduct = item.quantity;
+                const plan: { locationId: string, amount: number }[] = [];
 
-                if (totalStock < item.quantity) {
+                if (stockData) {
+                    for (const stock of stockData) {
+                        if (remainingToDeduct <= 0) break;
+                        const available = Number(stock.quantity);
+                        if (available > 0) {
+                            const deduct = Math.min(available, remainingToDeduct);
+                            plan.push({ locationId: stock.location_id, amount: deduct });
+                            remainingToDeduct -= deduct;
+                        }
+                    }
+                }
+
+                if (remainingToDeduct > 0) {
                     return { message: `Stock insuficiente para ${invItem.name}.` };
                 }
+                
+                itemsToTrack.set(itemId, plan);
             }
         }
 
@@ -738,14 +774,19 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                 }
 
                 // Decrement inventory only if tracked
-                if (itemsToTrack.has(itemId)) {
-                    const { error: updateError } = await supabase.rpc('decrement_inventory', {
-                        item_id: itemId,
-                        amount: item.quantity
-                    });
-                    if (updateError) {
-                        console.error('RPC Error:', updateError);
-                        throw new Error(`Error al descontar inventario. Detalle: ${updateError.message}`);
+                // Decrement inventory using deduction plan
+                const plan = itemsToTrack.get(itemId);
+                if (plan) {
+                    for (const deduction of plan) {
+                        const { error: updateError } = await supabase.rpc('decrement_inventory', {
+                            p_item_id: itemId,
+                            p_amount: deduction.amount,
+                            p_location_id: deduction.locationId
+                        });
+                        if (updateError) {
+                            console.error('RPC Error:', updateError);
+                            throw new Error(`Error al descontar inventario. Detalle: ${updateError.message}`);
+                        }
                     }
                 }
             }
