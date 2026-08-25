@@ -60,6 +60,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
   const [closings, setClosings] = useState<any[]>([]);
   
   const [expenseCat, setExpenseCat] = useState(EXPENSE_CATEGORIES[0]);
+  const [expenseMethod, setExpenseMethod] = useState('Efectivo');
   const [expenseDesc, setExpenseDesc] = useState('');
   const [expenseVal, setExpenseVal] = useState('');
   const [submittingExpense, setSubmittingExpense] = useState(false);
@@ -115,7 +116,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
     try {
       const [year, month, day] = date.split('-').map(Number);
       const localDate = new Date(year, month - 1, day, 12, 0, 0);
-      await addExpense(organizationId, expenseCat, expenseDesc, Number(expenseVal), localDate.toISOString());
+      await addExpense(organizationId, expenseCat, expenseDesc, Number(expenseVal), localDate.toISOString(), expenseMethod);
       toast.success('Gasto registrado');
       setExpenseDesc('');
       setExpenseVal('');
@@ -145,9 +146,15 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
   const balance = summary ? summary.totalIncome - summary.totalExpenses : 0;
   
   // Calcular métricas
+  
   const totalCompletedOrders = summary?.technicianSummary.reduce((sum, t) => sum + t.totalServices, 0) || 0;
   const avgTicket = totalCompletedOrders > 0 ? (summary?.totalIncome || 0) / totalCompletedOrders : 0;
   const margin = summary?.totalIncome ? ((balance) / summary.totalIncome) * 100 : 0;
+
+  const cashIncome = summary?.incomeByPaymentMethod.find(m => m.method === 'Efectivo' || m.method === 'cash')?.total || 0;
+  const cashExpenses = summary?.detailedExpenses.filter(e => e.payment_method === 'Efectivo' || e.payment_method === 'cash').reduce((sum, e) => sum + e.amount, 0) || 0;
+  const expectedCash = (summary?.totalCashBase || 0) + cashIncome - cashExpenses;
+
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -221,7 +228,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
               <div className="p-6 bg-background space-y-6 overflow-y-auto max-h-[70vh]">
                 
                 {/* 4 CARDS */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="bg-card border-2 border-orange-500/20 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
                     <Target className="w-6 h-6 text-orange-500 mb-2" />
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Servicios</p>
@@ -238,14 +245,57 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Pagos/Gastos</p>
                     <p className="text-xl font-black text-rose-500">{formatCurrency(summary.totalExpenses)}</p>
                   </div>
+                  
+                  <div className="bg-card border-2 border-indigo-500/20 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
+                    <Calculator className="w-6 h-6 text-indigo-500 mb-2" />
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Efectivo Esperado</p>
+                    <p className="text-xl font-black text-indigo-500">{formatCurrency(expectedCash)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Base + Ventas - Gastos</p>
+                  </div>
                   <div className="bg-card border-2 border-indigo-500/20 rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm">
                     <Calculator className="w-6 h-6 text-indigo-500 mb-2" />
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Utilidad</p>
                     <p className="text-xl font-black text-indigo-500">{formatCurrency(balance)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Ingresos netos</p>
+                  </div>
+
+                </div>
+
+                
+                {/* DETALLE EFECTIVO */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                    Detalle de Efectivo en Caja
+                  </h4>
+                  <div className="space-y-2 text-sm bg-muted/10 p-4 rounded-xl border border-border/50">
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>Base Inicial Acumulada</span>
+                      <span className="font-medium text-foreground">{formatCurrency(summary.totalCashBase)}</span>
+                    </div>
+                    {summary.cashBases?.map((b: any, i: number) => (
+                      <div key={i} className="flex justify-between items-center text-xs pl-4 border-l-2 border-border/50">
+                        <span className="text-muted-foreground">- {b.description}</span>
+                        <span className="text-emerald-500">+{formatCurrency(b.amount)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>Ventas en Efectivo</span>
+                      <span className="font-medium text-emerald-500">+{formatCurrency(cashIncome)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-muted-foreground">
+                      <span>Gastos en Efectivo</span>
+                      <span className="font-medium text-rose-500">-{formatCurrency(cashExpenses)}</span>
+                    </div>
+                    <div className="border-t border-border pt-2 mt-2 flex justify-between items-center font-bold text-base">
+                      <span>Efectivo Total Esperado</span>
+                      <span className="text-indigo-500">{formatCurrency(expectedCash)}</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* CHECKLIST */}
+
                 <div>
                   <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-orange-500" />
@@ -429,7 +479,8 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                   <div className={`p-4 rounded-xl border border-border/50 bg-background/50 ${isClosed ? 'opacity-50 pointer-events-none' : ''}`}>
                     <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3">Nuevo Registro de Gasto</h4>
                     <form onSubmit={handleAddExpense} className="flex flex-col sm:flex-row gap-3 items-end">
-                      <div className="w-full sm:w-1/3 space-y-1.5">
+                      
+                      <div className="w-full sm:w-1/4 space-y-1.5">
                         <Label className="text-xs">Categoría</Label>
                         <Select value={expenseCat} onValueChange={setExpenseCat}>
                           <SelectTrigger className="bg-background">
@@ -440,8 +491,26 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="w-full sm:w-1/3 space-y-1.5">
+                      
+                      <div className="w-full sm:w-1/4 space-y-1.5">
+                        <Label className="text-xs">Método Pago</Label>
+                        <Select value={expenseMethod} onValueChange={setExpenseMethod}>
+                          <SelectTrigger className="bg-background">
+                            <SelectValue placeholder="Método" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Efectivo">Efectivo</SelectItem>
+                            <SelectItem value="Transferencia">Transferencia</SelectItem>
+                            <SelectItem value="Nequi">Nequi</SelectItem>
+                            <SelectItem value="DaviPlata">DaviPlata</SelectItem>
+                            <SelectItem value="Otro">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="w-full sm:w-1/4 space-y-1.5">
                         <Label className="text-xs">Descripción</Label>
+
                         <Input 
                           placeholder="Ej. Pago luz..." 
                           value={expenseDesc} 
@@ -449,7 +518,7 @@ export default function DailyClosingDashboard({ organizationId }: DailyClosingDa
                           className="bg-background"
                         />
                       </div>
-                      <div className="w-full sm:w-1/3 space-y-1.5">
+                      <div className="w-full sm:w-1/4 space-y-1.5">
                         <Label className="text-xs">Valor (Pesos)</Label>
                         <Input 
                           type="number" 

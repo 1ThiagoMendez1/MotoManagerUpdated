@@ -341,7 +341,8 @@ export async function addExpense(
   category: string,
   description: string,
   amount: number,
-  date?: string
+  date?: string,
+  paymentMethod?: string
 ) {
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -357,6 +358,7 @@ export async function addExpense(
       description,
       amount,
       date: date || new Date().toISOString(),
+      payment_method: paymentMethod || 'Efectivo',
     })
     .select()
     .single();
@@ -409,7 +411,9 @@ export interface DailyClosingSummary {
   expensesByCategory: { category: string; total: number }[];
   technicianSummary: { name: string; totalServices: number; totalAmount: number }[];
   pendingOrdersCount: number;
-  detailedExpenses: { id: string; category: string; description: string; amount: number }[];
+  detailedExpenses: { id: string; category: string; description: string; amount: number; payment_method: string }[];
+  cashBases: { id: string; amount: number; description: string; type: string }[];
+  totalCashBase: number;
 }
 
 export async function getDailyClosingSummary(
@@ -470,7 +474,8 @@ export async function getDailyClosingSummary(
     id: exp.id,
     category: exp.category,
     description: exp.description,
-    amount: Number(exp.amount)
+    amount: Number(exp.amount),
+    payment_method: exp.payment_method || 'Efectivo'
   }));
 
   // Add payroll payments to expenses
@@ -490,7 +495,8 @@ export async function getDailyClosingSummary(
         id: payment.id,
         category: cat,
         description: `Pago de comisiones a ${techName}`,
-        amount: amount
+        amount: amount,
+        payment_method: 'Efectivo'
       });
     });
   }
@@ -584,6 +590,23 @@ export async function getDailyClosingSummary(
     .gte('created_at', startIso)
     .lte('created_at', endIso);
 
+  
+  // Fetch cash bases
+  const { data: basesData } = await supabaseAdmin
+    .from('cash_bases')
+    .select('id, amount, description, type')
+    .eq('organization_id', organizationId)
+    .gte('date', startIso)
+    .lte('date', endIso);
+    
+  const cashBases = (basesData || []).map((b: any) => ({
+    id: b.id,
+    amount: Number(b.amount),
+    description: b.description || 'Base',
+    type: b.type || 'addition'
+  }));
+  const totalCashBase = cashBases.reduce((acc, curr) => acc + curr.amount, 0);
+
   return {
     totalIncome,
     totalExpenses,
@@ -592,8 +615,11 @@ export async function getDailyClosingSummary(
     expensesByCategory,
     technicianSummary,
     pendingOrdersCount: pendingOrdersCount || 0,
-    detailedExpenses
+    detailedExpenses,
+    cashBases,
+    totalCashBase
   };
+
 }
 
 export async function closeDay(
@@ -674,6 +700,7 @@ export interface RealtimeFinancialData {
   sales: any[];
   expenses: any[];
   payroll: any[];
+  cash_bases?: any[];
 }
 
 export async function getRealtimeFinancialDataRaw(
@@ -704,7 +731,7 @@ export async function getRealtimeFinancialDataRaw(
   // 2. Fetch expenses
   const { data: expenses, error: expensesError } = await supabaseAdmin
     .from('expenses')
-    .select('id, amount, category, date')
+    .select('id, amount, category, date, payment_method')
     .eq('organization_id', organizationId)
     .gte('date', startIso)
     .lte('date', endIso);
@@ -726,9 +753,69 @@ export async function getRealtimeFinancialDataRaw(
     console.error('Error fetching realtime payroll:', payrollError);
   }
 
+  // 4. Fetch cash_bases
+  let cash_bases: any[] = [];
+  try {
+    const { data: bases, error: basesError } = await supabaseAdmin
+      .from('cash_bases')
+      .select('id, amount, date, description, type')
+      .eq('organization_id', organizationId)
+      .gte('date', startIso)
+      .lte('date', endIso);
+    
+    if (!basesError && bases) {
+      cash_bases = bases;
+    }
+  } catch (e) {
+    // Ignore error if table doesn't exist yet
+  }
+
   return {
     sales: sales || [],
     expenses: expenses || [],
-    payroll: payroll || []
+    payroll: payroll || [],
+    cash_bases: cash_bases
   };
+}
+
+export async function setInitialCashBase(organizationId: string, date: string, amount: number, description: string = 'Apertura', type: string = 'addition') {
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+
+  const { data, error } = await supabaseAdmin
+    .from('cash_bases')
+    .insert({ organization_id: organizationId, date, amount, description, type })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error setting cash base:', error);
+    throw new Error('No se pudo guardar el registro de la base.');
+  }
+
+  revalidatePath('/accounting');
+  return data;
+}
+
+export async function getInitialCashBase(organizationId: string, date: string) {
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+
+  const { data, error } = await supabaseAdmin
+    .from('cash_bases')
+    .select('amount')
+    .eq('organization_id', organizationId)
+    .eq('date', date)
+    .single();
+
+  if (error) {
+    return 0; // if not found, return 0
+  }
+  return Number(data.amount) || 0;
 }

@@ -6,7 +6,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPlanLimits } from '@/lib/constants/plans';
 import { Lock, PieChart, TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, ArrowUpRight, ArrowDownRight, Rocket, Loader2, Percent } from 'lucide-react';
-import { getRealtimeFinancialDataRaw, RealtimeFinancialData } from '@/actions/accounting';
+import { getRealtimeFinancialDataRaw, RealtimeFinancialData, setInitialCashBase } from '@/actions/accounting';
+import { toast } from 'sonner';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -29,15 +31,13 @@ import {
 interface AccountingClientProps {
   subscriptionPlan?: string | null;
   organizationId: string;
-  inventory: InventoryItem[];
+  inventory: any[];
   purchases?: any[];
 }
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 };
-
-// Datos calculados dinámicamente desde Supabase.
 
 const supplierData = [
   { name: 'MotoPartes SA', compras: 1250000, envios: '24h', calidad: 'Alta' },
@@ -50,6 +50,34 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
   const [periodFilter, setPeriodFilter] = useState<'day' | 'month' | 'year'>('day');
   const [realtimeData, setRealtimeData] = useState<RealtimeFinancialData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  const [baseInput, setBaseInput] = useState('');
+    const [isSettingBase, setIsSettingBase] = useState(false);
+
+  
+      const handleSetBase = async (motivo: string) => {
+    const rawAmount = Number(baseInput.replace(/\D/g, ''));
+    if (!rawAmount || isNaN(rawAmount)) {
+      toast.error('Ingrese un valor válido para la base');
+      return;
+    }
+    
+    setIsSettingBase(true);
+    try {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      const localDate = now.toISOString().split('T')[0];
+      await setInitialCashBase(organizationId, localDate, rawAmount, motivo, 'addition');
+      toast.success('Movimiento de caja registrado');
+      setBaseInput('');
+      setRefreshKey(k => k + 1);
+    } catch (e: any) {
+      toast.error(e.message || 'Error al actualizar base');
+    } finally {
+      setIsSettingBase(false);
+    }
+  };
 
   const planLimits = getPlanLimits(subscriptionPlan || 'basic');
   
@@ -86,10 +114,10 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       }
     }
     fetchRealtime();
-  }, [organizationId, periodFilter, activeTab]);
+  }, [organizationId, periodFilter, activeTab, refreshKey]);
 
   const { chartData, metrics, paymentMethodsData, cashFlowData } = useMemo(() => {
-    if (!realtimeData) return { chartData: [], metrics: { ingresos: 0, gastos: 0, utilidad: 0, margen: 0, totalVentas: 0, label: '' }, paymentMethodsData: [], cashFlowData: { efectivoIngresado: 0, efectivoNeto: 0, otrosMetodos: 0, categorias: [] } };
+    if (!realtimeData) return { chartData: [], metrics: { ingresos: 0, gastos: 0, utilidad: 0, margen: 0, totalVentas: 0, label: '' }, paymentMethodsData: [], cashFlowData: { efectivoIngresado: 0, efectivoNeto: 0, otrosMetodos: 0, otrosMetodosIngresado: 0, totalOtherExpenses: 0, categorias: [], totalCashExpenses: 0, initialBase: 0, cashBases: [] } };
     
     let aggregated: Record<string, { ingresos: number, egresos: number, utilidad: number, ventas: number }> = {};
     let totalIngresos = 0;
@@ -98,6 +126,17 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
     
     const methodsMap: Record<string, number> = {};
     const categoriesMap: Record<string, number> = {};
+
+    const uiMethods: Record<string, string> = {
+      'cash': 'Efectivo',
+      'credit_card': 'Tarjeta de Crédito',
+      'debit_card': 'Tarjeta de Débito',
+      'transfer': 'Transferencia',
+      'nequi': 'Nequi',
+      'daviplata': 'DaviPlata',
+      'wompi': 'Wompi',
+      'other': 'Otro'
+    };
 
     realtimeData.sales.forEach(sale => {
       const d = new Date(sale.created_at);
@@ -120,8 +159,9 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       totalIngresos += amount;
       totalVentas += 1;
 
-      const method = sale.payment_method || 'Efectivo';
-      methodsMap[method] = (methodsMap[method] || 0) + amount;
+      const rawMethod = sale.payment_method || 'cash';
+      const methodStr = uiMethods[rawMethod] || rawMethod;
+      methodsMap[methodStr] = (methodsMap[methodStr] || 0) + amount;
 
       sale.sale_items?.forEach((item: any) => {
         let cat = 'Otros';
@@ -131,7 +171,9 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       });
     });
 
-    const addExpense = (dateStr: string, amount: number) => {
+    let totalCashExpenses = 0;
+
+    const addExpense = (dateStr: string, amount: number, method: string = 'Efectivo') => {
       const d = new Date(dateStr);
       let key = '';
       if (periodFilter === 'day') {
@@ -146,10 +188,14 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       aggregated[key].egresos += amount;
       aggregated[key].utilidad -= amount;
       totalEgresos += amount;
+
+      if (method === 'Efectivo' || method === 'cash') {
+        totalCashExpenses += amount;
+      }
     };
 
-    realtimeData.expenses.forEach(exp => addExpense(exp.date, Number(exp.amount) || 0));
-    realtimeData.payroll.forEach(pay => addExpense(pay.created_at, Number(pay.total_paid) || 0));
+    realtimeData.expenses.forEach(exp => addExpense(exp.date, Number(exp.amount) || 0, exp.payment_method || 'Efectivo'));
+    realtimeData.payroll.forEach(pay => addExpense(pay.created_at, Number(pay.total_paid) || 0, 'Efectivo'));
 
     let chartData = [];
     if (periodFilter === 'day') {
@@ -174,14 +220,32 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
     }
 
     const paymentMethodsData = Object.keys(methodsMap).map(k => ({ method: k, amount: methodsMap[k] })).sort((a,b) => b.amount - a.amount);
-    const efectivoIngresado = methodsMap['Efectivo'] || 0;
-    const efectivoNeto = efectivoIngresado - totalEgresos; // Asumimos gastos pagados en efectivo
     
+    let initialBase = 0;
+    if (realtimeData.cash_bases) {
+      initialBase = realtimeData.cash_bases.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+    }
+
+    // El total de efectivo ingresado es 'Efectivo'
+    const efectivoIngresado = methodsMap['Efectivo'] || 0;
+    
+    // Le restamos SOLO los gastos pagados en efectivo y le sumamos la base inicial
+    const efectivoNeto = efectivoIngresado - totalCashExpenses + initialBase; 
+    
+    const otrosMetodosIngresado = paymentMethodsData.filter(p => p.method !== 'Efectivo').reduce((sum, p) => sum + p.amount, 0);
+    const totalOtherExpenses = totalEgresos - totalCashExpenses;
+    const otrosMetodosNeto = otrosMetodosIngresado - totalOtherExpenses;
+
     const cashFlowData = {
       efectivoIngresado,
       efectivoNeto,
-      otrosMetodos: paymentMethodsData.filter(p => p.method !== 'Efectivo').reduce((sum, p) => sum + p.amount, 0),
-      categorias: Object.keys(categoriesMap).map(k => ({ category: k, amount: categoriesMap[k] })).sort((a,b) => b.amount - a.amount)
+      otrosMetodos: otrosMetodosNeto,
+      otrosMetodosIngresado,
+      totalOtherExpenses,
+      categorias: Object.keys(categoriesMap).map(k => ({ category: k, amount: categoriesMap[k] })).sort((a,b) => b.amount - a.amount),
+      totalCashExpenses,
+      initialBase,
+      cashBases: realtimeData.cash_bases || []
     };
 
     return {
@@ -457,23 +521,89 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                       <div className={`text-3xl font-bold ${cashFlowData.efectivoNeto >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                         {formatCurrency(cashFlowData.efectivoNeto)}
                       </div>
+                      
                       <p className="text-xs text-muted-foreground mt-2">
+                        Total en Base: <span className="font-semibold text-foreground">{formatCurrency(cashFlowData.initialBase)}</span> <br/>
                         Ingresos efectivo: {formatCurrency(cashFlowData.efectivoIngresado)} <br/>
-                        Gastos deducidos: {formatCurrency(metrics.gastos)}
+                        Gastos deducidos: {formatCurrency(cashFlowData.totalCashExpenses)}
                       </p>
+                      
+                      {cashFlowData.cashBases && cashFlowData.cashBases.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-[10px] font-bold uppercase text-muted-foreground">Historial de Base Hoy</p>
+                          {cashFlowData.cashBases.map((b: any, i: number) => (
+                            <div key={i} className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground">- {b.description || 'Adición'}</span>
+                              <span className="font-medium text-emerald-500">{formatCurrency(Number(b.amount))}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {periodFilter === 'day' && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <label className="text-xs font-medium text-foreground mb-1 block">Añadir a Base de Caja (Hoy)</label>
+                          <div className="flex flex-col gap-2">
+                            <input 
+                              type="text" 
+                              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" 
+                              placeholder="Monto (Ej. $ 100.000)"
+                              value={baseInput}
+                              onChange={e => {
+                                const rawValue = e.target.value.replace(/\D/g, '');
+                                if (!rawValue) {
+                                  setBaseInput('');
+                                  return;
+                                }
+                                const formatted = new Intl.NumberFormat('es-CO', {
+                                  style: 'currency',
+                                  currency: 'COP',
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0
+                                }).format(Number(rawValue));
+                                setBaseInput(formatted);
+                              }}
+                            />
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm"
+                                variant="outline"
+                                className="w-full border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10"
+                                onClick={() => handleSetBase('Apertura')} 
+                                disabled={isSettingBase}
+                              >
+                                {isSettingBase ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apertura'}
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                onClick={() => handleSetBase('Adición')} 
+                                disabled={isSettingBase}
+                              >
+                                {isSettingBase ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sumar'}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                     </CardContent>
                   </Card>
 
                   {/* OTROS MÉTODOS */}
                   <Card className="bg-card border-border/50 shadow-sm">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Bancos / Otros Métodos</CardTitle>
-                      <CardDescription>Transferencias, tarjetas, etc.</CardDescription>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Bancos / Otros Métodos (Neto)</CardTitle>
+                      <CardDescription>Transferencias, tarjetas menos gastos por banco</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-3xl font-bold text-indigo-500">
+                      <div className={`text-3xl font-bold ${cashFlowData.otrosMetodos >= 0 ? 'text-indigo-500' : 'text-rose-500'}`}>
                         {formatCurrency(cashFlowData.otrosMetodos)}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Ingresos banco: {formatCurrency(cashFlowData.otrosMetodosIngresado)} <br/>
+                        Gastos deducidos: {formatCurrency(cashFlowData.totalOtherExpenses)}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
