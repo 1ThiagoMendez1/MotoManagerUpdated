@@ -66,7 +66,7 @@ export default function InventoryClient({
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <SearchInventory />
+        <SearchInventory placeholder="Buscar repuestos..." />
         <CategoryFilter />
       </div>
 
