@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Loader2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,10 +32,11 @@ import type { InventoryItem, InventoryCategory } from '@/lib/types';
 const inventoryCategories: InventoryCategory[] = ['Repuestos', 'Lubricantes', 'Llantas', 'Accesorios', 'Aceites'];
 
 function SubmitButton() {
+  const { pending } = useFormStatus();
   return (
-    <Button type="submit">
-      <Edit className="mr-2 h-4 w-4" />
-      Actualizar Artículo
+    <Button type="submit" disabled={pending}>
+      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Edit className="mr-2 h-4 w-4" />}
+      {pending ? 'Actualizando...' : 'Actualizar Artículo'}
     </Button>
   );
 }
@@ -159,12 +161,17 @@ export function EditInventoryItem({ item }: EditInventoryItemProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad (Total actual: {item.quantity})</label>
-              <Input name="quantity" type="number" defaultValue={item.quantity} placeholder="25" className="bg-card text-card-foreground border-border" disabled title="Usa el módulo de compras o transferencias para modificar el stock" />
+              <Input name="quantity" type="number" defaultValue={item.quantity} placeholder="25" className="bg-card text-card-foreground border-border" disabled={item.trackInventory !== false} title={item.trackInventory !== false ? "Usa el módulo de compras o transferencias para modificar el stock" : "Ingresa el stock inicial para empezar a controlar"} />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Mínima</label>
               <Input name="minimumQuantity" type="number" defaultValue={item.minimumQuantity} placeholder="10" className="bg-card text-card-foreground border-border" />
             </div>
+          </div>
+          
+          <div>
+              <label className="text-sm font-medium text-foreground text-muted-foreground">Ubicación Física Específica</label>
+              <Input name="location" defaultValue={item.location} placeholder="p. ej., Estante 2, Fila B" className="bg-card text-card-foreground border-border" />
           </div>
 
           <DialogFooter>

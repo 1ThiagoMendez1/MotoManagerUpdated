@@ -518,8 +518,8 @@ export async function addItemToWorkOrder(formData: FormData) {
             return { success: false, error: 'Error al agregar el repuesto a la orden.' };
         }
 
-        // Descontar inventario inmediatamente si la cotización ya fue aprobada
-        if (isApproved) {
+        // Descontar inventario inmediatamente si la cotización ya fue aprobada y tiene control de inventario
+        if (isApproved && inventoryItem.track_inventory !== false) {
             const { error: decrementError } = await supabase.rpc('decrement_inventory', {
                 item_id: itemId,
                 amount: quantity
@@ -563,18 +563,30 @@ export async function removeItemFromWorkOrder(formData: FormData) {
         .single();
 
     if (isApproved && saleItem && saleItem.item_type === 'inventory' && saleItem.inventory_item_id) {
-        // Devolver el stock
-        const { data: invItem } = await supabase
-            .from('inventory_items')
-            .select('quantity')
-            .eq('id', saleItem.inventory_item_id)
-            .single();
-            
-        if (invItem) {
-            await supabase
-                .from('inventory_items')
-                .update({ quantity: Number(invItem.quantity) + Number(saleItem.quantity) })
-                .eq('id', saleItem.inventory_item_id);
+        // Devolver el stock a vitrina (storefront)
+        const { data: vitrinaLoc } = await supabase
+            .from('inventory_locations')
+            .select('id')
+            .eq('organization_id', user.workshopId)
+            .eq('type', 'storefront')
+            .limit(1)
+            .maybeSingle();
+
+        if (vitrinaLoc) {
+            const { data: currentStock } = await supabase
+                .from('inventory_item_stock')
+                .select('quantity')
+                .eq('item_id', saleItem.inventory_item_id)
+                .eq('location_id', vitrinaLoc.id)
+                .maybeSingle();
+
+            if (currentStock) {
+                await supabase
+                    .from('inventory_item_stock')
+                    .update({ quantity: Number(currentStock.quantity) + Number(saleItem.quantity) })
+                    .eq('item_id', saleItem.inventory_item_id)
+                    .eq('location_id', vitrinaLoc.id);
+            }
         }
     }
 
@@ -671,7 +683,10 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
             // Si recién se aprueba, descontamos el stock reservado
             for (const item of quoteItems) {
                 if (item.item_type === 'inventory' && item.inventory_item_id) {
-                    await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+                    const { data: invItem } = await supabase.from('inventory_items').select('track_inventory').eq('id', item.inventory_item_id).single();
+                    if (invItem && invItem.track_inventory !== false) {
+                        await supabase.rpc('decrement_inventory', { item_id: item.inventory_item_id, amount: item.quantity });
+                    }
                 }
             }
         }
@@ -681,11 +696,29 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
     } else if (dbQuoteStatus === 'rejected') {
         if (wasApproved) {
             // Devolver el inventario si la orden estaba aprobada (por error y la rechazan después)
+            const { data: vitrinaLoc } = await supabase
+                .from('inventory_locations')
+                .select('id')
+                .eq('organization_id', user.workshopId)
+                .eq('type', 'storefront')
+                .limit(1)
+                .maybeSingle();
+
             for (const item of quoteItems) {
-                if (item.item_type === 'inventory' && item.inventory_item_id) {
-                    const { data: invItem } = await supabase.from('inventory_items').select('quantity').eq('id', item.inventory_item_id).single();
-                    if (invItem) {
-                        await supabase.from('inventory_items').update({ quantity: Number(invItem.quantity) + Number(item.quantity) }).eq('id', item.inventory_item_id);
+                if (item.item_type === 'inventory' && item.inventory_item_id && vitrinaLoc) {
+                    const { data: currentStock } = await supabase
+                        .from('inventory_item_stock')
+                        .select('quantity')
+                        .eq('item_id', item.inventory_item_id)
+                        .eq('location_id', vitrinaLoc.id)
+                        .maybeSingle();
+                        
+                    if (currentStock) {
+                        await supabase
+                            .from('inventory_item_stock')
+                            .update({ quantity: Number(currentStock.quantity) + Number(item.quantity) })
+                            .eq('item_id', item.inventory_item_id)
+                            .eq('location_id', vitrinaLoc.id);
                     }
                 }
             }
@@ -893,7 +926,7 @@ export async function fulfillPartRequest(requestId: string, workOrderId: string)
             
         const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
 
-        if (isApproved) {
+        if (isApproved && invItem && invItem.track_inventory !== false) {
             const { error: decrementError } = await supabase.rpc('decrement_inventory', {
                 item_id: request.inventory_item_id,
                 amount: request.quantity

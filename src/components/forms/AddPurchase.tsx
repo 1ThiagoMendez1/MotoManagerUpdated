@@ -9,6 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { useToast } from '@/hooks/use-toast';
 import { createPurchase } from '@/lib/actions/purchases';
@@ -44,7 +46,10 @@ const purchaseItemSchema = z.object({
 const formSchema = z.object({
   invoiceNumber: z.string().optional(),
   supplierId: z.string().optional(),
+  destination: z.enum(['warehouse', 'storefront']).default('warehouse'),
   items: z.array(purchaseItemSchema).min(1, "Debe agregar al menos un repuesto a la factura"),
+  paymentMethod: z.string().min(1, "Selecciona un método de pago"),
+  creditDays: z.coerce.number().min(0, "Los días de crédito no pueden ser negativos").optional(),
 });
 
 interface AddPurchaseProps {
@@ -56,7 +61,7 @@ function InventoryCombobox({ inventory, value, onSelect }: { inventory: any[], v
   const [open, setOpen] = useState(false);
   
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={true}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <FormControl>
           <Button
@@ -122,6 +127,9 @@ export function AddPurchase({ inventory }: AddPurchaseProps) {
     defaultValues: {
       invoiceNumber: '',
       supplierId: '',
+      destination: 'warehouse',
+      paymentMethod: 'cash',
+      creditDays: 0,
       items: [{ inventoryItemId: '', name: '', quantity: 1, unitCost: 0 }],
     },
   });
@@ -132,6 +140,7 @@ export function AddPurchase({ inventory }: AddPurchaseProps) {
   });
 
   const watchItems = form.watch("items");
+  const watchPaymentMethod = form.watch("paymentMethod");
 
   const total = watchItems.reduce((sum, item) => {
     const q = Number(item.quantity) || 0;
@@ -225,6 +234,84 @@ export function AddPurchase({ inventory }: AddPurchaseProps) {
                   </FormItem>
                 )}
               />
+            </div>
+
+            
+            <FormField
+              control={form.control}
+              name="destination"
+              render={({ field }) => (
+                <FormItem className="space-y-3 p-4 border border-border/50 rounded-lg bg-muted/5">
+                  <FormLabel>Destino de la Mercancía</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value="warehouse" />
+                        </FormControl>
+                        <FormLabel className="font-normal cursor-pointer">
+                          Directo a <b>Bodega</b> (Recomendado para almacenar)
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0 mt-2">
+                        <FormControl>
+                          <RadioGroupItem value="storefront" />
+                        </FormControl>
+                        <FormLabel className="font-normal cursor-pointer">
+                          Directo a <b>Vitrina / Comercial</b> (Para uso o venta inmediata)
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-border/50 rounded-lg bg-muted/10">
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Método de Pago</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione un método" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="cash">Efectivo</SelectItem>
+                        <SelectItem value="transfer">Transferencia</SelectItem>
+                        <SelectItem value="card">Tarjeta / Datafono</SelectItem>
+                        <SelectItem value="credit">Crédito (A plazos)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {watchPaymentMethod === 'credit' && (
+                <FormField
+                  control={form.control}
+                  name="creditDays"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Días de Crédito</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" placeholder="Ej: 30" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <div className="space-y-4">

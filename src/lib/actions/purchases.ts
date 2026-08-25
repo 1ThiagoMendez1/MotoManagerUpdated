@@ -14,7 +14,10 @@ const purchaseItemSchema = z.object({
 const purchaseSchema = z.object({
   invoiceNumber: z.string().optional(),
   supplierId: z.string().optional(),
+  destination: z.string().optional(),
   items: z.array(purchaseItemSchema).min(1, "Debe agregar al menos un repuesto a la factura"),
+  paymentMethod: z.string().min(1, "Selecciona un método de pago"),
+  creditDays: z.coerce.number().min(0).optional(),
 });
 
 export async function createPurchase(prevState: any, formData: FormData) {
@@ -60,6 +63,8 @@ export async function createPurchase(prevState: any, formData: FormData) {
       total,
       status: 'pending', // Initial state
       created_by: user.userId,
+      payment_method: data.paymentMethod,
+      credit_days: data.paymentMethod === 'credit' ? data.creditDays || 0 : 0,
     })
     .select()
     .single();
@@ -88,9 +93,24 @@ export async function createPurchase(prevState: any, formData: FormData) {
   }
 
   // 3. Mark as Received (RPC processes stock and expenses)
+  
+  // Resolve destination location ID if provided as 'warehouse' or 'storefront'
+  let p_location_id = null;
+  if (data.destination) {
+     const { data: loc } = await supabase
+        .from('inventory_locations')
+        .select('id')
+        .eq('organization_id', user.workshopId)
+        .eq('type', data.destination)
+        .limit(1)
+        .maybeSingle();
+     if (loc) p_location_id = loc.id;
+  }
+
   const { error: rpcError } = await supabase.rpc('process_purchase_receipt', {
     p_purchase_id: purchase.id,
     p_user_id: user.userId,
+    p_location_id: p_location_id
   });
 
   if (rpcError) {

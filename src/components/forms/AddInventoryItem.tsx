@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { createInventoryItem } from '@/lib/actions/inventory';
@@ -32,10 +33,11 @@ import type { InventoryCategory } from '@/lib/types';
 const inventoryCategories: InventoryCategory[] = ['Repuestos', 'Lubricantes', 'Llantas', 'Accesorios', 'Aceites'];
 
 function SubmitButton() {
+  const { pending } = useFormStatus();
   return (
-    <Button type="submit">
-      <PlusCircle className="mr-2 h-4 w-4" />
-      Agregar Artículo
+    <Button type="submit" disabled={pending}>
+      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+      {pending ? 'Guardando...' : 'Agregar Artículo'}
     </Button>
   );
 }
@@ -142,13 +144,38 @@ export function AddInventoryItem() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Inicial (Vitrina)</label>
-              <Input name="quantity" type="number" placeholder="25" className="bg-card text-card-foreground border-border" />
+              <label className="text-sm font-medium text-foreground">Lugar (Destino Inicial)</label>
+              <input type="hidden" id="destination-input" name="destination" defaultValue="storefront" />
+              <RadioGroup defaultValue="storefront" onValueChange={(val) => { document.getElementById('destination-input').value = val; }} className="flex flex-col space-y-1 mt-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="storefront" id="add-storefront" />
+                  <label htmlFor="add-storefront" className="text-sm font-medium leading-none cursor-pointer">
+                    Directo a <b>Vitrina</b>
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="warehouse" id="add-warehouse" />
+                  <label htmlFor="add-warehouse" className="text-sm font-medium leading-none cursor-pointer">
+                    Directo a <b>Bodega</b>
+                  </label>
+                </div>
+              </RadioGroup>
             </div>
-            <div>
-              <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Mínima</label>
-              <Input name="minimumQuantity" type="number" placeholder="10" className="bg-card text-card-foreground border-border" />
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Inicial</label>
+                <Input name="quantity" type="number" placeholder="25" className="bg-card text-card-foreground border-border" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground text-muted-foreground">Ubicación Física Específica</label>
+                <Input name="location" placeholder="p. ej., Estante 2, Fila B" className="bg-card text-card-foreground border-border" />
+              </div>
             </div>
+          </div>
+          
+          <div>
+              <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Mínima de Alerta</label>
+              <Input name="minimumQuantity" type="number" placeholder="10" className="bg-card text-card-foreground border-border w-1/2" />
           </div>
 
           <DialogFooter>

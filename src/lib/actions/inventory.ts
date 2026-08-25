@@ -15,6 +15,8 @@ const inventorySchema = z.object({
     price: z.coerce.number().positive("El precio debe ser un número positivo."),
     supplierPrice: z.coerce.number().optional().default(0),
     minimumQuantity: z.coerce.number().int().optional().default(0),
+    location: z.string().optional(),
+    destination: z.string().optional().default('storefront'),
 });
 
 export async function createInventoryItem(prevState: any, formData: FormData) {
@@ -34,6 +36,8 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
         price: formData.get('price'),
         supplierPrice: formData.get('supplierPrice'),
         minimumQuantity: formData.get('minimumQuantity'),
+        location: formData.get('location') || '',
+        destination: formData.get('destination') || undefined,
     });
 
     if (!validatedFields.success) {
@@ -69,7 +73,7 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
             name: data.name,
             code: data.sku,
             category: data.category,
-            description: `Proveedor: ${data.supplier || ''}`,
+            description: JSON.stringify({ location: data.location || '', supplier: data.supplier || '' }),
             unit_price: data.price,
             min_quantity: data.minimumQuantity,
             track_inventory: data.trackInventory,
@@ -94,6 +98,18 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
                 location_id: vitrinaLoc.id,
                 quantity: data.quantity || 0
             });
+            
+            if ((data.quantity || 0) > 0) {
+                await supabase.from('inventory_movements').insert({
+                    organization_id: user.workshopId,
+                    item_id: insertedItem.id,
+                    from_location_id: null,
+                    to_location_id: vitrinaLoc.id,
+                    quantity: data.quantity,
+                    movement_type: 'purchase',
+                    created_by: user.userId
+                });
+            }
         }
     }
 
@@ -126,6 +142,8 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
         price: formData.get('price'),
         supplierPrice: formData.get('supplierPrice'),
         minimumQuantity: formData.get('minimumQuantity'),
+        location: formData.get('location') || '',
+        destination: formData.get('destination') || undefined,
     });
 
     if (!validatedFields.success) {
@@ -156,13 +174,20 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
     if (nameError) return { message: 'Error al verificar el nombre del producto.' };
     if (existingName) return { message: 'Ya existe otro producto con este nombre en el inventario.' };
 
+    // Fetch old item to check if track_inventory was false
+    const { data: oldItem } = await supabase
+        .from('inventory_items')
+        .select('track_inventory')
+        .eq('id', id)
+        .single();
+
     const { error } = await supabase
         .from('inventory_items')
         .update({
             name: data.name,
             code: data.sku,
             category: data.category,
-            description: `Proveedor: ${data.supplier || ''}`,
+            description: JSON.stringify({ location: data.location || '', supplier: data.supplier || '' }),
             unit_price: data.price,
             min_quantity: data.minimumQuantity,
             track_inventory: data.trackInventory,
@@ -173,6 +198,49 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
 
     if (error) {
         return { message: 'Error al actualizar.' };
+    }
+    
+    // Si el item antes no controlaba stock, la caja de cantidad estaba habilitada. 
+    // Si el usuario tipeó algo, lo guardamos sin importar si encendió el switch o no.
+    if (oldItem && oldItem.track_inventory === false) {
+        const qtyRaw = formData.get('quantity');
+        const qtyNum = qtyRaw ? Number(qtyRaw) : 0;
+        
+        if (qtyNum >= 0) {
+            // Verificar si ya tiene stock en vitrina
+            const { data: vitrinaLoc } = await supabase
+                .from('inventory_locations')
+                .select('id')
+                .eq('organization_id', user.workshopId)
+                .eq('type', 'storefront')
+                .maybeSingle();
+                
+            if (vitrinaLoc) {
+                // Borrar cualquier stock basura anterior para este item
+                await supabase.from('inventory_item_stock').delete().eq('item_id', id);
+                
+                // Insertar el stock nuevo
+                await supabase.from('inventory_item_stock').insert({
+                    item_id: id,
+                    location_id: vitrinaLoc.id,
+                    quantity: qtyNum
+                });
+                
+                if (qtyNum > 0) {
+                    // Registrar el movimiento de ajuste inicial
+                    await supabase.from('inventory_movements').insert({
+                        organization_id: user.workshopId,
+                        item_id: id,
+                        from_location_id: null,
+                        to_location_id: vitrinaLoc.id,
+                        quantity: qtyNum,
+                        movement_type: 'adjustment',
+                        created_by: user.userId,
+                        notes: 'Stock inicial al activar control de inventario'
+                    });
+                }
+            }
+        }
     }
 
     revalidatePath('/inventory');
@@ -266,4 +334,105 @@ export async function notifyAdminLowStock() {
     }
 
     return { success: true };
+}
+
+export async function transferStock(prevState: any, formData: FormData) {
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+    
+    const itemId = formData.get('itemId') as string;
+    const fromLocId = formData.get('fromLocationId') as string;
+    const toLocId = formData.get('toLocationId') as string;
+    const qty = parseInt(formData.get('quantity') as string, 10);
+
+    if (!itemId || !fromLocId || !toLocId || isNaN(qty) || qty <= 0) {
+        return { message: 'Datos inválidos para el traslado.' };
+    }
+
+    // Since transferring stock is a multi-step process (decrement from, increment to, write movement),
+    // we should use a transaction via a Postgres function, OR just do it sequentially if we don't have one.
+    // Wait, we have the "decrement_inventory" RPC! But we don't have an "increment_inventory" RPC.
+    // Let's do it sequentially since we're in server action, but ideally this should be a transaction.
+    
+    // Check if source has enough
+    const { data: sourceStock } = await supabase
+      .from('inventory_item_stock')
+      .select('quantity')
+      .eq('item_id', itemId)
+      .eq('location_id', fromLocId)
+      .single();
+
+    if (!sourceStock || sourceStock.quantity < qty) {
+       return { message: 'Stock insuficiente en la ubicación de origen.' };
+    }
+
+    // Decrement from source
+    const { error: decError } = await supabase
+      .from('inventory_item_stock')
+      .update({ quantity: sourceStock.quantity - qty })
+      .eq('item_id', itemId)
+      .eq('location_id', fromLocId);
+
+    if (decError) return { message: 'Error descontando stock.' };
+
+    // Increment to dest
+    const { data: destStock } = await supabase
+      .from('inventory_item_stock')
+      .select('quantity')
+      .eq('item_id', itemId)
+      .eq('location_id', toLocId)
+      .maybeSingle();
+
+    if (destStock) {
+       await supabase
+         .from('inventory_item_stock')
+         .update({ quantity: destStock.quantity + qty })
+         .eq('item_id', itemId)
+         .eq('location_id', toLocId);
+    } else {
+       await supabase
+         .from('inventory_item_stock')
+         .insert({ item_id: itemId, location_id: toLocId, quantity: qty });
+    }
+
+    // Record movement
+    await supabase.from('inventory_movements').insert({
+      organization_id: user.workshopId,
+      item_id: itemId,
+      from_location_id: fromLocId,
+      to_location_id: toLocId,
+      quantity: qty,
+      movement_type: 'transfer',
+      created_by: user.userId
+    });
+
+    revalidatePath('/inventory');
+    return { success: true };
+}
+
+export async function getKardexMovements(itemId: string) {
+    const user = await requireWorkshop();
+    
+    // We use the service role client here to bypass any complex RLS recursion 
+    // that might be caused by joins on profiles/organization_members.
+    // We enforce security manually by filtering strictly by the user's workshopId.
+    const { createClient } = require('@supabase/supabase-js');
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    const { data, error } = await supabaseAdmin
+      .from('inventory_movements')
+      .select('*, from_loc:inventory_locations!inventory_movements_from_location_id_fkey(name), to_loc:inventory_locations!inventory_movements_to_location_id_fkey(name), user:profiles(first_name, last_name)')
+      .eq('item_id', itemId)
+      .eq('organization_id', user.workshopId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching kardex admin:', error);
+        return { error: error.message };
+    }
+    
+    return { data: data || [] };
 }

@@ -169,10 +169,26 @@ export const getInventory = async (params: { query?: string, page?: number, limi
       quantity: totalQty,
       price: Number(i.unit_price) || 0,
       minimumQuantity: i.min_quantity || 0,
-      location: i.description || '',
+      location: (() => {
+        try {
+          const parsed = JSON.parse(i.description || '{}');
+          return parsed.location || '';
+        } catch(e) {
+          if (i.description && !i.description.startsWith('Proveedor:')) return i.description;
+          return '';
+        }
+      })(),
       category: (i.category as any) || 'Repuestos',
       supplierPrice: Number(i.last_cost) || 0,
-      supplier: i.supplier_id || '',
+      supplier: (() => {
+        try {
+          const parsed = JSON.parse(i.description || '{}');
+          return parsed.supplier || '';
+        } catch(e) {
+          if (i.description && i.description.startsWith('Proveedor:')) return i.description.replace('Proveedor: ', '').trim();
+          return '';
+        }
+      })(),
       trackInventory: i.track_inventory !== false,
       lastCost: Number(i.last_cost) || 0,
       stockDetails
