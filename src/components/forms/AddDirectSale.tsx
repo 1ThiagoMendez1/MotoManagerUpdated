@@ -183,6 +183,37 @@ export function AddDirectSale({ inventory, customers, services = [] }: AddDirect
     }
   }
 
+  function handleServiceSearchChange(rawSearchString: string, index: number) {
+    if (!rawSearchString.trim()) {
+      form.setValue(`items.${index}.name`, '', { shouldValidate: true });
+      form.setValue(`items.${index}.price`, 0, { shouldValidate: true });
+      return;
+    }
+
+    const searchString = rawSearchString.trim().toLowerCase();
+
+    const matches = services.filter(item =>
+      item.name.toLowerCase().includes(searchString) ||
+      (item.code && item.code.toLowerCase().includes(searchString)) ||
+      (item.category && item.category.toLowerCase().includes(searchString))
+    );
+
+    // If there is an exact match on the code, or exactly 1 match overall
+    const exactCodeMatch = matches.find(item => item.code && item.code.trim().toLowerCase() === searchString);
+    const selectedService = exactCodeMatch || (matches.length === 1 ? matches[0] : null);
+
+    if (selectedService) {
+      form.setValue(`items.${index}.price`, selectedService.default_price || 0, { shouldValidate: true });
+      form.setValue(`items.${index}.name`, selectedService.name, { shouldValidate: true });
+      if (selectedService.code) {
+        form.setValue(`items.${index}.sku`, selectedService.code, { shouldValidate: true });
+      }
+    } else if (matches.length === 0) {
+      form.setValue(`items.${index}.name`, '', { shouldValidate: true });
+      form.setValue(`items.${index}.price`, 0, { shouldValidate: true });
+    }
+  }
+
   function handleSkuChange(sku: string, index: number) {
     if (!sku.trim()) {
       form.setValue(`items.${index}.inventoryItemId`, '');
@@ -403,11 +434,12 @@ export function AddDirectSale({ inventory, customers, services = [] }: AddDirect
 
                       // For services search, we can use sku field as a temporary search field or a new one. 
                       // Let's use currentSku to store the service search term as well to avoid changing schema.
-                      const currentServiceSearch = currentItem?.sku || '';
+                      const currentServiceSearch = (currentItem?.sku || '').trim().toLowerCase();
                       const filteredServices = currentServiceSearch
                         ? services.filter(item =>
-                            item.name.toLowerCase().includes(currentServiceSearch.toLowerCase()) ||
-                            (item.category && item.category.toLowerCase().includes(currentServiceSearch.toLowerCase()))
+                            item.name.toLowerCase().includes(currentServiceSearch) ||
+                            (item.code && item.code.toLowerCase().includes(currentServiceSearch)) ||
+                            (item.category && item.category.toLowerCase().includes(currentServiceSearch))
                           )
                         : services;
                       const servicePlaceholder = currentServiceSearch && filteredServices.length === 0 ? "No coincidencias" : "Selecciona un servicio";
@@ -423,7 +455,12 @@ export function AddDirectSale({ inventory, customers, services = [] }: AddDirect
                                     <FormItem>
                                       <FormControl>
                                         <Input
-                                          placeholder="Buscar servicio..." {...field}
+                                          placeholder="Buscar servicio..." 
+                                          {...field}
+                                          onChange={(e) => {
+                                            field.onChange(e);
+                                            handleServiceSearchChange(e.target.value, index);
+                                          }}
                                           className="bg-background border-input focus:ring-primary/20"
                                         />
                                       </FormControl>

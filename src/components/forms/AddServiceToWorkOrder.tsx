@@ -92,7 +92,26 @@ export function AddServiceToWorkOrder({ workOrderId, services }: AddServiceToWor
           </PopoverTrigger>
           <PopoverContent className="w-full sm:w-[400px] p-0" align="start">
             <Command>
-              <CommandInput placeholder="Buscar por nombre o categoría..." />
+              <CommandInput 
+                placeholder="Buscar por código, nombre o categoría..." 
+                onValueChange={(rawSearch) => {
+                  if (!rawSearch.trim()) return;
+                  const search = rawSearch.trim().toLowerCase();
+                  const matches = services.filter(item =>
+                    item.name.toLowerCase().includes(search) ||
+                    (item.code && item.code.toLowerCase().includes(search)) ||
+                    (item.category && item.category.toLowerCase().includes(search))
+                  );
+                  if (matches.length === 1 && matches[0].code?.trim().toLowerCase() === search) {
+                    setValue(matches[0].id);
+                    setOpen(false);
+                  } else if (matches.length === 1) {
+                     // Auto-select if there is exactly 1 match
+                    setValue(matches[0].id);
+                    setOpen(false);
+                  }
+                }}
+              />
               <CommandList>
                 <CommandEmpty>No se encontró ningún servicio.</CommandEmpty>
                 <CommandGroup>
@@ -100,6 +119,7 @@ export function AddServiceToWorkOrder({ workOrderId, services }: AddServiceToWor
                     <CommandItem
                       key={service.id}
                       value={service.id}
+                      keywords={[service.name, service.code || "", service.category || ""]}
                       onSelect={(currentValue) => {
                         setValue(currentValue === value ? "" : currentValue);
                         setOpen(false);
