@@ -77,6 +77,7 @@ export type WorkOrder = {
   sales?: any[];
   work_order_services?: any[];
   images?: WorkOrderImage[];
+  depositHistory?: any[];
 };
 
 export type SaleItem = {

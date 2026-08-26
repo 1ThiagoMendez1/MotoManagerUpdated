@@ -405,7 +405,6 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         category: s.service_catalog.category
       } : null
     })) : [],
-    depositAmount: parsedDeposit,
     depositHistory: depositHistory
   };
 };
