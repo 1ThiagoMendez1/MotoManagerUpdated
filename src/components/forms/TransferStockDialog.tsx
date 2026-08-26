@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { transferStock } from '@/lib/actions/inventory'; // We need to create this action
+import { transferStock } from '@/lib/actions/inventory';
 import type { InventoryItem } from '@/lib/types';
 import {
   Select,
@@ -38,45 +38,72 @@ import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   quantity: z.coerce.number().int().min(1, "Cantidad debe ser mayor a 0"),
+  destination: z.enum(['warehouse', 'storefront']),
 });
 
-export function TransferStockDialog({ item }: { item: InventoryItem }) {
+export function TransferStockDialog({ 
+  item, 
+  currentLocation = 'warehouse' 
+}: { 
+  item: InventoryItem;
+  currentLocation?: 'warehouse' | 'storefront';
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
+  const bodegaStock = item.stockDetails?.find(s => s.type === 'warehouse');
+  const vitrinaStock = item.stockDetails?.find(s => s.type === 'storefront');
+
+  const defaultDestination = currentLocation === 'warehouse' ? 'storefront' : 'warehouse';
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       quantity: 1,
+      destination: defaultDestination,
     },
   });
 
-  const bodegaStock = item.stockDetails?.find(s => s.type === 'warehouse');
-  const vitrinaStock = item.stockDetails?.find(s => s.type === 'storefront');
+  const watchDestination = form.watch("destination");
+  const originType = watchDestination === 'warehouse' ? 'storefront' : 'warehouse';
   
-  const hasBodega = bodegaStock && bodegaStock.quantity > 0;
+  const originStock = originType === 'warehouse' ? bodegaStock : vitrinaStock;
+  const destinationStock = watchDestination === 'warehouse' ? bodegaStock : vitrinaStock;
+  
+  const hasOriginStock = originStock && originStock.quantity > 0;
+  const maxQuantity = originStock?.quantity || 1;
+
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        quantity: 1,
+        destination: defaultDestination,
+      });
+    }
+  }, [isOpen, form, defaultDestination]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     try {
-      if (!bodegaStock) {
-          toast({ title: "Error", description: "No hay stock en Bodega para trasladar.", variant: "destructive" });
+      if (!originStock || originStock.quantity <= 0) {
+          toast({ title: "Error", description: `No hay stock en el origen para trasladar.`, variant: "destructive" });
           setIsSubmitting(false);
           return;
       }
-      if (values.quantity > bodegaStock.quantity) {
-          toast({ title: "Error", description: "No hay suficiente stock en Bodega.", variant: "destructive" });
+      if (values.quantity > originStock.quantity) {
+          toast({ title: "Error", description: "No hay suficiente stock en el origen.", variant: "destructive" });
           setIsSubmitting(false);
           return;
       }
       
       const formData = new FormData();
       formData.append('itemId', item.id);
-      formData.append('fromLocationId', bodegaStock.locationId);
-      // Si no hay stock previo en vitrina, le enviamos 'storefront' para que el backend lo resuelva
-      formData.append('toLocationId', vitrinaStock?.locationId || 'storefront');
+      formData.append('fromLocationId', originStock.locationId);
+      // Si no hay stock previo en destino, enviamos el tipo
+      formData.append('toLocationId', destinationStock?.locationId || watchDestination);
       formData.append('quantity', values.quantity.toString());
       
       const result = await transferStock(null, formData);
@@ -84,7 +111,7 @@ export function TransferStockDialog({ item }: { item: InventoryItem }) {
       if (result?.message) {
         toast({ title: "Error", description: result.message, variant: "destructive" });
       } else {
-        toast({ title: "Éxito", description: "Stock trasladado a Vitrina correctamente." });
+        toast({ title: "Éxito", description: "Stock trasladado correctamente." });
         setIsOpen(false);
         form.reset();
         router.refresh();
@@ -101,16 +128,16 @@ export function TransferStockDialog({ item }: { item: InventoryItem }) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" title="Trasladar a Vitrina" disabled={!hasBodega}>
+        <Button variant="outline" size="sm" title="Trasladar Stock">
           <ArrowRightLeft className="w-4 h-4 mr-2" />
           Trasladar
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md bg-card text-card-foreground">
         <DialogHeader>
-          <DialogTitle>Trasladar Stock a Vitrina</DialogTitle>
+          <DialogTitle>Trasladar Stock</DialogTitle>
           <DialogDescription>
-            Vas a mover repuestos desde la <b>Bodega</b> hacia la <b>Vitrina (Comercial)</b> para {item.name}.
+            Mueve repuestos entre la <b>Bodega</b> y la <b>Vitrina</b> para {item.name}.
           </DialogDescription>
         </DialogHeader>
 
@@ -128,14 +155,37 @@ export function TransferStockDialog({ item }: { item: InventoryItem }) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            
+            <FormField
+              control={form.control}
+              name="destination"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Destino</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona el destino" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="storefront">Vitrina (Comercial)</SelectItem>
+                      <SelectItem value="warehouse">Bodega Principal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cantidad a trasladar</FormLabel>
+                  <FormLabel>Cantidad a trasladar (máx. {maxQuantity})</FormLabel>
                   <FormControl>
-                    <Input type="number" min="1" max={bodegaStock?.quantity || 1} {...field} />
+                    <Input type="number" min="1" max={maxQuantity} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -146,7 +196,7 @@ export function TransferStockDialog({ item }: { item: InventoryItem }) {
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting || !hasBodega}>
+              <Button type="submit" disabled={isSubmitting || !hasOriginStock}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Confirmar Traslado
               </Button>

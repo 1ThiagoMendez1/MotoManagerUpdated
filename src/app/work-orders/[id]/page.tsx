@@ -324,6 +324,31 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
               </div>
             )}
           </div>
+
+          {/* HISTORIAL DE ABONOS */}
+          {(workOrder as any).depositHistory && (workOrder as any).depositHistory.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-green-500/20">
+              <h4 className="text-xs font-bold uppercase text-green-700/70 dark:text-green-400/70 mb-2 flex items-center gap-2">
+                Historial de Movimientos
+              </h4>
+              <div className="space-y-2">
+                {(workOrder as any).depositHistory.map((h: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center text-sm p-2 bg-green-500/5 rounded-lg border border-green-500/10">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-green-800 dark:text-green-300">Abono {h.method}</span>
+                      <span className="text-[10px] text-green-700/60 dark:text-green-400/60">
+                        {new Date(h.date).toLocaleString('es-CO')} • Recibido por: {h.received_by}
+                      </span>
+                    </div>
+                    <span className="font-bold text-green-600 dark:text-green-400">
+                      ${Number(h.amount).toLocaleString('es-CO')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </CardContent>
       </Card>
 

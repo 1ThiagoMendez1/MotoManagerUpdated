@@ -385,13 +385,18 @@ export async function transferStock(prevState: any, formData: FormData) {
     }
 
     // Decrement from source
-    const { error: decError } = await supabase
+    const newQty = sourceStock.quantity - qty;
+        if (newQty === 0) {
+            await supabase.from("inventory_item_stock").delete().eq("item_id", itemId).eq("location_id", fromLocId);
+        } else {
+            const { error: decError } = await supabase
       .from('inventory_item_stock')
       .update({ quantity: sourceStock.quantity - qty })
       .eq('item_id', itemId)
       .eq('location_id', fromLocId);
 
     if (decError) return { message: 'Error descontando stock.' };
+        }
 
     // Increment to dest
     const { data: destStock } = await supabase
@@ -453,4 +458,121 @@ export async function getKardexMovements(itemId: string) {
     }
     
     return { data: data || [] };
+}
+
+export async function bulkTransferStock(prevState: any, formData: FormData) {
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+    
+    const itemsJson = formData.get('items') as string;
+    const toLocType = formData.get('toLocationType') as string;
+
+    if (!itemsJson || !toLocType) {
+        return { message: 'Datos inválidos para el traslado masivo.' };
+    }
+
+    let itemsToTransfer: { itemId: string, fromLocId: string, quantity: number }[] = [];
+    try {
+        itemsToTransfer = JSON.parse(itemsJson);
+    } catch (e) {
+        return { message: 'Error en el formato de los items.' };
+    }
+
+    if (itemsToTransfer.length === 0) {
+        return { message: 'No hay items para trasladar.' };
+    }
+
+    // Buscar el ID real de la ubicación de destino
+    const { data: realLoc } = await supabase
+        .from('inventory_locations')
+        .select('id')
+        .eq('organization_id', user.workshopId)
+        .eq('type', toLocType)
+        .maybeSingle();
+    
+    let toLocId = toLocType;
+    if (realLoc) {
+        toLocId = realLoc.id;
+    } else if (toLocType === 'storefront' || toLocType === 'warehouse') {
+        return { message: 'No se encontró la ubicación de destino.' };
+    }
+
+    // Idealmente, esto debería ser una transacción. Como estamos en un server action y no tenemos una 
+    // función RPC para bulk transfer, iteraremos secuencialmente. 
+    // Para entornos reales con alta concurrencia, es imperativo crear un RPC en Postgres.
+    
+    let successCount = 0;
+    for (const item of itemsToTransfer) {
+        const { itemId, fromLocId, quantity: qty } = item;
+        
+        // 1. Verificar stock origen
+        const { data: sourceStock } = await supabase
+            .from('inventory_item_stock')
+            .select('quantity')
+            .eq('item_id', itemId)
+            .eq('location_id', fromLocId)
+            .single();
+
+        if (!sourceStock || sourceStock.quantity < qty) {
+            continue; // Skip this item if insufficient stock
+        }
+
+        // 2. Descontar origen
+        const newQty = sourceStock.quantity - qty;
+        if (newQty === 0) {
+            await supabase.from("inventory_item_stock").delete().eq("item_id", itemId).eq("location_id", fromLocId);
+        } else {
+            const { error: decError } = await supabase
+            .from('inventory_item_stock')
+            .update({ quantity: sourceStock.quantity - qty })
+            .eq('item_id', itemId)
+            .eq('location_id', fromLocId);
+
+            if (decError) continue;
+        }
+
+        // 3. Incrementar destino
+        const { data: destStock } = await supabase
+            .from('inventory_item_stock')
+            .select('quantity')
+            .eq('item_id', itemId)
+            .eq('location_id', toLocId)
+            .maybeSingle();
+
+        if (destStock) {
+            await supabase
+                .from('inventory_item_stock')
+                .update({ quantity: destStock.quantity + qty })
+                .eq('item_id', itemId)
+                .eq('location_id', toLocId);
+        } else {
+            await supabase
+                .from('inventory_item_stock')
+                .insert({ item_id: itemId, location_id: toLocId, quantity: qty });
+        }
+
+        // 4. Registrar movimiento
+        await supabase.from('inventory_movements').insert({
+            organization_id: user.workshopId,
+            item_id: itemId,
+            from_location_id: fromLocId,
+            to_location_id: toLocId,
+            quantity: qty,
+            movement_type: 'transfer',
+            created_by: user.userId
+        });
+        
+        successCount++;
+    }
+
+    revalidatePath('/inventory');
+    
+    if (successCount === 0) {
+        return { message: 'No se pudo trasladar ningún item (stock insuficiente o errores).' };
+    }
+    if (successCount < itemsToTransfer.length) {
+        return { message: `Se trasladaron ${successCount} de ${itemsToTransfer.length} items.` };
+    }
+
+    return { success: true };
 }

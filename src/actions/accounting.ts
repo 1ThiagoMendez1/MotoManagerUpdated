@@ -718,7 +718,7 @@ export async function getRealtimeFinancialDataRaw(
   // 1. Fetch sales
   const { data: sales, error: salesError } = await supabaseAdmin
     .from('sales')
-    .select('id, total, status, created_at, payment_method, sale_items(item_type, total, inventory_items(category), service_catalog(category))')
+    .select('id, total, status, created_at, payment_method, notes, sale_number, sale_items(item_type, total, inventory_items(category), service_catalog(category))')
     .eq('organization_id', organizationId)
     .in('status', ['paid', 'completed'])
     .gte('created_at', startIso)

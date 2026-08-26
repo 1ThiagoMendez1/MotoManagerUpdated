@@ -380,6 +380,7 @@ export async function addDepositToWorkOrder(formData: FormData) {
     const workOrderId = formData.get('workOrderId') as string;
     const amount = parseFloat(formData.get('amount') as string);
     const mode = formData.get('mode') as string || 'add';
+    const paymentMethod = formData.get('paymentMethod') as string || 'Efectivo';
 
     if (!workOrderId || isNaN(amount) || amount < 0) {
         throw new Error('Datos inválidos');
@@ -388,32 +389,76 @@ export async function addDepositToWorkOrder(formData: FormData) {
     // Obtener las observaciones actuales para sumar el abono
     const { data: woData } = await supabase
         .from('work_orders')
-        .select('customer_observations')
+        .select('customer_observations, order_number, motorcycle_id')
         .eq('id', workOrderId)
         .eq('organization_id', user.workshopId)
         .single();
 
-    let currentObs = woData?.customer_observations || '';
+        // Query current abonos directly from sales
+    const { data: depositSales } = await supabase
+        .from('sales')
+        .select('total')
+        .eq('work_order_id', workOrderId)
+        .ilike('notes', 'Abono de orden%');
+        
     let currentAbono = 0;
-    const match = currentObs.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
-    
-    if (match) {
-        currentAbono = parseFloat(match[1]);
-        currentObs = currentObs.replace(/Abono registrado:\s*(\d+(\.\d+)?)\s*/, '').trim();
+    if (depositSales) {
+        currentAbono = depositSales.reduce((sum, s) => sum + Number(s.total || 0), 0);
     }
     
-    const totalAbono = mode === 'set' ? amount : (currentAbono + amount);
+    const amountToAdd = mode === 'set' ? (amount - currentAbono) : amount;
+    
+    // RESTORE THE CUSTOMER OBSERVATIONS UPDATE FOR COMPATIBILITY
+    const totalAbono = currentAbono + amountToAdd;
+    let currentObs = woData?.customer_observations || '';
+    currentObs = currentObs.replace(/Abono registrado:\s*(\d+(\.\d+)?)\s*/, '').trim();
+    
     const newObs = totalAbono > 0 
         ? `Abono registrado: ${totalAbono}${currentObs ? '\n' + currentObs : ''}` 
-        : currentObs; // Si es 0, simplemente lo quitamos
+        : currentObs;
 
-    const { error } = await supabase
+    await supabase
         .from('work_orders')
         .update({ customer_observations: newObs })
         .eq('id', workOrderId)
         .eq('organization_id', user.workshopId);
 
-    if (error) throw new Error('Error al actualizar abono');
+    // Manage cash flow entry for the deposit
+    if (amountToAdd !== 0) {
+        // Map payment method
+        let dbPaymentMethod = 'cash';
+        if (paymentMethod === 'Tarjeta') dbPaymentMethod = 'credit_card';
+        if (paymentMethod === 'Nequi') dbPaymentMethod = 'nequi';
+        if (paymentMethod === 'DaviPlata') dbPaymentMethod = 'daviplata';
+        if (paymentMethod === 'Transferencia') dbPaymentMethod = 'transfer';
+        if (paymentMethod === 'Otros') dbPaymentMethod = 'other';
+        
+        // ALWAYS insert a new sale record for the amountToAdd (to maintain independent history)
+        if (amountToAdd !== 0) {
+
+            // Get motorcycle for plate mapping
+            const { data: motoData } = await supabase
+                .from('motorcycles')
+                .select('license_plate')
+                .eq('id', woData?.motorcycle_id)
+                .single();
+            const plate = motoData?.license_plate || 'S/N';
+            
+            // Create a new sale for the deposit
+            const { data: newSale } = await supabase.from('sales').insert({
+                organization_id: user.workshopId,
+                work_order_id: workOrderId,
+                sale_number: `AB-${woData?.order_number}-${Math.floor(Date.now() / 1000).toString().slice(-4)}`,
+                subtotal: amountToAdd,
+                total: amountToAdd,
+                payment_method: dbPaymentMethod,
+                status: 'paid',
+                notes: `Abono de orden #${woData?.order_number} - ${plate}`
+            }).select().single();
+            
+            
+        }
+    }
 
     revalidatePath('/work-orders/' + workOrderId);
 }

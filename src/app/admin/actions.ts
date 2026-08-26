@@ -41,8 +41,7 @@ export async function createUser(data: any) {
     await supabaseAdmin
         .from('profiles')
         .update({ 
-            phone: data.phone,
-            is_super_admin: data.isSuperAdmin
+            phone: data.phone
         })
         .eq('id', newUserId);
 
@@ -100,8 +99,7 @@ export async function updateUser(userId: string, data: any) {
         .update({ 
             first_name: firstName,
             last_name: lastName,
-            phone: data.phone,
-            is_super_admin: data.isSuperAdmin
+            phone: data.phone
         })
         .eq('id', userId);
         

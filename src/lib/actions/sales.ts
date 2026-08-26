@@ -201,7 +201,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const itemsTotal = productItemsForTotal.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const subtotal = itemsTotal + data.laborCost;
         const discountAmount = itemsTotal * ((data.discountPercentage || 0) / 100);
-        const total = subtotal - discountAmount;
+        const total = Math.max(0, subtotal - discountAmount - (data.depositAmount || 0));
 
         // 4. Create or Update Sale Record
         // Check if there is already a paid/completed sale for this work order to prevent duplicates
@@ -540,7 +540,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
             discountPercentage: data.discountPercentage,
             discountAmount: discountAmount,
             depositAmount: parsedDeposit,
-            remainingBalance: parsedDeposit > 0 ? Math.max(0, total - parsedDeposit) : undefined,
+            remainingBalance: parsedDeposit > 0 ? total : undefined,
             total: total,
             paymentMethod: data.paymentMethod === 'Wompi' ? 'Wompi' : mapPaymentMethodToUi(dbPaymentMethod),
             workOrderId: wo?.order_number,

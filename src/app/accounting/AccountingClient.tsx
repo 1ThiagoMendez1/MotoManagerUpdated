@@ -117,7 +117,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
   }, [organizationId, periodFilter, activeTab, refreshKey]);
 
   const { chartData, metrics, paymentMethodsData, cashFlowData } = useMemo(() => {
-    if (!realtimeData) return { chartData: [], metrics: { ingresos: 0, gastos: 0, utilidad: 0, margen: 0, totalVentas: 0, label: '' }, paymentMethodsData: [], cashFlowData: { efectivoIngresado: 0, efectivoNeto: 0, otrosMetodos: 0, otrosMetodosIngresado: 0, totalOtherExpenses: 0, categorias: [], totalCashExpenses: 0, initialBase: 0, cashBases: [] } };
+    if (!realtimeData) return { chartData: [], metrics: { ingresos: 0, gastos: 0, utilidad: 0, margen: 0, totalVentas: 0, label: '' }, paymentMethodsData: [], cashFlowData: { efectivoIngresado: 0, efectivoNeto: 0, otrosMetodos: 0, otrosMetodosIngresado: 0, totalOtherExpenses: 0, categorias: [], totalCashExpenses: 0, initialBase: 0, cashBases: [], cashHistory: [], bankHistory: [] } };
     
     let aggregated: Record<string, { ingresos: number, egresos: number, utilidad: number, ventas: number }> = {};
     let totalIngresos = 0;
@@ -236,6 +236,33 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
     const totalOtherExpenses = totalEgresos - totalCashExpenses;
     const otrosMetodosNeto = otrosMetodosIngresado - totalOtherExpenses;
 
+    
+    const cashHistory: { label: string, amount: number, method: string }[] = [];
+    const bankHistory: { label: string, amount: number, method: string }[] = [];
+    
+    realtimeData.sales.forEach(s => {
+       const isAbono = s.notes && s.notes.includes('Abono de orden');
+       let label = s.sale_number || 'Venta';
+       if (isAbono) {
+           label = s.sale_number + (s.notes ? ' (' + s.notes.split('-').pop().trim() + ')' : '');
+       }
+       
+       const uiMethod = s.payment_method === 'cash' ? 'Efectivo' :
+                        s.payment_method === 'transfer' ? 'Transferencia' :
+                        s.payment_method === 'credit_card' ? 'Tarjeta' :
+                        s.payment_method === 'nequi' ? 'Nequi' :
+                        s.payment_method === 'daviplata' ? 'DaviPlata' : 'Otros';
+
+       const amount = Number(s.total) || 0;
+       if (amount > 0) {
+           if (uiMethod === 'Efectivo') {
+               cashHistory.push({ label, amount, method: uiMethod });
+           } else {
+               bankHistory.push({ label, amount, method: uiMethod });
+           }
+       }
+    });
+
     const cashFlowData = {
       efectivoIngresado,
       efectivoNeto,
@@ -245,7 +272,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       categorias: Object.keys(categoriesMap).map(k => ({ category: k, amount: categoriesMap[k] })).sort((a,b) => b.amount - a.amount),
       totalCashExpenses,
       initialBase,
-      cashBases: realtimeData.cash_bases || []
+      cashBases: realtimeData.cash_bases || [], cashHistory, bankHistory
     };
 
     return {
@@ -540,6 +567,17 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                         </div>
                       )}
                       
+                      {cashFlowData.cashHistory && cashFlowData.cashHistory.length > 0 && (
+                        <div className="mt-4 space-y-1 pt-4 border-t border-border/50">
+                          <p className="text-[10px] font-bold uppercase text-muted-foreground">Historial de Ingresos</p>
+                          {cashFlowData.cashHistory.map((h: any, i: number) => (
+                            <div key={i} className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground">+ {h.label}</span>
+                              <span className="font-medium text-emerald-500">{formatCurrency(h.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {periodFilter === 'day' && (
                         <div className="mt-4 pt-4 border-t border-border/50">
                           <label className="text-xs font-medium text-foreground mb-1 block">Añadir a Base de Caja (Hoy)</label>
@@ -604,6 +642,17 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                         Ingresos banco: {formatCurrency(cashFlowData.otrosMetodosIngresado)} <br/>
                         Gastos deducidos: {formatCurrency(cashFlowData.totalOtherExpenses)}
                       </p>
+                      {cashFlowData.bankHistory && cashFlowData.bankHistory.length > 0 && (
+                        <div className="mt-4 space-y-1 pt-4 border-t border-border/50">
+                          <p className="text-[10px] font-bold uppercase text-muted-foreground">Historial de Ingresos Bancarios</p>
+                          {cashFlowData.bankHistory.map((h: any, i: number) => (
+                            <div key={i} className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground truncate max-w-[150px]">+ {h.label} ({h.method})</span>
+                              <span className="font-medium text-indigo-500">{formatCurrency(h.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </div>

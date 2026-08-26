@@ -301,7 +301,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   );
 
   let query = supabaseAdmin.from('work_orders')
-    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, sale_items(*, inventory_items(*))), work_order_services(*, service_catalog(*)), organizations(name)')
+    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, created_by_profile:profiles!sales_created_by_fkey(first_name, last_name), sale_items(*, inventory_items(*))), work_order_services(*, service_catalog(*)), organizations(name)')
     .eq('id', id)
     .eq('organization_id', user.workshopId);
 
@@ -318,11 +318,26 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   const { items: technicians } = await getTechnicians();
 
   let parsedDeposit = 0;
-  if (wo.customer_observations) {
-      const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
-      if (match) {
-          parsedDeposit = parseFloat(match[1]);
-      }
+  let depositHistory: any[] = [];
+  if (wo.sales && wo.sales.length > 0) {
+      wo.sales.forEach((sale: any) => {
+          if (sale.notes && sale.notes.includes('Abono de orden')) {
+              parsedDeposit += Number(sale.total);
+              depositHistory.push({
+                  id: sale.id,
+                  amount: sale.total,
+                  method: sale.payment_method === 'cash' ? 'Efectivo' :
+                          sale.payment_method === 'transfer' ? 'Transferencia' :
+                          sale.payment_method === 'credit_card' ? 'Tarjeta' :
+                          sale.payment_method === 'nequi' ? 'Nequi' :
+                          sale.payment_method === 'daviplata' ? 'DaviPlata' :
+                          sale.payment_method === 'wompi' ? 'Wompi' : 'Otros',
+                  date: sale.created_at,
+                  sale_number: sale.sale_number,
+                  received_by: sale.created_by_profile ? `${sale.created_by_profile.first_name} ${sale.created_by_profile.last_name}`.trim() : 'Sistema'
+              });
+          }
+      });
   }
 
   return {
@@ -389,7 +404,9 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         name: s.service_catalog.name,
         category: s.service_catalog.category
       } : null
-    })) : []
+    })) : [],
+    depositAmount: parsedDeposit,
+    depositHistory: depositHistory
   };
 };
 

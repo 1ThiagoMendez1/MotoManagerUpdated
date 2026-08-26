@@ -19,10 +19,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { AddInventoryItem } from '@/components/forms/AddInventoryItem';
 import { EditInventoryItem } from '@/components/forms/EditInventoryItem';
 import { TransferStockDialog } from '@/components/forms/TransferStockDialog';
+import { BulkTransferDialog } from '@/components/forms/BulkTransferDialog';
 import { ItemKardexModal } from '@/components/inventory/ItemKardexModal';
 import { ExportInventoryButton } from '@/components/buttons/ExportInventoryButton';
 import { ExportLowStockButton } from '@/components/buttons/ExportLowStockButton';
@@ -49,6 +51,124 @@ export default function InventoryClient({
   totalPages: number;
   globalMovements?: any[];
 }) {
+  const [selectedVitrina, setSelectedVitrina] = useState<string[]>([]);
+  const [selectedBodega, setSelectedBodega] = useState<string[]>([]);
+
+  function toggleSelection(id: string, locationType: 'warehouse' | 'storefront') {
+    if (locationType === 'warehouse') {
+      setSelectedBodega(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    } else {
+      setSelectedVitrina(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    }
+  }
+
+  function toggleAll(items: InventoryItem[], locationType: 'warehouse' | 'storefront') {
+    const trackableItems = items.filter(i => i.trackInventory !== false);
+    if (locationType === 'warehouse') {
+      if (selectedBodega.length === trackableItems.length && trackableItems.length > 0) {
+        setSelectedBodega([]);
+      } else {
+        setSelectedBodega(trackableItems.map(i => i.id));
+      }
+    } else {
+      if (selectedVitrina.length === trackableItems.length && trackableItems.length > 0) {
+        setSelectedVitrina([]);
+      } else {
+        setSelectedVitrina(trackableItems.map(i => i.id));
+      }
+    }
+  }
+
+  function renderTable(inventory: InventoryItem[], locationType: 'warehouse' | 'storefront') {
+    const filteredInventory = inventory.filter(item => {
+        if (item.trackInventory === false) return true;
+        const stock = item.stockDetails?.find(s => s.type === locationType);
+        return stock && stock.quantity >= 0;
+    });
+
+    const selected = locationType === 'warehouse' ? selectedBodega : selectedVitrina;
+    const trackableCount = filteredInventory.filter(i => i.trackInventory !== false).length;
+    const allSelected = trackableCount > 0 && selected.length === trackableCount;
+
+    return (
+        <div className="space-y-4">
+          {selected.length > 0 && (
+            <div className="flex items-center justify-between bg-muted/30 p-2 rounded-md border border-border/50">
+              <span className="text-sm font-medium ml-2">{selected.length} seleccionados</span>
+              <BulkTransferDialog 
+                selectedItemIds={selected} 
+                inventory={inventory} 
+                currentLocation={locationType} 
+                onSuccess={() => {
+                  if (locationType === 'warehouse') setSelectedBodega([]);
+                  else setSelectedVitrina([]);
+                }}
+              />
+            </div>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border/50 hover:bg-transparent">
+                <TableHead className="w-[50px]">
+                  <Checkbox 
+                    checked={allSelected}
+                    onCheckedChange={() => toggleAll(filteredInventory, locationType)}
+                    aria-label="Seleccionar todos"
+                  />
+                </TableHead>
+                <TableHead>Artículo</TableHead>
+                <TableHead className="hidden md:table-cell">Categoría</TableHead>
+                <TableHead className="text-right">Stock en {locationType === 'warehouse' ? 'Bodega' : 'Vitrina'}</TableHead>
+                <TableHead className="text-right hidden md:table-cell">Precio</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredInventory.map((item) => {
+                const stockItem = item.stockDetails?.find(s => s.type === locationType);
+                const qty = stockItem?.quantity || 0;
+                const isLowStock = item.trackInventory !== false && qty <= item.minimumQuantity;
+                const isSelected = selected.includes(item.id);
+                const isTrackable = item.trackInventory !== false;
+                
+                return (
+                  <TableRow key={item.id} className={cn('border-border/50 hover:bg-primary/5 transition-colors', isLowStock && 'bg-destructive/20 hover:bg-destructive/30', isSelected && 'bg-primary/5')}>
+                    <TableCell>
+                      {isTrackable && (
+                        <Checkbox 
+                          checked={isSelected}
+                          onCheckedChange={() => toggleSelection(item.id, locationType)}
+                          aria-label={`Seleccionar ${item.name}`}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                        <div>{item.name}</div>
+                        <div className="text-sm text-muted-foreground font-mono">{item.sku}</div>
+                        {item.location && <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Package className="w-3 h-3" /> {item.location}</div>}
+                        {item.supplier && <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Package className="w-3 h-3" /> Proveedor: {item.supplier}</div>}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{item.category}</TableCell>
+                    <TableCell className="text-right font-bold text-lg">
+                        {!isTrackable ? '∞' : qty}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-right text-muted-foreground">{formatCurrency(item.price)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <TransferStockDialog item={item} currentLocation={locationType} />
+                        <ItemKardexModal item={item} />
+                        <EditInventoryItem item={item} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+    );
+  }
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
@@ -133,56 +253,4 @@ export default function InventoryClient({
       </div>
     </div>
   );
-}
-
-function renderTable(inventory: InventoryItem[], locationType: 'warehouse' | 'storefront') {
-    const filteredInventory = inventory.filter(item => {
-        if (item.trackInventory === false) return true; // Show non-tracked everywhere
-        const stock = item.stockDetails?.find(s => s.type === locationType);
-        return stock && stock.quantity >= 0; // Show if it has an entry, even if 0
-    });
-
-    return (
-        <Table>
-          <TableHeader>
-            <TableRow className="border-border/50 hover:bg-transparent">
-              <TableHead>Artículo</TableHead>
-              <TableHead className="hidden md:table-cell">Categoría</TableHead>
-              <TableHead className="text-right">Stock en {locationType === 'warehouse' ? 'Bodega' : 'Vitrina'}</TableHead>
-              <TableHead className="text-right hidden md:table-cell">Precio</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredInventory.map((item) => {
-              const stockItem = item.stockDetails?.find(s => s.type === locationType);
-              const qty = stockItem?.quantity || 0;
-              const isLowStock = item.trackInventory !== false && qty <= item.minimumQuantity;
-              
-              return (
-                <TableRow key={item.id} className={cn('border-border/50 hover:bg-primary/5 transition-colors', isLowStock && 'bg-destructive/20 hover:bg-destructive/30')}>
-                  <TableCell className="font-medium">
-                      <div>{item.name}</div>
-                      <div className="text-sm text-muted-foreground font-mono">{item.sku}</div>
-                      {item.location && <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Package className="w-3 h-3" /> {item.location}</div>}
-                      {item.supplier && <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Package className="w-3 h-3" /> Proveedor: {item.supplier}</div>}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{item.category}</TableCell>
-                  <TableCell className="text-right font-bold text-lg">
-                      {item.trackInventory === false ? '∞' : qty}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-right text-muted-foreground">{formatCurrency(item.price)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-2 justify-end">
-                      {locationType === 'warehouse' && <TransferStockDialog item={item} />}
-                      <ItemKardexModal item={item} />
-                      <EditInventoryItem item={item} />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-    );
 }

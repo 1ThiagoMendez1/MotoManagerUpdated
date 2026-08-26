@@ -53,11 +53,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Proteger la ruta de admin solo para juanurian31@gmail.com
-  if (user && request.nextUrl.pathname.startsWith('/admin') && user.email?.toLowerCase() !== 'juanurian31@gmail.com') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  // Proteger la ruta de admin
+  if (user && request.nextUrl.pathname.startsWith('/admin')) {
+    const isSuperAdmin = user.user_metadata?.is_super_admin === true;
+    const isAllowedEmail = 
+      user.email?.toLowerCase() === 'juanurian31@gmail.com' || 
+      user.email?.toLowerCase() === 'mivraadmin@motomanager.com.co';
+
+    if (!isSuperAdmin && !isAllowedEmail) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Redirigir de login a dashboard si ya está autenticado

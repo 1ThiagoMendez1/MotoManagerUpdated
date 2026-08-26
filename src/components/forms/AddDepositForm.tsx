@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addDepositToWorkOrder } from "@/lib/actions/work-orders";
-import { Edit2, Plus, X } from "lucide-react";
+import { Edit2, X } from "lucide-react";
 
 export function AddDepositForm({ workOrderId, currentDeposit = 0 }: { workOrderId: string, currentDeposit?: number }) {
   const [resetKey, setResetKey] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("Efectivo");
 
   async function handleAction(formData: FormData) {
     try {
+      formData.append("paymentMethod", paymentMethod);
       await addDepositToWorkOrder(formData);
       setResetKey(k => k + 1);
       setIsEditing(false);
@@ -42,7 +45,20 @@ export function AddDepositForm({ workOrderId, currentDeposit = 0 }: { workOrderI
           className="bg-card/30 text-foreground border border-border/50"
           required
         />
-        <Button type="submit" variant={isEditing ? "outline" : "default"} className={!isEditing ? "bg-emerald-600 hover:bg-emerald-700" : "border-emerald-500/50 hover:bg-emerald-500/10"}>
+        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+            <SelectTrigger className="w-[140px] bg-card/30 border-border/50">
+                <SelectValue placeholder="Medio de pago" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="Efectivo">Efectivo</SelectItem>
+                <SelectItem value="Transferencia">Transferencia</SelectItem>
+                <SelectItem value="Tarjeta">Tarjeta</SelectItem>
+                <SelectItem value="Nequi">Nequi</SelectItem>
+                <SelectItem value="DaviPlata">DaviPlata</SelectItem>
+                <SelectItem value="Otros">Otros</SelectItem>
+            </SelectContent>
+        </Select>
+        <Button type="submit" variant={isEditing ? "outline" : "default"} className={!isEditing ? "bg-emerald-600 hover:bg-emerald-700 whitespace-nowrap" : "border-emerald-500/50 hover:bg-emerald-500/10 whitespace-nowrap"}>
           {isEditing ? "Guardar total" : "Sumar abono"}
         </Button>
       </form>
