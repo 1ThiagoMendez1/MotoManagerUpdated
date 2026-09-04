@@ -237,11 +237,66 @@ export default function InventoryClient({
               <CardDescription>Libro mayor de todos los ingresos, traslados y salidas del taller.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="py-10 text-center text-muted-foreground flex flex-col items-center">
-                 <History className="h-10 w-10 mb-4 opacity-50" />
-                 <p>El libro mayor de movimientos está activo.</p>
-                 <p className="text-sm mt-2">Para ver el historial detallado, ve a Bodega o Vitrina y haz clic en el botón <b>Kardex</b> de cada repuesto.</p>
-              </div>
+              {globalMovements.length === 0 ? (
+                <div className="py-10 text-center text-muted-foreground flex flex-col items-center">
+                  <History className="h-10 w-10 mb-4 opacity-50" />
+                  <p>Aún no hay movimientos registrados en el sistema.</p>
+                  <p className="text-sm mt-2">Los ingresos, ventas y traslados aparecerán aquí.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border/50 hover:bg-transparent">
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Artículo</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Origen</TableHead>
+                        <TableHead>Destino</TableHead>
+                        <TableHead className="text-right">Cantidad</TableHead>
+                        <TableHead>Responsable</TableHead>
+                        <TableHead>Notas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {globalMovements.map((mov) => {
+                        let typeText = mov.type;
+                        let typeColor = 'default';
+                        
+                        switch(mov.type) {
+                          case 'purchase': typeText = 'Ingreso (Compra)'; typeColor = 'bg-blue-500/10 text-blue-500'; break;
+                          case 'sale': typeText = 'Venta / Salida'; typeColor = 'bg-red-500/10 text-red-500'; break;
+                          case 'direct_sale': typeText = 'Venta directa'; typeColor = 'bg-red-500/10 text-red-500'; break;
+                          case 'service_sale': typeText = 'Venta por servicio'; typeColor = 'bg-red-500/10 text-red-500'; break;
+                          case 'transfer': typeText = 'Traslado'; typeColor = 'bg-purple-500/10 text-purple-500'; break;
+                          case 'adjustment': typeText = 'Ajuste'; typeColor = 'bg-orange-500/10 text-orange-500'; break;
+                        }
+
+                        return (
+                          <TableRow key={mov.id} className="border-border/50 hover:bg-primary/5 transition-colors">
+                            <TableCell className="whitespace-nowrap">
+                              {new Date(mov.date).toLocaleDateString('es-CO')} {new Date(mov.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={typeColor}>{typeText}</Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">{mov.itemName}</TableCell>
+                            <TableCell className="text-muted-foreground font-mono">{mov.itemSku}</TableCell>
+                            <TableCell>{mov.fromLocation}</TableCell>
+                            <TableCell>{mov.toLocation}</TableCell>
+                            <TableCell className="text-right font-bold">{mov.quantity}</TableCell>
+                            <TableCell>{mov.responsible || mov.user}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={mov.notes}>
+                              {mov.notes}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

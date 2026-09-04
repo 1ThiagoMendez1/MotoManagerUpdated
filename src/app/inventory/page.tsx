@@ -1,5 +1,5 @@
 import { authorize } from '@/lib/auth-server';
-import { getInventory } from '@/lib/data';
+import { getInventory, getGlobalMovements } from '@/lib/data';
 
 // Force dynamic rendering to avoid database connection during build
 export const dynamic = 'force-dynamic';
@@ -23,17 +23,24 @@ export default async function InventoryPage({
   const category = resolvedSearchParams.category || '';
   const currentPage = Number(resolvedSearchParams.page) || 1;
 
-  const { items: inventory, totalPages } = await getInventory({
-    query,
-    category,
-    page: currentPage,
-    limit: ITEMS_PER_PAGE,
-  });
+  const [
+    { items: inventory, totalPages },
+    { items: globalMovements }
+  ] = await Promise.all([
+    getInventory({
+      query,
+      category,
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+    }),
+    getGlobalMovements({ page: 1, limit: 100 })
+  ]);
 
   return (
     <InventoryClient 
       inventory={inventory} 
-      totalPages={totalPages} 
+      totalPages={totalPages}
+      globalMovements={globalMovements}
     />
   );
 }

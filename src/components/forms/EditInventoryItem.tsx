@@ -51,6 +51,13 @@ export function EditInventoryItem({ item }: EditInventoryItemProps) {
   const router = useRouter();
   // @ts-ignore
   const [state, formAction] = useActionState(updateInventoryItem, undefined);
+  const [trackInventory, setTrackInventory] = useState(item.trackInventory !== false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTrackInventory(item.trackInventory !== false);
+    }
+  }, [isOpen, item]);
 
   useEffect(() => {
     if (state?.message) {
@@ -115,14 +122,15 @@ export function EditInventoryItem({ item }: EditInventoryItemProps) {
           </div>
 
           <div className="flex items-center space-x-2 py-2">
-            <Switch id={`trackInventory-${item.id}`} name="trackInventory" defaultChecked={item.trackInventory !== false} onCheckedChange={(checked) => {
+            <Switch id={`trackInventory-${item.id}`} name="trackInventory" checked={trackInventory} onCheckedChange={(checked) => {
+              setTrackInventory(checked);
               const el = document.getElementById(`track-inventory-input-${item.id}`) as HTMLInputElement;
               if (el) el.value = checked ? 'true' : 'false';
             }} />
             <label htmlFor={`trackInventory-${item.id}`} className="text-sm font-medium text-foreground cursor-pointer">
               Controlar Stock (Desmarcar para compras directas o sin stock fijo)
             </label>
-            <input type="hidden" id={`track-inventory-input-${item.id}`} name="trackInventoryVal" defaultValue={item.trackInventory !== false ? 'true' : 'false'} />
+            <input type="hidden" id={`track-inventory-input-${item.id}`} name="trackInventoryVal" value={trackInventory ? 'true' : 'false'} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -161,7 +169,15 @@ export function EditInventoryItem({ item }: EditInventoryItemProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad (Total actual: {item.quantity})</label>
-              <Input name="quantity" type="number" defaultValue={item.quantity} placeholder="25" className="bg-card text-card-foreground border-border" disabled={item.trackInventory !== false} title={item.trackInventory !== false ? "Usa el módulo de compras o transferencias para modificar el stock" : "Ingresa el stock inicial para empezar a controlar"} />
+              <Input 
+                name="quantity" 
+                type="number" 
+                min="0"
+                defaultValue={item.quantity} 
+                placeholder="25" 
+                className="bg-card text-card-foreground border-border" 
+                disabled={!trackInventory} 
+              />
             </div>
             <div>
               <label className="text-sm font-medium text-foreground text-muted-foreground">Cantidad Mínima</label>

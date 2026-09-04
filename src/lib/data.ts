@@ -571,3 +571,71 @@ export const getPurchases = async (organizationId: string) => {
   }
   return data || [];
 };
+
+export const getGlobalMovements = async (params: { page?: number, limit?: number } = {}) => {
+  const user = await requireWorkshop();
+  
+  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+  
+  const page = params.page || 1;
+  const limit = params.limit || 50;
+  const offset = (page - 1) * limit;
+
+  const { data, count, error } = await supabaseAdmin
+    .from('inventory_movements')
+    .select('*, inventory_items(name, code), from_loc:inventory_locations!inventory_movements_from_location_id_fkey(name), to_loc:inventory_locations!inventory_movements_to_location_id_fkey(name), user:profiles(first_name, last_name)', { count: 'exact' })
+    .eq('organization_id', user.workshopId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error('Error fetching global movements:', error);
+    return { items: [], totalPages: 0 };
+  }
+  
+  const saleIds = (data || []).filter(m => m.movement_type === 'sale' && m.reference_id).map(m => m.reference_id);
+  const salesMap: Record<string, any> = {};
+  
+  if (saleIds.length > 0) {
+    const { data: salesData } = await supabaseAdmin
+      .from('sales')
+      .select('id, work_order_id')
+      .in('id', saleIds);
+      
+    if (salesData) {
+      salesData.forEach(sale => {
+        salesMap[sale.id] = sale;
+      });
+    }
+  }
+
+  const items = (data || []).map((m: any) => {
+    let resolvedType = m.movement_type;
+    if (resolvedType === 'sale' && m.reference_id) {
+        const sale = salesMap[m.reference_id];
+        if (sale) {
+            resolvedType = sale.work_order_id ? 'service_sale' : 'direct_sale';
+        }
+    }
+    
+    return {
+      id: m.id,
+      date: m.created_at,
+      type: resolvedType, // 'purchase', 'transfer', 'adjustment', 'sale', 'direct_sale', 'service_sale'
+      quantity: m.quantity,
+      itemName: m.inventory_items?.name || 'Desconocido',
+      itemSku: m.inventory_items?.code || '',
+      fromLocation: m.from_loc?.name || '-',
+      toLocation: m.to_loc?.name || '-',
+      notes: m.notes || '',
+      responsible: m.user ? `${m.user.first_name} ${m.user.last_name}` : 'Sistema'
+    };
+  });
+
+  return { items, totalPages: Math.ceil((count || 0) / limit) };
+};

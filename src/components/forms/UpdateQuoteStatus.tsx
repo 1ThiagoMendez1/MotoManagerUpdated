@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import { updateQuoteStatus } from '@/lib/actions/work-orders';
 import type { WorkOrder } from '@/lib/types';
@@ -20,6 +20,7 @@ export function UpdateQuoteStatus({ workOrder }: UpdateQuoteStatusProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>(
     workOrder.quoteStatus || 'Pendiente'
   );
+  const [isPending, startTransition] = useTransition();
   
   // @ts-ignore
   const [state, formAction] = useActionState(updateQuoteStatus, undefined);
@@ -38,8 +39,10 @@ export function UpdateQuoteStatus({ workOrder }: UpdateQuoteStatusProps) {
     formData.append('id', workOrder.id);
     formData.append('quoteStatus', value);
     
-    // @ts-ignore
-    formAction(formData);
+    startTransition(() => {
+      // @ts-ignore
+      formAction(formData);
+    });
   };
 
   const getVariantStyles = (status: string) => {

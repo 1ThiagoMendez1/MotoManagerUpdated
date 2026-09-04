@@ -150,11 +150,23 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const dbPaymentMethod = mapPaymentMethodToDb(data.paymentMethod);
         const saleNumber = await generateSaleNumber(supabase, user.workshopId, 'VS');
 
+        // Check if quote was approved before to know if inventory was already deducted
+        let quoteWasApproved = false;
+        if (data.workOrderId) {
+            const { data: currentWo } = await supabase
+                .from('work_orders')
+                .select('quote_status')
+                .eq('id', data.workOrderId)
+                .single();
+            quoteWasApproved = currentWo?.quote_status === 'approved';
+        }
+
         // 2. Check Inventory (skip items already deducted from approved quote)
         const itemsToTrack = new Map<string, { locationId: string, amount: number }[]>();
 
         for (const item of data.items || []) {
-            if (item.fromWorkOrder) continue;
+            if (item.type === 'service') continue;
+            if (item.fromWorkOrder && quoteWasApproved) continue;
 
             const { data: invItem } = await supabase
                 .from('inventory_items')
@@ -296,26 +308,22 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         const productItems = (data.items || []).filter(item => item.type !== 'service');
 
         for (const item of productItems) {
-            if (item.fromWorkOrder) {
-                // El item ya fue insertado en sale_items y ya se le descontó el stock cuando se agregó a la orden.
-                continue;
+            if (!item.fromWorkOrder) {
+                const { error: itemError } = await supabase
+                    .from('sale_items')
+                    .insert({
+                        sale_id: sale.id,
+                        item_type: 'inventory',
+                        inventory_item_id: item.inventoryItemId,
+                        description: item.name || 'Producto',
+                        quantity: item.quantity,
+                        unit_price: item.price,
+                        total: item.price * item.quantity
+                    });
+
+                if (itemError) throw new Error('Error al registrar uno de los productos de la venta.');
             }
 
-            const { error: itemError } = await supabase
-                .from('sale_items')
-                .insert({
-                    sale_id: sale.id,
-                    item_type: 'inventory',
-                    inventory_item_id: item.inventoryItemId,
-                    description: item.name || 'Producto',
-                    quantity: item.quantity,
-                    unit_price: item.price,
-                    total: item.price * item.quantity
-                });
-
-            if (itemError) throw new Error('Error al registrar uno de los productos de la venta.');
-
-            // Decrement stock using RPC only if tracked
             // Decrement stock using deduction plan
             const plan = itemsToTrack.get(item.inventoryItemId);
             if (plan) {
@@ -323,7 +331,9 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     const { error: updateError } = await supabase.rpc('decrement_inventory', {
                         p_item_id: item.inventoryItemId,
                         p_amount: deduction.amount,
-                        p_location_id: deduction.locationId
+                        p_location_id: deduction.locationId,
+                        p_sale_id: sale.id,
+                        p_user_id: user.userId
                     });
                     
                     if (updateError) throw new Error(`Error al descontar inventario del producto.`);
@@ -781,7 +791,9 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                         const { error: updateError } = await supabase.rpc('decrement_inventory', {
                             p_item_id: itemId,
                             p_amount: deduction.amount,
-                            p_location_id: deduction.locationId
+                            p_location_id: deduction.locationId,
+                            p_sale_id: sale.id,
+                            p_user_id: user.userId
                         });
                         if (updateError) {
                             console.error('RPC Error:', updateError);

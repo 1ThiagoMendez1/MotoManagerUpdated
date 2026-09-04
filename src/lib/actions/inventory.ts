@@ -17,6 +17,8 @@ const inventorySchema = z.object({
     minimumQuantity: z.coerce.number().int().optional().default(0),
     location: z.string().optional(),
     destination: z.string().optional().default('storefront'),
+    stockStorefront: z.coerce.number().optional(),
+    stockWarehouse: z.coerce.number().optional(),
 });
 
 export async function createInventoryItem(prevState: any, formData: FormData) {
@@ -146,6 +148,8 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
         minimumQuantity: formData.get('minimumQuantity'),
         location: formData.get('location') || '',
         destination: formData.get('destination') || undefined,
+        stockStorefront: formData.get('stockStorefront') ?? undefined,
+        stockWarehouse: formData.get('stockWarehouse') ?? undefined,
     });
 
     if (!validatedFields.success) {
@@ -176,13 +180,6 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
     if (nameError) return { message: 'Error al verificar el nombre del producto.' };
     if (existingName) return { message: 'Ya existe otro producto con este nombre en el inventario.' };
 
-    // Fetch old item to check if track_inventory was false
-    const { data: oldItem } = await supabase
-        .from('inventory_items')
-        .select('track_inventory')
-        .eq('id', id)
-        .single();
-
     const { error } = await supabase
         .from('inventory_items')
         .update({
@@ -202,47 +199,152 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
         return { message: 'Error al actualizar.' };
     }
     
-    // Si el item antes no controlaba stock, la caja de cantidad estaba habilitada. 
-    // Si el usuario tipeó algo, lo guardamos sin importar si encendió el switch o no.
-    if (oldItem && oldItem.track_inventory === false) {
-        const qtyRaw = formData.get('quantity');
-        const qtyNum = qtyRaw ? Number(qtyRaw) : 0;
-        
-        if (qtyNum >= 0) {
-            // Verificar si ya tiene stock en vitrina
-            const { data: vitrinaLoc } = await supabase
+    // Gestión del stock en ubicaciones (Vitrina / Bodega)
+    if (data.trackInventory !== false) {
+        // Asegurar que existan las ubicaciones de la organización
+        let { data: locations } = await supabase
+            .from('inventory_locations')
+            .select('id, type, name')
+            .eq('organization_id', user.workshopId);
+
+        let vitrinaLoc = locations?.find(l => l.type === 'storefront');
+        let bodegaLoc = locations?.find(l => l.type === 'warehouse');
+
+        if (!vitrinaLoc) {
+            const { data: newLoc } = await supabase
                 .from('inventory_locations')
-                .select('id')
-                .eq('organization_id', user.workshopId)
-                .eq('type', 'storefront')
-                .maybeSingle();
-                
-            if (vitrinaLoc) {
-                // Borrar cualquier stock basura anterior para este item
-                await supabase.from('inventory_item_stock').delete().eq('item_id', id);
-                
-                // Insertar el stock nuevo
-                await supabase.from('inventory_item_stock').insert({
-                    item_id: id,
-                    location_id: vitrinaLoc.id,
-                    quantity: qtyNum
-                });
-                
-                if (qtyNum > 0) {
-                    // Registrar el movimiento de ajuste inicial
-                    await supabase.from('inventory_movements').insert({
-                        organization_id: user.workshopId,
-                        item_id: id,
-                        from_location_id: null,
-                        to_location_id: vitrinaLoc.id,
-                        quantity: qtyNum,
-                        movement_type: 'adjustment',
-                        created_by: user.userId,
-                        notes: 'Stock inicial al activar control de inventario'
-                    });
+                .insert({ organization_id: user.workshopId, name: 'Vitrina', type: 'storefront' })
+                .select('id, type, name')
+                .single();
+            if (newLoc) vitrinaLoc = newLoc;
+        }
+
+        if (!bodegaLoc) {
+            const { data: newLoc } = await supabase
+                .from('inventory_locations')
+                .insert({ organization_id: user.workshopId, name: 'Bodega Principal', type: 'warehouse' })
+                .select('id, type, name')
+                .single();
+            if (newLoc) bodegaLoc = newLoc;
+        }
+
+        // Obtener registros de stock actuales para este item
+        const { data: currentStocks } = await supabase
+            .from('inventory_item_stock')
+            .select('id, location_id, quantity')
+            .eq('item_id', id);
+
+        const currentVitrinaStock = currentStocks?.find(s => s.location_id === vitrinaLoc?.id);
+        const currentBodegaStock = currentStocks?.find(s => s.location_id === bodegaLoc?.id);
+
+        const oldVitrinaQty = currentVitrinaStock ? Number(currentVitrinaStock.quantity) : 0;
+        const oldBodegaQty = currentBodegaStock ? Number(currentBodegaStock.quantity) : 0;
+
+        const stockStorefrontRaw = formData.get('stockStorefront');
+        const stockWarehouseRaw = formData.get('stockWarehouse');
+        const quantityRaw = formData.get('quantity');
+
+        let targetVitrinaQty = oldVitrinaQty;
+        let targetBodegaQty = oldBodegaQty;
+
+        if (stockStorefrontRaw !== null || stockWarehouseRaw !== null) {
+            targetVitrinaQty = stockStorefrontRaw !== null && stockStorefrontRaw !== '' ? Math.max(0, Number(stockStorefrontRaw)) : 0;
+            targetBodegaQty = stockWarehouseRaw !== null && stockWarehouseRaw !== '' ? Math.max(0, Number(stockWarehouseRaw)) : 0;
+        } else if (quantityRaw !== null && quantityRaw !== '') {
+            const requestedTotal = Math.max(0, Number(quantityRaw));
+            const currentTotal = oldVitrinaQty + oldBodegaQty;
+            const diff = requestedTotal - currentTotal;
+            if (diff !== 0) {
+                if (oldBodegaQty > 0 && oldVitrinaQty === 0) {
+                    targetBodegaQty = requestedTotal;
+                } else if (oldVitrinaQty > 0 && oldBodegaQty === 0) {
+                    targetVitrinaQty = requestedTotal;
+                } else if (oldBodegaQty > 0 && oldVitrinaQty > 0) {
+                    if (diff > 0) {
+                        targetVitrinaQty = oldVitrinaQty + diff;
+                    } else {
+                        const absDiff = Math.abs(diff);
+                        if (oldVitrinaQty >= absDiff) {
+                            targetVitrinaQty = oldVitrinaQty - absDiff;
+                        } else {
+                            const remainder = absDiff - oldVitrinaQty;
+                            targetVitrinaQty = 0;
+                            targetBodegaQty = Math.max(0, oldBodegaQty - remainder);
+                        }
+                    }
+                } else {
+                    const isBodega = (data.location || '').toLowerCase().includes('bodega');
+                    if (isBodega) {
+                        targetBodegaQty = requestedTotal;
+                    } else {
+                        targetVitrinaQty = requestedTotal;
+                    }
                 }
             }
         }
+
+        // Actualizar Vitrina si cambió
+        if (vitrinaLoc && targetVitrinaQty !== oldVitrinaQty) {
+            const diff = targetVitrinaQty - oldVitrinaQty;
+            if (currentVitrinaStock) {
+                await supabase
+                    .from('inventory_item_stock')
+                    .update({ quantity: targetVitrinaQty })
+                    .eq('id', currentVitrinaStock.id);
+            } else {
+                await supabase
+                    .from('inventory_item_stock')
+                    .insert({
+                        item_id: id,
+                        location_id: vitrinaLoc.id,
+                        quantity: targetVitrinaQty
+                    });
+            }
+
+            await supabase.from('inventory_movements').insert({
+                organization_id: user.workshopId,
+                item_id: id,
+                from_location_id: diff < 0 ? vitrinaLoc.id : null,
+                to_location_id: diff > 0 ? vitrinaLoc.id : null,
+                quantity: Math.abs(diff),
+                movement_type: 'adjustment',
+                created_by: user.userId,
+                notes: `Ajuste manual de stock en Vitrina (${diff > 0 ? `+${diff}` : diff})`
+            });
+        }
+
+        // Actualizar Bodega si cambió
+        if (bodegaLoc && targetBodegaQty !== oldBodegaQty) {
+            const diff = targetBodegaQty - oldBodegaQty;
+            if (currentBodegaStock) {
+                await supabase
+                    .from('inventory_item_stock')
+                    .update({ quantity: targetBodegaQty })
+                    .eq('id', currentBodegaStock.id);
+            } else {
+                await supabase
+                    .from('inventory_item_stock')
+                    .insert({
+                        item_id: id,
+                        location_id: bodegaLoc.id,
+                        quantity: targetBodegaQty
+                    });
+            }
+
+            await supabase.from('inventory_movements').insert({
+                organization_id: user.workshopId,
+                item_id: id,
+                from_location_id: diff < 0 ? bodegaLoc.id : null,
+                to_location_id: diff > 0 ? bodegaLoc.id : null,
+                quantity: Math.abs(diff),
+                movement_type: 'adjustment',
+                created_by: user.userId,
+                notes: `Ajuste manual de stock en Bodega (${diff > 0 ? `+${diff}` : diff})`
+            });
+        }
+    } else {
+        // Si el artículo no controla stock, eliminar registros de stock existentes
+        await supabase.from('inventory_item_stock').delete().eq('item_id', id);
     }
 
     revalidatePath('/inventory');
@@ -457,7 +559,29 @@ export async function getKardexMovements(itemId: string) {
         return { error: error.message };
     }
     
-    return { data: data || [] };
+    let resolvedData = data || [];
+    const saleIds = resolvedData.filter((m: any) => m.movement_type === 'sale' && m.reference_id).map((m: any) => m.reference_id);
+    
+    if (saleIds.length > 0) {
+        const { data: salesData } = await supabaseAdmin
+            .from('sales')
+            .select('id, work_order_id')
+            .in('id', saleIds);
+            
+        if (salesData) {
+            const salesMap: Record<string, any> = {};
+            salesData.forEach((s: any) => { salesMap[s.id] = s; });
+            
+            resolvedData = resolvedData.map((m: any) => {
+                if (m.movement_type === 'sale' && m.reference_id && salesMap[m.reference_id]) {
+                    m.movement_type = salesMap[m.reference_id].work_order_id ? 'service_sale' : 'direct_sale';
+                }
+                return m;
+            });
+        }
+    }
+    
+    return { data: resolvedData };
 }
 
 export async function bulkTransferStock(prevState: any, formData: FormData) {

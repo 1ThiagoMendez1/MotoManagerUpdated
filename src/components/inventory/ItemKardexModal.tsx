@@ -48,7 +48,9 @@ export function ItemKardexModal({ item }: { item: InventoryItem }) {
       switch (type) {
           case 'purchase': return <ShoppingCart className="w-4 h-4 text-emerald-500" />;
           case 'transfer': return <ArrowRightLeft className="w-4 h-4 text-amber-500" />;
-          case 'sale': return <Tag className="w-4 h-4 text-rose-500" />;
+          case 'sale': 
+          case 'direct_sale': 
+          case 'service_sale': return <Tag className="w-4 h-4 text-rose-500" />;
           default: return <History className="w-4 h-4 text-muted-foreground" />;
       }
   };
@@ -58,6 +60,8 @@ export function ItemKardexModal({ item }: { item: InventoryItem }) {
           case 'purchase': return 'Compra (Ingreso)';
           case 'transfer': return 'Traslado Interno';
           case 'sale': return 'Salida (Venta/Orden)';
+          case 'direct_sale': return 'Venta directa';
+          case 'service_sale': return 'Venta por servicio';
           default: return 'Ajuste Manual';
       }
   };
