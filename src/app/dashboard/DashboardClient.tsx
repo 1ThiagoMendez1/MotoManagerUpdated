@@ -47,23 +47,25 @@ const containerVariants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1
+      staggerChildren: 0.08,
+      delayChildren: 0.05
     }
   }
 };
 
 const itemVariants: any = {
-  hidden: { y: 20, opacity: 0 },
+  hidden: { opacity: 0, y: 12 },
   visible: {
-    y: 0,
     opacity: 1,
-    transition: { type: 'spring', stiffness: 100 }
+    y: 0,
+    transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }
   }
 };
 
 export default function DashboardPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const [reminders, setReminders] = useState<any[]>([]);
   const [stats, setStats] = useState({
     ingresosMes: 0,
@@ -77,6 +79,10 @@ export default function DashboardPage() {
     workshopName: '',
     subscriptionPlan: 'basic'
   });
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const planLimits = getPlanLimits(stats.subscriptionPlan);
   const isChartsLocked = planLimits.dashboard_level !== 'complete';
@@ -294,25 +300,43 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    let isSubscribed = true;
     const fetchDashboard = async () => {
       try {
         const resStats = await getDashboardData();
-        if (resStats.success && resStats.data) {
-          setStats(resStats.data as any);
+        if (isSubscribed && resStats?.success && resStats?.data) {
+          const d = resStats.data as any;
+          setStats({
+            ingresosMes: Number(d.ingresosMes) || 0,
+            motosEnTallerCount: Number(d.motosEnTallerCount) || 0,
+            activeWorkOrdersCount: Number(d.activeWorkOrdersCount) || 0,
+            stockCriticoCount: Number(d.stockCriticoCount) || 0,
+            revenueData: Array.isArray(d.revenueData) ? d.revenueData : [],
+            topPartsData: Array.isArray(d.topPartsData) ? d.topPartsData : [],
+            incomeByMethodData: Array.isArray(d.incomeByMethodData) ? d.incomeByMethodData : [],
+            alerts: Array.isArray(d.alerts) ? d.alerts : [],
+            workshopName: d.workshopName || '',
+            subscriptionPlan: d.subscriptionPlan || 'basic'
+          });
         }
         
         const resRem = await getPendingReminders();
-        if (resRem.success && resRem.data) {
+        if (isSubscribed && resRem?.success && Array.isArray(resRem?.data)) {
           setReminders(resRem.data);
         }
-        } catch (e) {
-          console.error("Error fetching dashboard data", e);
-        } finally {
+      } catch (e) {
+        console.error("Error fetching dashboard data", e);
+      } finally {
+        if (isSubscribed) {
           setIsLoading(false);
         }
-      };
-      fetchDashboard();
-    }, []);
+      }
+    };
+    fetchDashboard();
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
   
     if (isLoading) {
       return (
@@ -385,315 +409,326 @@ export default function DashboardPage() {
         }
       />
 
+      <div className="space-y-8">
+        {/* Top KPI Cards */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-8"
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" 
+          id="tour-kpis"
         >
-          {/* Top KPI Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" id="tour-kpis">
-            <motion.div variants={itemVariants}>
-              <Card id="tour-kpi-ingresos" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos del Mes</CardTitle>
-                  <DollarSign className="h-4 w-4 text-primary" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">
-                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(stats.ingresosMes)}
-                  </div>
-                  <p className="text-xs text-emerald-500 flex items-center mt-1">
-                    <ArrowUpRight className="h-3 w-3 mr-1" /> Actualizado
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={itemVariants}>
-              <Card id="tour-kpi-motos" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Motos en Taller</CardTitle>
-                  <Bike className="h-4 w-4 text-blue-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{stats.motosEnTallerCount}</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Actualmente en servicio
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={itemVariants}>
-              <Card id="tour-kpi-ordenes" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Órdenes Activas</CardTitle>
-                  <Wrench className="h-4 w-4 text-orange-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{stats.activeWorkOrdersCount}</div>
-                  <p className="text-xs text-emerald-500 flex items-center mt-1">
-                    En proceso
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div variants={itemVariants}>
-              <Card id="tour-kpi-stock" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
-                <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Stock Crítico</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{stats.stockCriticoCount}</div>
-                  <p className={`text-xs flex items-center mt-1 ${stats.stockCriticoCount > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                    {stats.stockCriticoCount > 0 ? (
-                      <><ArrowDownRight className="h-3 w-3 mr-1" /> Requiere atención</>
-                    ) : (
-                      <><ArrowUpRight className="h-3 w-3 mr-1" /> Stock saludable</>
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Charts Section */}
-          <div className="relative grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            
-            {isChartsLocked && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
-                <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-blue-500/20 to-transparent opacity-50 pointer-events-none" />
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-                  <Lock className="w-8 h-8 text-white" />
+          <motion.div variants={itemVariants}>
+            <Card id="tour-kpi-ingresos" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos del Mes</CardTitle>
+                <DollarSign className="h-4 w-4 text-primary" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">
+                  {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(stats.ingresosMes) || 0)}
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Análisis Avanzado Bloqueado</h3>
-                <p className="text-muted-foreground text-sm max-w-md mb-6">
-                  El Flujo de Caja, Repuestos de Mayor Rotación y otros gráficos avanzados están disponibles exclusivamente en el plan <strong className="text-white">Full Taller</strong>.
+                <p className="text-xs text-emerald-500 flex items-center mt-1">
+                  <ArrowUpRight className="h-3 w-3 mr-1" /> Actualizado
                 </p>
-                <Link href="/planes">
-                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
-                    <Rocket className="w-4 h-4 mr-2" />
-                    Mejorar a Full Taller
-                  </Button>
-                </Link>
-              </div>
-            )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
-            {/* Revenue Chart */}
-            <motion.div variants={itemVariants} className={`lg:col-span-4 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
-              <Card id="tour-chart-flujo" className="bg-card border-border/50 h-full">
-                <CardHeader>
-                  <CardTitle>Flujo de Caja (Semanal)</CardTitle>
-                  <CardDescription>Ingresos vs Gastos en los últimos 7 días</CardDescription>
-                </CardHeader>
-                <CardContent className="pl-2">
-                  <div className="h-[300px] w-full mt-4">
-                    {stats.revenueData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={stats.revenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#2f80ed" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#2f80ed" stopOpacity={0}/>
-                            </linearGradient>
-                            <linearGradient id="colorGastos" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                          <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
-                          <Tooltip 
-                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                            itemStyle={{ color: 'hsl(var(--foreground))' }}
-                          />
-                          <Area type="monotone" dataKey="ingresos" stroke="#2f80ed" fillOpacity={1} fill="url(#colorIngresos)" strokeWidth={2} />
-                          <Area type="monotone" dataKey="gastos" stroke="#ef4444" fillOpacity={1} fill="url(#colorGastos)" strokeWidth={2} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                        No hay datos suficientes
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Top Selling Parts Chart */}
-            <motion.div variants={itemVariants} className={`lg:col-span-3 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
-              <Card id="tour-chart-repuestos" className="bg-card border-border/50 h-full">
-                <CardHeader>
-                  <CardTitle>Repuestos de Mayor Rotación</CardTitle>
-                  <CardDescription>Top 5 repuestos más vendidos del mes</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] w-full mt-4">
-                    {stats.topPartsData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={stats.topPartsData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
-                          <XAxis type="number" hide />
-                          <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={12} stroke="#888888" />
-                          <Tooltip 
-                            cursor={{fill: 'transparent'}}
-                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                          />
-                          <Bar dataKey="ventas" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-                        <p>No hay datos suficientes</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-
-          {/* Income By Payment Method Row */}
-          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 relative">
-            {isChartsLocked && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-                  <Lock className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Gráfico Bloqueado</h3>
-                <p className="text-muted-foreground text-sm max-w-md mb-6">
-                  El detalle de ingresos por método de pago requiere el plan Full Taller.
+          <motion.div variants={itemVariants}>
+            <Card id="tour-kpi-motos" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Motos en Taller</CardTitle>
+                <Bike className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{Number(stats.motosEnTallerCount) || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Actualmente en servicio
                 </p>
-                <Link href="/planes">
-                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
-                    <Rocket className="w-4 h-4 mr-2" />
-                    Mejorar Plan
-                  </Button>
-                </Link>
-              </div>
-            )}
-            
-            <motion.div variants={itemVariants} className={`${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
-              <Card id="tour-chart-metodos" className="bg-card border-border/50 h-[400px]">
-                <CardHeader>
-                  <CardTitle>Ingresos por Medio de Pago (Mes Actual)</CardTitle>
-                  <CardDescription>Distribución de los pagos recibidos</CardDescription>
-                </CardHeader>
-                <CardContent className="h-[300px] pb-4">
-                  <div className="h-full w-full flex flex-col items-center justify-center">
-                    {stats.incomeByMethodData?.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={stats.incomeByMethodData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="amount"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                          >
-                            {stats.incomeByMethodData.map((entry, index) => {
-                              const colors = ['#2f80ed', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                              return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                            })}
-                          </Pie>
-                          <Tooltip 
-                            formatter={(value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)}
-                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                            itemStyle={{ color: 'hsl(var(--foreground))' }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-                        <p>No hay datos suficientes</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          {/* Recent Activity / Alerts */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <motion.div variants={itemVariants}>
-              <Card id="tour-alertas" className="bg-card border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    Alertas del Taller
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {stats.alerts.map((alert: any, i: number) => (
-                    <div 
-                      key={i} 
-                      className={`flex items-start gap-4 border-b border-border/50 pb-4 last:border-0 last:pb-0 ${alert.link ? 'cursor-pointer hover:bg-muted/50 p-2 -mx-2 rounded-md transition-colors' : ''}`}
-                      onClick={() => alert.link && router.push(alert.link)}
-                    >
-                      <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${alert.urgent ? 'bg-red-500' : 'bg-amber-500'}`} />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-none text-foreground">{alert.text}</p>
-                        <p className="text-xs text-muted-foreground">{alert.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {stats.alerts.length === 0 && (
-                    <p className="text-sm text-muted-foreground py-4 text-center">No hay alertas recientes</p>
+          <motion.div variants={itemVariants}>
+            <Card id="tour-kpi-ordenes" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Órdenes Activas</CardTitle>
+                <Wrench className="h-4 w-4 text-orange-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{Number(stats.activeWorkOrdersCount) || 0}</div>
+                <p className="text-xs text-emerald-500 flex items-center mt-1">
+                  En proceso
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Card id="tour-kpi-stock" className="bg-card border-border/50 shadow-sm relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Stock Crítico</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">{Number(stats.stockCriticoCount) || 0}</div>
+                <p className={`text-xs flex items-center mt-1 ${(stats.stockCriticoCount || 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                  {(stats.stockCriticoCount || 0) > 0 ? (
+                    <><ArrowDownRight className="h-3 w-3 mr-1" /> Requiere atención</>
+                  ) : (
+                    <><ArrowUpRight className="h-3 w-3 mr-1" /> Stock saludable</>
                   )}
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Oculto temporalmente a petición del usuario. Cambiar a true para desocultar */}
-            {true && (
-              <motion.div variants={itemVariants}>
-                <Card id="tour-recordatorios" className="bg-card border-border/50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-blue-500" />
-                      Recordatorios a Clientes
-                    </CardTitle>
-                    <CardDescription>Próximos mantenimientos sugeridos</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {reminders.length > 0 ? (
-                      reminders.map((rem: any, i) => {
-                        const date = new Date(rem.due_date).toLocaleDateString('es-CO');
-                        return (
-                          <div key={rem.id || i} className="flex items-center justify-between border-b border-border/50 pb-4 last:border-0 last:pb-0">
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium leading-none text-foreground">{rem.customers ? `${rem.customers.first_name} ${rem.customers.last_name}` : 'Cliente'}</p>
-                              <p className="text-xs text-muted-foreground">{rem.motorcycles?.brand} {rem.motorcycles?.model} - {rem.service_type}</p>
-                            </div>
-                            <div className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-full">
-                              {date}
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">No hay recordatorios pendientes</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </div>
-          
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </motion.div>
+
+        {/* Charts Section */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="relative grid gap-4 md:grid-cols-2 lg:grid-cols-7"
+        >
+          {isChartsLocked && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/70 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
+              <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-blue-500/20 to-transparent opacity-50 pointer-events-none" />
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                <Lock className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Análisis Avanzado Bloqueado</h3>
+              <p className="text-muted-foreground text-sm max-w-md mb-6">
+                El Flujo de Caja, Repuestos de Mayor Rotación y otros gráficos avanzados están disponibles exclusivamente en el plan <strong className="text-white">Full Taller</strong>.
+              </p>
+              <Link href="/planes">
+                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
+                  <Rocket className="w-4 h-4 mr-2" />
+                  Mejorar a Full Taller
+                </Button>
+              </Link>
+            </div>
+          )}
+
+          {/* Revenue Chart */}
+          <motion.div variants={itemVariants} className={`lg:col-span-4 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
+            <Card id="tour-chart-flujo" className="bg-card border-border/50 h-full">
+              <CardHeader>
+                <CardTitle>Flujo de Caja (Semanal)</CardTitle>
+                <CardDescription>Ingresos vs Gastos en los últimos 7 días</CardDescription>
+              </CardHeader>
+              <CardContent className="pl-2">
+                <div className="h-[300px] w-full mt-4">
+                  {isMounted && (stats.revenueData || []).length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={stats.revenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorIngresos" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2f80ed" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#2f80ed" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorGastos" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                          itemStyle={{ color: 'hsl(var(--foreground))' }}
+                        />
+                        <Area type="monotone" dataKey="ingresos" stroke="#2f80ed" fillOpacity={1} fill="url(#colorIngresos)" strokeWidth={2} />
+                        <Area type="monotone" dataKey="gastos" stroke="#ef4444" fillOpacity={1} fill="url(#colorGastos)" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                      {!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Top Selling Parts Chart */}
+          <motion.div variants={itemVariants} className={`lg:col-span-3 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
+            <Card id="tour-chart-repuestos" className="bg-card border-border/50 h-full">
+              <CardHeader>
+                <CardTitle>Repuestos de Mayor Rotación</CardTitle>
+                <CardDescription>Top 5 repuestos más vendidos del mes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full mt-4">
+                  {isMounted && (stats.topPartsData || []).length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.topPartsData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={12} stroke="#888888" />
+                        <Tooltip 
+                          cursor={{fill: 'transparent'}}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                        />
+                        <Bar dataKey="ventas" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                      <p>{!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+
+        {/* Income By Payment Method Row */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 relative"
+        >
+          {isChartsLocked && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/70 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                <Lock className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">Gráfico Bloqueado</h3>
+              <p className="text-muted-foreground text-sm max-w-md mb-6">
+                El detalle de ingresos por método de pago requiere el plan Full Taller.
+              </p>
+              <Link href="/planes">
+                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
+                  <Rocket className="w-4 h-4 mr-2" />
+                  Mejorar Plan
+                </Button>
+              </Link>
+            </div>
+          )}
+          
+          <motion.div variants={itemVariants} className={`${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
+            <Card id="tour-chart-metodos" className="bg-card border-border/50 h-[400px]">
+              <CardHeader>
+                <CardTitle>Ingresos por Medio de Pago (Mes Actual)</CardTitle>
+                <CardDescription>Distribución de los pagos recibidos</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px] pb-4">
+                <div className="h-full w-full flex flex-col items-center justify-center">
+                  {isMounted && (stats.incomeByMethodData || []).length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.incomeByMethodData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="amount"
+                          labelLine={false}
+                          label={({ name, percent }: any) => `${name} (${(((percent || 0) * 100)).toFixed(0)}%)`}
+                        >
+                          {(stats.incomeByMethodData || []).map((entry, index) => {
+                            const colors = ['#2f80ed', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                            return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                          })}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: any) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(value) || 0)}
+                          contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                          itemStyle={{ color: 'hsl(var(--foreground))' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                      <p>{!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+
+        {/* Recent Activity / Alerts */}
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid gap-4 md:grid-cols-2"
+        >
+          <motion.div variants={itemVariants}>
+            <Card id="tour-alertas" className="bg-card border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  Alertas del Taller
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(stats.alerts || []).map((alert: any, i: number) => (
+                  <div 
+                    key={i} 
+                    className={`flex items-start gap-4 border-b border-border/50 pb-4 last:border-0 last:pb-0 ${alert.link ? 'cursor-pointer hover:bg-muted/50 p-2 -mx-2 rounded-md transition-colors' : ''}`}
+                    onClick={() => alert.link && router.push(alert.link)}
+                  >
+                    <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${alert.urgent ? 'bg-red-500' : 'bg-amber-500'}`} />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none text-foreground">{alert.text}</p>
+                      <p className="text-xs text-muted-foreground">{alert.time}</p>
+                    </div>
+                  </div>
+                ))}
+                {(!stats.alerts || stats.alerts.length === 0) && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No hay alertas recientes</p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <Card id="tour-recordatorios" className="bg-card border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  Recordatorios a Clientes
+                </CardTitle>
+                <CardDescription>Próximos mantenimientos sugeridos</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(reminders || []).length > 0 ? (
+                  (reminders || []).map((rem: any, i) => {
+                    const date = rem.due_date ? new Date(rem.due_date).toLocaleDateString('es-CO') : 'Sin fecha';
+                    return (
+                      <div key={rem.id || i} className="flex items-center justify-between border-b border-border/50 pb-4 last:border-0 last:pb-0">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium leading-none text-foreground">{rem.customers ? `${rem.customers.first_name || ''} ${rem.customers.last_name || ''}`.trim() || 'Cliente' : 'Cliente'}</p>
+                          <p className="text-xs text-muted-foreground">{rem.motorcycles?.brand || ''} {rem.motorcycles?.model || ''} - {rem.service_type || 'Mantenimiento'}</p>
+                        </div>
+                        <div className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-full">
+                          {date}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">No hay recordatorios pendientes</p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }
