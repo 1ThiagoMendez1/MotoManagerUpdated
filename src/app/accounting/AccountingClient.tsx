@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import CategorySalesDashboard from './components/CategorySalesDashboard';
 import PayrollManager from './components/PayrollManager';
@@ -314,67 +316,94 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <PieChart className="w-8 h-8 text-indigo-500" />
-              Contabilidad e Inteligencia Financiera
-            </h1>
-            <p className="text-muted-foreground">
-              {isBasic 
-                ? 'Resumen financiero y métricas clave de tu taller.' 
-                : 'Análisis detallado, proyecciones de IA y gestión de compras avanzada.'}
-            </p>
-          </div>
-        </div>
+    <div className="w-full space-y-4">
+      {/* Header */}
+      <PageHeader
+        icon={PieChart}
+        iconBg="bg-indigo-500/10 text-indigo-500"
+        title="Contabilidad & Finanzas"
+        description={
+          isBasic 
+            ? 'Resumen financiero y métricas clave de tu taller.' 
+            : 'Análisis detallado, flujo de caja, compras, nómina y cierres diarios.'
+        }
+        badge={
+          <Badge variant="outline" className="text-xs bg-muted/40 font-mono uppercase">
+            {isComplete ? 'Plan Full' : isBasic ? 'Plan Básico' : 'Plan Pro'}
+          </Badge>
+        }
+      />
 
+      {/* Navigation Sub-bar & Filter Controls */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-card border border-border/60 p-2 rounded-xl shadow-sm">
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 p-1 bg-card/50 border border-border/50 rounded-xl w-fit">
+        <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg overflow-x-auto">
           <button 
             onClick={() => setActiveTab('resumen')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'resumen' ? 'bg-indigo-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+              activeTab === 'resumen' 
+                ? 'bg-background text-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             Resumen Financiero
           </button>
           
-          {/* Ocultamos las pestañas avanzadas si es básico */}
           <button 
             onClick={() => isBasic ? null : setActiveTab('flujo')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${activeTab === 'flujo' ? 'bg-indigo-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'} ${isBasic ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={isBasic}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'flujo' 
+                ? 'bg-background text-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            } ${isBasic ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
-            Flujo de Caja Detallado
-            {isBasic && <Lock className="w-3 h-3" />}
+            <span>Flujo de Caja</span>
+            {isBasic && <Lock className="w-3 h-3 text-amber-500" />}
           </button>
 
           <button 
             onClick={() => setActiveTab('categorias')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'categorias' ? 'bg-indigo-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+              activeTab === 'categorias' 
+                ? 'bg-background text-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             Ventas por Categoría
           </button>
 
           <button 
             onClick={() => setActiveTab('nomina')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'nomina' ? 'bg-indigo-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+              activeTab === 'nomina' 
+                ? 'bg-background text-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             Nómina de Técnicos
           </button>
           
           <button 
-            onClick={() => setActiveTab('compras')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-2 ${activeTab === 'compras' ? 'bg-indigo-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'} ${isBasic ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => isBasic ? null : setActiveTab('compras')}
+            disabled={isBasic}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'compras' 
+                ? 'bg-background text-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            } ${isBasic ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
-            Compras y Proveedores
-            {isBasic && <Lock className="w-3 h-3" />}
+            <span>Compras y Proveedores</span>
+            {isBasic && <Lock className="w-3 h-3 text-amber-500" />}
           </button>
           
           <button 
             onClick={() => setActiveTab('cierre')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'cierre' ? 'bg-indigo-500 text-white shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
+              activeTab === 'cierre' 
+                ? 'bg-background text-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
             Cierre Diario
           </button>
@@ -382,30 +411,41 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
 
         {/* Global Period Filter for Resumen and Flujo */}
         {(activeTab === 'resumen' || activeTab === 'flujo') && (
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-sm text-muted-foreground font-medium">Periodo:</span>
-            <div className="flex gap-1 p-1 bg-card/50 border border-border/50 rounded-lg">
-              <button 
-                onClick={() => setPeriodFilter('day')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${periodFilter === 'day' ? 'bg-indigo-500 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
-              >
-                Por Día
-              </button>
-              <button 
-                onClick={() => setPeriodFilter('month')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${periodFilter === 'month' ? 'bg-indigo-500 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
-              >
-                Por Mes
-              </button>
-              <button 
-                onClick={() => setPeriodFilter('year')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${periodFilter === 'year' ? 'bg-indigo-500 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
-              >
-                Por Año
-              </button>
-            </div>
+          <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto p-1 bg-muted/60 rounded-lg">
+            <span className="text-[11px] text-muted-foreground font-semibold px-1">Periodo:</span>
+            <button 
+              onClick={() => setPeriodFilter('day')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                periodFilter === 'day' 
+                  ? 'bg-background text-foreground shadow-sm font-semibold' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Hoy
+            </button>
+            <button 
+              onClick={() => setPeriodFilter('month')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                periodFilter === 'month' 
+                  ? 'bg-background text-foreground shadow-sm font-semibold' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Este Mes
+            </button>
+            <button 
+              onClick={() => setPeriodFilter('year')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                periodFilter === 'year' 
+                  ? 'bg-background text-foreground shadow-sm font-semibold' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Este Año
+            </button>
           </div>
         )}
+      </div>
 
         {/* Content Area */}
         <AnimatePresence mode="wait">
@@ -788,7 +828,6 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
 
           </motion.div>
         </AnimatePresence>
-      </div>
     </div>
   );
 }

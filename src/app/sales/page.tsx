@@ -1,15 +1,8 @@
 import { authorize } from '@/lib/auth-server';
 import { getSales, getWorkOrders, getInventory, getCustomers } from '@/lib/data';
-
-
-// Force dynamic rendering to avoid database connection during build
-export const dynamic = 'force-dynamic';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import {
   Table,
@@ -22,7 +15,6 @@ import {
 import { formatExactDateTime } from '@/lib/dateUtils';
 import { ExportSalesButton } from '@/components/buttons/ExportSalesButton';
 import { SalesFilters } from '@/components/SalesFilters';
-import { SalesPagination } from '@/components/SalesPagination';
 import { ExportDirectSalesButton } from '@/components/buttons/ExportDirectSalesButton';
 import { ExportServiceSalesButton } from '@/components/buttons/ExportServiceSalesButton';
 import { AddSale } from '@/components/forms/AddSale';
@@ -31,7 +23,13 @@ import { SaleDetails } from '@/components/details/SaleDetails';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ShoppingCart, AlertCircle } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
+import { ModuleToolbar } from '@/components/common/ModuleToolbar';
 import type { Sale, InventoryItem } from '@/lib/types';
+
+// Force dynamic rendering to avoid database connection during build
+export const dynamic = 'force-dynamic';
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('es-CO', {
@@ -43,79 +41,33 @@ function formatCurrency(amount: number) {
 }
 
 function getPaymentMethodBadge(method?: string) {
-  if (!method) return <Badge variant="outline" className="text-xs">Otros</Badge>;
+  if (!method) return <Badge variant="outline" className="text-[10px]">Otros</Badge>;
   
   const m = method.toLowerCase();
   if (m === 'cash' || m === 'efectivo') {
-    return <Badge variant="outline" className="text-xs border-green-500/30 text-green-500 bg-green-500/10">Efectivo</Badge>;
+    return <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">Efectivo</Badge>;
   }
   if (m === 'credit_card' || m === 'debit_card' || m === 'tarjeta') {
-    return <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-500 bg-purple-500/10">Tarjeta</Badge>;
+    return <Badge variant="outline" className="text-[10px] border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/10">Tarjeta</Badge>;
   }
   if (m === 'transfer' || m === 'transferencia' || m === 'nequi' || m === 'daviplata') {
-    // If it's a specific app, capitalize it, otherwise just show the method name
     const label = m === 'nequi' ? 'Nequi' : m === 'daviplata' ? 'DaviPlata' : (m === 'transfer' ? 'Transferencia' : method);
-    return <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-500 bg-blue-500/10">{label}</Badge>;
+    return <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/10">{label}</Badge>;
   }
   if (m === 'wompi') {
-    return <Badge variant="outline" className="text-xs border-indigo-500/30 text-indigo-500 bg-indigo-500/10">Wompi</Badge>;
+    return <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-500 bg-indigo-500/10">Wompi</Badge>;
   }
   
-  return <Badge variant="outline" className="text-xs">{method}</Badge>;
+  return <Badge variant="outline" className="text-[10px]">{method}</Badge>;
 }
 
-
-// Loading component
-function SalesPageSkeleton() {
-  return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-        <div>
-          <Skeleton className="h-9 w-48 mb-2" />
-          <Skeleton className="h-5 w-64" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-32" />
-          <Skeleton className="h-10 w-28" />
-          <Skeleton className="h-10 w-24" />
-        </div>
-      </div>
-      <Card className="glass-card text-foreground">
-        <CardHeader>
-          <Skeleton className="h-7 w-48 mb-2" />
-          <Skeleton className="h-5 w-96" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center space-x-4">
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-6 w-20" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Error component
 function SalesPageError({ error }: { error: string }) {
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Ventas</h1>
-          <p className="text-muted-foreground text-muted-foreground">Revisa todas las ventas y transacciones.</p>
-        </div>
-      </div>
-      <Alert className="bg-red-500/10 border-red-500/20 text-red-400">
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Error al cargar los datos de ventas: {error}
+          Error al cargar las ventas: {error}. Por favor, intente de nuevo.
         </AlertDescription>
       </Alert>
     </div>
@@ -139,22 +91,21 @@ export default async function SalesPage({
   const type = resolvedSearchParams.type as 'direct' | 'service' | 'all' || 'all';
   const currentPage = Number(resolvedSearchParams.page) || 1;
 
-  // Needed for getServices
   const { getServices } = await import('@/actions/services');
 
   try {
     const [sls, wos, inv, custs, allSales, servicesResult] = await Promise.all([
       getSales({ dateFrom, dateTo, type, page: currentPage, limit: 10 } as any),
-      getWorkOrders({ limit: 200 }), // Get all work orders for forms
+      getWorkOrders({ limit: 200 }),
       getInventory({ limit: 200 } as any),
       getCustomers(),
-      getSales({ dateFrom, dateTo, type, limit: 1000 } as any), // For export
+      getSales({ dateFrom, dateTo, type, limit: 1000 } as any),
       getServices(user.workshopId),
     ]);
 
     const sales = sls.items;
     const totalPages = sls.totalPages;
-    const workOrders = wos.items || wos; // Handle both paginated and non-paginated responses
+    const workOrders = wos.items || wos;
     const inventoryItems = inv.items as InventoryItem[];
     const customers = (custs as any).items || custs;
     const allFilteredSales = allSales.items;
@@ -178,90 +129,120 @@ export default async function SalesPage({
     };
 
     return (
-      <div className="w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Ventas</h1>
-            <p className="text-sm sm:text-base text-muted-foreground text-muted-foreground">Revisa todas las ventas y transacciones.</p>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center">
-              <SalesFilters currentDateFrom={dateFrom} currentDateTo={dateTo} currentType={type} />
-              <AddSale workOrders={workOrders} inventory={inventoryItems} />
+      <div className="w-full space-y-4">
+        {/* Header Estandarizado */}
+        <PageHeader
+          title="Ventas & Facturación"
+          description="Historial completo de ventas de mostrador y facturación de órdenes de trabajo."
+          icon={ShoppingCart}
+          badge={
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">
+              {sales.length} registros
+            </span>
+          }
+        />
+
+        {/* Toolbar con Filtros y Agrupación de Creación y Exportaciones */}
+        <ModuleToolbar
+          searchComponent={
+            <SalesFilters currentDateFrom={dateFrom} currentDateTo={dateTo} currentType={type} />
+          }
+          primaryAction={
+            <div className="flex items-center gap-2">
               <AddDirectSale inventory={inventoryItems} customers={customers} services={services} />
-              <ExportDirectSalesButton sales={allFilteredSales.filter(s => !s.workOrderId)} />
-              <ExportServiceSalesButton sales={allFilteredSales.filter(s => s.workOrderId)} />
-          </div>
-        </div>
-        <Card className="glass-card relative overflow-hidden group text-foreground glow-primary">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-          <CardHeader className="relative z-10">
-            <CardTitle className="text-lg sm:text-xl">Historial de Transacciones</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm sm:text-base">
-              Un registro detallado de todas las ventas completadas. Página {currentPage} de {totalPages}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+              <AddSale workOrders={workOrders} inventory={inventoryItems} />
+            </div>
+          }
+          secondaryActions={[
+            { label: 'Exportar Ventas Directas', component: <ExportDirectSalesButton sales={allFilteredSales.filter(s => !s.workOrderId)} /> },
+            { label: 'Exportar Ventas por Servicio', component: <ExportServiceSalesButton sales={allFilteredSales.filter(s => s.workOrderId)} /> },
+            { label: 'Exportar Todo el Historial', component: <ExportSalesButton sales={allFilteredSales} /> }
+          ]}
+        />
+
+        {/* Tabla de Alta Densidad */}
+        <Card className="border-border/60 bg-card/60 backdrop-blur-sm shadow-sm overflow-hidden rounded-2xl">
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-border/50 hover:bg-transparent">
-                    <TableHead className="text-foreground/90 text-xs sm:text-sm">Número</TableHead>
-                    <TableHead className="text-foreground/90 text-xs sm:text-sm">Tipo</TableHead>
-                    <TableHead className="text-foreground/90 text-xs sm:text-sm">Cliente / Vehículo</TableHead>
-                    <TableHead className="hidden md:table-cell text-foreground/90 text-xs sm:text-sm">Detalles</TableHead>
-                    <TableHead className="text-foreground/90 text-xs sm:text-sm">Fecha</TableHead>
-                    <TableHead className="hidden sm:table-cell text-foreground/90 text-xs sm:text-sm">Pago</TableHead>
-                    <TableHead className="text-right text-foreground/90 text-xs sm:text-sm">Total</TableHead>
-                    <TableHead className="text-center text-foreground/90 text-xs sm:text-sm">Detalle</TableHead>
+                  <TableRow className="border-border/60 hover:bg-transparent bg-muted/20">
+                    <TableHead className="w-[100px] text-foreground font-semibold text-xs uppercase tracking-wider py-3">N° Venta</TableHead>
+                    <TableHead className="text-foreground font-semibold text-xs uppercase tracking-wider py-3">Tipo</TableHead>
+                    <TableHead className="text-foreground font-semibold text-xs uppercase tracking-wider py-3">Cliente / Vehículo</TableHead>
+                    <TableHead className="hidden md:table-cell text-foreground font-semibold text-xs uppercase tracking-wider py-3">Detalles</TableHead>
+                    <TableHead className="text-foreground font-semibold text-xs uppercase tracking-wider py-3">Fecha</TableHead>
+                    <TableHead className="hidden sm:table-cell text-foreground font-semibold text-xs uppercase tracking-wider py-3">Pago</TableHead>
+                    <TableHead className="text-right text-foreground font-semibold text-xs uppercase tracking-wider py-3">Total</TableHead>
+                    <TableHead className="text-center text-foreground font-semibold text-xs uppercase tracking-wider py-3 pr-4">Detalle</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.map((sale) => (
-                    <TableRow key={sale.id} className="border-border/50 hover:bg-primary/5 transition-colors">
-                      <TableCell className="font-medium text-xs sm:text-sm">{sale.saleNumber}</TableCell>
-                      <TableCell className="text-xs sm:text-sm">
-                        {sale.workOrderId ? (
-                          <Badge variant="secondary" className="text-xs">Servicio</Badge>
-                        ) : (
-                          <Badge className="text-xs">Mostrador</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs sm:text-sm">
-                        {sale.workOrderId && sale.workOrder ? (
-                          <>
-                            <div>{sale.workOrder.motorcycle.customer.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {sale.workOrder.motorcycle.make} {sale.workOrder.motorcycle.model}
-                            </div>
-                          </>
-                        ) : (
-                          <div>{sale.customer?.name || sale.customerName || 'Cliente de Mostrador'}</div>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-xs sm:text-sm text-muted-foreground max-w-xs truncate">
-                        {getSaleDetails(sale)}
-                      </TableCell>
-                      <TableCell className="text-xs sm:text-sm">{formatExactDateTime(sale.date)}</TableCell>
-                      
-                      <TableCell className="hidden sm:table-cell">
-                        {getPaymentMethodBadge(sale.paymentMethod)}
-                      </TableCell>
-
-                      <TableCell className="text-right font-medium text-xs sm:text-sm">{formatCurrency(sale.total)}</TableCell>
-                      <TableCell className="text-center">
-                        <SaleDetails sale={sale} inventoryItems={inventoryItems} />
+                  {sales.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
+                        No se encontraron ventas registradas con los filtros seleccionados.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    sales.map((sale) => (
+                      <TableRow key={sale.id} className="border-border/50 hover:bg-muted/30 transition-colors">
+                        <TableCell className="font-mono font-bold text-xs sm:text-sm text-foreground py-2.5">
+                          #{sale.saleNumber}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {sale.workOrderId ? (
+                            <Badge variant="outline" className="text-[10px] font-semibold border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                              Servicio
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] font-semibold border-primary/30 text-primary bg-primary/10">
+                              Mostrador
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          {sale.workOrderId && sale.workOrder ? (
+                            <div>
+                              <div className="font-semibold text-foreground text-sm leading-tight">
+                                {sale.workOrder.motorcycle.customer.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {sale.workOrder.motorcycle.make} {sale.workOrder.motorcycle.model}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="font-semibold text-foreground text-sm">
+                              {sale.customer?.name || sale.customerName || 'Cliente de Mostrador'}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-xs truncate py-2.5">
+                          {getSaleDetails(sale)}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap py-2.5">
+                          {formatExactDateTime(sale.date)}
+                        </TableCell>
+                        <TableCell className="hidden sm:table-cell py-2.5">
+                          {getPaymentMethodBadge(sale.paymentMethod)}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-sm text-foreground py-2.5 font-mono">
+                          {formatCurrency(sale.total)}
+                        </TableCell>
+                        <TableCell className="text-center py-2.5 pr-4">
+                          <SaleDetails sale={sale} inventoryItems={inventoryItems} />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
 
-            {/* Pagination */}
+            {/* Paginación */}
             {totalPages > 1 && (
-              <div className="mt-6 flex justify-center">
-                <div className="flex items-center space-x-2">
-                  {/* Previous Button */}
+              <div className="p-3 border-t border-border/50 flex justify-center bg-muted/10">
+                <div className="flex items-center space-x-1.5 text-xs font-medium">
                   <a
                     href={`/sales?${new URLSearchParams({
                       ...(dateFrom && { dateFrom }),
@@ -269,41 +250,15 @@ export default async function SalesPage({
                       ...(type !== 'all' && { type }),
                       page: Math.max(1, currentPage - 1).toString(),
                     }).toString()}`}
-                    className={`px-3 py-2 text-sm font-medium text-foreground bg-card/50 border border-border/50 rounded-md hover:bg-card/80 ${
-                      currentPage === 1 ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    className={`px-3 py-1.5 rounded-lg border border-border/60 hover:bg-card transition-colors ${
+                      currentPage === 1 ? 'opacity-40 pointer-events-none' : ''
                     }`}
                   >
                     ← Anterior
                   </a>
-
-                  {/* Page Numbers */}
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                      if (pageNum > totalPages) return null;
-
-                      return (
-                        <a
-                          key={pageNum}
-                          href={`/sales?${new URLSearchParams({
-                            ...(dateFrom && { dateFrom }),
-                            ...(dateTo && { dateTo }),
-                            ...(type !== 'all' && { type }),
-                            page: pageNum.toString(),
-                          }).toString()}`}
-                          className={`px-3 py-2 text-sm font-medium rounded-md ${
-                            pageNum === currentPage
-                              ? 'bg-blue-600 text-foreground'
-                              : 'text-foreground bg-card/50 border border-border/50 hover:bg-card/80'
-                          }`}
-                        >
-                          {pageNum}
-                        </a>
-                      );
-                    })}
-                  </div>
-
-                  {/* Next Button */}
+                  <span className="px-3 py-1 text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </span>
                   <a
                     href={`/sales?${new URLSearchParams({
                       ...(dateFrom && { dateFrom }),
@@ -311,8 +266,8 @@ export default async function SalesPage({
                       ...(type !== 'all' && { type }),
                       page: Math.min(totalPages, currentPage + 1).toString(),
                     }).toString()}`}
-                    className={`px-3 py-2 text-sm font-medium text-foreground bg-card/50 border border-border/50 rounded-md hover:bg-card/80 ${
-                      currentPage === totalPages ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+                    className={`px-3 py-1.5 rounded-lg border border-border/60 hover:bg-card transition-colors ${
+                      currentPage === totalPages ? 'opacity-40 pointer-events-none' : ''
                     }`}
                   >
                     Siguiente →

@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import Header from '@/components/Header';
+import { AppSidebar } from '@/components/navigation/AppSidebar';
 import { TenantProvider } from '@/components/TenantContextProvider';
 
 const inter = Inter({
@@ -94,18 +95,24 @@ export default async function RootLayout({
                 subscriptionEndDate={workshop?.subscription_end_date}
                 subscriptionStatus={workshop?.subscription_status}
                 workshopCreatedAt={workshop?.created_at}
-                userRole={workshop?.user_role}
+                userRole={workshop?.user_role || user?.role}
+                customPermissions={workshop?.custom_permissions || user?.custom_permissions}
+              />
+            }
+            sidebar={
+              <AppSidebar
+                workshopName={workshop?.name}
+                workshopSlug={workshop?.slug}
+                userRole={workshop?.user_role || user?.role}
+                customPermissions={workshop?.custom_permissions || user?.custom_permissions}
+                subscriptionPlan={workshop?.subscription_plan}
               />
             }
             footer={
-              <footer className="bg-card/30 backdrop-blur-md border-t border-border/50 py-3 px-4 md:px-6 lg:px-8 mt-auto">
-                <div className="max-w-7xl mx-auto text-center">
-                  <p className="text-muted-foreground text-sm">
-                    © {new Date().getFullYear()} MotoManager. Todos los derechos reservados.
-                  </p>
-                  <p className="text-muted-foreground/70 text-xs mt-1">
-                    Sistema de gestión para talleres de motocicletas
-                  </p>
+              <footer className="bg-card/20 backdrop-blur-sm border-t border-border/40 py-2.5 px-4 md:px-6 text-center mt-auto">
+                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-muted-foreground">
+                  <p>© {new Date().getFullYear()} MotoManager — Sistema de Gestión Integral</p>
+                  <p className="text-[11px] text-muted-foreground/70">Potenciando talleres de motocicletas</p>
                 </div>
               </footer>
             }

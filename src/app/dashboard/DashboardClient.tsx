@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/common/PageHeader';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getPlanLimits } from '@/lib/constants/plans';
@@ -366,28 +367,23 @@ export default function DashboardPage() {
     }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-4">
-
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard General</h1>
-              <p className="text-muted-foreground">Resumen financiero y operativo del taller.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              id="tour-reporte"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground print:hidden"
-              onClick={() => generatePDFReport(stats)}
-            >
-              Generar Reporte
-            </Button>
-          </div>
-        </div>
+    <div className="w-full space-y-6">
+      {/* Header Section */}
+      <PageHeader
+        icon={TrendingUp}
+        iconBg="bg-primary/10 text-primary"
+        title="Dashboard General"
+        description="Resumen financiero y operativo del taller."
+        actions={
+          <Button 
+            id="tour-reporte"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 px-3 text-xs font-semibold rounded-lg shadow-sm print:hidden"
+            onClick={() => generatePDFReport(stats)}
+          >
+            Generar Reporte
+          </Button>
+        }
+      />
 
         <motion.div 
           variants={containerVariants}
@@ -698,7 +694,6 @@ export default function DashboardPage() {
           </div>
           
         </motion.div>
-      </div>
     </div>
   );
 }

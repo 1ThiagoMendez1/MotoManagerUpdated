@@ -26,6 +26,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TechniciansChart } from '@/components/TechniciansChart';
 import { DownloadTechniciansReportButton } from '@/components/DownloadTechniciansReportButton';
 import { Pagination } from '@/components/Pagination';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Users } from 'lucide-react';
 
 export default async function TechniciansPage({
   searchParams,
@@ -61,53 +64,69 @@ export default async function TechniciansPage({
   }
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Técnicos</h1>
-          <p className="text-muted-foreground text-muted-foreground">Gestiona el personal de tu taller.</p>
-        </div>
-      </div>
+    <div className="w-full space-y-4">
+      {/* Header */}
+      <PageHeader
+        icon={Users}
+        iconBg="bg-blue-500/10 text-blue-500"
+        title="Técnicos"
+        description="Gestiona el personal técnico y mecánicos de tu taller."
+        badge={
+          <Badge variant="outline" className="text-xs bg-muted/40 font-mono">
+            {technicians.length} {technicians.length === 1 ? 'técnico' : 'técnicos'}
+          </Badge>
+        }
+        actions={
+          isAdminOrOwner ? (
+            <DownloadTechniciansReportButton technicians={technicians} />
+          ) : undefined
+        }
+      />
 
-      <Tabs defaultValue="list" className="w-full">
-        <div className="flex items-center justify-between mb-4">
-          <TabsList className="bg-card/50 border border-border/50">
-            <TabsTrigger value="list">Lista</TabsTrigger>
-            {isAdminOrOwner && <TabsTrigger value="analysis">Análisis</TabsTrigger>}
+      <Tabs defaultValue="list" className="w-full space-y-4">
+        <div className="flex items-center justify-between">
+          <TabsList className="bg-muted/60 p-1 rounded-lg border border-border/50">
+            <TabsTrigger value="list" className="text-xs font-semibold px-3 py-1.5 rounded-md">
+              Lista de Personal
+            </TabsTrigger>
+            {isAdminOrOwner && (
+              <TabsTrigger value="analysis" className="text-xs font-semibold px-3 py-1.5 rounded-md">
+                Rendimiento & Análisis
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
         <TabsContent value="list" className="mt-0">
-          <Card className="glass-card relative overflow-hidden group text-foreground">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-            <CardHeader className="relative z-10">
-              <CardTitle>Lista de Personal</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Una lista de todos los técnicos de tu equipo.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <div className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-border/40">
+              <h3 className="text-sm font-semibold text-foreground">Lista de Técnicos</h3>
+              <p className="text-xs text-muted-foreground">
+                Personal activo asignado a órdenes de trabajo y reparaciones.
+              </p>
+            </div>
+            <div className="p-0">
               {error ? (
-                <div className="text-center py-10 text-red-400">
+                <div className="text-center py-10 text-red-400 text-sm">
                   {error}
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-border/50 hover:bg-transparent">
-                      <TableHead className="text-foreground/90">Nombre</TableHead>
-                      <TableHead className="text-foreground/90">Contacto</TableHead>
-                      <TableHead className="text-foreground/90">Especialidad</TableHead>
-                      <TableHead className="text-foreground/90 text-center">Órdenes de Trabajo</TableHead>
-                      <TableHead>
+                    <TableRow className="border-border/40 bg-muted/30 hover:bg-transparent">
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase py-2.5">Nombre</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase py-2.5">Contacto</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase py-2.5">Especialidad</TableHead>
+                      <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase py-2.5 text-center">Órdenes de Trabajo</TableHead>
+                      <TableHead className="w-12">
                         <span className="sr-only">Acciones</span>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody className="divide-y divide-border/40">
                     {technicians.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground text-xs">
                           No hay técnicos registrados.
                         </TableCell>
                       </TableRow>
@@ -120,30 +139,29 @@ export default async function TechniciansPage({
                 </Table>
               )}
               {totalPages > 1 && (
-                <div className="mt-4 border-t border-border/50 pt-4">
+                <div className="p-3 border-t border-border/40">
                   <Pagination totalPages={totalPages} />
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {isAdminOrOwner && (
           <TabsContent value="analysis" className="mt-0">
-            <Card className="glass-card relative overflow-hidden group text-foreground">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-              <CardHeader className="flex flex-row items-center justify-between relative z-10">
-                <div className="space-y-1.5">
-                  <CardTitle>Rendimiento de Técnicos</CardTitle>
-                  <CardDescription className="text-muted-foreground">
-                    Análisis de la carga de trabajo y órdenes de cada técnico.
+            <Card className="border border-border/60 bg-card shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-3 border-b border-border/40">
+                <div className="space-y-0.5">
+                  <CardTitle className="text-sm font-semibold">Rendimiento de Técnicos</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Análisis de la carga de trabajo, órdenes completadas y eficiencia de cada técnico.
                   </CardDescription>
                 </div>
                 <DownloadTechniciansReportButton technicians={technicians} />
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 {error ? (
-                  <div className="text-center py-10 text-red-400">
+                  <div className="text-center py-10 text-red-400 text-sm">
                     {error}
                   </div>
                 ) : (

@@ -10,7 +10,8 @@ import {
   CalendarDays,
   ArrowUpCircle,
   Settings,
-  Bell
+  Bell,
+  Search
 } from 'lucide-react';
 import { getPlanLimits } from '@/lib/constants/plans';
 import { PlanUsageModal } from './PlanUsageModal';
@@ -18,7 +19,11 @@ import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ColombiaClock } from '@/components/ColombiaClock';
-
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
+import { CommandPalette } from '@/components/navigation/CommandPalette';
+import { QuickCreateMenu } from '@/components/navigation/QuickCreateMenu';
 
 import {
   DropdownMenu,
@@ -37,23 +42,37 @@ interface HeaderProps {
   subscriptionStatus?: string | null;
   workshopCreatedAt?: string | null;
   userRole?: string | null;
+  customPermissions?: string[] | null;
 }
 
 export default function Header({ 
   workshopName, 
   workshopSlug,
-  userName,
+  userName, 
   subscriptionPlan,
   subscriptionEndDate,
   subscriptionStatus,
   workshopCreatedAt,
-  userRole
+  userRole,
+  customPermissions
 }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [showPlanUsageModal, setShowPlanUsageModal] = useState(false);
+  const [openCommandPalette, setOpenCommandPalette] = useState(false);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpenCommandPalette((open) => !open);
+      }
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && userName) {
@@ -235,64 +254,44 @@ export default function Header({
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 flex items-center justify-between py-1 px-4 sm:px-6 text-foreground z-50">
-      <div className="flex items-center gap-2 sm:gap-4">
-        {!isRoot && (
-          <Button
-            onClick={() => {
-              if (pathname.startsWith('/clientes') || pathname.startsWith('/cotizacion')) {
-                const searchParams = new URLSearchParams(window.location.search);
-                const authParam = searchParams.get('auth');
-                router.push(authParam ? `/clientes?auth=${authParam}` : '/clientes');
-              } else {
-                router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/dashboard'));
-              }
-            }}
-            variant="ghost"
-            size="icon"
-            className="text-foreground hover:bg-card/50 h-9 w-9 rounded-full transition-transform hover:scale-110"
-            title="Ir a inicio"
-          >
-            <Home className="h-5 w-5" />
-          </Button>
-        )}
-        <Link
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            if (pathname.startsWith('/clientes') || pathname.startsWith('/cotizacion')) {
-              const searchParams = new URLSearchParams(window.location.search);
-              const authParam = searchParams.get('auth');
-              router.push(authParam ? `/clientes?auth=${authParam}` : '/clientes');
-            } else {
-              router.push(pathname.startsWith('/admin') ? '/admin' : (workshopSlug ? `/${workshopSlug}` : '/dashboard'));
-            }
-          }}
-          className="flex items-center gap-3 font-semibold hover:opacity-80 transition-opacity"
-        >
-          <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 drop-shadow-md">
-            <Image 
-              src="/logo.png" 
-              alt="MotoManager Logo" 
-              fill
-              sizes="(max-width: 768px) 100vw, 20vw"
-              className="object-contain"
-              priority
-            />
-          </div>
-          <span className="text-foreground hidden sm:flex items-center">
-            <span className="font-space font-bold text-xl tracking-tight">MotoManager</span>
-            {pathname === '/admin' ? (
-              <span className="text-red-500 font-bold text-xl ml-2">ADMIN</span>
-            ) : workshopName ? (
-              <span className="text-primary font-bold text-xl ml-2">| {workshopName}</span>
-            ) : null}
-          </span>
-        </Link>
+    <header className="sticky top-0 left-0 right-0 z-40 w-full h-14 border-b border-border/60 bg-background/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between transition-all">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <SidebarTrigger className="h-8 w-8 text-foreground/80 hover:bg-muted rounded-lg shrink-0" />
+        <Separator orientation="vertical" className="h-4 hidden sm:block bg-border/60" />
+        <Breadcrumbs workshopSlug={workshopSlug} />
       </div>
-      <div className="flex items-center gap-1 sm:gap-2">
 
-        <ColombiaClock />
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Global Search / Command Palette */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setOpenCommandPalette(true)}
+          className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 border-border/60 hover:bg-muted hover:text-foreground h-8 px-2.5 rounded-lg"
+          title="Buscar módulo o acción (Ctrl+K)"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Buscar...</span>
+          <kbd className="pointer-events-none hidden lg:inline-flex h-4 select-none items-center gap-0.5 rounded border bg-background px-1 font-mono text-[10px] font-medium text-muted-foreground">
+            <span>⌘</span>K
+          </kbd>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setOpenCommandPalette(true)}
+          className="sm:hidden h-8 w-8 text-muted-foreground hover:text-foreground"
+          title="Buscar módulo (Ctrl+K)"
+        >
+          <Search className="w-4 h-4" />
+        </Button>
+
+        {/* Global Action: + Nuevo */}
+        <QuickCreateMenu userRole={userRole} customPermissions={customPermissions} />
+
+        <div className="hidden lg:block">
+          <ColombiaClock />
+        </div>
         <ThemeToggle />
         
         {/* Notificaciones y Perfil (solo si hay sesión) */}
@@ -465,6 +464,15 @@ export default function Header({
           </>
         )}
       </div>
+
+      {/* Global Command Palette (Ctrl+K) */}
+      <CommandPalette 
+        open={openCommandPalette} 
+        onOpenChange={setOpenCommandPalette} 
+        userRole={userRole} 
+        customPermissions={customPermissions}
+        workshopSlug={workshopSlug}
+      />
     </header>
   );
 }

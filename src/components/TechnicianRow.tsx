@@ -63,9 +63,14 @@ export function TechnicianRow({ technician }: TechnicianRowProps) {
 
       {isExpanded && hasOrders && (
         <TableRow>
-          <TableCell colSpan={4} className="p-0">
-            <div className="px-4 py-2 bg-primary/5 rounded-md mx-4 mb-2">
-              <h4 className="text-sm font-medium text-foreground/90 mb-3">Órdenes de Trabajo Asignadas</h4>
+          <TableCell colSpan={5} className="p-0">
+            <div className="px-4 py-3 bg-muted/40 rounded-lg mx-4 mb-3 border border-border/40">
+              <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                <span>Órdenes de Trabajo Asignadas</span>
+                <span className="text-[10px] px-1.5 py-0.2 bg-primary/10 text-primary font-mono rounded-full font-bold">
+                  {technician.workOrders!.length}
+                </span>
+              </h4>
               <div className="space-y-2">
                 {technician.workOrders!.map((workOrder) => (
                   <div key={workOrder.id} className="flex items-center justify-between p-3 bg-card/50 rounded border border-border/30 hover:bg-primary/5 transition-colors">

@@ -17,7 +17,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Search, Clock, CheckCircle2, AlertCircle, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { PlusCircle, Search, Clock, CheckCircle2, AlertCircle, FileText, ChevronDown, ChevronUp, LifeBuoy } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
+import { ModuleToolbar } from '@/components/common/ModuleToolbar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -125,79 +127,88 @@ export function WorkshopTicketsClient({ initialTickets }: { initialTickets: any[
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header section with liquid glass style */}
-      <div className="p-6 rounded-2xl bg-card/40 backdrop-blur-md border border-border/50 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="flex-1 w-full">
-          <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">Centro de Soporte</h2>
-          <p className="text-sm text-muted-foreground mt-1">Gestiona tus solicitudes y revisa las soluciones.</p>
-        </div>
-        
-        <div className="flex w-full md:w-auto items-center gap-3">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Buscar solicitudes..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-background/50 border-border/50 focus-visible:ring-1 transition-all h-10 rounded-xl"
-            />
-          </div>
+    <div className="w-full space-y-4">
+      {/* Header */}
+      <PageHeader
+        icon={LifeBuoy}
+        iconBg="bg-primary/10 text-primary"
+        title="Centro de Soporte"
+        description="Gestiona tus solicitudes de soporte técnico y revisa las soluciones del equipo MotoManager."
+        badge={
+          <Badge variant="outline" className="text-xs bg-muted/40 font-mono">
+            {tickets.length} {tickets.length === 1 ? 'solicitud' : 'solicitudes'}
+          </Badge>
+        }
+        actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="h-10 rounded-xl shadow-md bg-primary hover:bg-primary/90 transition-all gap-2">
-                <PlusCircle className="w-4 h-4" />
+              <Button className="h-9 rounded-lg shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold gap-1.5">
+                <PlusCircle className="w-3.5 h-3.5" />
                 Nueva Solicitud
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] rounded-2xl border-border/50 bg-card/95 backdrop-blur-xl">
+            <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle className="text-xl">Nueva Solicitud de Soporte</DialogTitle>
-                <DialogDescription>
-                  Describe el requerimiento de manera sencilla y clara.
+                <DialogTitle className="text-lg">Nueva Solicitud de Soporte</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Describe tu requerimiento o incidencia técnica de manera clara.
                 </DialogDescription>
               </DialogHeader>
-              <form action={handleCreateTicket} className="space-y-5 mt-4">
-                {error && <div className="p-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">{error}</div>}
+              <form action={handleCreateTicket} className="space-y-4 mt-2">
+                {error && <div className="p-3 bg-destructive/10 text-destructive text-xs rounded-lg border border-destructive/20">{error}</div>}
                 
-                <div className="p-3 bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm rounded-xl border border-blue-500/20 flex gap-3 items-start">
-                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="p-3 bg-blue-500/10 text-blue-700 dark:text-blue-400 text-xs rounded-lg border border-blue-500/20 flex gap-2.5 items-start">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Tu solicitud será evaluada y atendida en un plazo máximo de <strong>3 días hábiles</strong>.
+                    Tu solicitud será atendida en un plazo máximo de <strong>3 días hábiles</strong>.
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="subject" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Asunto</Label>
-                  <Input id="subject" name="subject" placeholder="Ej: Error al registrar venta" className="rounded-xl bg-background/50 border-border/50" required />
+                <div className="space-y-1.5">
+                  <Label htmlFor="subject" className="text-xs font-semibold text-foreground">Asunto</Label>
+                  <Input id="subject" name="subject" placeholder="Ej: Error al registrar venta" className="rounded-lg text-xs h-9 bg-background border-border" required />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Detalle de la solicitud</Label>
-                  <Textarea id="description" name="description" placeholder="Explica lo que necesitas..." rows={5} className="rounded-xl bg-background/50 border-border/50 resize-none" required />
+                <div className="space-y-1.5">
+                  <Label htmlFor="description" className="text-xs font-semibold text-foreground">Detalle de la solicitud</Label>
+                  <Textarea id="description" name="description" placeholder="Explica lo que necesitas..." rows={4} className="rounded-lg text-xs bg-background border-border resize-none" required />
                 </div>
                 <SubmitButton />
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar px-1">
-        {['Todos', 'Pendiente', 'En Revisión', 'Finalizado'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "px-4 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap transition-all duration-200 border",
-              filter === f 
-                ? "bg-primary text-primary-foreground border-primary shadow-md" 
-                : "bg-card/40 backdrop-blur-sm border-border/50 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            )}
-          >
-            {f === 'Finalizado' ? 'Resueltos' : f}
-          </button>
-        ))}
+      {/* Module Toolbar with Search and Filter Tabs */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card border border-border/60 p-2.5 rounded-xl shadow-sm">
+        {/* Status Filters */}
+        <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg overflow-x-auto">
+          {['Todos', 'Pendiente', 'En Revisión', 'Finalizado'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all",
+                filter === f 
+                  ? "bg-background text-foreground shadow-sm font-bold" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f === 'Finalizado' ? 'Resueltos' : f}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar solicitudes..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8 h-9 text-xs bg-background border-border rounded-lg"
+          />
+        </div>
       </div>
 
       {/* Tickets List */}
