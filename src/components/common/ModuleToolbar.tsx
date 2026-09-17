@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 
 interface SecondaryAction {
   label: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }> | React.ReactNode;
   onClick?: () => void;
   component?: React.ReactNode;
   destructive?: boolean;
@@ -86,7 +86,14 @@ export function ModuleToolbar({
                       action.destructive && 'text-destructive focus:bg-destructive/10 focus:text-destructive'
                     )}
                   >
-                    {Icon && <Icon className="w-3.5 h-3.5" />}
+                    {Icon && (
+                      React.isValidElement(Icon) ? (
+                        Icon
+                      ) : typeof Icon === 'function' || (typeof Icon === 'object' && Icon !== null && 'render' in Icon) ? (
+                        // @ts-ignore
+                        <Icon className="w-3.5 h-3.5" />
+                      ) : null
+                    )}
                     <span>{action.label}</span>
                   </DropdownMenuItem>
                 );

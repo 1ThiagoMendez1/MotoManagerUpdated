@@ -1,12 +1,10 @@
-'use client';
-
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
   title: string;
   description?: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }> | React.ReactNode;
   iconBg?: string;
   badge?: React.ReactNode;
   actions?: React.ReactNode;
@@ -27,7 +25,12 @@ export function PageHeader({
       <div className="flex items-start gap-3 min-w-0">
         {Icon && (
           <div className={cn('p-2 rounded-xl shrink-0 mt-0.5 shadow-sm', iconBg)}>
-            <Icon className="w-5 h-5" />
+            {React.isValidElement(Icon) ? (
+              Icon
+            ) : typeof Icon === 'function' || (typeof Icon === 'object' && Icon !== null && 'render' in Icon) ? (
+              // @ts-ignore
+              <Icon className="w-5 h-5" />
+            ) : null}
           </div>
         )}
         <div className="min-w-0">
