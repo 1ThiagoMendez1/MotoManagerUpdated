@@ -20,7 +20,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/common/PageHeader';
+import { AddAppointment } from '@/components/forms/AddAppointment';
 import { updateAppointmentStatus } from './actions';
+import type { Motorcycle, Technician } from '@/lib/types';
 
 interface Appointment {
   id: string;
@@ -51,9 +53,11 @@ interface Appointment {
 
 interface AppointmentsClientProps {
   initialAppointments: Appointment[];
+  motorcycles: Motorcycle[];
+  technicians: Technician[];
 }
 
-export default function AppointmentsClient({ initialAppointments }: AppointmentsClientProps) {
+export default function AppointmentsClient({ initialAppointments, motorcycles, technicians }: AppointmentsClientProps) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
@@ -139,6 +143,9 @@ export default function AppointmentsClient({ initialAppointments }: Appointments
           <Badge variant="outline" className="text-xs bg-muted/40 font-mono">
             {total} {total === 1 ? 'registrada' : 'registradas'}
           </Badge>
+        }
+        actions={
+          <AddAppointment motorcycles={motorcycles} technicians={technicians} />
         }
       />
 

@@ -38,7 +38,7 @@ import type { InventoryItem, Customer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { createDirectSale } from '@/lib/actions/sales';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { getCustomerByCedula } from '@/lib/actions/customers';
 import { ReceiptDialog } from '@/components/ui/receipt-dialog';
 import { Card } from '@/components/ui/card';
@@ -82,6 +82,15 @@ export function AddDirectSale({ inventory, customers, services = [] }: AddDirect
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsOpen(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, pathname, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

@@ -425,7 +425,7 @@ interface AppleGlassCardProps {
 
 function AppleGlassCard({ href, icon: Icon, title, description, iconBg, locked, onClickLocked }: AppleGlassCardProps) {
   const content = (
-    <div className={cn("relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] flex flex-col min-w-0", locked && "opacity-80 grayscale-[50%]")}>
+    <div className={cn("relative h-full min-h-[140px] sm:min-h-[160px] p-4 sm:p-5 rounded-3xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] ring-1 ring-inset ring-foreground/[0.08] dark:ring-white/[0.1] shadow-lg overflow-hidden transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:ring-foreground/[0.15] dark:hover:ring-white/[0.2] active:scale-[0.98] flex flex-col min-w-0", locked && "opacity-80 grayscale-[50%]")}>
       
       {locked && (
         <div className="absolute top-3 right-3 p-1.5 rounded-full bg-foreground/10 text-foreground/50 z-20">
@@ -445,13 +445,13 @@ function AppleGlassCard({ href, icon: Icon, title, description, iconBg, locked, 
   );
 
   return (
-    <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } }} className="h-full">
+    <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }} className="h-full">
       {locked ? (
         <button type="button" onClick={onClickLocked} className="block w-full h-full text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
           {content}
         </button>
       ) : (
-        <Link href={href} className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
+        <Link href={href} className="block w-full h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-3xl min-w-0">
           {content}
         </Link>
       )}
@@ -461,7 +461,7 @@ function AppleGlassCard({ href, icon: Icon, title, description, iconBg, locked, 
 
 function AppleGlassCardSmall({ href, icon: Icon, title, description, iconBg, locked, onClickLocked }: AppleGlassCardProps) {
   const content = (
-    <div className={cn("relative h-full p-4 sm:p-5 rounded-2xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[40px] border border-foreground/[0.08] dark:border-white/[0.1] transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2] active:scale-[0.98] min-w-0", locked && "opacity-80 grayscale-[50%]")}>
+    <div className={cn("relative h-full p-4 sm:p-5 rounded-2xl bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[40px] ring-1 ring-inset ring-foreground/[0.08] dark:ring-white/[0.1] transition-all duration-300 hover:bg-foreground/[0.06] dark:hover:bg-white/[0.08] hover:ring-foreground/[0.15] dark:hover:ring-white/[0.2] active:scale-[0.98] min-w-0", locked && "opacity-80 grayscale-[50%]")}>
       
       {locked && (
         <div className="absolute top-2 right-2 p-1 rounded-full bg-foreground/10 text-foreground/50 z-20">
@@ -478,17 +478,18 @@ function AppleGlassCardSmall({ href, icon: Icon, title, description, iconBg, loc
           <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">{description}</p>
         </div>
       </div>
+      
     </div>
   );
 
   return (
-    <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="h-full">
+    <motion.div variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }} className="h-full">
       {locked ? (
         <button type="button" onClick={onClickLocked} className="block w-full h-full text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl min-w-0">
           {content}
         </button>
       ) : (
-        <Link href={href} className="block h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl min-w-0">
+        <Link href={href} className="block w-full h-full group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl min-w-0">
           {content}
         </Link>
       )}

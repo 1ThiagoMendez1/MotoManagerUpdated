@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Loader2, PlusCircle, Check, ChevronsUpDown, AlertTriangle, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -114,6 +114,15 @@ export function AddMotorcycle({ customers, technicians }: AddMotorcycleProps) {
   const [selectedTech, setSelectedTech] = useState<string>('');
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsOpen(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, pathname, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

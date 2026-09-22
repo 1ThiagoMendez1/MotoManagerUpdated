@@ -60,7 +60,7 @@ export default async function RootLayout({
 
   return (
     <html lang="es" suppressHydrationWarning className={cn(inter.variable, spaceGrotesk.variable)}>
-      <body className={cn('font-body antialiased bg-background text-foreground min-h-screen flex flex-col relative')}>
+      <body className={cn('font-body antialiased bg-background text-foreground min-h-screen flex flex-col relative overflow-x-hidden')}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {/* <ShaderBackground /> */}
           <TenantProvider>
@@ -86,6 +86,7 @@ export default async function RootLayout({
           )}
 
           <LayoutWrapper
+            workshopSlug={workshop?.slug}
             header={
               <Header 
                 workshopName={workshop?.name}

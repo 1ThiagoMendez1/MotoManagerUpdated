@@ -17,15 +17,21 @@ export const DEFAULT_PLANS = [
     btn: 'from-primary to-primary/80 hover:opacity-90 text-primary-foreground shadow-primary/25',
     
     // Limits & Features
-    users_limit: 1,
-    whatsapp_limit: 50,
-    has_inventory: false,
-    has_sales: false,
+    users_limit: 3,
+    whatsapp_limit: 70,
+    clients_limit: 50,
+    motorcycles_limit: 50,
+    work_orders_limit: 50,
+    inventory_limit: 250,
+    services_limit: 50,
+    sales_limit: 50,
+    has_inventory: true,
+    has_sales: true,
     has_appointments: false,
     has_technicians: false,
     has_accounting: false,
     dashboard_level: 'none', // none, basic, complete
-    permissions_level: 'none', // none, limited, complete
+    permissions_level: 'basic', // changed from none to allow limited access for basic plan
     accounting_level: 'none', // none, basic, complete
     support_level: 'basic'
   },
@@ -49,6 +55,12 @@ export const DEFAULT_PLANS = [
     // Limits & Features
     users_limit: 3,
     whatsapp_limit: 150,
+    clients_limit: -1,
+    motorcycles_limit: -1,
+    work_orders_limit: -1,
+    inventory_limit: -1,
+    services_limit: -1,
+    sales_limit: -1,
     has_inventory: true,
     has_sales: true,
     has_appointments: true,
@@ -79,6 +91,12 @@ export const DEFAULT_PLANS = [
     // Limits & Features
     users_limit: -1, // -1 means unlimited
     whatsapp_limit: -1, // -1 means unlimited
+    clients_limit: -1,
+    motorcycles_limit: -1,
+    work_orders_limit: -1,
+    inventory_limit: -1,
+    services_limit: -1,
+    sales_limit: -1,
     has_inventory: true,
     has_sales: true,
     has_appointments: true,
@@ -103,10 +121,10 @@ export const DEFAULT_FEATURES = [
   { id: '9', feature_name: 'Citas / agenda', order_index: 90, included_in_basic: 'No', included_in_pro: 'Sí', included_in_full: 'Sí' },
   { id: '10', feature_name: 'Dashboard', order_index: 100, included_in_basic: 'No', included_in_pro: 'Básico', included_in_full: 'Completo' },
   { id: '11', feature_name: 'Técnicos', order_index: 110, included_in_basic: 'No', included_in_pro: 'Sí', included_in_full: 'Avanzado' },
-  { id: '12', feature_name: 'Permisos de usuarios', order_index: 120, included_in_basic: 'No', included_in_pro: 'Limitado', included_in_full: 'Sí' },
+  { id: '12', feature_name: 'Permisos de usuarios', order_index: 120, included_in_basic: 'Limitado (1 por rol)', included_in_pro: 'Limitado', included_in_full: 'Sí' },
   { id: '13', feature_name: 'Contabilidad y Finanzas', order_index: 125, included_in_basic: 'No', included_in_pro: 'Básico', included_in_full: 'Completo' },
   { id: '14', feature_name: 'Soporte', order_index: 130, included_in_basic: 'Básico', included_in_pro: 'Prioritario', included_in_full: 'Prioritario' },
-  { id: '15', feature_name: 'Usuarios incluidos', order_index: 140, included_in_basic: '1', included_in_pro: '3', included_in_full: '5 o más' },
+  { id: '15', feature_name: 'Usuarios incluidos', order_index: 140, included_in_basic: '1 por rol', included_in_pro: '3', included_in_full: 'Ilimitados' },
   { id: '16', feature_name: 'Ideal para', order_index: 150, included_in_basic: 'Taller pequeño', included_in_pro: 'Taller organizado', included_in_full: 'Taller grande o con equipo' }
 ];
 

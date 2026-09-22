@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,16 @@ export function AddInventoryItem() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsOpen(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, pathname, router]);
+
   // @ts-ignore
   const [state, formAction] = useActionState(createInventoryItem, undefined);
 

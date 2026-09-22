@@ -45,13 +45,13 @@ export function QuickCreateMenu({
   const canCreateService = hasPermission(role, '/services', customPermissions);
 
   const actions = [
-    { label: 'Nueva Orden de Trabajo', path: '/work-orders', icon: FileText, allowed: canCreateWorkOrder },
-    { label: 'Nueva Venta', path: '/sales', icon: ShoppingCart, allowed: canCreateSale },
-    { label: 'Nuevo Cliente', path: '/customers', icon: Users, allowed: canCreateCustomer },
-    { label: 'Nueva Motocicleta', path: '/motorcycles', icon: Bike, allowed: canCreateMotorcycle },
-    { label: 'Nuevo Artículo en Inventario', path: '/inventory', icon: Package, allowed: canCreateInventory },
-    { label: 'Nueva Cita', path: '/appointments', icon: Calendar, allowed: canCreateAppointment },
-    { label: 'Nuevo Servicio', path: '/services', icon: Wrench, allowed: canCreateService },
+    { label: 'Nueva Orden de Trabajo', path: '/work-orders?new=true', icon: FileText, allowed: canCreateWorkOrder },
+    { label: 'Nueva Venta', path: '/sales?new=true', icon: ShoppingCart, allowed: canCreateSale },
+    { label: 'Nuevo Cliente', path: '/customers?new=true', icon: Users, allowed: canCreateCustomer },
+    { label: 'Nueva Motocicleta', path: '/motorcycles?new=true', icon: Bike, allowed: canCreateMotorcycle },
+    { label: 'Nuevo Artículo en Inventario', path: '/inventory?new=true', icon: Package, allowed: canCreateInventory },
+    { label: 'Nueva Cita', path: '/appointments?new=true', icon: Calendar, allowed: canCreateAppointment },
+    { label: 'Nuevo Servicio', path: '/services?new=true', icon: Wrench, allowed: canCreateService },
   ].filter(a => a.allowed);
 
   if (actions.length === 0) return null;

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { CalendarIcon, Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Motorcycle, Technician } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { createAppointment } from '@/app/appointments/actions';
 
 const formSchema = z.object({
   motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -57,6 +59,16 @@ type AddAppointmentProps = {
 export function AddAppointment({ motorcycles, technicians }: AddAppointmentProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsOpen(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, pathname, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -71,14 +83,31 @@ export function AddAppointment({ motorcycles, technicians }: AddAppointmentProps
   const { isSubmitting } = form.formState;
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log("Simulating adding appointment:", values);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({
-      title: "Éxito",
-      description: "Nueva cita programada correctamente.",
+    const [hours, minutes] = values.time.split(':');
+    const scheduledDate = new Date(values.date);
+    scheduledDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+
+    const result = await createAppointment({
+      motorcycleId: values.motorcycleId,
+      technicianId: values.technicianId,
+      notes: values.service,
+      scheduledStart: scheduledDate.toISOString()
     });
-    setIsOpen(false);
-    form.reset();
+
+    if (result.success) {
+      toast({
+        title: "Éxito",
+        description: result.message,
+      });
+      setIsOpen(false);
+      form.reset();
+    } else {
+      toast({
+        title: "Error",
+        description: result.message,
+        variant: "destructive"
+      });
+    }
   }
 
   return (

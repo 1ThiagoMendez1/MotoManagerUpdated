@@ -20,6 +20,7 @@ import { DateRange } from 'react-day-picker'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { DEFAULT_PLANS } from '@/lib/constants/plans'
 
 const initialState = {
     error: '',
@@ -43,7 +44,7 @@ export default function RegisterForm() {
     const router = useRouter()
     // @ts-ignore - useFormState types might conflict in some setups but this is valid
     const [state, formAction] = useActionState(registerWorkshop, initialState)
-    const [plan, setPlan] = useState('monthly')
+    const [plan, setPlan] = useState('basic')
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: new Date(),
         to: new Date(new Date().setDate(new Date().getDate() + 15)),
@@ -142,9 +143,11 @@ export default function RegisterForm() {
                                     <SelectValue placeholder="Selecciona un plan" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-background/90 border-border/50 text-foreground backdrop-blur-xl">
-                                    <SelectItem value="monthly">Mensual ($18.900/mes)</SelectItem>
-                                    <SelectItem value="biannual">Semestral ($99.900/6 meses)</SelectItem>
-                                    <SelectItem value="yearly">Anual ($199.900/año) - ¡Ahorra!</SelectItem>
+                                    {DEFAULT_PLANS.map((p) => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                            {p.name} (${(p.price).toLocaleString('es-CO')}{p.period})
+                                        </SelectItem>
+                                    ))}
                                     <SelectItem value="demo">Demo (Solo Administradores)</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -286,7 +289,7 @@ export default function RegisterForm() {
                                     
                                     <div className="h-px bg-border my-2" />
                                     
-                                    <p><strong className="text-foreground">Plan:</strong> {state?.data?.subscriptionPlan === 'demo' ? 'Demo (Solo Administradores)' : state?.data?.subscriptionPlan}</p>
+                                    <p><strong className="text-foreground">Plan:</strong> {state?.data?.subscriptionPlan === 'demo' ? 'Demo (Solo Administradores)' : (DEFAULT_PLANS.find(p => p.id === state?.data?.subscriptionPlan)?.name || state?.data?.subscriptionPlan)}</p>
                                     
                                     {state?.data?.subscriptionPlan === 'demo' && state?.data?.demoStartDate && state?.data?.demoEndDate && (
                                         <>

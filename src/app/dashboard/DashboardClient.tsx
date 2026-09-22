@@ -13,7 +13,11 @@ import {
   ArrowDownRight,
   ArrowLeft,
   Lock,
-  Rocket
+  Rocket,
+  CreditCard,
+  PackageOpen,
+  CheckCircle2,
+  CalendarCheck
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -494,7 +498,7 @@ export default function DashboardPage() {
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="relative grid gap-4 md:grid-cols-2 lg:grid-cols-7"
+          className="relative space-y-4"
         >
           {isChartsLocked && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/70 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
@@ -504,7 +508,7 @@ export default function DashboardPage() {
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">Análisis Avanzado Bloqueado</h3>
               <p className="text-muted-foreground text-sm max-w-md mb-6">
-                El Flujo de Caja, Repuestos de Mayor Rotación y otros gráficos avanzados están disponibles exclusivamente en el plan <strong className="text-white">Full Taller</strong>.
+                El Flujo de Caja, Repuestos de Mayor Rotación e Ingresos por Medio de Pago están disponibles exclusivamente en el plan <strong className="text-white">Full Taller</strong>.
               </p>
               <Link href="/planes">
                 <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
@@ -515,15 +519,25 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Revenue Chart */}
-          <motion.div variants={itemVariants} className={`lg:col-span-4 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
-            <Card id="tour-chart-flujo" className="bg-card border-border/50 h-full">
-              <CardHeader>
-                <CardTitle>Flujo de Caja (Semanal)</CardTitle>
-                <CardDescription>Ingresos vs Gastos en los últimos 7 días</CardDescription>
+          {/* Revenue Chart (Hero Timeline) */}
+          <motion.div variants={itemVariants} className={isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}>
+            <Card id="tour-chart-flujo" className="bg-card border-border/50">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2">
+                <div>
+                  <CardTitle>Flujo de Caja (Semanal)</CardTitle>
+                  <CardDescription>Ingresos vs Gastos en los últimos 7 días</CardDescription>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-medium">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#2f80ed]" /> Ingresos
+                  </span>
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" /> Gastos
+                  </span>
+                </div>
               </CardHeader>
               <CardContent className="pl-2">
-                <div className="h-[300px] w-full mt-4">
+                <div className="h-[280px] w-full mt-2">
                   {isMounted && (stats.revenueData || []).length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={stats.revenueData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -549,38 +563,8 @@ export default function DashboardPage() {
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                      {!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Top Selling Parts Chart */}
-          <motion.div variants={itemVariants} className={`lg:col-span-3 ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
-            <Card id="tour-chart-repuestos" className="bg-card border-border/50 h-full">
-              <CardHeader>
-                <CardTitle>Repuestos de Mayor Rotación</CardTitle>
-                <CardDescription>Top 5 repuestos más vendidos del mes</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] w-full mt-4">
-                  {isMounted && (stats.topPartsData || []).length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={stats.topPartsData} layout="vertical" margin={{ top: 0, right: 0, left: 30, bottom: 0 }}>
-                        <XAxis type="number" hide />
-                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={12} stroke="#888888" />
-                        <Tooltip 
-                          cursor={{fill: 'transparent'}}
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                        />
-                        <Bar dataKey="ventas" fill="#f97316" radius={[0, 4, 4, 0]} barSize={20} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                      <TrendingUp className="h-8 w-8 text-muted-foreground/30 mb-2" />
                       <p>{!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}</p>
                     </div>
                   )}
@@ -588,76 +572,87 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </motion.div>
-        </motion.div>
 
-        {/* Income By Payment Method Row */}
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid gap-4 md:grid-cols-1 lg:grid-cols-2 relative"
-        >
-          {isChartsLocked && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/70 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl overflow-hidden p-6 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-                <Lock className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Gráfico Bloqueado</h3>
-              <p className="text-muted-foreground text-sm max-w-md mb-6">
-                El detalle de ingresos por método de pago requiere el plan Full Taller.
-              </p>
-              <Link href="/planes">
-                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg border-0">
-                  <Rocket className="w-4 h-4 mr-2" />
-                  Mejorar Plan
-                </Button>
-              </Link>
-            </div>
-          )}
-          
-          <motion.div variants={itemVariants} className={`${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
-            <Card id="tour-chart-metodos" className="bg-card border-border/50 h-[400px]">
-              <CardHeader>
-                <CardTitle>Ingresos por Medio de Pago (Mes Actual)</CardTitle>
-                <CardDescription>Distribución de los pagos recibidos</CardDescription>
-              </CardHeader>
-              <CardContent className="h-[300px] pb-4">
-                <div className="h-full w-full flex flex-col items-center justify-center">
-                  {isMounted && (stats.incomeByMethodData || []).length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={stats.incomeByMethodData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
-                          dataKey="amount"
-                          labelLine={false}
-                          label={({ name, percent }: any) => `${name} (${(((percent || 0) * 100)).toFixed(0)}%)`}
-                        >
-                          {(stats.incomeByMethodData || []).map((entry, index) => {
-                            const colors = ['#2f80ed', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-                            return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                          })}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value: any) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(value) || 0)}
-                          contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
-                          itemStyle={{ color: 'hsl(var(--foreground))' }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
-                      <p>{!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+          {/* Categorical Breakdowns: Repuestos & Medios de Pago */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Top Selling Parts Chart */}
+            <motion.div variants={itemVariants} className={`h-full ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
+              <Card id="tour-chart-repuestos" className="bg-card border-border/50 h-full flex flex-col justify-between">
+                <CardHeader>
+                  <CardTitle>Repuestos de Mayor Rotación</CardTitle>
+                  <CardDescription>Top 5 repuestos más vendidos del mes</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col justify-center">
+                  <div className="h-[260px] w-full mt-2">
+                    {isMounted && (stats.topPartsData || []).length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={stats.topPartsData} layout="vertical" margin={{ top: 0, right: 10, left: 30, bottom: 0 }}>
+                          <XAxis type="number" hide />
+                          <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={12} stroke="#888888" width={110} />
+                          <Tooltip 
+                            cursor={{fill: 'transparent'}}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                          />
+                          <Bar dataKey="ventas" fill="#f97316" radius={[0, 4, 4, 0]} barSize={18} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                        <PackageOpen className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                        <p>{!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Income By Payment Method */}
+            <motion.div variants={itemVariants} className={`h-full ${isChartsLocked ? 'opacity-30 pointer-events-none blur-sm select-none' : ''}`}>
+              <Card id="tour-chart-metodos" className="bg-card border-border/50 h-full flex flex-col justify-between">
+                <CardHeader>
+                  <CardTitle>Ingresos por Medio de Pago (Mes Actual)</CardTitle>
+                  <CardDescription>Distribución de los pagos recibidos</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col justify-center">
+                  <div className="h-[260px] w-full flex flex-col items-center justify-center mt-2">
+                    {isMounted && (stats.incomeByMethodData || []).length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={stats.incomeByMethodData}
+                            cx="50%"
+                            cy="45%"
+                            innerRadius={55}
+                            outerRadius={75}
+                            paddingAngle={5}
+                            dataKey="amount"
+                            labelLine={false}
+                          >
+                            {(stats.incomeByMethodData || []).map((entry, index) => {
+                              const colors = ['#2f80ed', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                              return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                            })}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value: any) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(value) || 0)}
+                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                            itemStyle={{ color: 'hsl(var(--foreground))' }}
+                          />
+                          <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm">
+                        <CreditCard className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                        <p>{!isMounted ? 'Cargando gráficos...' : 'No hay datos suficientes'}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </motion.div>
 
         {/* Recent Activity / Alerts */}
@@ -667,15 +662,15 @@ export default function DashboardPage() {
           animate="visible"
           className="grid gap-4 md:grid-cols-2"
         >
-          <motion.div variants={itemVariants}>
-            <Card id="tour-alertas" className="bg-card border-border/50">
+          <motion.div variants={itemVariants} className="h-full">
+            <Card id="tour-alertas" className="bg-card border-border/50 h-full flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-amber-500" />
                   Alertas del Taller
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 flex-1 flex flex-col justify-center">
                 {(stats.alerts || []).map((alert: any, i: number) => (
                   <div 
                     key={i} 
@@ -690,14 +685,17 @@ export default function DashboardPage() {
                   </div>
                 ))}
                 {(!stats.alerts || stats.alerts.length === 0) && (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No hay alertas recientes</p>
+                  <div className="flex flex-col items-center justify-center py-6 text-muted-foreground text-sm">
+                    <CheckCircle2 className="h-7 w-7 text-emerald-500/50 mb-2" />
+                    <p>Todo está al día en tu taller</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <Card id="tour-recordatorios" className="bg-card border-border/50">
+          <motion.div variants={itemVariants} className="h-full">
+            <Card id="tour-recordatorios" className="bg-card border-border/50 h-full flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-blue-500" />
@@ -705,7 +703,7 @@ export default function DashboardPage() {
                 </CardTitle>
                 <CardDescription>Próximos mantenimientos sugeridos</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 flex-1 flex flex-col justify-center">
                 {(reminders || []).length > 0 ? (
                   (reminders || []).map((rem: any, i) => {
                     const date = rem.due_date ? new Date(rem.due_date).toLocaleDateString('es-CO') : 'Sin fecha';
@@ -722,7 +720,10 @@ export default function DashboardPage() {
                     );
                   })
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">No hay recordatorios pendientes</p>
+                  <div className="flex flex-col items-center justify-center py-6 text-muted-foreground text-sm">
+                    <CalendarCheck className="h-7 w-7 text-blue-500/50 mb-2" />
+                    <p>No hay recordatorios pendientes</p>
+                  </div>
                 )}
               </CardContent>
             </Card>

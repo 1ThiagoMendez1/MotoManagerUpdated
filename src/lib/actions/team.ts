@@ -33,13 +33,27 @@ export async function inviteUser(data: {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } }
   );
-      const { count } = await supabaseAdmin
-        .from('organization_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('organization_id', currentUser.workshopId);
 
-      if (count !== null && count >= planLimits.users_limit) {
-        throw new Error(`Límite de usuarios alcanzado para el plan ${planLimits.name}. Actualiza tu plan para invitar a más usuarios.`);
+      if (planLimits.id === 'basic') {
+        const roleToCheck = data.role === 'receptionist' ? 'service_advisor' : data.role;
+        const { count } = await supabaseAdmin
+          .from('organization_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', currentUser.workshopId)
+          .eq('role', roleToCheck);
+
+        if (count !== null && count >= 1) {
+          throw new Error(`Límite alcanzado: El plan ${planLimits.name} permite máximo 1 usuario por rol.`);
+        }
+      } else {
+        const { count } = await supabaseAdmin
+          .from('organization_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', currentUser.workshopId);
+
+        if (count !== null && count >= planLimits.users_limit) {
+          throw new Error(`Límite de usuarios alcanzado para el plan ${planLimits.name}. Actualiza tu plan para invitar a más usuarios.`);
+        }
       }
     }
 
@@ -198,6 +212,11 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
       throw new Error('No tienes permisos para cambiar roles');
     }
 
+    const workshopDetails = await getWorkshopDetails();
+    if (!workshopDetails) {
+      throw new Error('No se encontraron detalles de tu taller');
+    }
+
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -205,6 +224,19 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
   );
 
     const dbRole = newRole === 'receptionist' ? 'service_advisor' : newRole;
+
+    const planLimits = getPlanLimits(workshopDetails.subscription_plan || 'basic');
+    if (planLimits.id === 'basic') {
+      const { count } = await supabaseAdmin
+        .from('organization_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentUser.workshopId)
+        .eq('role', dbRole);
+
+      if (count !== null && count >= 1) {
+        throw new Error(`Límite alcanzado: El plan ${planLimits.name} permite máximo 1 usuario por rol.`);
+      }
+    }
 
     const { error } = await supabaseAdmin
       .from('organization_members')

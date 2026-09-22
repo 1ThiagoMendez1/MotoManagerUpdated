@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +40,16 @@ function SubmitButton() {
 
 export function AddCustomer() {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setIsOpen(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, pathname, router]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

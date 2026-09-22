@@ -11,7 +11,7 @@ const registrationSchema = z.object({
     email: z.string().email(),
     fullName: z.string().min(2),
     phone: z.string().min(8, 'El teléfono debe tener al menos 8 dígitos'),
-    subscriptionPlan: z.enum(['monthly', 'biannual', 'yearly', 'demo']),
+    subscriptionPlan: z.enum(['basic', 'pro', 'full', 'demo']),
     demoStartDate: z.string().optional(),
     demoEndDate: z.string().optional(),
     legalName: z.string().optional(),
@@ -146,12 +146,8 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         const startDate = new Date();
         const endDate = new Date(startDate);
 
-        if (subscriptionPlan === 'monthly') {
+        if (['basic', 'pro', 'full'].includes(subscriptionPlan)) {
             endDate.setMonth(endDate.getMonth() + 1);
-        } else if (subscriptionPlan === 'biannual') {
-            endDate.setMonth(endDate.getMonth() + 6);
-        } else if (subscriptionPlan === 'yearly') {
-            endDate.setFullYear(endDate.getFullYear() + 1);
         } else if (subscriptionPlan === 'demo') {
             if (demoEndDate) {
                 const parsedEnd = new Date(demoEndDate);

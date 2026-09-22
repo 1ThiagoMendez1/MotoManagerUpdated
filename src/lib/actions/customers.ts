@@ -183,7 +183,7 @@ export async function updateCustomer(prevState: any, formData: FormData) {
     return { success: true };
 }
 
-export async function deleteCustomer(formData: FormData) {
+export async function deleteCustomer(prevState: any, formData: FormData) {
     const user = await requireWorkshop();
     const supabase = await createClient();
     const id = formData.get('id') as string;
@@ -206,6 +206,48 @@ export async function deleteCustomer(formData: FormData) {
 
     if (error) {
         console.error('❌ [deleteCustomer] Error eliminando cliente:', error);
+        return { message: 'Error al eliminar: ' + error.message };
+    }
+
+    revalidatePath('/customers');
+    revalidatePath('/customers', 'page');
+    revalidatePath('/motorcycles');
+    revalidatePath('/sales');
+    revalidatePath('/work-orders');
+    revalidatePath('/', 'layout');
+    return { success: true };
+}
+
+export async function bulkDeleteCustomers(ids: string[]) {
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+
+    if (!ids || ids.length === 0) {
+        return { message: 'No hay clientes seleccionados' };
+    }
+
+    // Verificar si tienen motos asociadas
+    const { data: motorcycles } = await supabase
+        .from('motorcycles')
+        .select('customer_id')
+        .in('customer_id', ids)
+        .eq('organization_id', user.workshopId);
+
+    if (motorcycles && motorcycles.length > 0) {
+        const customersWithMotos = new Set(motorcycles.map(m => m.customer_id));
+        if (customersWithMotos.size > 0) {
+            return { message: `No se pueden eliminar ${customersWithMotos.size} cliente(s) porque tienen motocicletas asociadas. Por favor, elimínelos o reasígnelos primero.` };
+        }
+    }
+
+    const { error } = await supabase
+        .from('customers')
+        .delete()
+        .in('id', ids)
+        .eq('organization_id', user.workshopId);
+
+    if (error) {
+        console.error('❌ [bulkDeleteCustomers] Error eliminando clientes:', error);
         return { message: 'Error al eliminar: ' + error.message };
     }
 

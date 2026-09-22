@@ -114,7 +114,7 @@ export async function updateTechnician(prevState: any, formData: FormData) {
     return { success: true }
 }
 
-export async function deleteTechnician(formData: FormData) {
+export async function deleteTechnician(prevState: any, formData: FormData) {
     const user = await requireWorkshop()
     const supabase = new Proxy({}, {
   get: (target, prop) => {

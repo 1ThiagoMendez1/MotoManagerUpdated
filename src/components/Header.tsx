@@ -24,6 +24,9 @@ import { Separator } from '@/components/ui/separator';
 import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
 import { CommandPalette } from '@/components/navigation/CommandPalette';
 import { QuickCreateMenu } from '@/components/navigation/QuickCreateMenu';
+import { checkIsMainPage } from '@/lib/navigation';
+import { getNotificationsForUser } from '@/lib/actions/notifications';
+import { signOutAction } from '@/lib/actions/auth';
 
 import {
   DropdownMenu,
@@ -92,7 +95,6 @@ export default function Header({
 
     const fetchNotifications = async () => {
       try {
-        const { getNotificationsForUser } = await import('@/lib/actions/notifications');
         const res = await getNotificationsForUser();
         if (res.success && res.data) {
           let currentReadIds: string[] = [];
@@ -140,7 +142,6 @@ export default function Header({
 
   const handleSignOut = async () => {
     try {
-      const { signOutAction } = await import('@/lib/actions/auth');
       await signOutAction();
     } catch (error) {
       if (error && typeof error === 'object' && 'message' in error && (error.message as string).includes('NEXT_REDIRECT')) {
@@ -253,39 +254,47 @@ export default function Header({
     }).format(date);
   };
 
-  return (
-    <header className="sticky top-0 left-0 right-0 z-40 w-full h-14 border-b border-border/60 bg-background/80 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between transition-all">
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        <SidebarTrigger className="h-8 w-8 text-foreground/80 hover:bg-muted rounded-lg shrink-0" />
-        <Separator orientation="vertical" className="h-4 hidden sm:block bg-border/60" />
-        <Breadcrumbs workshopSlug={workshopSlug} />
+    const isMainPage = checkIsMainPage(pathname, workshopSlug);
+
+    return (
+    <header className="sticky top-0 left-0 right-0 z-40 w-full h-14 border-b border-border/60 bg-background/80 backdrop-blur-md px-2 sm:px-4 flex items-center justify-between transition-all overflow-hidden">
+      <div className="flex items-center gap-1 sm:gap-3 min-w-0 shrink">
+        {isMainPage ? (
+          <Link
+            href={workshopSlug ? `/${workshopSlug}` : '/dashboard'}
+            className="flex items-center gap-2.5 transition-opacity hover:opacity-90 shrink-0"
+            title={workshopName || 'MotoManager'}
+          >
+            <div className="relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 drop-shadow-md">
+              <Image
+                src="/logo.png"
+                alt="MotoManager"
+                fill
+                className="object-contain dark:mix-blend-screen mix-blend-multiply"
+                priority
+              />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-space font-bold text-sm sm:text-base tracking-tight text-foreground truncate">
+                MotoManager
+              </span>
+              {workshopName && (
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground truncate leading-none mt-0.5">
+                  {workshopName}
+                </span>
+              )}
+            </div>
+          </Link>
+        ) : (
+          <>
+            <SidebarTrigger className="h-8 w-8 text-foreground/80 hover:bg-muted rounded-lg shrink-0" />
+            <Separator orientation="vertical" className="h-4 hidden sm:block bg-border/60" />
+            <Breadcrumbs workshopSlug={workshopSlug} />
+          </>
+        )}
       </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        {/* Global Search / Command Palette */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setOpenCommandPalette(true)}
-          className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 border-border/60 hover:bg-muted hover:text-foreground h-8 px-2.5 rounded-lg"
-          title="Buscar módulo o acción (Ctrl+K)"
-        >
-          <Search className="w-3.5 h-3.5" />
-          <span className="hidden md:inline">Buscar...</span>
-          <kbd className="pointer-events-none hidden lg:inline-flex h-4 select-none items-center gap-0.5 rounded border bg-background px-1 font-mono text-[10px] font-medium text-muted-foreground">
-            <span>⌘</span>K
-          </kbd>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setOpenCommandPalette(true)}
-          className="sm:hidden h-8 w-8 text-muted-foreground hover:text-foreground"
-          title="Buscar módulo (Ctrl+K)"
-        >
-          <Search className="w-4 h-4" />
-        </Button>
-
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Global Action: + Nuevo */}
         <QuickCreateMenu userRole={userRole} customPermissions={customPermissions} />
 

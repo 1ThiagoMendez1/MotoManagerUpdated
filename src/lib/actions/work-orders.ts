@@ -3,7 +3,7 @@ import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification } from '@/lib/whatsapp';
+import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -171,23 +171,28 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
                 const workshopName = orgObj?.name || 'Águilas Doradas';
 
                 if (customer?.phone) {
-                    const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
-                    const brand = mcObj?.brand || 'Motocicleta';
-                    const model = mcObj?.model || 'Modelo';
-                    const plate = mcObj?.license_plate || '';
-                    const orderNumber = woData.order_number?.toString() || createdOrderId.substring(0, 8);
-                    const intakeDate = woData.created_at || new Date();
+                    const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+                    if (canSend) {
+                        const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+                        const brand = mcObj?.brand || 'Motocicleta';
+                        const model = mcObj?.model || 'Modelo';
+                        const plate = mcObj?.license_plate || '';
+                        const orderNumber = woData.order_number?.toString() || createdOrderId.substring(0, 8);
+                        const intakeDate = woData.created_at || new Date();
 
-                    sendMotoIngresoNotification(
-                        customer.phone,
-                        customerName || 'Cliente',
-                        workshopName,
-                        brand,
-                        model,
-                        plate,
-                        intakeDate,
-                        orderNumber
-                    ).catch(err => console.error('Error sending WhatsApp moto ingreso update:', err));
+                        sendMotoIngresoNotification(
+                            customer.phone,
+                            customerName || 'Cliente',
+                            workshopName,
+                            brand,
+                            model,
+                            plate,
+                            intakeDate,
+                            orderNumber
+                        ).catch(err => console.error('Error sending WhatsApp moto ingreso update:', err));
+                    } else {
+                        console.warn(`WhatsApp notification skipped for moto ingreso (Limit reached)`);
+                    }
                 }
             }
         } catch (fetchErr) {
@@ -310,37 +315,42 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         }
 
         if (customer?.phone) {
-            const isDiagnosticadoToReparado = oldStatus === 'diagnosis' && status === 'completed';
+            const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+            if (canSend) {
+                const isDiagnosticadoToReparado = oldStatus === 'diagnosis' && status === 'completed';
 
-            if (isDiagnosticadoToReparado) {
-                const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Cliente';
-                const motorcycleInfo = `${mc?.brand || ''} ${mc?.model || ''}`.trim() || 'Motocicleta';
-                const plate = mc?.license_plate || '';
-                const orderNum = updatedWo.order_number?.toString() || id.substring(0, 8);
-                const address = workshop?.address || '';
+                if (isDiagnosticadoToReparado) {
+                    const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Cliente';
+                    const motorcycleInfo = `${mc?.brand || ''} ${mc?.model || ''}`.trim() || 'Motocicleta';
+                    const plate = mc?.license_plate || '';
+                    const orderNum = updatedWo.order_number?.toString() || id.substring(0, 8);
+                    const address = workshop?.address || '';
 
-                sendDiagnosticadoReparadoNotification(
-                    customer.phone,
-                    customerName,
-                    workshop?.name || 'Taller',
-                    motorcycleInfo,
-                    plate,
-                    orderNum,
-                    address
-                ).catch(err => console.error('Error sending WhatsApp diagnosticado_reparado template:', err));
+                    sendDiagnosticadoReparadoNotification(
+                        customer.phone,
+                        customerName,
+                        workshop?.name || 'Taller',
+                        motorcycleInfo,
+                        plate,
+                        orderNum,
+                        address
+                    ).catch(err => console.error('Error sending WhatsApp diagnosticado_reparado template:', err));
+                } else {
+                    sendOrderStatusUpdate(
+                        customer.phone,
+                        {
+                            orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
+                            status: uiStatus as any,
+                            customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
+                            motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
+                            technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
+                            items: usedPartsItems,
+                            workshopName: workshop?.name
+                        }
+                    ).catch(err => console.error('Error sending WhatsApp order status update:', err));
+                }
             } else {
-                sendOrderStatusUpdate(
-                    customer.phone,
-                    {
-                        orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
-                        status: uiStatus as any,
-                        customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
-                        motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
-                        technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
-                        items: usedPartsItems,
-                        workshopName: workshop?.name
-                    }
-                ).catch(err => console.error('Error sending WhatsApp order status update:', err));
+                console.warn(`WhatsApp notification skipped for order update (Limit reached)`);
             }
         }
     }

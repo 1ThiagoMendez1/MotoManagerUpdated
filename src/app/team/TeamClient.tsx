@@ -99,7 +99,7 @@ const AVAILABLE_MODULES = [
   { id: '/tickets', label: 'Tickets de Soporte' },
 ];
 
-export default function TeamPage() {
+export default function TeamClient() {
   const router = useRouter();
   const { toast } = useToast();
   const [users, setUsers] = useState(initialUsers);

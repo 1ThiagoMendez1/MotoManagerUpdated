@@ -121,13 +121,19 @@ export async function updateAppointmentStatus(id: string, status: string) {
 
         if (phone) {
           console.log(`Sending appointment confirmation to ${phone} for workshop ${workshopName} on ${appointmentDate}`);
-          const { sendCitaConfirmadaNotification } = await import('@/lib/whatsapp');
-          sendCitaConfirmadaNotification(
-            phone,
-            customerName || 'Cliente',
-            workshopName,
-            appointmentDate
-          ).catch(err => console.error('Error sending WhatsApp appointment confirmation:', err));
+          const { sendCitaConfirmadaNotification, checkAndUpdateWhatsAppLimit } = await import('@/lib/whatsapp');
+          
+          const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+          if (canSend) {
+            sendCitaConfirmadaNotification(
+              phone,
+              customerName || 'Cliente',
+              workshopName,
+              appointmentDate
+            ).catch(err => console.error('Error sending WhatsApp appointment confirmation:', err));
+          } else {
+            console.warn('WhatsApp notification skipped for appointment confirmation (Limit reached)');
+          }
         } else {
           console.log('No phone found for appointment, skipping WhatsApp notification.');
         }
@@ -142,4 +148,63 @@ export async function updateAppointmentStatus(id: string, status: string) {
   revalidatePath('/appointments');
   revalidatePath('/dashboard');
   return { success: true, message: 'Estado de la cita actualizado exitosamente.' };
+}
+
+export async function createAppointment(data: {
+  motorcycleId: string;
+  technicianId: string;
+  notes: string;
+  scheduledStart: string;
+}) {
+  try {
+    const user = await requireWorkshop();
+    const supabase = await createAdminClient();
+
+    const { data: motoData, error: motoError } = await supabase
+      .from('motorcycles')
+      .select('customer_id')
+      .eq('id', data.motorcycleId)
+      .single();
+
+    if (motoError) {
+      console.error('Error fetching motorcycle customer:', motoError);
+      return { success: false, message: `Error obteniendo la moto: ${motoError.message}` };
+    }
+
+    const customerId = motoData?.customer_id;
+
+    if (!customerId) {
+      return { success: false, message: 'No se encontró el cliente asociado a la motocicleta.' };
+    }
+
+    // Use a default duration of 1 hour for now
+    const endDate = new Date(data.scheduledStart);
+    endDate.setHours(endDate.getHours() + 1);
+
+    const { error } = await supabase
+      .from('appointments')
+      .insert({
+        organization_id: user.workshopId,
+        customer_id: customerId,
+        motorcycle_id: data.motorcycleId,
+        technician_id: data.technicianId || null,
+        notes: data.notes,
+        scheduled_start: data.scheduledStart,
+        scheduled_end: endDate.toISOString(),
+        status: 'confirmed', // Created manually from the portal, so confirmed by default
+        created_by: user.userId,
+      });
+
+    if (error) {
+      console.error('Error creating appointment in db:', error);
+      return { success: false, message: `Error insertando en la base de datos: ${error.message}` };
+    }
+
+    revalidatePath('/appointments');
+    revalidatePath('/dashboard');
+    return { success: true, message: 'Cita creada exitosamente.' };
+  } catch (err: any) {
+    console.error('Unhandled error in createAppointment:', err);
+    return { success: false, message: `Excepción no manejada: ${err.message}` };
+  }
 }
