@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, MapPin, X, Loader2, Navigation, Phone, Wrench, Clock, Car } from 'lucide-react';
 import { PublicWorkshop, getPublicWorkshops } from '@/actions/public-workshops';
 import Link from 'next/link';
+import { getWhatsAppLink } from '@/lib/utils';
 import { Map, MapMarker, MarkerContent, MarkerTooltip, MapControls, MapRoute, MapPopup } from '@/components/ui/mapcn-map-route';
 
 interface WorkshopSearchModalProps {
@@ -325,7 +326,7 @@ export function WorkshopSearchModal({ isOpen, onClose }: WorkshopSearchModalProp
 
                       <div className="mt-auto pt-4 flex gap-2">
                         {workshop.phone ? (
-                          <Link href={`https://wa.me/${workshop.phone.replace(/\D/g, '')}`} target="_blank" className="flex-1" onClick={(e) => e.stopPropagation()}>
+                          <Link href={getWhatsAppLink(workshop.phone, `Hola ${workshop.name}, los encontré en MotoManager. Quisiera consultar sobre sus servicios.`)} target="_blank" className="flex-1" onClick={(e) => e.stopPropagation()}>
                             <button className="w-full py-2 px-3 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors flex items-center justify-center gap-2 text-sm font-medium">
                               <Phone className="w-4 h-4" />
                               Contactar

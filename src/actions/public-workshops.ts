@@ -19,7 +19,17 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
 
     let query = supabaseAdmin
       .from('organizations')
-      .select('id, name, slug, phone, settings')
+      .select(`
+        id, 
+        name, 
+        slug, 
+        phone, 
+        settings,
+        organization_members (
+          role,
+          profiles ( phone )
+        )
+      `)
       .neq('status', 'suspended')
       .order('created_at', { ascending: false });
 
@@ -36,15 +46,21 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
       return [];
     }
 
-    return data.map((org: any) => ({
-      id: org.id,
-      name: org.name,
-      slug: org.slug,
-      phone: org.phone,
-      address: org.settings?.address || null,
-      city: org.settings?.city || null,
-      maps_link: org.settings?.maps_link || null,
-    }));
+    return (data || []).map((org: any) => {
+      const ownerMember = org.organization_members?.find((m: any) => m.role === 'owner' || m.role === 'admin');
+      const ownerPhone = ownerMember?.profiles?.phone || null;
+      const resolvedPhone = org.phone || org.settings?.phone || org.settings?.whatsapp || ownerPhone || null;
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        phone: resolvedPhone,
+        address: org.settings?.address || null,
+        city: org.settings?.city || null,
+        maps_link: org.settings?.maps_link || null,
+      };
+    });
   } catch (error) {
     console.error('Unexpected error fetching public workshops:', error);
     return [];

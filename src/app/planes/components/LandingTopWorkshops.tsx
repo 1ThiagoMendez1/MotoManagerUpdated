@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Star, MapPin, Wrench, Trophy, CheckCircle2, Phone, Navigation, Search } from 'lucide-react';
 import Link from 'next/link';
+import { getWhatsAppLink } from '@/lib/utils';
 import { getPublicWorkshops, PublicWorkshop } from '@/actions/public-workshops';
 import { WorkshopSearchModal } from './WorkshopSearchModal';
 
@@ -194,7 +195,7 @@ export function LandingTopWorkshops() {
 
                   <div className="pt-4 flex gap-3">
                     {workshop.phone ? (
-                      <Link href={`https://wa.me/${workshop.phone.replace(/\D/g, '')}`} target="_blank" className="flex-1">
+                      <Link href={getWhatsAppLink(workshop.phone, `Hola ${workshop.name}, los encontré en MotoManager. Quisiera consultar sobre sus servicios.`)} target="_blank" className="flex-1">
                         <button className="w-full py-2.5 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors flex items-center justify-center gap-2 font-semibold text-sm">
                           <Phone className="w-4 h-4" />
                           Contactar

@@ -10,6 +10,7 @@ import {
 // ── Types ────────────────────────────────────────────────────────────────────
 import { updateCancellationStatus } from './actions';
 import { useToast } from '@/hooks/use-toast';
+import { getWhatsAppLink } from '@/lib/utils';
 
 export interface CancellationRecord {
   id: string;
@@ -376,7 +377,7 @@ export default function CancellationsTab({ records }: Props) {
                         <div className="flex gap-2 mt-4">
                           {record.owner?.phone && (
                             <a
-                              href={`https://wa.me/${record.owner.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${record.owner.name?.split(' ')[0] || ''}, vimos que intentaste cancelar tu MotoManager. ¿Podemos ayudarte?`)}`}
+                              href={getWhatsAppLink(record.owner.phone, `Hola ${record.owner.name?.split(' ')[0] || ''}, vimos que intentaste cancelar tu MotoManager. ¿Podemos ayudarte?`)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-2 px-3 py-2 rounded-xl bg-green-500/15 border border-green-400/20 text-green-400 text-xs font-semibold hover:bg-green-500/25 transition-all"

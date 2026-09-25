@@ -374,7 +374,7 @@ export function ManageSubscriptionClient({
                   <div className="flex justify-center">
                     <WompiButton
                       amountInCents={amountInCents}
-                      reference={`SUB-UPG-${userId}-${Date.now().toString(36).toUpperCase()}`}
+                      reference={`sub_${workshopId}_${Date.now()}`}
                       customerEmail={userEmail}
                       customerName={userName}
                       redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/subscription?payment=success&plan=${selectedPlan.id}&cycle=${billingCycle}&amount=${netAmountToPay}`}

@@ -288,3 +288,110 @@ export async function updateUserPermissions(userIdToUpdate: string, permissions:
     return { success: false, error: error.message };
   }
 }
+
+export async function updateTeamMemberInfo(userIdToUpdate: string, data: { name: string; phone: string; email?: string }) {
+  try {
+    const currentUser = await getCurrentUserServer();
+    if (!currentUser || !currentUser.workshopId) {
+      throw new Error('No estás autenticado o no estás asociado a ningún taller');
+    }
+
+    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+      throw new Error('No tienes permisos para editar la información de los usuarios');
+    }
+
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const nameParts = data.name.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Actualizar perfil
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+        phone: data.phone
+      })
+      .eq('id', userIdToUpdate);
+
+    if (profileError) {
+      throw new Error('Error al actualizar el perfil: ' + profileError.message);
+    }
+
+    // Actualizar correo en Auth si fue provisto
+    if (data.email) {
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+        userIdToUpdate,
+        {
+          email: data.email,
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName,
+            full_name: data.name
+          }
+        }
+      );
+      if (authError) {
+        console.warn('Aviso al actualizar correo en Auth:', authError.message);
+      }
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in updateTeamMemberInfo:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function removeUserFromTeam(userIdToRemove: string) {
+  try {
+    const currentUser = await getCurrentUserServer();
+    if (!currentUser || !currentUser.workshopId) {
+      throw new Error('No estás autenticado o no estás asociado a ningún taller');
+    }
+
+    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+      throw new Error('No tienes permisos para revocar acceso a miembros');
+    }
+
+    if (currentUser.userId === userIdToRemove) {
+      throw new Error('No puedes eliminar tu propia cuenta desde este módulo');
+    }
+
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    // Eliminar de organization_members
+    const { error: deleteMemberError } = await supabaseAdmin
+      .from('organization_members')
+      .delete()
+      .eq('user_id', userIdToRemove)
+      .eq('organization_id', currentUser.workshopId);
+
+    if (deleteMemberError) {
+      throw new Error('Error al revocar acceso del taller: ' + deleteMemberError.message);
+    }
+
+    // Intentar eliminar del sistema Auth
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(userIdToRemove);
+    } catch (e) {
+      console.warn('Eliminado de la organización, pero aviso al borrar de auth:', e);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in removeUserFromTeam:', error);
+    return { success: false, error: error.message };
+  }
+}
+
