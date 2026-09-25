@@ -9,45 +9,86 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache'
 
 export async function updateSubscriptionPlan(formData: FormData) {
-    const user = await requireWorkshop()
-    const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+    const user = await requireWorkshop();
     const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  )
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false } }
+    );
 
-    const newPlan = formData.get('plan') as string
+    const newPlan = (formData.get('plan') as string) || 'basic';
+    const billingCycle = (formData.get('billingCycle') as string) || (formData.get('cycle') as string) || 'monthly';
+    const paidAmount = Number(formData.get('paidAmount') || 0);
 
-    if (!['monthly', 'biannual', 'yearly'].includes(newPlan)) {
-        return { error: 'Plan inválido' }
+    const validPlans = ['basic', 'pro', 'full', 'monthly', 'biannual', 'yearly'];
+    if (!validPlans.includes(newPlan)) {
+        return { error: 'Plan inválido' };
     }
+
+    const normalizedPlan = newPlan === 'monthly' ? 'basic' : newPlan;
 
     const startDate = new Date();
     const endDate = new Date(startDate);
-    if (newPlan === 'monthly') endDate.setMonth(endDate.getMonth() + 1);
-    else if (newPlan === 'biannual') endDate.setMonth(endDate.getMonth() + 6);
-    else if (newPlan === 'yearly') endDate.setFullYear(endDate.getFullYear() + 1);
-
-    const { error } = await supabaseAdmin
-        .from('workshops')
-        .update({
-            subscription_plan: newPlan,
-            subscription_status: 'active',
-            subscription_start_date: startDate.toISOString(),
-            subscription_end_date: endDate.toISOString(),
-        })
-        .eq('id', user.workshopId)
-
-    if (error) {
-        return { error: 'Error al actualizar plan' }
+    if (billingCycle === 'biannual') {
+        endDate.setMonth(endDate.getMonth() + 6);
+    } else if (billingCycle === 'yearly') {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+        endDate.setMonth(endDate.getMonth() + 1);
     }
 
-    revalidatePath('/', 'layout')
-    return { success: true }
+    // 1. Fetch current organization settings to merge
+    const { data: currentOrg } = await supabaseAdmin
+        .from('organizations')
+        .select('settings')
+        .eq('id', user.workshopId)
+        .single();
+
+    const currentSettings = currentOrg?.settings || {};
+    const updatedSettings = {
+        ...currentSettings,
+        plan: normalizedPlan,
+        billingCycle,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        demoStartDate: startDate.toISOString(),
+        demoEndDate: endDate.toISOString(),
+        subscription_start_date: startDate.toISOString(),
+        subscription_end_date: endDate.toISOString(),
+        paidAmount,
+        lastPaymentDate: startDate.toISOString(),
+    };
+
+    // Update organizations
+    const { error: orgError } = await supabaseAdmin
+        .from('organizations')
+        .update({
+            settings: updatedSettings,
+            status: 'active'
+        })
+        .eq('id', user.workshopId);
+
+    // Also update workshops if the table/view exists
+    try {
+        await supabaseAdmin
+            .from('workshops')
+            .update({
+                subscription_plan: normalizedPlan,
+                subscription_status: 'active',
+                subscription_start_date: startDate.toISOString(),
+                subscription_end_date: endDate.toISOString(),
+            })
+            .eq('id', user.workshopId);
+    } catch (e) {
+        console.warn('Could not update workshops table:', e);
+    }
+
+    if (orgError) {
+        console.error('Error updating organization subscription:', orgError);
+        return { error: 'Error al actualizar plan' };
+    }
+
+    revalidatePath('/', 'layout');
+    revalidatePath('/dashboard/subscription');
+    return { success: true };
 }

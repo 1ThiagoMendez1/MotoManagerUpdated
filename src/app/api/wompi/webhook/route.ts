@@ -4,6 +4,8 @@ import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDirectSalePaidNotification, sendServiceSaleNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 
+export const dynamic = 'force-dynamic';
+
 function getFriendlyPaymentMethod(type: string) {
   if (!type) return 'Wompi';
   const t = type.toUpperCase();

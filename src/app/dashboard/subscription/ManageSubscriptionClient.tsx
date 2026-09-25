@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, CreditCard, Shield, Lock, Loader2, ArrowRight, HeartCrack, Gift, TrendingUp, Users, Wrench, Star, AlertTriangle, X, ChevronRight, Zap, Trophy } from 'lucide-react';
+import { CheckCircle2, CreditCard, Shield, Lock, Loader2, ArrowRight, HeartCrack, Gift, TrendingUp, Users, Wrench, Star, AlertTriangle, X, ChevronRight, Zap, Trophy, Sparkles, Clock } from 'lucide-react';
 import { WompiSubscriptionForm } from '@/components/payments/WompiSubscriptionForm';
 import { WompiButton } from '@/components/payments/WompiButton';
 import { updateSubscriptionPlan } from '@/lib/actions/subscription';
@@ -29,6 +29,10 @@ function formatCOP(n: number) {
 
 interface ManageSubscriptionProps {
   currentPlan: string;
+  currentBillingCycle?: 'monthly' | 'biannual' | 'yearly';
+  startDate?: string | null;
+  endDate?: string | null;
+  paidAmount?: number | null;
   userName: string;
   userEmail: string;
   userId: string;
@@ -40,6 +44,10 @@ interface ManageSubscriptionProps {
 
 export function ManageSubscriptionClient({ 
   currentPlan,
+  currentBillingCycle = 'monthly',
+  startDate = null,
+  endDate = null,
+  paidAmount = null,
   userName,
   userEmail,
   userId,
@@ -49,15 +57,17 @@ export function ManageSubscriptionClient({
   features
 }: ManageSubscriptionProps) {
   const [activePlan, setActivePlan] = useState(currentPlan);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'biannual' | 'yearly'>(
+    currentBillingCycle || 'monthly'
+  );
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
-  const [paymentMode, setPaymentMode] = useState<'automatic' | 'manual'>('manual'); // Nequi/PSE by default to avoid 404 errors with direct API while we fix tokenization
+  const [paymentMode, setPaymentMode] = useState<'automatic' | 'manual'>('manual');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [cancelStep, setCancelStep] = useState<0 | 1 | 2 | 3>(0); // 0=closed, 1=reasons, 2=counter-offer, 3=final-confirm
+  const [cancelStep, setCancelStep] = useState<0 | 1 | 2 | 3>(0);
   const [cancelReason, setCancelReason] = useState<string>('');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -69,29 +79,34 @@ export function ManageSubscriptionClient({
     // Process successful payment redirect
     const paymentStatus = searchParams.get('payment');
     const planToUpdate = searchParams.get('plan');
+    const cycleToUpdate = searchParams.get('cycle') || 'monthly';
+    const amountToUpdate = searchParams.get('amount') || '0';
     
     if (paymentStatus === 'success' && planToUpdate && !isUpdating) {
-      handlePaymentSuccess(planToUpdate);
+      handlePaymentSuccess(planToUpdate, cycleToUpdate, amountToUpdate);
     }
   }, [searchParams]);
 
-  const handlePaymentSuccess = async (plan: string) => {
+  const handlePaymentSuccess = async (plan: string, cycle?: string, amount?: string) => {
     setIsUpdating(true);
     const formData = new FormData();
     formData.append('plan', plan);
+    if (cycle) formData.append('billingCycle', cycle);
+    if (amount) formData.append('paidAmount', amount);
     
     try {
       const res = await updateSubscriptionPlan(formData);
       if (res.error) throw new Error(res.error);
       
       setActivePlan(plan);
+      if (cycle) setBillingCycle(cycle as any);
       
       toast({
         title: '¡Suscripción actualizada!',
         description: 'Tu pago fue recibido y tu plan ha sido mejorado con éxito.',
         variant: 'default',
       });
-      // Remove query params and refresh server data
+      setSelectedPlan(null);
       router.replace('/dashboard/subscription');
       router.refresh();
     } catch (error: any) {
@@ -109,28 +124,93 @@ export function ManageSubscriptionClient({
 
   const getPlanLabel = (planId: string) => {
     const id = planId === 'monthly' ? 'basic' : planId;
-    return plans.find(p => p.id === id)?.name || planId;
+    return plans.find(p => p.id === id)?.name || (id === 'pro' ? 'Pro Taller' : id === 'full' ? 'Full Taller' : 'Básico');
   };
 
-  const sortedPlans = [...plans].sort((a, b) => a.months - b.months);
+  const getCycleInfo = (cycle: string) => {
+    if (cycle === 'biannual') return { months: 6, discount: 0.9, label: '/ 6 meses', name: 'Semestral', discountText: '-10%' };
+    if (cycle === 'yearly') return { months: 12, discount: 0.8, label: '/ año', name: 'Anual', discountText: '-20%' };
+    return { months: 1, discount: 1, label: '/ mes', name: 'Mensual', discountText: null };
+  };
+
+  // Prorated credit calculation
+  const now = new Date();
+  let remainingDays = 0;
+  let totalDays = 0;
+  let creditRemaining = 0;
+
+  // Resolve effective start & end dates (matching Header logic)
+  const effectiveStartDate = startDate || new Date().toISOString();
+  
+  // Detect active cycle: from prop or duration between dates
+  let detectedCycle = currentBillingCycle || 'monthly';
+  if (endDate && startDate) {
+    const durationDays = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24));
+    if (durationDays >= 250) {
+      detectedCycle = 'yearly';
+    } else if (durationDays >= 120) {
+      detectedCycle = 'biannual';
+    }
+  }
+
+  let effectiveEndDate = endDate;
+  if (!effectiveEndDate) {
+    const d = new Date(effectiveStartDate);
+    const monthsToAdd = detectedCycle === 'yearly' ? 12 : detectedCycle === 'biannual' ? 6 : 1;
+    d.setMonth(d.getMonth() + monthsToAdd);
+    effectiveEndDate = d.toISOString();
+  }
+
+  const end = new Date(effectiveEndDate);
+  const start = new Date(effectiveStartDate);
+
+  // Determine cost of active plan according to its billing cycle (mensual, semestral o anual)
+  const curCycle = getCycleInfo(detectedCycle);
+  let currentCost = paidAmount;
+  if (!currentCost || currentCost <= 0) {
+    const currentPlanObj = plans.find(p => p.id === normalizedActivePlan) || plans[0];
+    currentCost = Math.round((currentPlanObj?.price || 49900) * curCycle.months * curCycle.discount);
+  }
+
+  if (end.getTime() > now.getTime()) {
+    totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    remainingDays = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    
+    if (totalDays > 0 && remainingDays > 0 && currentCost > 0) {
+      // Si el usuario acaba de adquirir el plan o le queda la mayor parte del ciclo (ej. primeros 5 días),
+      // abonamos el 100% del valor pagado del plan. Si ha pasado más tiempo, se prorratea.
+      if (remainingDays >= (totalDays - 5)) {
+        creditRemaining = currentCost;
+      } else {
+        const dailyRate = currentCost / totalDays;
+        creditRemaining = Math.min(currentCost, Math.round(dailyRate * remainingDays));
+      }
+    }
+  } else if (normalizedActivePlan && currentCost > 0) {
+    // Si la organización tiene el plan activo en sesión pero la fecha calculada cayó en el pasado,
+    // garantizamos el abono del plan activo.
+    creditRemaining = currentCost;
+    remainingDays = curCycle.months * 30;
+    totalDays = curCycle.months * 30;
+  }
+
+  // Sort plans by price ascending (Básico -> Pro -> Full)
+  const sortedPlans = [...plans].sort((a, b) => a.price - b.price);
   
   // Calculate orders so the active plan is always in the middle (index 1)
   const getPlanOrder = (planId: string, index: number) => {
     if (planId === normalizedActivePlan) return 'order-first md:order-2';
     
-    // If active plan is basic (index 0)
-    if (normalizedActivePlan === sortedPlans[0].id) {
+    if (normalizedActivePlan === sortedPlans[0]?.id) {
       if (index === 1) return 'order-2 md:order-1';
       if (index === 2) return 'order-last md:order-3';
     }
     
-    // If active plan is full (index 2)
-    if (normalizedActivePlan === sortedPlans[2].id) {
+    if (normalizedActivePlan === sortedPlans[2]?.id) {
       if (index === 0) return 'order-2 md:order-1';
       if (index === 1) return 'order-last md:order-3';
     }
     
-    // If active plan is pro (index 1), normal order
     if (index === 0) return 'order-1';
     if (index === 2) return 'order-3';
     
@@ -139,109 +219,227 @@ export function ManageSubscriptionClient({
 
   const sortedFeatures = [...features].sort((a, b) => a.order_index - b.order_index);
 
+  // Selected plan calculation for the checkout modal
+  const selectedCycleInfo = getCycleInfo(billingCycle);
+  const targetBasePrice = selectedPlan ? (selectedPlan.price || 0) : 0;
+  const regularTotal = targetBasePrice * selectedCycleInfo.months;
+  const planCyclePrice = Math.round(targetBasePrice * selectedCycleInfo.months * selectedCycleInfo.discount);
+  const cycleDiscountSavings = regularTotal - planCyclePrice;
+
+  // Prorated credit applies when upgrading or changing from an active plan
+  const applicableCredit = (selectedPlan && selectedPlan.id !== normalizedActivePlan && creditRemaining > 0)
+    ? Math.min(planCyclePrice, creditRemaining)
+    : 0;
+
+  const netAmountToPay = Math.max(0, planCyclePrice - applicableCredit);
+  const amountInCents = netAmountToPay * 100;
+
   const modalContent = selectedPlan ? (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedPlan(null)} />
-      <div className="relative w-full max-w-md bg-background dark:bg-[#0d1117] border border-border/30 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        <div className="flex items-center gap-3 p-5 border-b border-border/30">
-          <div className="p-2 bg-primary/20 rounded-xl">
-            <CreditCard className="h-4 w-4 text-primary" />
+      <div className="relative w-full max-w-lg bg-background dark:bg-[#0d1117] border border-border/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        {/* Modal Header */}
+        <div className="flex items-center gap-3 p-5 border-b border-border/40 bg-muted/30">
+          <div className="p-2.5 bg-primary/15 rounded-xl border border-primary/20 text-primary">
+            <Zap className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <h2 className="font-bold text-foreground">Actualizar a Plan {selectedPlan.name}</h2>
+            <h2 className="font-bold text-lg text-foreground">Resumen de Compra</h2>
             <p className="text-muted-foreground text-xs">
-              Confirma tu pago con Wompi
+              Mejora a Plan {selectedPlan.name} • Facturación {selectedCycleInfo.name}
             </p>
           </div>
-          <button onClick={() => setSelectedPlan(null)} className="text-muted-foreground hover:text-foreground text-xl leading-none px-2">×</button>
+          <button 
+            onClick={() => setSelectedPlan(null)} 
+            className="text-muted-foreground hover:text-foreground text-2xl leading-none px-2 rounded-lg hover:bg-muted transition-colors"
+          >
+            ×
+          </button>
         </div>
 
-        <div className="p-5 space-y-6">
-          <div className={`p-4 rounded-xl bg-gradient-to-br ${selectedPlan.gradient} border ${selectedPlan.border}`}>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-muted-foreground text-xs mb-0.5">Total a pagar</p>
-                <p className="text-2xl font-extrabold text-foreground">{formatCOP(selectedPlan.price)}</p>
-                <p className="text-muted-foreground text-xs">{selectedPlan.period}</p>
+        <div className="p-6 space-y-6">
+          {/* Order Breakdown Box */}
+          <div className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-border/40">
+              <span className="font-bold text-foreground text-base">Plan {selectedPlan.name}</span>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">
+                {selectedCycleInfo.name} ({selectedCycleInfo.months} {selectedCycleInfo.months === 1 ? 'mes' : 'meses'})
+              </span>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Precio regular ({selectedCycleInfo.months} {selectedCycleInfo.months === 1 ? 'mes' : 'meses'})</span>
+                <span>{formatCOP(regularTotal)}</span>
               </div>
-              {selectedPlan.savings && (
-                <span className="text-xs px-2.5 py-1 rounded-full bg-green-500/15 border border-green-400/25 text-green-400 font-medium">
-                  {selectedPlan.savings}
-                </span>
+
+              {cycleDiscountSavings > 0 && (
+                <div className="flex justify-between text-emerald-500 font-medium">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Descuento {selectedCycleInfo.name} ({selectedCycleInfo.discountText})
+                  </span>
+                  <span>-{formatCOP(cycleDiscountSavings)}</span>
+                </div>
+              )}
+
+              {applicableCredit > 0 && (
+                <div className="pt-1">
+                  <div className="flex justify-between text-emerald-500 font-semibold">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Abono Plan {getPlanLabel(normalizedActivePlan)} ({curCycle.name} • {remainingDays} {remainingDays === 1 ? 'día' : 'días'} restantes)
+                    </span>
+                    <span>-{formatCOP(applicableCredit)}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 pl-4.5">
+                    Se descuenta el valor de tu plan actual ({curCycle.name}) para pagar únicamente el excedente.
+                  </p>
+                </div>
               )}
             </div>
+
+            {/* Total Neto */}
+            <div className="pt-3 border-t border-border/40 flex justify-between items-baseline">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total a Pagar</p>
+                <p className="text-xs text-muted-foreground">IVA y costos de plataforma incluidos</p>
+              </div>
+              <div className="text-right">
+                <span className="text-3xl font-black text-foreground tracking-tight">
+                  {formatCOP(netAmountToPay)}
+                </span>
+                <span className="text-xs text-muted-foreground block">COP</span>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex bg-muted p-1 rounded-xl mb-4">
-              <button 
-                onClick={() => setPaymentMode('manual')}
-                className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'manual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+          {/* Payment execution */}
+          {netAmountToPay === 0 ? (
+            <div className="space-y-4 text-center">
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
+                ¡Tu saldo a favor cubre el costo total de esta actualización! No se requiere ningún cobro adicional.
+              </div>
+              <button
+                disabled={isUpdating}
+                onClick={() => handlePaymentSuccess(selectedPlan.id, billingCycle, '0')}
+                className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
               >
-                Pago Único (PSE, Nequi)
-              </button>
-              <button 
-                onClick={() => setPaymentMode('automatic')}
-                className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'automatic' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-              >
-                Débito Automático (Tarjeta)
+                {isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                Confirmar Cambio de Plan Gratis
               </button>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex bg-muted/60 p-1 rounded-xl">
+                <button 
+                  onClick={() => setPaymentMode('manual')}
+                  className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'manual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Pago Único (PSE, Nequi, Tarjetas)
+                </button>
+                <button 
+                  onClick={() => setPaymentMode('automatic')}
+                  className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'automatic' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  Débito Automático (Tarjeta)
+                </button>
+              </div>
 
-            {paymentMode === 'automatic' ? (
-              <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                <p className="text-sm text-muted-foreground text-center leading-relaxed mb-4">
-                  Ingresa los datos de tu tarjeta para suscribirte. El cobro se realizará automáticamente de forma segura cada ciclo.
-                </p>
-                <div className="flex justify-center py-2">
-                  <WompiSubscriptionForm
-                    planId={selectedPlan.id}
-                    workshopId={workshopId}
-                    userEmail={userEmail}
-                    userName={userName}
-                    amountToPay={selectedPlan.amountInCents}
-                    onSuccess={() => {
-                      setSelectedPlan(null);
-                    }}
-                  />
+              {paymentMode === 'automatic' ? (
+                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                  <p className="text-xs text-muted-foreground text-center mb-3">
+                    Ingresa los datos de tu tarjeta. Se cobrará {formatCOP(netAmountToPay)} COP de forma segura.
+                  </p>
+                  <div className="flex justify-center py-1">
+                    <WompiSubscriptionForm
+                      planId={selectedPlan.id}
+                      workshopId={workshopId}
+                      userEmail={userEmail}
+                      userName={userName}
+                      amountToPay={amountInCents}
+                      onSuccess={() => {
+                        setSelectedPlan(null);
+                        handlePaymentSuccess(selectedPlan.id, billingCycle, String(netAmountToPay));
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-                <p className="text-sm text-muted-foreground text-center leading-relaxed mb-6">
-                  Paga con PSE, Nequi o Efecty. Serás redirigido a Wompi. Cuando el plan expire en {selectedPlan.months} {selectedPlan.months === 1 ? 'mes' : 'meses'}, te enviaremos un WhatsApp para que renueves manualmente.
-                </p>
-                <div className="flex justify-center py-2">
-                  <WompiButton
-                    amountInCents={selectedPlan.amountInCents}
-                    reference={`SUB-UPG-${userId}-${Date.now().toString(36).toUpperCase()}`}
-                    customerEmail={userEmail}
-                    customerName={userName}
-                    redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/subscription?payment=success&plan=${selectedPlan.id}`}
-                    buttonLabel={`Pagar ${formatCOP(selectedPlan.price)} con Wompi`}
-                  />
+              ) : (
+                <div className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-4">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Paga con PSE, Nequi, Tarjeta o Bancolombia a través de la pasarela segura de Wompi.
+                  </p>
+                  <div className="flex justify-center">
+                    <WompiButton
+                      amountInCents={amountInCents}
+                      reference={`SUB-UPG-${userId}-${Date.now().toString(36).toUpperCase()}`}
+                      customerEmail={userEmail}
+                      customerName={userName}
+                      redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/subscription?payment=success&plan=${selectedPlan.id}&cycle=${billingCycle}&amount=${netAmountToPay}`}
+                      buttonLabel={`Pagar ${formatCOP(netAmountToPay)} con Wompi`}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-center gap-4 text-muted-foreground/60 text-xs pt-1">
+                    <span className="flex items-center gap-1"><Lock className="h-3.5 w-3.5" />Pago cifrado SSL</span>
+                    <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" />Pasarela oficial Wompi</span>
+                  </div>
                 </div>
-                
-                <div className="flex items-center justify-center gap-4 text-foreground/30 text-xs pt-4">
-                  <span className="flex items-center gap-1"><Lock className="h-3 w-3" />Pago cifrado SSL</span>
-                  <span className="flex items-center gap-1"><Shield className="h-3 w-3" />Powered by Wompi</span>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
   ) : null;
 
   return (
-    <div className="space-y-12 pb-12 overflow-hidden">
+    <div className="space-y-10 pb-12 overflow-hidden">
       {/* Header section */}
       <div className="text-center max-w-2xl mx-auto space-y-4">
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Gestionar Suscripción</h1>
         <p className="text-muted-foreground text-lg">
           Tu plan actual es <span className={`font-semibold capitalize ${plans.find(p => p.id === normalizedActivePlan)?.accentText || 'text-primary'}`}>{getPlanLabel(activePlan)}</span>
         </p>
+      </div>
+
+
+      {/* Billing Cycle Toggle */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="bg-muted/60 p-1.5 rounded-full inline-flex border border-border/50 backdrop-blur-md shadow-inner">
+          <button
+            onClick={() => setBillingCycle('monthly')}
+            className={`px-6 py-2 rounded-full text-xs md:text-sm font-bold transition-all ${
+              billingCycle === 'monthly' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Mensual
+          </button>
+          <button
+            onClick={() => setBillingCycle('biannual')}
+            className={`px-6 py-2 rounded-full text-xs md:text-sm font-bold transition-all ${
+              billingCycle === 'biannual' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Semestral <span className="ml-1 text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold">-10%</span>
+          </button>
+          <button
+            onClick={() => setBillingCycle('yearly')}
+            className={`px-6 py-2 rounded-full text-xs md:text-sm font-bold transition-all relative ${
+              billingCycle === 'yearly' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Anual <span className="ml-1 text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-bold">-20%</span>
+            {billingCycle !== 'yearly' && (
+              <span className="absolute -top-1.5 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {isUpdating && (
@@ -253,10 +451,15 @@ export function ManageSubscriptionClient({
       )}
 
       {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto py-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto py-4">
         {sortedPlans.map((plan, index) => {
           const isCurrent = plan.id === normalizedActivePlan;
           const orderClass = getPlanOrder(plan.id, index);
+          const currentCycle = getCycleInfo(billingCycle);
+          const basePrice = plan.price;
+          const grossCyclePrice = Math.round(basePrice * currentCycle.months * currentCycle.discount);
+          const monthlyEquivalent = Math.round(grossCyclePrice / currentCycle.months);
+          const hasDiscount = currentCycle.months > 1;
           
           return (
             <div
@@ -272,7 +475,7 @@ export function ManageSubscriptionClient({
               )}
               {plan.badge && !isCurrent && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold text-foreground bg-gradient-to-r ${plan.id === 'biannual' ? 'from-amber-500 to-orange-500' : 'from-purple-600 to-purple-500'}`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold text-foreground bg-gradient-to-r ${plan.id === 'pro' ? 'from-amber-500 to-orange-500' : 'from-purple-600 to-purple-500'}`}>
                     {plan.badge}
                   </span>
                 </div>
@@ -281,21 +484,21 @@ export function ManageSubscriptionClient({
               <div className="space-y-1 pt-2">
                 <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
                 <p className="text-sm text-muted-foreground">{plan.description}</p>
-                {plan.savings && (
+                {hasDiscount && (
                   <span className="inline-block px-2.5 py-0.5 mt-1 rounded-full bg-green-500/15 border border-green-500/25 text-green-400 text-xs font-medium">
-                    ✓ {plan.savings}
+                    ✓ Ahorra {currentCycle.discountText} en {currentCycle.name}
                   </span>
                 )}
               </div>
 
               <div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-extrabold text-foreground tracking-tight">{formatCOP(plan.price)}</span>
+                  <span className="text-4xl font-extrabold text-foreground tracking-tight">{formatCOP(grossCyclePrice)}</span>
                 </div>
-                <p className={`text-sm mt-0.5 ${plan.accentText}`}>{plan.period}</p>
-                {plan.months > 1 && (
+                <p className={`text-sm mt-0.5 ${plan.accentText}`}>{currentCycle.label}</p>
+                {currentCycle.months > 1 && (
                   <p className="text-muted-foreground text-xs mt-1">
-                    ≈ {formatCOP(Math.round(plan.price / plan.months))}/mes
+                    ≈ {formatCOP(monthlyEquivalent)}/mes
                   </p>
                 )}
               </div>

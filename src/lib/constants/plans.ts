@@ -2,9 +2,9 @@ export const DEFAULT_PLANS = [
   {
     id: 'basic',
     name: 'Básico',
-    price: 18900, // Precios de prueba temporales
-    amount_in_cents: 1890000,
-    amountInCents: 1890000,
+    price: 49900,
+    amount_in_cents: 4990000,
+    amountInCents: 4990000,
     period: '/ mes',
     months: 1,
     description: 'Taller pequeño',
@@ -38,9 +38,9 @@ export const DEFAULT_PLANS = [
   {
     id: 'pro',
     name: 'Pro Taller',
-    price: 99900,
-    amount_in_cents: 9990000,
-    amountInCents: 9990000,
+    price: 79900,
+    amount_in_cents: 7990000,
+    amountInCents: 7990000,
     period: '/ mes',
     months: 1,
     description: 'Taller organizado',
@@ -74,9 +74,9 @@ export const DEFAULT_PLANS = [
   {
     id: 'full',
     name: 'Full Taller',
-    price: 199900,
-    amount_in_cents: 19990000,
-    amountInCents: 19990000,
+    price: 119900,
+    amount_in_cents: 11990000,
+    amountInCents: 11990000,
     period: '/ mes',
     months: 1,
     description: 'Taller grande o con equipo',
