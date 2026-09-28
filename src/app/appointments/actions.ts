@@ -150,9 +150,17 @@ export async function updateAppointmentStatus(id: string, status: string) {
   return { success: true, message: 'Estado de la cita actualizado exitosamente.' };
 }
 
+function splitName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/);
+  const firstName = parts[0] || 'Cliente';
+  const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
+  return { firstName, lastName };
+}
+
 export async function createAppointment(data: {
-  motorcycleId: string;
-  technicianId: string;
+  plate: string;
+  customerName: string;
+  customerPhone?: string;
   notes: string;
   scheduledStart: string;
 }) {
@@ -160,49 +168,166 @@ export async function createAppointment(data: {
     const user = await requireWorkshop();
     const supabase = await createAdminClient();
 
-    const { data: motoData, error: motoError } = await supabase
+    const normalizedPlate = data.plate.trim().toUpperCase();
+    const cleanCustomerName = data.customerName.trim();
+    let customerPhone = data.customerPhone?.trim() || null;
+
+    if (!normalizedPlate) {
+      return { success: false, message: 'La placa de la moto es requerida.' };
+    }
+    if (!cleanCustomerName) {
+      return { success: false, message: 'El nombre de la persona es requerido.' };
+    }
+
+    // 1. Buscar si la motocicleta ya existe en la organización del taller
+    const { data: existingMotos } = await supabase
       .from('motorcycles')
-      .select('customer_id')
-      .eq('id', data.motorcycleId)
-      .single();
+      .select('id, customer_id, customers(id, first_name, last_name, phone)')
+      .ilike('license_plate', normalizedPlate)
+      .eq('organization_id', user.workshopId);
 
-    if (motoError) {
-      console.error('Error fetching motorcycle customer:', motoError);
-      return { success: false, message: `Error obteniendo la moto: ${motoError.message}` };
+    let customerId: string | null = null;
+    let motorcycleId: string | null = null;
+
+    const existingMoto = existingMotos && existingMotos.length > 0 ? existingMotos[0] : null;
+
+    if (existingMoto) {
+      motorcycleId = existingMoto.id;
+      customerId = existingMoto.customer_id;
+      const custObj = Array.isArray(existingMoto.customers) ? existingMoto.customers[0] : existingMoto.customers;
+      if (!customerPhone && custObj?.phone) {
+        customerPhone = custObj.phone;
+      }
+    } else {
+      // 2. Buscar o crear el cliente
+      const { firstName, lastName } = splitName(cleanCustomerName);
+      
+      const { data: existingCustomers } = await supabase
+        .from('customers')
+        .select('id, phone')
+        .eq('organization_id', user.workshopId)
+        .ilike('first_name', firstName)
+        .ilike('last_name', lastName || '');
+
+      const existingCustomer = existingCustomers && existingCustomers.length > 0 ? existingCustomers[0] : null;
+
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+        if (!customerPhone && existingCustomer.phone) {
+          customerPhone = existingCustomer.phone;
+        }
+      } else {
+        const { data: newCustomer, error: custErr } = await supabase
+          .from('customers')
+          .insert({
+            organization_id: user.workshopId,
+            first_name: firstName,
+            last_name: lastName,
+            phone: customerPhone || null,
+          })
+          .select('id')
+          .single();
+
+        if (custErr || !newCustomer) {
+          console.error('Error creando cliente para la cita:', custErr);
+          return { success: false, message: `Error creando cliente: ${custErr?.message || 'Error desconocido'}` };
+        }
+        customerId = newCustomer.id;
+      }
+
+      // 3. Crear la motocicleta
+      const { data: newMoto, error: motoErr } = await supabase
+        .from('motorcycles')
+        .insert({
+          organization_id: user.workshopId,
+          customer_id: customerId,
+          license_plate: normalizedPlate,
+          brand: 'General',
+          model: 'Moto',
+          model_year: new Date().getFullYear(),
+        })
+        .select('id')
+        .single();
+
+      if (motoErr || !newMoto) {
+        console.error('Error creando motocicleta para la cita:', motoErr);
+        return { success: false, message: `Error creando motocicleta: ${motoErr?.message || 'Error desconocido'}` };
+      }
+      motorcycleId = newMoto.id;
     }
 
-    const customerId = motoData?.customer_id;
-
-    if (!customerId) {
-      return { success: false, message: 'No se encontró el cliente asociado a la motocicleta.' };
-    }
-
-    // Use a default duration of 1 hour for now
     const endDate = new Date(data.scheduledStart);
     endDate.setHours(endDate.getHours() + 1);
 
-    const { error } = await supabase
+    // 4. Insertar la cita (solo con los campos de la cita)
+    const { error: insertErr } = await supabase
       .from('appointments')
       .insert({
         organization_id: user.workshopId,
         customer_id: customerId,
-        motorcycle_id: data.motorcycleId,
-        technician_id: data.technicianId || null,
+        motorcycle_id: motorcycleId,
         notes: data.notes,
         scheduled_start: data.scheduledStart,
         scheduled_end: endDate.toISOString(),
-        status: 'confirmed', // Created manually from the portal, so confirmed by default
+        status: 'confirmed',
         created_by: user.userId,
       });
 
-    if (error) {
-      console.error('Error creating appointment in db:', error);
-      return { success: false, message: `Error insertando en la base de datos: ${error.message}` };
+    if (insertErr) {
+      console.error('Error creando cita:', insertErr);
+      return { success: false, message: `Error insertando en la base de datos: ${insertErr.message}` };
+    }
+
+    // 5. Preparar notificación WhatsApp
+    let whatsappUrl: string | null = null;
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', user.workshopId)
+      .single();
+    const workshopName = orgData?.name || 'Taller Motos';
+
+    const startDateObj = new Date(data.scheduledStart);
+    const dateFormatted = startDateObj.toLocaleDateString('es-CO', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const timeFormatted = startDateObj.toLocaleTimeString('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    if (customerPhone) {
+      try {
+        const { sendCitaConfirmadaNotification, checkAndUpdateWhatsAppLimit } = await import('@/lib/whatsapp');
+        const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+        if (canSend) {
+          sendCitaConfirmadaNotification(
+            customerPhone,
+            cleanCustomerName,
+            workshopName,
+            startDateObj
+          ).catch(err => console.error('Error enviando WhatsApp API:', err));
+        }
+      } catch (waErr) {
+        console.error('Error con módulo WhatsApp:', waErr);
+      }
+
+      const cleanPhone = customerPhone.replace(/\D/g, '');
+      const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+      const msgText = `Hola *${cleanCustomerName}*, tu cita para la moto con placa *${normalizedPlate}* ha sido programada con éxito en *${workshopName}*.\n\n📅 *Fecha:* ${dateFormatted}\n⏰ *Hora:* ${timeFormatted}\n🛠️ *Motivo:* ${data.notes}\n\n¡Te esperamos!`;
+      whatsappUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msgText)}`;
     }
 
     revalidatePath('/appointments');
     revalidatePath('/dashboard');
-    return { success: true, message: 'Cita creada exitosamente.' };
+    return {
+      success: true,
+      message: 'Cita programada exitosamente.',
+      whatsappUrl,
+    };
   } catch (err: any) {
     console.error('Unhandled error in createAppointment:', err);
     return { success: false, message: `Excepción no manejada: ${err.message}` };

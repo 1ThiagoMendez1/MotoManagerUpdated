@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -60,9 +60,13 @@ interface AppointmentsClientProps {
 export default function AppointmentsClient({ initialAppointments, motorcycles, technicians }: AppointmentsClientProps) {
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'pending' | 'confirmed' | 'cancelled'>('pending');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('confirmed');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    setAppointments(initialAppointments);
+  }, [initialAppointments]);
 
   // Status statistics
   const total = appointments.length;
@@ -108,7 +112,7 @@ export default function AppointmentsClient({ initialAppointments, motorcycles, t
 
   const filteredAppointments = appointments.filter(apt => {
     // Tab filter
-    if (apt.status !== activeTab) {
+    if (activeTab !== 'all' && apt.status !== activeTab) {
       return false;
     }
 
@@ -204,8 +208,9 @@ export default function AppointmentsClient({ initialAppointments, motorcycles, t
         {/* Segmented status tabs */}
         <div className="flex items-center p-1 bg-muted/60 rounded-lg shrink-0 gap-1 overflow-x-auto">
           {[
-            { id: 'pending', label: 'Pendientes', count: pending },
+            { id: 'all', label: 'Todas', count: total },
             { id: 'confirmed', label: 'Confirmadas', count: confirmed },
+            { id: 'pending', label: 'Pendientes', count: pending },
             { id: 'cancelled', label: 'Canceladas', count: cancelled }
           ].map(tab => (
             <button
