@@ -3,6 +3,7 @@ import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { createNotification } from '@/lib/actions/notifications';
 
 const motorcycleSchema = z.object({
     make: z.string().min(2, "La marca debe tener al menos 2 caracteres."),
@@ -213,6 +214,16 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
             return { message: 'Motocicleta guardada, pero hubo un error al crear la orden: ' + (woResult?.message || 'Error de validación') };
         }
     }
+
+    // Notificación en vivo para el taller
+    await createNotification({
+        organizationId: user.workshopId,
+        type: 'motorcycle_created',
+        title: 'Nueva moto registrada',
+        message: `${make} ${model} (${plate}) - Cliente: ${customerName}`,
+        link: '/motorcycles',
+        urgent: false
+    });
 
     revalidatePath('/motorcycles');
     revalidatePath('/customers');

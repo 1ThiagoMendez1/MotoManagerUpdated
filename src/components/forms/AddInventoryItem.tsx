@@ -44,6 +44,7 @@ function SubmitButton() {
 
 export function AddInventoryItem() {
   const [isOpen, setIsOpen] = useState(false);
+  const [destination, setDestination] = useState<'storefront' | 'warehouse'>('storefront');
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,6 +64,7 @@ export function AddInventoryItem() {
     if (state?.success) {
       console.log('Se agregó un nuevo artículo al inventario');
       setIsOpen(false);
+      setDestination('storefront');
       toast({ title: 'Artículo agregado', description: 'El artículo ha sido guardado exitosamente.' });
       router.refresh();
     } else if (state?.message) {
@@ -155,11 +157,8 @@ export function AddInventoryItem() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-foreground">Lugar (Destino Inicial)</label>
-              <input type="hidden" id="destination-input" name="destination" defaultValue="storefront" />
-              <RadioGroup defaultValue="storefront" onValueChange={(val) => { 
-                const el = document.getElementById('destination-input') as HTMLInputElement | null;
-                if (el) el.value = val;
-              }} className="flex flex-col space-y-1 mt-2">
+              <input type="hidden" id="destination-input" name="destination" value={destination} />
+              <RadioGroup value={destination} onValueChange={(val: 'storefront' | 'warehouse') => setDestination(val)} className="flex flex-col space-y-1 mt-2">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="storefront" id="add-storefront" />
                   <label htmlFor="add-storefront" className="text-sm font-medium leading-none cursor-pointer">

@@ -197,6 +197,14 @@ export const getInventory = async (params: { query?: string, category?: string, 
         }
       })(),
       trackInventory: i.track_inventory !== false,
+      destination: (() => {
+        try {
+          const parsed = JSON.parse(i.description || '{}');
+          return parsed.destination || (i.description && i.description.toLowerCase().includes('bodega') ? 'warehouse' : 'storefront');
+        } catch(e) {
+          return 'storefront';
+        }
+      })(),
       lastCost: Number(i.last_cost) || 0,
       stockDetails
     };

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendLowStockNotification } from '@/lib/whatsapp';
+import { createNotification } from '@/lib/actions/notifications';
 
 const inventorySchema = z.object({
     name: z.string().min(2, "El nombre debe tener al menos 2 caracteres."),
@@ -20,6 +21,36 @@ const inventorySchema = z.object({
     stockStorefront: z.coerce.number().optional(),
     stockWarehouse: z.coerce.number().optional(),
 });
+
+export async function ensureOrganizationLocations(supabase: any, organizationId: string) {
+    const { data: locations } = await supabase
+        .from('inventory_locations')
+        .select('id, type, name')
+        .eq('organization_id', organizationId);
+
+    let vitrinaLoc = locations?.find((l: any) => l.type === 'storefront');
+    let bodegaLoc = locations?.find((l: any) => l.type === 'warehouse');
+
+    if (!vitrinaLoc) {
+        const { data: newLoc } = await supabase
+            .from('inventory_locations')
+            .insert({ organization_id: organizationId, name: 'Vitrina', type: 'storefront' })
+            .select('id, type, name')
+            .single();
+        if (newLoc) vitrinaLoc = newLoc;
+    }
+
+    if (!bodegaLoc) {
+        const { data: newLoc } = await supabase
+            .from('inventory_locations')
+            .insert({ organization_id: organizationId, name: 'Bodega Principal', type: 'warehouse' })
+            .select('id, type, name')
+            .single();
+        if (newLoc) bodegaLoc = newLoc;
+    }
+
+    return { vitrinaLoc, bodegaLoc };
+}
 
 export async function createInventoryItem(prevState: any, formData: FormData) {
     const user = await requireWorkshop();
@@ -75,7 +106,11 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
             name: data.name,
             code: data.sku,
             category: data.category,
-            description: JSON.stringify({ location: data.location || '', supplier: data.supplier || '' }),
+            description: JSON.stringify({ 
+                location: data.location || '', 
+                supplier: data.supplier || '',
+                destination: data.destination || 'storefront'
+            }),
             unit_price: data.price,
             min_quantity: data.minimumQuantity,
             track_inventory: data.trackInventory,
@@ -85,15 +120,10 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
         .single();
 
     if (!error && insertedItem && data.trackInventory !== false) {
-        // Find the requested location (Vitrina or Bodega)
+        // Ensure locations exist for this organization
+        const { vitrinaLoc, bodegaLoc } = await ensureOrganizationLocations(supabase, user.workshopId);
         const locationType = data.destination || 'storefront';
-        const { data: targetLoc } = await supabase
-            .from('inventory_locations')
-            .select('id')
-            .eq('organization_id', user.workshopId)
-            .eq('type', locationType)
-            .limit(1)
-            .maybeSingle();
+        const targetLoc = locationType === 'warehouse' ? bodegaLoc : vitrinaLoc;
 
         if (targetLoc) {
             await supabase.from('inventory_item_stock').insert({
@@ -121,6 +151,16 @@ export async function createInventoryItem(prevState: any, formData: FormData) {
         console.error('Error creating inventory item:', error);
         return { message: 'Error al crear el artículo.' };
     }
+
+    // Notificación en vivo para el taller
+    await createNotification({
+        organizationId: user.workshopId,
+        type: 'product_created',
+        title: 'Nuevo producto en inventario',
+        message: `Se registró "${data.name}" (${data.sku}) con ${data.quantity || 0} unid.`,
+        link: '/inventory',
+        urgent: false
+    });
 
     revalidatePath('/inventory');
     return { success: true };
@@ -186,7 +226,11 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
             name: data.name,
             code: data.sku,
             category: data.category,
-            description: JSON.stringify({ location: data.location || '', supplier: data.supplier || '' }),
+            description: JSON.stringify({ 
+                location: data.location || '', 
+                supplier: data.supplier || '',
+                destination: data.destination || 'storefront'
+            }),
             unit_price: data.price,
             min_quantity: data.minimumQuantity,
             track_inventory: data.trackInventory,
@@ -202,31 +246,7 @@ export async function updateInventoryItem(prevState: any, formData: FormData) {
     // Gestión del stock en ubicaciones (Vitrina / Bodega)
     if (data.trackInventory !== false) {
         // Asegurar que existan las ubicaciones de la organización
-        let { data: locations } = await supabase
-            .from('inventory_locations')
-            .select('id, type, name')
-            .eq('organization_id', user.workshopId);
-
-        let vitrinaLoc = locations?.find(l => l.type === 'storefront');
-        let bodegaLoc = locations?.find(l => l.type === 'warehouse');
-
-        if (!vitrinaLoc) {
-            const { data: newLoc } = await supabase
-                .from('inventory_locations')
-                .insert({ organization_id: user.workshopId, name: 'Vitrina', type: 'storefront' })
-                .select('id, type, name')
-                .single();
-            if (newLoc) vitrinaLoc = newLoc;
-        }
-
-        if (!bodegaLoc) {
-            const { data: newLoc } = await supabase
-                .from('inventory_locations')
-                .insert({ organization_id: user.workshopId, name: 'Bodega Principal', type: 'warehouse' })
-                .select('id, type, name')
-                .single();
-            if (newLoc) bodegaLoc = newLoc;
-        }
+        const { vitrinaLoc, bodegaLoc } = await ensureOrganizationLocations(supabase, user.workshopId);
 
         // Obtener registros de stock actuales para este item
         const { data: currentStocks } = await supabase

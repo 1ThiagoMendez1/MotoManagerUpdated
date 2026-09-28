@@ -81,9 +81,17 @@ export default function InventoryClient({
 
   function renderTable(items: InventoryItem[], locationType: 'warehouse' | 'storefront') {
     const filteredInventory = items.filter(item => {
-      if (item.trackInventory === false) return true;
+      if (item.trackInventory === false) {
+        const itemDestination = item.destination || 'storefront';
+        return itemDestination === locationType;
+      }
       const stock = item.stockDetails?.find(s => s.type === locationType);
-      return stock && stock.quantity >= 0;
+      if (stock && stock.quantity >= 0) return true;
+      // Fallback defensivo: si un artículo no tiene aún registros de ubicación, mostrarlo en su lugar de destino
+      if ((!item.stockDetails || item.stockDetails.length === 0) && (item.destination || 'storefront') === locationType) {
+        return true;
+      }
+      return false;
     });
 
     const selected = locationType === 'warehouse' ? selectedBodega : selectedVitrina;

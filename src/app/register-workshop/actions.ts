@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 import { sendOwnerWelcomeNotification } from '@/lib/whatsapp'
+import { ensureOrganizationLocations } from '@/lib/actions/inventory'
 
 const registrationSchema = z.object({
     workshopName: z.string().min(3),
@@ -120,6 +121,9 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
         return { error: 'Error al crear el taller en la base de datos: ' + rpcError.message };
     }
+
+    // Inicializar ubicaciones predeterminadas para el inventario
+    await ensureOrganizationLocations(supabaseAdmin, orgId);
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const loginUrl = `${appUrl}/login`;

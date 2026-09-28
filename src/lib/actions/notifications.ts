@@ -3,6 +3,73 @@
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
 
+function formatRelativeTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (isNaN(diffInSeconds)) return 'Reciente';
+    if (diffInSeconds < 60) return 'Hace un momento';
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `Hace ${diffInMinutes}m`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `Hace ${diffInHours}h`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) return 'Ayer';
+    if (diffInDays < 7) return `Hace ${diffInDays}d`;
+    return date.toLocaleDateString('es-CO', { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Reciente';
+  }
+}
+
+export async function createNotification({
+  organizationId,
+  userId = null,
+  type,
+  title,
+  message,
+  link,
+  urgent = false,
+  metadata = {}
+}: {
+  organizationId: string;
+  userId?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  link?: string;
+  urgent?: boolean;
+  metadata?: any;
+}) {
+  try {
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const { error } = await supabaseAdmin.from('notifications').insert({
+      organization_id: organizationId,
+      user_id: userId,
+      type,
+      title,
+      message,
+      link,
+      urgent,
+      metadata
+    });
+
+    if (error) {
+      console.warn('Could not insert notification into notifications table:', error.message);
+    }
+  } catch (err: any) {
+    console.warn('Error creating notification:', err.message);
+  }
+}
+
 export async function getNotificationsForUser() {
   try {
     const user = await getCurrentUserServer();
@@ -11,180 +78,76 @@ export async function getNotificationsForUser() {
     }
 
     const supabase = await createClient();
-    const role = user.role; // 'super_admin' | 'owner' | 'admin' | 'service_advisor' | 'technician'
-    
+    const role = user.role;
     const notifications: any[] = [];
 
-    // 1. Técnico (technician/mechanic)
-    if (role === 'technician' || role === 'mechanic') {
-      // Query active work orders assigned to this technician
-      const { data: wos, error } = await supabase
-        .from('work_orders')
-        .select('id, order_number, status, quote_status')
+    // 1. Fetch real event notifications from the database
+    try {
+      const { data: dbNotifications, error: dbError } = await supabase
+        .from('notifications')
+        .select('*')
         .eq('organization_id', user.workshopId)
-        .eq('assigned_mechanic_id', user.userId)
-        .neq('status', 'delivered');
+        .or(`user_id.is.null,user_id.eq.${user.userId}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      if (error) {
-        console.error('Error fetching technician work orders for notifications:', error);
-      }
+      if (!dbError && dbNotifications) {
+        const unreadDb = dbNotifications.filter(
+          (n: any) => !n.read_by || !n.read_by.includes(user.userId)
+        );
 
-      const pendingWOs = wos || [];
-      
-      // Contar órdenes por estado
-      const receivedCount = pendingWOs.filter(w => w.status === 'received').length;
-      const diagnosisCount = pendingWOs.filter(w => w.status === 'diagnosis').length;
-
-      if (pendingWOs.length > 0) {
-        notifications.push({
-          id: `tech-total-wos-${pendingWOs.length}`,
-          text: `Tienes ${pendingWOs.length} orden(es) de trabajo asignada(s) pendiente(s).`,
-          time: 'Ahora',
-          urgent: true,
-          link: '/work-orders'
-        });
-      }
-
-      if (receivedCount > 0) {
-        notifications.push({
-          id: `tech-received-wos-${receivedCount}`,
-          text: `${receivedCount} orden(es) en "Ingreso a revisión".`,
-          time: 'Reciente',
-          urgent: false,
-          link: '/work-orders'
-        });
-      }
-
-      if (diagnosisCount > 0) {
-        notifications.push({
-          id: `tech-diagnosis-wos-${diagnosisCount}`,
-          text: `${diagnosisCount} orden(es) en "Diagnosticando".`,
-          time: 'Reciente',
-          urgent: true,
-          link: '/work-orders'
-        });
-      }
-
-      // Alertas de cotizaciones asignadas al técnico
-      pendingWOs.forEach(wo => {
-        if (wo.quote_status === 'approved' && wo.status !== 'ready') {
+        for (const n of unreadDb) {
           notifications.push({
-            id: `tech-quote-approved-${wo.id}`,
-            text: `¡Cotización aprobada! Podés iniciar la reparación en la Orden WO-${wo.order_number}.`,
-            time: 'Nueva',
-            urgent: true,
-            link: `/work-orders/${wo.id}`
-          });
-        } else if (wo.quote_status === 'rejected') {
-          notifications.push({
-            id: `tech-quote-rejected-${wo.id}`,
-            text: `Cotización rechazada para la Orden WO-${wo.order_number}.`,
-            time: 'Nueva',
-            urgent: false,
-            link: `/work-orders/${wo.id}`
+            id: n.id,
+            type: n.type,
+            title: n.title,
+            text: n.message,
+            time: formatRelativeTime(n.created_at),
+            urgent: Boolean(n.urgent),
+            link: n.link || '/dashboard',
+            createdAt: n.created_at
           });
         }
-      });
-    } 
-    // 2. Administrador / Dueño / Asesor
-    else {
-      // Alertas de Stock Crítico (bajo el mínimo)
+      }
+    } catch (dbErr) {
+      console.warn('Notifications table not yet queried or not created:', dbErr);
+    }
+
+    // 2. Critical Stock Alerts (Super Admin / Owner / Admin / Service Advisor)
+    if (role !== 'technician' && role !== 'mechanic') {
       const { data: inventory, error: invError } = await supabase
         .from('inventory_items')
         .select('id, min_quantity, inventory_item_stock(quantity), track_inventory')
         .eq('organization_id', user.workshopId);
 
-      if (invError) {
-        console.error('Error fetching inventory for notifications:', invError);
-      }
+      if (!invError && inventory) {
+        const stockCriticoCount = inventory.filter(item => {
+          if (item.track_inventory === false) return false;
+          const totalQty = item.inventory_item_stock?.reduce((acc: number, stock: any) => acc + (stock.quantity || 0), 0) || 0;
+          return totalQty <= (item.min_quantity || 5);
+        }).length;
 
-      const stockCriticoCount = (inventory || []).filter(item => {
-        if (item.track_inventory === false) return false;
-        const totalQty = item.inventory_item_stock?.reduce((acc, stock) => acc + (stock.quantity || 0), 0) || 0;
-        return totalQty <= (item.min_quantity || 5);
-      }).length;
-
-      if (stockCriticoCount > 0) {
-        notifications.push({
-          id: `admin-low-stock-${stockCriticoCount}`,
-          text: `Hay ${stockCriticoCount} repuesto(s) con stock crítico.`,
-          time: 'Reciente',
-          urgent: true,
-          link: '/inventory'
-        });
-      }
-
-      // Alertas de Citas Pendientes de Confirmación
-      const { data: appointments, error: appError } = await supabase
-        .from('appointments')
-        .select('id')
-        .eq('organization_id', user.workshopId)
-        .eq('status', 'pending');
-
-      if (appError) {
-        console.error('Error fetching appointments for notifications:', appError);
-      }
-
-      const pendingAppointmentsCount = (appointments || []).length;
-      if (pendingAppointmentsCount > 0) {
-        notifications.push({
-          id: `admin-pending-appointments-${pendingAppointmentsCount}`,
-          text: `Tienes ${pendingAppointmentsCount} cita(s) pendiente(s) de confirmación.`,
-          time: 'Ahora',
-          urgent: true,
-          link: '/appointments'
-        });
-      }
-
-      // Cantidad de Órdenes de Trabajo Activas
-      const { data: activeWOs, error: woError } = await supabase
-        .from('work_orders')
-        .select('id, status, order_number, quote_status')
-        .eq('organization_id', user.workshopId)
-        .neq('status', 'delivered');
-
-      if (woError) {
-        console.error('Error fetching active WOs for notifications:', woError);
-      }
-
-      const pendingWOs = activeWOs || [];
-      if (pendingWOs.length > 0) {
-        notifications.push({
-          id: `admin-active-wos-${pendingWOs.length}`,
-          text: `Hay ${pendingWOs.length} orden(es) de trabajo activa(s) en proceso.`,
-          time: 'Reciente',
-          urgent: false,
-          link: '/work-orders'
-        });
-      }
-
-      // Alertas de Cotizaciones (para dueños, admins, y asesores)
-      pendingWOs.forEach(wo => {
-        if (wo.quote_status === 'approved' && wo.status !== 'ready') {
-          notifications.push({
-            id: `admin-quote-approved-${wo.id}`,
-            text: `¡Cotización aprobada por cliente para la Orden WO-${wo.order_number}!`,
-            time: 'Nueva',
+        if (stockCriticoCount > 0) {
+          notifications.unshift({
+            id: `admin-low-stock-${stockCriticoCount}`,
+            type: 'low_stock',
+            title: 'Stock Crítico',
+            text: `Hay ${stockCriticoCount} repuesto(s) con stock crítico.`,
+            time: 'Alerta',
             urgent: true,
-            link: `/work-orders/${wo.id}`
-          });
-        } else if (wo.quote_status === 'rejected') {
-          notifications.push({
-            id: `admin-quote-rejected-${wo.id}`,
-            text: `Cotización rechazada por cliente para la Orden WO-${wo.order_number}.`,
-            time: 'Nueva',
-            urgent: false,
-            link: `/work-orders/${wo.id}`
+            link: '/inventory'
           });
         }
-      });
+      }
 
-      // Alerta de Facturación/Suscripción vencida (Solo dueños y admins)
+      // Billing Alert
       if (role === 'owner' || role === 'admin') {
         const workshopDetails = await getWorkshopDetails(user);
         if (workshopDetails && workshopDetails.subscription_status === 'past_due') {
-          notifications.push({
+          notifications.unshift({
             id: 'admin-sub-past-due',
+            type: 'billing',
+            title: 'Suscripción Vencida',
             text: `Tu suscripción de MotoManager está VENCIDA. Por favor actualiza tu plan.`,
             time: 'Crítico',
             urgent: true,
@@ -198,5 +161,84 @@ export async function getNotificationsForUser() {
   } catch (error: any) {
     console.error('Error in getNotificationsForUser:', error);
     return { success: false, error: error.message };
+  }
+}
+
+export async function markNotificationAsRead(notificationId: string) {
+  try {
+    const user = await getCurrentUserServer();
+    if (!user || !user.workshopId) return { success: false };
+
+    // If it's a dynamic alert id (e.g. admin-low-stock-...), nothing to update in DB
+    if (notificationId.startsWith('admin-low-stock') || notificationId.startsWith('admin-sub-')) {
+      return { success: true };
+    }
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const { data: notif } = await supabaseAdmin
+      .from('notifications')
+      .select('read_by')
+      .eq('id', notificationId)
+      .eq('organization_id', user.workshopId)
+      .single();
+
+    if (notif) {
+      const currentReadBy: string[] = notif.read_by || [];
+      if (!currentReadBy.includes(user.userId)) {
+        await supabaseAdmin
+          .from('notifications')
+          .update({
+            read_by: [...currentReadBy, user.userId]
+          })
+          .eq('id', notificationId);
+      }
+    }
+
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error marking notification as read:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+export async function markAllNotificationsAsRead() {
+  try {
+    const user = await getCurrentUserServer();
+    if (!user || !user.workshopId) return { success: false };
+
+    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
+
+    const { data: notifs } = await supabaseAdmin
+      .from('notifications')
+      .select('id, read_by')
+      .eq('organization_id', user.workshopId);
+
+    if (notifs && notifs.length > 0) {
+      for (const n of notifs) {
+        const readBy: string[] = n.read_by || [];
+        if (!readBy.includes(user.userId)) {
+          await supabaseAdmin
+            .from('notifications')
+            .update({ read_by: [...readBy, user.userId] })
+            .eq('id', n.id);
+        }
+      }
+    }
+
+    return { success: true };
+  } catch (e: any) {
+    console.error('Error marking all notifications as read:', e);
+    return { success: false, error: e.message };
   }
 }

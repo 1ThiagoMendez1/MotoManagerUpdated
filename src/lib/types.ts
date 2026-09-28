@@ -42,6 +42,7 @@ export type InventoryItem = {
   supplierPrice: number;
   supplier: string;
   trackInventory?: boolean;
+  destination?: 'warehouse' | 'storefront' | string;
   lastCost?: number;
   stockDetails?: { locationId: string, locationName: string, quantity: number, type: string }[];
 };

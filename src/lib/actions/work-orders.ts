@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
+import { createNotification } from '@/lib/actions/notifications';
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -200,6 +201,16 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         }
     }
 
+    // Notificación en vivo para el taller
+    await createNotification({
+        organizationId: user.workshopId,
+        type: 'work_order_created',
+        title: 'Nueva orden de trabajo',
+        message: `Orden creada para moto ${mc.license_plate}.`,
+        link: createdOrderId ? `/work-orders/${createdOrderId}` : '/work-orders',
+        urgent: true
+    });
+
     revalidatePath('/work-orders');
     return { success: true };
 }
@@ -273,6 +284,17 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         const mc = Array.isArray(updatedWo.motorcycles) ? updatedWo.motorcycles[0] : updatedWo.motorcycles;
         const customer = mc?.customers;
         const tech = Array.isArray(updatedWo.profiles) ? updatedWo.profiles[0] : updatedWo.profiles;
+        const plate = mc?.license_plate || 'la moto';
+
+        // Notificación en vivo para el taller
+        await createNotification({
+            organizationId: user.workshopId,
+            type: 'work_order_status',
+            title: `Orden WO-${updatedWo.order_number || ''}: ${uiStatus}`,
+            message: `La orden de ${plate} cambió su estado a "${uiStatus}".`,
+            link: `/work-orders/${id}`,
+            urgent: status === 'completed' || status === 'delivered'
+        });
 
         // Recuperar ítems de la orden (work_order_services) en el nuevo esquema en lugar de sales
         let usedPartsItems: Array<{ name: string; quantity: number; price: number }> | undefined = undefined;
@@ -812,6 +834,16 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
         .eq('organization_id', user.workshopId);
 
     if (error) return { message: 'Error al actualizar cotización: ' + error.message };
+
+    // Notificación en vivo para el taller
+    await createNotification({
+        organizationId: user.workshopId,
+        type: 'quote_status',
+        title: `Cotización ${quoteStatus}`,
+        message: `La cotización para la orden fue marcada como "${quoteStatus}".`,
+        link: `/work-orders/${id}`,
+        urgent: quoteStatus === 'Aprobada'
+    });
 
     revalidatePath('/work-orders');
     revalidatePath(`/work-orders/${id}`);

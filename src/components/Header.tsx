@@ -25,7 +25,8 @@ import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
 import { CommandPalette } from '@/components/navigation/CommandPalette';
 import { QuickCreateMenu } from '@/components/navigation/QuickCreateMenu';
 import { checkIsMainPage } from '@/lib/navigation';
-import { getNotificationsForUser } from '@/lib/actions/notifications';
+import { getNotificationsForUser, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/actions/notifications';
+import { createClient } from '@/lib/supabase/client';
 import { signOutAction } from '@/lib/actions/auth';
 
 import {
@@ -115,20 +116,56 @@ export default function Header({
     };
 
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchNotifications, 45000);
+
+    // Suscripción Realtime a nuevas notificaciones
+    let channel: any = null;
+    try {
+      const supabase = createClient();
+      channel = supabase
+        .channel('realtime:header_notifications')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications'
+          },
+          () => {
+            fetchNotifications();
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('Realtime notifications channel unavailable:', e);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch (_) {}
+      }
+    };
   }, [userName]);
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
     const updatedReadIds = Array.from(new Set([...readIds, id])).slice(-100);
     setReadIds(updatedReadIds);
     if (typeof window !== 'undefined') {
       localStorage.setItem(`motomanager_read_notifications_${userName}`, JSON.stringify(updatedReadIds));
     }
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await markNotificationAsRead(id);
+    } catch (e) {
+      console.error('Error syncing markAsRead with server:', e);
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     const currentIds = notifications.map((n) => n.id);
     const updatedReadIds = Array.from(new Set([...readIds, ...currentIds])).slice(-100);
     setReadIds(updatedReadIds);
@@ -136,6 +173,11 @@ export default function Header({
       localStorage.setItem(`motomanager_read_notifications_${userName}`, JSON.stringify(updatedReadIds));
     }
     setNotifications([]);
+    try {
+      await markAllNotificationsAsRead();
+    } catch (e) {
+      console.error('Error syncing markAllAsRead with server:', e);
+    }
   };
 
   const isRoot = pathname === '/' || pathname === '/login' || pathname === '/register-workshop' || pathname === '/admin' || (!!workshopSlug && pathname === `/${workshopSlug}`);
@@ -320,10 +362,21 @@ export default function Header({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80 p-0 border border-white/10 shadow-2xl rounded-xl overflow-hidden bg-background/95 backdrop-blur-xl">
                 <div className="bg-muted/50 p-3 border-b border-white/5 flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">Notificaciones</h3>
-                  <span className="text-xs text-primary cursor-pointer hover:underline" onClick={markAllAsRead}>Marcar leídas</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm">Notificaciones</h3>
+                    {notifications.length > 0 && (
+                      <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold">
+                        {notifications.length}
+                      </span>
+                    )}
+                  </div>
+                  {notifications.length > 0 && (
+                    <span className="text-xs text-primary cursor-pointer hover:underline" onClick={markAllAsRead}>
+                      Marcar leídas
+                    </span>
+                  )}
                 </div>
-                <div className="max-h-[300px] overflow-y-auto">
+                <div className="max-h-[340px] overflow-y-auto">
                   {notifications.length > 0 ? (
                     <div className="divide-y divide-white/5">
                       {notifications.map((notif) => (
@@ -337,11 +390,14 @@ export default function Header({
                             }
                           }}
                         >
-                          <div className="flex items-center gap-2 w-full">
-                            <span className={`h-2 w-2 rounded-full flex-shrink-0 ${notif.urgent ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-amber-500'}`} />
-                            <span className="font-semibold text-xs text-muted-foreground">{notif.time}</span>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              <span className={`h-2 w-2 rounded-full flex-shrink-0 ${notif.urgent ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-primary'}`} />
+                              <span className="font-semibold text-xs text-foreground/90">{notif.title || 'Aviso'}</span>
+                            </div>
+                            <span className="text-[11px] font-medium text-muted-foreground">{notif.time}</span>
                           </div>
-                          <p className="text-sm font-medium leading-snug">{notif.text}</p>
+                          <p className="text-xs text-muted-foreground leading-snug line-clamp-2 pl-4">{notif.text}</p>
                         </DropdownMenuItem>
                       ))}
                     </div>
