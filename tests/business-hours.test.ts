@@ -56,6 +56,26 @@ test('mensaje de entrega y parámetros Meta incluyen los horarios exclusivos del
   assert.equal(fields[7], 'FrankorMotos');
 });
 
+test('Meta recibe horarios completos por taller sin saltos de línea ni tabulaciones en las ocho variables', () => {
+  const frankor = notice(base());
+  const another = emptyBusinessHours();
+  another.monday = [{ open: '07:30', close: '12:30' }];
+  const values = readyNoticeTemplateParameters({ ...frankor, customerName: 'Santiago\nMendez',
+    workshopAddress: 'Calle 8\tLocal 2' });
+  assert.equal(values.length, 8);
+  assert.ok(values.every(value => !/[\r\n\t]| {5,}/.test(value)));
+  assert.match(values[6], /Lunes a viernes:/);
+  assert.match(values[6], /; Sábado:/);
+  assert.match(values[6], /; Domingo: Cerrado/);
+  assert.equal(values[0], 'Santiago Mendez');
+  assert.equal(values[5], 'Calle 8 Local 2');
+  const different = readyNoticeTemplateParameters({ ...frankor, workshopName: 'Otro taller',
+    businessHours: another });
+  assert.match(different[6], /Lunes: 7:30 a. m. a 12:30 p. m./);
+  assert.doesNotMatch(different[6], /9:00 a. m./);
+  assert.match(composeReadyNotice(frankor), /\nSábado:/);
+});
+
 test('una configuración vieja nunca selecciona la plantilla Meta con horas fijas', () => {
   assert.equal(readyDynamicTemplateName(undefined), 'diagnosticado_reparado_horarios');
   assert.equal(readyDynamicTemplateName('diagnosticado_reparado'), null);

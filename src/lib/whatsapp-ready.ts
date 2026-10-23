@@ -52,6 +52,13 @@ export function composeReadyNotice(data: ReadyNotice): string {
  * {{5}} orden, {{6}} dirección, {{7}} horario completo, {{8}} taller.
  * La plantilla antigua NO es compatible: contiene horarios literales.
  */
+/** Meta rejects newlines, tabs and runs of 5+ spaces inside template values.
+ * Keep each workshop's distinct day/split-shift information on a single line.
+ */
+function safeMetaParameter(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
 export function readyNoticeTemplateParameters(data: ReadyNotice): string[] {
   return [
     data.customerName.trim(),
@@ -60,7 +67,7 @@ export function readyNoticeTemplateParameters(data: ReadyNotice): string[] {
     data.plate.trim(),
     data.orderNumber.trim(),
     data.workshopAddress.trim() || 'Consulta la dirección con el taller',
-    formatBusinessHours(data.businessHours),
+    formatBusinessHours(data.businessHours).replace(/\r?\n/g, '; '),
     data.workshopName.trim(),
-  ];
+  ].map(safeMetaParameter);
 }

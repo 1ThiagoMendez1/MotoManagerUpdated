@@ -47,8 +47,11 @@ Hola, {{1}}. 👋
 
 Parámetros: (1) cliente, (2) taller, (3) moto, (4) placa, (5) orden, (6)
 dirección, (7) **horarios leídos de la organización**, (8) nombre del taller.
-El horario es **un único parámetro multilínea**, incluso con almuerzos,
-domingos cerrados y otras variaciones. Aprobar exactamente esta estructura
+El horario es **un único parámetro**: conserva pausas de almuerzo, días
+cerrados y otras variaciones, pero al enviarlo por Meta **separaremos los días
+con punto y coma** en una sola línea. Meta rechaza los saltos de línea y
+tabulaciones dentro de las variables de plantilla; el texto libre de Evolution
+puede conservar sus saltos de línea. Aprobar exactamente esta estructura
 antes de conectar tráfico real. Verificar que el nombre, la categoría, el idioma
 y la política de Meta correspondan a la cuenta de WhatsApp utilizada.
 
