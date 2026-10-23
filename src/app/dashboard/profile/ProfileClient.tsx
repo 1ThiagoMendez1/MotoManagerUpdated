@@ -13,6 +13,8 @@ import { updateProfileData } from '@/lib/actions/profile';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import WorkshopQR from '@/components/workshops/WorkshopQR';
+import { BusinessHoursEditor } from './BusinessHoursEditor';
+import type { BusinessHours } from '@/lib/business-hours';
 
 interface ProfileData {
   workshopName: string;
@@ -27,6 +29,7 @@ interface ProfileData {
   workshopMapsLink?: string;
   workshopSlug: string;
   enrollmentEnabled: boolean;
+  businessHours: BusinessHours | null;
 }
 
 export default function ProfileClient({ initialData }: { initialData: ProfileData }) {
@@ -371,6 +374,9 @@ export default function ProfileClient({ initialData }: { initialData: ProfileDat
 
           </div>
         </form>
+        {['owner', 'admin'].includes(data.userRole || '') && (
+          <BusinessHoursEditor initialHours={data.businessHours} />
+        )}
         {['owner', 'admin'].includes(data.userRole || '') && data.workshopSlug && (
           <WorkshopQR name={data.workshopName} slug={data.workshopSlug} enabled={data.enrollmentEnabled} />
         )}

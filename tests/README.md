@@ -10,3 +10,10 @@ Usar Node >=22 y ejecutar `npm ci` desde la raíz.
 El test del navegador crea una cuenta ficticia `@example.test`, recibe el enlace únicamente en Mailpit y confirma el registro y la denegación de acceso administrativo. No acepta destinos externos. El taller debe estar activo y tener `settings.customer_enrollment_enabled=true`. Se necesitan las tablas base de organizaciones, perfiles y clientes, las tres migraciones nuevas y un servicio Auth real; una respuesta HTTP simulada no valida este flujo. Este ensayo no cubre Storage, Realtime, cobros ni envíos reales. Las credenciales de los servicios locales se generan fuera del repositorio y no deben imprimirse ni reutilizarse en producción.
 
 Para staging, seguir [la revisión y el orden de despliegue](../docs/production-review-v6.8.0.md). No usar estos scripts para enviar correos a clientes ni para reinicializar una base existente.
+
+## Nuevos controles de seguridad y horarios
+
+- Las pruebas unitarias cubren formato de horarios independiente por taller, parámetros WhatsApp, OTP criptográfico y ausencia de valores por defecto.
+- `npm run test:db` también aplica las migraciones `20261023200000_workshop_business_hours.sql` y `20261023201000_mobile_otp_challenges.sql` sobre el contenedor descartable. Prueba aislamiento de horarios, preservación de ajustes, límites de intentos y no reutilización OTP.
+- Las pruebas aisladas no envían WhatsApp ni confirman la aprobación de la nueva plantilla Meta. Ver `docs/whatsapp-business-hours.md`.
+- Antes de activar OTP renovado, configurar `MOBILE_OTP_PEPPER` con al menos 32 caracteres aleatorios protegidos y verificar un flujo de inicio de sesión móvil real en staging.

@@ -2,6 +2,7 @@
 import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'
+import { parseBusinessHours } from '@/lib/business-hours';
 
 /**
  * Obtiene los datos actuales del perfil del taller y del usuario dueño.
@@ -46,6 +47,7 @@ export async function getProfileData() {
     userRole: user.role,
     workshopSlug: workshop?.slug || '',
     enrollmentEnabled: settings.customer_enrollment_enabled === true,
+    businessHours: parseBusinessHours(settings.business_hours),
   }
 }
 
@@ -88,33 +90,20 @@ export async function updateProfileData(formData: FormData) {
   }
 
   if (user.role === 'owner') {
-    // Fetch existing settings to not overwrite them
-    const { data: currentOrg } = await supabaseAdmin
-      .from('organizations')
-      .select('settings')
-      .eq('id', user.workshopId!)
-      .single();
-    const currentSettings = currentOrg?.settings || {};
-
-    // Actualizar datos del taller
-    const { error: workshopError } = await supabaseAdmin
-      .from('organizations')
-      .update({
-        name: workshopName,
-        phone: workshopPhone,
-        settings: {
-          ...currentSettings,
-          address: workshopAddress,
-          city: workshopCity,
-          nit: workshopNit,
-          maps_link: workshopMapsLink,
-        }
-      })
-      .eq('id', user.workshopId!)
-
+    // Actualización SQL atómica: el formulario no reemplaza el JSON entero.
+    // Así, cambios simultáneos de horarios/QR no se pierden.
+    const { error: workshopError } = await supabase.rpc('update_workshop_profile_fields', {
+      p_organization_id: user.workshopId,
+      p_name: workshopName,
+      p_phone: workshopPhone,
+      p_address: workshopAddress,
+      p_city: workshopCity,
+      p_nit: workshopNit,
+      p_maps_link: workshopMapsLink,
+    });
     if (workshopError) {
-      console.error('[updateProfileData] Organization error:', workshopError)
-      return { error: 'Error al actualizar los datos del taller.' }
+      console.error('[updateProfileData] Organization update failed');
+      return { error: 'Error al actualizar los datos del taller.' };
     }
   }
 
@@ -138,4 +127,23 @@ export async function updateProfileData(formData: FormData) {
 
   revalidatePath('/', 'layout')
   return { success: true }
+}
+
+
+export async function setWorkshopBusinessHours(raw: unknown) {
+  const user = await requireWorkshop();
+  if (!user.workshopId || !['owner', 'admin'].includes(user.role)) {
+    return { error: 'Solo propietarios o administradores pueden modificar horarios.' };
+  }
+  const hours = parseBusinessHours(raw);
+  if (!hours) return { error: 'Revisa que los intervalos sean válidos y no se superpongan.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_workshop_business_hours', {
+    p_organization_id: user.workshopId,
+    p_hours: hours,
+  });
+  if (error) return { error: 'No se pudieron guardar los horarios del taller.' };
+  revalidatePath('/dashboard/profile');
+  return { success: true };
 }

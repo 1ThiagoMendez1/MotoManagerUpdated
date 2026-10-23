@@ -89,6 +89,57 @@ DO $$ DECLARE summary jsonb; cid uuid; repeated uuid; BEGIN
   RAISE NOTICE 'PASS: enrollment, permissions, tenant isolation, revenue, stock, idempotency and disable checks';
 END $$;
 
+-- Horarios independientes y validación de propietario antes del ROLLBACK final.
+SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  PERFORM public.set_workshop_business_hours(
+    '20000000-0000-0000-0000-000000000001'::uuid,
+    '{"monday":[{"open":"09:00","close":"13:00"},{"open":"15:00","close":"19:00"}],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"saturday":[],"sunday":[]}'::jsonb);
+  IF (SELECT settings->'business_hours'->'monday'->0->>'open'
+      FROM public.organizations WHERE slug='taller-uno') <> '09:00' THEN
+    RAISE EXCEPTION 'Business hours not persisted'; END IF;
+  IF (SELECT settings->>'address' FROM public.organizations WHERE slug='taller-uno') <> 'Calle 1' THEN
+    RAISE EXCEPTION 'Business hours overwrote address'; END IF;
+  BEGIN
+    PERFORM public.set_workshop_business_hours(
+      '20000000-0000-0000-0000-000000000002'::uuid,
+      '{"monday":[],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"saturday":[],"sunday":[]}'::jsonb);
+    RAISE EXCEPTION 'Cross-tenant business hours write';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN
+    PERFORM public.set_workshop_business_hours(
+      '20000000-0000-0000-0000-000000000001'::uuid,
+      '{"monday":[{"open":"18:00","close":"08:00"}],"tuesday":[],"wednesday":[],"thursday":[],"friday":[],"saturday":[],"sunday":[]}'::jsonb);
+    RAISE EXCEPTION 'Invalid hours accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+END $$;
+RESET ROLE;
+
+-- OTP: un solo uso, cooldown y bloqueo tras cinco errores, sin exponer hashes.
+SET LOCAL ROLE service_role;
+DO $$
+DECLARE user_id uuid := '10000000-0000-0000-0000-000000000001'; linked uuid;
+BEGIN
+ IF NOT public.issue_mobile_otp('579999999999', user_id, repeat('a',64)) THEN
+   RAISE EXCEPTION 'OTP issue denied'; END IF;
+ IF public.issue_mobile_otp('579999999999',user_id,repeat('a',64)) THEN
+   RAISE EXCEPTION 'OTP cooldown bypassed'; END IF;
+ FOR i IN 1..5 LOOP
+   linked := public.consume_mobile_otp('579999999999',repeat('b',64));
+   IF linked IS NOT NULL THEN RAISE EXCEPTION 'Wrong OTP accepted'; END IF;
+ END LOOP;
+ linked := public.consume_mobile_otp('579999999999',repeat('a',64));
+ IF linked IS NOT NULL THEN RAISE EXCEPTION 'OTP lockout bypassed'; END IF;
+ IF NOT public.issue_mobile_otp('579999999998',user_id,repeat('c',64)) THEN
+   RAISE EXCEPTION 'Second OTP denied'; END IF;
+ linked := public.consume_mobile_otp('579999999998',repeat('c',64));
+ IF linked IS DISTINCT FROM user_id THEN RAISE EXCEPTION 'Correct OTP denied'; END IF;
+ linked := public.consume_mobile_otp('579999999998',repeat('c',64));
+ IF linked IS NOT NULL THEN RAISE EXCEPTION 'OTP replay accepted'; END IF;
+END $$;
+RESET ROLE;
+
 -- RLS enforcement uses the actual low-privilege role.
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
 SET LOCAL ROLE authenticated;

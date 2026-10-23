@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { createNotification } from '@/lib/actions/notifications';
+import { formatBusinessHours } from '@/lib/business-hours';
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -314,27 +315,21 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
             }
         }
 
-        // Recuperar nombre y dirección del taller de workshops
-        let { data: workshop } = await supabase
-            .from('workshops')
-            .select('name, address')
+        // Los datos de la notificación provienen de la organización de esta orden.
+        // Nunca consultar la tabla heredada workshops ni tomar horarios del cliente.
+        const { data: organization, error: organizationError } = await supabase
+            .from('organizations')
+            .select('name, settings')
             .eq('id', user.workshopId)
             .single();
-
-        // Fallback a organizations si falla o no tiene nombre
-        if (!workshop || !workshop.name) {
-            const { data: orgData } = await supabase
-                .from('organizations')
-                .select('name, settings')
-                .eq('id', user.workshopId)
-                .single();
-            if (orgData) {
-                workshop = {
-                    name: orgData.name,
-                    address: workshop?.address || (orgData.settings as any)?.address || ''
-                };
-            }
+        if (organizationError) {
+            console.error('No se pudo consultar el perfil del taller para WhatsApp.');
         }
+        const workshop = organization ? {
+            name: organization.name,
+            address: (organization.settings as any)?.address || '',
+            businessHours: (organization.settings as any)?.business_hours ?? null,
+        } : null;
 
         if (customer?.phone) {
             const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
@@ -355,7 +350,8 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                         motorcycleInfo,
                         plate,
                         orderNum,
-                        address
+                        address,
+                        workshop?.businessHours ?? null
                     ).catch(err => console.error('Error sending WhatsApp diagnosticado_reparado template:', err));
                 } else {
                     sendOrderStatusUpdate(
@@ -367,7 +363,9 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                             motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
                             technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
                             items: usedPartsItems,
-                            workshopName: workshop?.name
+                            workshopName: workshop?.name,
+                            workshopAddress: workshop?.address,
+                            businessHours: formatBusinessHours(workshop?.businessHours)
                         }
                     ).catch(err => console.error('Error sending WhatsApp order status update:', err));
                 }

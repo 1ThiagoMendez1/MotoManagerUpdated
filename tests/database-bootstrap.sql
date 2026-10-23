@@ -3,6 +3,7 @@
 CREATE SCHEMA auth;
 CREATE ROLE anon NOLOGIN;
 CREATE ROLE authenticated NOLOGIN;
+CREATE ROLE service_role NOLOGIN;
 CREATE TABLE auth.users (
   id uuid PRIMARY KEY, email text, email_confirmed_at timestamptz,
   raw_user_meta_data jsonb DEFAULT '{}'::jsonb
@@ -21,5 +22,8 @@ CREATE TABLE public.inventory_item_stock (
 );
 \ir ../supabase/migrations/20261022220000_dashboard_summary.sql
 \ir ../supabase/migrations/20261022221000_workshop_enrollment.sql
-GRANT SELECT ON public.organization_members TO authenticated;
+\ir ../supabase/migrations/20261023200000_workshop_business_hours.sql
+\ir ../supabase/migrations/20261023201000_mobile_otp_challenges.sql
+\ir ../supabase/migrations/20261023202000_atomic_workshop_profile.sql
+GRANT SELECT ON public.organization_members, public.organizations TO authenticated;
 \ir database-regression.sql

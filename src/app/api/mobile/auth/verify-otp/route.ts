@@ -1,85 +1,65 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { generateTemporaryPassword, hashMobileCode, normalizeMobilePhone } from '@/lib/mobile-otp';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { phone, code } = await req.json();
-
-    if (!phone || !code) {
-      return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
+    const input = await req.json().catch(() => null);
+    const phone = normalizeMobilePhone(input?.phone);
+    const code = input?.code;
+    if (!phone || typeof code !== 'string' || !/^[0-9]{6}$/.test(code)) {
+      return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });
+    }
+    if (!process.env.MOBILE_OTP_PEPPER || process.env.MOBILE_OTP_PEPPER.length < 32) {
+      return NextResponse.json({ error: 'Autenticación móvil temporalmente no disponible' }, { status: 503 });
     }
 
-    const cleanPhone = phone.replace(/\D/g, '');
-    const fakeEmail = `${cleanPhone}@clientes.motomanager.com.co`;
-
-    const supabaseAdmin = createClient(
+    const admin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
     );
 
-    // 1. Buscar el usuario
-    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (usersError) {
-      return NextResponse.json({ error: 'Error interno de autenticación' }, { status: 500 });
-    }
-
-    const existingUser = usersData.users.find(u => u.email === fakeEmail);
-
-    if (!existingUser) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
-    }
-
-    // 2. Verificar el OTP
-    const metadata = existingUser.user_metadata || {};
-    const storedOtp = metadata.otp_code;
-    const expiresAt = metadata.otp_expires;
-
-    if (!storedOtp || storedOtp !== code) {
-      return NextResponse.json({ error: 'Código incorrecto' }, { status: 401 });
-    }
-
-    if (Date.now() > expiresAt) {
-      return NextResponse.json({ error: 'El código ha expirado' }, { status: 401 });
-    }
-
-    // 3. OTP válido. Generar una contraseña fuerte aleatoria para este inicio de sesión
-    // Esto asegura que nadie pueda entrar con email/password adivinándolo
-    const secureRandomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8) + 'X1!';
-
-    // Actualizamos la contraseña del usuario y borramos el OTP
-    await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-      password: secureRandomPassword,
-      user_metadata: { ...metadata, otp_code: null, otp_expires: null }
+    // Consumo transaccional: máximo cinco intentos, cinco minutos y un solo uso.
+    const { data: userId, error } = await admin.rpc('consume_mobile_otp', {
+      p_phone: phone,
+      p_code_hash: hashMobileCode(phone, code),
     });
+    if (error) return NextResponse.json({ error: 'Servicio no disponible' }, { status: 503 });
+    if (!userId) return NextResponse.json({ error: 'Código inválido o vencido' }, { status: 401 });
 
-    // 4. Iniciar sesión usando la nueva contraseña para obtener la sesión (Token JWT)
-    // Para esto necesitamos un cliente normal (no admin)
-    const supabaseClient = createClient(
+    const { data: account, error: accountError } = await admin.auth.admin.getUserById(userId);
+    const email = phone + '@clientes.motomanager.com.co';
+    if (accountError || account.user?.email?.toLowerCase() !== email) {
+      return NextResponse.json({ error: 'Cuenta móvil no disponible' }, { status: 403 });
+    }
+
+    const password = generateTemporaryPassword();
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      password,
+      user_metadata: {
+        ...(account.user.user_metadata || {}),
+        otp_code: null,
+        otp_expires: null,
+      },
+    });
+    if (updateError) return NextResponse.json({ error: 'No se pudo completar el acceso' }, { status: 503 });
+
+    const client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { persistSession: false } }
     );
-
-    const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
-      email: fakeEmail,
-      password: secureRandomPassword
+    const { data: authData, error: signInError } = await client.auth.signInWithPassword({
+      email, password,
     });
-
-    if (authError || !authData.session) {
-      console.error('Error signInWithPassword:', authError);
-      return NextResponse.json({ error: 'Error generando la sesión' }, { status: 500 });
+    if (signInError || !authData.session) {
+      return NextResponse.json({ error: 'No se pudo iniciar sesión' }, { status: 503 });
     }
-
-    // Devolver la sesión a la aplicación móvil
-    return NextResponse.json({
-      success: true,
-      session: authData.session
-    });
-
-  } catch (error: any) {
-    console.error('Verify OTP Error:', error);
+    return NextResponse.json({ success: true, session: authData.session });
+  } catch {
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }
 }
