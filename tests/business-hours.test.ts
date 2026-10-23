@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyBusinessHours, formatBusinessHours, parseBusinessHours } from '../src/lib/business-hours';
-import { composeReadyNotice, readyNoticeTemplateParameters } from '../src/lib/whatsapp-ready';
+import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName } from '../src/lib/whatsapp-ready';
 
 const base = () => {
   const hours = emptyBusinessHours();
@@ -54,6 +54,14 @@ test('mensaje de entrega y parámetros Meta incluyen los horarios exclusivos del
   assert.equal(fields[5], 'Calle 8');
   assert.match(fields[6], /Lunes a viernes/);
   assert.equal(fields[7], 'FrankorMotos');
+});
+
+test('una configuración vieja nunca selecciona la plantilla Meta con horas fijas', () => {
+  assert.equal(readyDynamicTemplateName(undefined), 'diagnosticado_reparado_horarios');
+  assert.equal(readyDynamicTemplateName('diagnosticado_reparado'), null);
+  assert.equal(readyDynamicTemplateName('diagnosticado_reparado_horarios'), 'diagnosticado_reparado_horarios');
+  assert.equal(readyDynamicTemplateName('bad template'), null);
+  assert.equal(readyDynamicTemplateName(''), null);
 });
 
 test('días cerrados se distinguen de días abiertos y validan el formato', () => {

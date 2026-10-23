@@ -140,6 +140,45 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- Concurrent WhatsApp reservations must be isolated and preserve the workshop's
+-- saved address, custom business hours and QR enrollment settings.
+SET LOCAL ROLE service_role;
+DO $$
+DECLARE
+  own uuid := '20000000-0000-0000-0000-000000000001';
+  other uuid := '20000000-0000-0000-0000-000000000002';
+BEGIN
+  IF NOT public.reserve_workshop_whatsapp_quota(own, '2026-10', 2)
+    OR NOT public.reserve_workshop_whatsapp_quota(own, '2026-10', 2) THEN
+    RAISE EXCEPTION 'WhatsApp reservation rejected under quota'; END IF;
+  IF public.reserve_workshop_whatsapp_quota(own, '2026-10', 2) THEN
+    RAISE EXCEPTION 'WhatsApp limit exceeded'; END IF;
+  IF NOT public.reserve_workshop_whatsapp_quota(other, '2026-10', 1) THEN
+    RAISE EXCEPTION 'Workshop quota was not isolated'; END IF;
+  BEGIN
+    PERFORM public.reserve_workshop_whatsapp_quota(own, 'bad-key', 2);
+    RAISE EXCEPTION 'Invalid month accepted';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+END $$;
+RESET ROLE;
+DO $$ BEGIN
+  IF (SELECT settings->>'address' FROM public.organizations
+      WHERE slug = 'taller-uno') <> 'Calle 1' THEN
+    RAISE EXCEPTION 'WhatsApp quota overwrote the address'; END IF;
+  IF (SELECT settings->>'customer_enrollment_enabled' FROM public.organizations
+      WHERE slug = 'taller-dos') <> 'true' THEN
+    RAISE EXCEPTION 'WhatsApp quota overwrote the enrollment toggle'; END IF;
+  IF (SELECT settings->'business_hours'->'monday'->0->>'open' FROM public.organizations
+      WHERE slug = 'taller-uno') <> '09:00' THEN
+    RAISE EXCEPTION 'WhatsApp quota overwrote saved opening hours'; END IF;
+  IF (SELECT settings->>'whatsapp_count_2026-10' FROM public.organizations
+      WHERE slug = 'taller-uno') <> '2' THEN
+    RAISE EXCEPTION 'WhatsApp quota count incorrect'; END IF;
+  IF has_function_privilege('authenticated',
+      'public.reserve_workshop_whatsapp_quota(uuid,text,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Client can reserve WhatsApp quota directly'; END IF;
+END $$;
+
 -- RLS enforcement uses the actual low-privilege role.
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
 SET LOCAL ROLE authenticated;

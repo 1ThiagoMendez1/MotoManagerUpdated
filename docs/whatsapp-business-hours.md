@@ -56,8 +56,20 @@ Si Meta rechaza expresamente la plantilla y Evolution API está configurado,
 el flujo puede enviar un texto con los mismos datos dinámicos. **No se reintenta
 por otro proveedor ante fallos indeterminados**, para evitar mensajes duplicados.
 Si no hay proveedor con plantilla válida, se registra el fallo; jamás se vuelve
-a la plantilla con horario fijo. El límite de envíos actual debe auditarse para
-no cobrar una notificación que no fue aceptada.
+a la plantilla con horario fijo. El nombre de la plantilla también se valida en el
+servidor: si `WHATSAPP_READY_DYNAMIC_TEMPLATE=diagnosticado_reparado`, se prohíbe
+su envío por Meta. El texto de Evolution conserva los horarios del taller.
+
+La migración `20261023203000_atomic_whatsapp_quota.sql` añade una reserva de cuota
+atómica por taller y mes. Esto evita que múltiples notificaciones simultáneas
+superen el límite y, sobre todo, impide que el contador de WhatsApp sobrescriba
+los horarios recién guardados, el QR o la dirección. Si no puede verificar la
+cuota, la aplicación no permite el envío. El contador se reserva antes de contactar
+al proveedor; **queda pendiente** una contabilidad idempotente basada en aceptación
+y webhooks de entrega para no cobrar mensajes que se rechacen posteriormente.
+La acción de cambio de estado de la orden ahora espera la respuesta inicial del
+proveedor WhatsApp y registra rechazo sin deshacer el cambio de estado de la moto.
+Esto no equivale a una confirmación final de entrega al teléfono.
 
 ## Validación antes de producción
 

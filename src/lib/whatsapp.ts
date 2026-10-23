@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { composeReadyNotice, readyNoticeTemplateParameters } from './whatsapp-ready';
+import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName } from './whatsapp-ready';
 import type { ReadyNotice } from './whatsapp-ready';
 import { ai } from '@/ai/genkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
@@ -1426,9 +1426,11 @@ export async function sendDiagnosticadoReparadoNotification(
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   // Una plantilla NUEVA y aprobada: la anterior contiene horarios escritos de forma fija.
-  const templateName = process.env.WHATSAPP_READY_DYNAMIC_TEMPLATE || 'diagnosticado_reparado_horarios';
+  const templateName = readyDynamicTemplateName(process.env.WHATSAPP_READY_DYNAMIC_TEMPLATE);
 
-  if (wpToken && wpPhoneId) {
+  // A stale WHATSAPP_READY_DYNAMIC_TEMPLATE must never select the old fixed-hours template.
+  // Evolution's free-text fallback remains safe because it uses workshop-specific data.
+  if (wpToken && wpPhoneId && templateName) {
     try {
       const response = await axios.post(
         'https://graph.facebook.com/v19.0/' + wpPhoneId + '/messages',
@@ -2203,7 +2205,7 @@ export default {
 }
 
 export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<boolean> {
-  if (!workshopId) return true;
+  if (!workshopId) return false;
 
   try {
     const supabaseAdmin = createSupabaseClient(
@@ -2217,32 +2219,36 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
       .eq('id', workshopId)
       .single();
 
-    if (error || !org) return true;
+    // Never allow a send on lookup failure: failing open bypasses paid plan limits.
+    if (error || !org) {
+      console.error('Unable to verify workshop WhatsApp quota.');
+      return false;
+    }
 
     const settings = typeof org.settings === 'string' ? JSON.parse(org.settings) : (org.settings || {});
     const subPlan = settings.sub_plan || 'basic';
     const planLimits = getPlanLimits(subPlan);
-
     if (planLimits.whatsapp_limit === -1) return true;
 
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const msgCountKey = `whatsapp_count_${currentMonth}`;
-    const currentCount = settings[msgCountKey] || 0;
-
-    if (currentCount >= planLimits.whatsapp_limit) {
-      console.warn(`WhatsApp limit reached for workshop ${workshopId}. Plan: ${subPlan}, Limit: ${planLimits.whatsapp_limit}`);
+    // The RPC serializes per-workshop reservations using a row lock and updates
+    // ONLY the month's JSON key. A read/modify/write of all settings could erase
+    // hours or QR changes saved concurrently by the workshop owner.
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const { data: reserved, error: reservationError } = await supabaseAdmin.rpc(
+      'reserve_workshop_whatsapp_quota',
+      {
+        p_organization_id: workshopId,
+        p_month: currentMonth,
+        p_limit: planLimits.whatsapp_limit,
+      }
+    );
+    if (reservationError) {
+      console.error('Unable to reserve workshop WhatsApp quota.');
       return false;
     }
-
-    settings[msgCountKey] = currentCount + 1;
-    await supabaseAdmin
-      .from('organizations')
-      .update({ settings })
-      .eq('id', workshopId);
-
-    return true;
-  } catch (err) {
-    console.error('Error checking WhatsApp limit:', err);
-    return true; // allow by default if db fails
+    return reserved === true;
+  } catch {
+    console.error('WhatsApp quota check failed.');
+    return false;
   }
 };

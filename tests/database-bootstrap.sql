@@ -25,5 +25,6 @@ CREATE TABLE public.inventory_item_stock (
 \ir ../supabase/migrations/20261023200000_workshop_business_hours.sql
 \ir ../supabase/migrations/20261023201000_mobile_otp_challenges.sql
 \ir ../supabase/migrations/20261023202000_atomic_workshop_profile.sql
+\ir ../supabase/migrations/20261023203000_atomic_whatsapp_quota.sql
 GRANT SELECT ON public.organization_members, public.organizations TO authenticated;
 \ir database-regression.sql

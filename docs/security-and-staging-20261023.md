@@ -41,6 +41,7 @@ Este cambio existe solo en el clon `/srv/motomanager-review-294d682`;
 - `20261023200000_workshop_business_hours.sql`
 - `20261023201000_mobile_otp_challenges.sql`
 - `20261023202000_atomic_workshop_profile.sql`
+- `20261023203000_atomic_whatsapp_quota.sql` (contador transaccional independiente; no sobrescribe horarios ni QR)
 
 Aplicar **solo después de una restauración y conciliación** y con el
 propietario adecuado del esquema. No ejecutar `supabase db reset` ni

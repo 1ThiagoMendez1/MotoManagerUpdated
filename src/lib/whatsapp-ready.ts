@@ -1,5 +1,18 @@
 import { formatBusinessHours } from './business-hours';
 
+/**
+ * The legacy ready-for-pickup template includes a fixed, wrong opening
+ * schedule. Never select it, including through an outdated environment value.
+ * A provider-specific name is permitted only if it is syntactically valid.
+ */
+export function readyDynamicTemplateName(configured: string | undefined): string | null {
+  const name = configured === undefined ? 'diagnosticado_reparado_horarios' : configured.trim();
+  if (!/^[a-z][a-z0-9_]{0,511}$/.test(name) ||
+      name === 'diagnosticado_reparado') return null;
+  return name;
+}
+
+
 export type ReadyNotice = {
   customerName: string;
   workshopName: string;
