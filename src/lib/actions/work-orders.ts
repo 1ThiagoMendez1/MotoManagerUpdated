@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
+import { shouldSendReadyNotice } from '@/lib/whatsapp-ready';
 import { createNotification } from '@/lib/actions/notifications';
 import { formatBusinessHours } from '@/lib/business-hours';
 
@@ -281,6 +282,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         return { message: `Error al actualizar el estado: ${error.message}` };
     }
 
+    let whatsappWarning: string | undefined;
     if (updatedWo) {
         const mc = Array.isArray(updatedWo.motorcycles) ? updatedWo.motorcycles[0] : updatedWo.motorcycles;
         const customer = mc?.customers;
@@ -332,11 +334,19 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         } : null;
 
         if (customer?.phone) {
-            const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
-            if (canSend) {
-                const isDiagnosticadoToReparado = oldStatus === 'diagnosis' && status === 'completed';
-
-                if (isDiagnosticadoToReparado) {
+            const isReadyTransition = shouldSendReadyNotice(oldStatus, status);
+            const evolutionAvailable = Boolean(
+                process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE_NAME
+            );
+            const metaAvailable = Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+            if (!isReadyTransition && !evolutionAvailable) {
+                whatsappWarning = 'Los cambios de estado distintos de Reparado necesitan una plantilla Meta específica o Evolution API configurada.';
+            } else if (isReadyTransition && !metaAvailable && !evolutionAvailable) {
+                whatsappWarning = 'No hay un proveedor de WhatsApp configurado para avisar que la moto está lista.';
+            } else {
+              const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+              if (canSend) {
+                if (isReadyTransition) {
                     const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Cliente';
                     const motorcycleInfo = `${mc?.brand || ''} ${mc?.model || ''}`.trim() || 'Motocicleta';
                     const plate = mc?.license_plate || '';
@@ -355,9 +365,11 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                             workshop?.businessHours ?? null
                         );
                         if (!delivery.success) {
-                            console.warn('[work-orders] WhatsApp ready notice was not accepted by the provider.');
+                            whatsappWarning = delivery.error || 'Meta no aceptó el aviso de moto lista.';
+                            console.warn('[work-orders] WhatsApp ready notice rejected:', whatsappWarning);
                         }
                     } catch {
+                        whatsappWarning = 'No se pudo confirmar el aviso de moto lista.';
                         console.error('[work-orders] WhatsApp ready notice could not be confirmed.');
                     }
                 } else {
@@ -377,20 +389,26 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                             }
                         );
                         if (!delivery.success) {
-                            console.warn('[work-orders] WhatsApp status notice was not accepted by the provider.');
+                            whatsappWarning = 'El proveedor no aceptó el aviso de cambio de estado.';
+                            console.warn('[work-orders] WhatsApp status notice rejected:', delivery.error === 'Evolution API not configured' ? 'Evolution not configured' : 'provider failure');
                         }
                     } catch {
+                        whatsappWarning = 'No se pudo confirmar el aviso de cambio de estado.';
                         console.error('[work-orders] WhatsApp status notice could not be confirmed.');
                     }
                 }
-            } else {
-                console.warn(`WhatsApp notification skipped for order update (Limit reached)`);
+              } else {
+                  whatsappWarning = 'Se alcanzó el límite de WhatsApp del taller o falló la comprobación de cuota.';
+                  console.warn('[work-orders] WhatsApp notification skipped: quota unavailable.');
+              }
             }
+        } else {
+            whatsappWarning = 'El cliente no tiene un teléfono registrado para WhatsApp.';
         }
     }
 
     revalidatePath('/work-orders');
-    return { success: true };
+    return { success: true, whatsappWarning };
 }
 
 export async function reassignWorkOrderTechnician(prevState: any, formData: FormData) {
