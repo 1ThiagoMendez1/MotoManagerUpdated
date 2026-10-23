@@ -2,11 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import * as XLSX from 'xlsx';
+import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 import type { Technician } from "@/lib/types";
 
 export function DownloadTechniciansReportButton({ technicians }: { technicians: Technician[] }) {
-  const handleDownload = () => {
+  const handleDownload = () => exportSpreadsheet((XLSX) => {
     // Preparar los datos
     const rows = technicians.map((tech) => {
       const orders = tech.workOrders || [];
@@ -54,7 +54,7 @@ export function DownloadTechniciansReportButton({ technicians }: { technicians: 
 
     // Generar y descargar el archivo XLSX
     XLSX.writeFile(wb, `Rendimiento_Tecnicos_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
+  });
 
   return (
     <Button onClick={handleDownload} variant="outline" size="sm" className="flex items-center gap-2">

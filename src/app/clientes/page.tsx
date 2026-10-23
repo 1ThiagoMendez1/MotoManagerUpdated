@@ -3,6 +3,7 @@ import { ClientPortalContent } from './ClientPortalContent'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Wrench } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export default async function ClientesPage({
   const result = await getCustomerPortalData(providedAuth)
 
   if (!result.success || !result.data) {
-    return <PlateVerificationForm error="No se encontró ninguna motocicleta con esa placa. Verifica e intenta de nuevo." providedAuth={providedAuth} />
+    return <PlateVerificationForm error={result.message || "No es posible consultar esta motocicleta."} providedAuth={providedAuth} />
   }
 
   return <ClientPortalContent data={result.data} auth={providedAuth} />
@@ -44,18 +45,19 @@ function PlateVerificationForm({ error, providedAuth }: { error?: string; provid
             Portal del Cliente
           </CardTitle>
           <p className="text-slate-500 text-sm mt-2">
-            Consulta tus cotizaciones y agenda citas de servicio
+            Consulta tus cotizaciones y citas tras iniciar sesión con tu cuenta verificada
           </p>
         </CardHeader>
         <CardContent className="pt-8 pb-8">
           <p className="text-slate-400 text-base mb-8 text-center leading-relaxed">
-            Ingresa la <strong className="text-slate-200">placa de tu vehículo</strong> para acceder a tu información.
+            Inicia sesión con tu cuenta verificada y después introduce la <strong className="text-slate-200">placa de tu vehículo</strong>. La placa por sí sola no permite acceder a datos privados.
           </p>
           {error && (
             <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
               {error}
             </div>
           )}
+          <p className="text-sm text-slate-400 mb-4 text-center">¿Aún no tienes cuenta? Solicita en tu taller el código QR de registro para verificar tu correo.</p>
           <form method="GET" className="space-y-6">
             <input
               type="text"
@@ -69,11 +71,12 @@ function PlateVerificationForm({ error, providedAuth }: { error?: string; provid
               Acceder a mi portal
             </Button>
           </form>
+          <Link href="/login" className="block text-center text-blue-300 underline mt-5">Iniciar sesión</Link>
         </CardContent>
       </Card>
 
       <p className="text-slate-600 text-xs mt-8 text-center max-w-sm">
-        Tu información está protegida. Solo podrás ver los datos asociados a la placa de tu vehículo.
+        Tu información está protegida. Solo podrás ver los vehículos vinculados a tu cuenta verificada.
       </p>
     </div>
   )

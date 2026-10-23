@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { createNotification } from '@/lib/actions/notifications';
+import { formatBusinessHours } from '@/lib/business-hours';
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -314,27 +315,21 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
             }
         }
 
-        // Recuperar nombre y dirección del taller de workshops
-        let { data: workshop } = await supabase
-            .from('workshops')
-            .select('name, address')
+        // Los datos de la notificación provienen de la organización de esta orden.
+        // Nunca consultar la tabla heredada workshops ni tomar horarios del cliente.
+        const { data: organization, error: organizationError } = await supabase
+            .from('organizations')
+            .select('name, settings')
             .eq('id', user.workshopId)
             .single();
-
-        // Fallback a organizations si falla o no tiene nombre
-        if (!workshop || !workshop.name) {
-            const { data: orgData } = await supabase
-                .from('organizations')
-                .select('name, settings')
-                .eq('id', user.workshopId)
-                .single();
-            if (orgData) {
-                workshop = {
-                    name: orgData.name,
-                    address: workshop?.address || (orgData.settings as any)?.address || ''
-                };
-            }
+        if (organizationError) {
+            console.error('No se pudo consultar el perfil del taller para WhatsApp.');
         }
+        const workshop = organization ? {
+            name: organization.name,
+            address: (organization.settings as any)?.address || '',
+            businessHours: (organization.settings as any)?.business_hours ?? null,
+        } : null;
 
         if (customer?.phone) {
             const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
@@ -348,28 +343,45 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                     const orderNum = updatedWo.order_number?.toString() || id.substring(0, 8);
                     const address = workshop?.address || '';
 
-                    sendDiagnosticadoReparadoNotification(
-                        customer.phone,
-                        customerName,
-                        workshop?.name || 'Taller',
-                        motorcycleInfo,
-                        plate,
-                        orderNum,
-                        address
-                    ).catch(err => console.error('Error sending WhatsApp diagnosticado_reparado template:', err));
-                } else {
-                    sendOrderStatusUpdate(
-                        customer.phone,
-                        {
-                            orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
-                            status: uiStatus as any,
-                            customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
-                            motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
-                            technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
-                            items: usedPartsItems,
-                            workshopName: workshop?.name
+                    try {
+                        const delivery = await sendDiagnosticadoReparadoNotification(
+                            customer.phone,
+                            customerName,
+                            workshop?.name || 'Taller',
+                            motorcycleInfo,
+                            plate,
+                            orderNum,
+                            address,
+                            workshop?.businessHours ?? null
+                        );
+                        if (!delivery.success) {
+                            console.warn('[work-orders] WhatsApp ready notice was not accepted by the provider.');
                         }
-                    ).catch(err => console.error('Error sending WhatsApp order status update:', err));
+                    } catch {
+                        console.error('[work-orders] WhatsApp ready notice could not be confirmed.');
+                    }
+                } else {
+                    try {
+                        const delivery = await sendOrderStatusUpdate(
+                            customer.phone,
+                            {
+                                orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
+                                status: uiStatus as any,
+                                customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
+                                motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
+                                technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
+                                items: usedPartsItems,
+                                workshopName: workshop?.name,
+                                workshopAddress: workshop?.address,
+                                businessHours: formatBusinessHours(workshop?.businessHours)
+                            }
+                        );
+                        if (!delivery.success) {
+                            console.warn('[work-orders] WhatsApp status notice was not accepted by the provider.');
+                        }
+                    } catch {
+                        console.error('[work-orders] WhatsApp status notice could not be confirmed.');
+                    }
                 }
             } else {
                 console.warn(`WhatsApp notification skipped for order update (Limit reached)`);

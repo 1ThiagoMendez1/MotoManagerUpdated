@@ -49,7 +49,7 @@ export default async function AdminPage({
     authData.users.forEach((u) => {
       authUsersMap.set(u.id, {
         email: u.email,
-        is_super_admin: u.user_metadata?.is_super_admin === true
+        is_super_admin: u.app_metadata?.is_super_admin === true
       });
     });
   }

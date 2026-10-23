@@ -1,15 +1,22 @@
 'use server';
+import { requireSuperAdmin } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { sendAccessCodeNotification } from '@/lib/whatsapp';
 
-export async function updateWorkshopStatus(workshopId: string, status: any) { return { success: true }; }
-export async function updateCancellationStatus(cancellationId: string, status: any, adminNotes?: string) { return { success: true }; }
-export async function updateWorkshopPlan(workshopId: string, plan: any) { return { success: true }; }
-export async function updateUserEmail(userId: string, newEmail: string) { return { success: true }; }
-export async function updateUserPassword(userId: string, newPassword: string) { return { success: true }; }
+export async function updateWorkshopStatus(workshopId: string, status: any) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateCancellationStatus(cancellationId: string, status: any, adminNotes?: string) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateWorkshopPlan(workshopId: string, plan: any) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateUserEmail(userId: string, newEmail: string) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateUserPassword(userId: string, newPassword: string) {
+    await requireSuperAdmin(); return { success: true }; }
 
 export async function createUser(data: any) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -21,6 +28,7 @@ export async function createUser(data: any) {
     const lastName = nameParts.slice(1).join(' ') || '';
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        app_metadata: { is_super_admin: data.isSuperAdmin === true },
         email: data.email,
         password: data.password,
         email_confirm: true,
@@ -28,7 +36,7 @@ export async function createUser(data: any) {
             first_name: firstName,
             last_name: lastName,
             full_name: data.name,
-            is_super_admin: data.isSuperAdmin,
+
         }
     });
 
@@ -50,6 +58,7 @@ export async function createUser(data: any) {
 }
 
 export async function deleteUser(userId: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -64,6 +73,7 @@ export async function deleteUser(userId: string) {
 }
 
 export async function updateUser(userId: string, data: any) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -75,12 +85,13 @@ export async function updateUser(userId: string, data: any) {
     const lastName = nameParts.slice(1).join(' ') || '';
     
     const updatePayload: any = {
+        app_metadata: { is_super_admin: data.isSuperAdmin === true },
         email: data.email,
         user_metadata: {
             first_name: firstName,
             last_name: lastName,
             full_name: data.name,
-            is_super_admin: data.isSuperAdmin,
+
         }
     };
     
@@ -108,6 +119,7 @@ export async function updateUser(userId: string, data: any) {
 }
 
 export async function getWorkshopCredentials(userId: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -135,6 +147,7 @@ export async function getWorkshopCredentials(userId: string) {
 }
 
 export async function sendCredentialsViaWhatsApp(userId: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -190,6 +203,7 @@ export async function sendCredentialsViaWhatsApp(userId: string) {
 }
 
 export async function resetUserPasswordAndNotify(userId: string, email: string, phone: string | undefined, name: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,

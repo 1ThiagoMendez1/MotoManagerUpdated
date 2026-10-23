@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { FileDown, AlertTriangle } from "lucide-react";
-import * as XLSX from "xlsx";
+import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 import type { InventoryItem } from "@/lib/types";
 
 type ExportLowStockButtonProps = {
@@ -10,7 +10,7 @@ type ExportLowStockButtonProps = {
 };
 
 export function ExportLowStockButton({ inventory }: ExportLowStockButtonProps) {
-  const handleExport = () => {
+  const handleExport = () => exportSpreadsheet((XLSX) => {
     // Filter only low stock items
     const lowStockItems = inventory.filter((item) => item.quantity <= item.minimumQuantity);
 
@@ -60,7 +60,7 @@ export function ExportLowStockButton({ inventory }: ExportLowStockButtonProps) {
     const filename = `Stock_Bajo_${dateStr}.xlsx`;
 
     XLSX.writeFile(workbook, filename);
-  };
+  });
 
   // Count low stock items
   const lowStockCount = inventory.filter((item) => item.quantity <= item.minimumQuantity).length;

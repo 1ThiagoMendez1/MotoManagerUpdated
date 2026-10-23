@@ -1,4 +1,5 @@
 'use server';
+import { requireSuperAdmin } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
@@ -11,6 +12,7 @@ const getSupabase = () => {
 };
 
 export async function updatePlan(id: string, formData: FormData) {
+    await requireSuperAdmin();
     try {
         const supabase = getSupabase();
         const name = formData.get('name') as string;
@@ -37,6 +39,7 @@ export async function updatePlan(id: string, formData: FormData) {
 }
 
 export async function addFeature(formData: FormData) {
+    await requireSuperAdmin();
     try {
         const supabase = getSupabase();
         const feature_name = formData.get('feature_name') as string;
@@ -63,6 +66,7 @@ export async function addFeature(formData: FormData) {
 }
 
 export async function updateFeature(id: string, formData: FormData) {
+    await requireSuperAdmin();
     try {
         const supabase = getSupabase();
         const feature_name = formData.get('feature_name') as string;
@@ -89,6 +93,7 @@ export async function updateFeature(id: string, formData: FormData) {
 }
 
 export async function deleteFeature(id: string) {
+    await requireSuperAdmin();
     try {
         const supabase = getSupabase();
         const { error } = await supabase.from('subscription_features').delete().eq('id', id);

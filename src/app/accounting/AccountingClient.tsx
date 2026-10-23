@@ -468,7 +468,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                     <PieChart className="w-12 h-12 text-muted-foreground mb-4 opacity-50" />
                     <h3 className="text-lg font-bold text-foreground">Sin datos de cierre</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mt-2">
-                      No hay registros de cierres diarios para mostrar en este periodo. Ve a la pestaña "Cierre Diario" para empezar a registrar.
+                      No hay registros de cierres diarios para mostrar en este periodo. Ve a la pestaña &quot;Cierre Diario&quot; para empezar a registrar.
                     </p>
                   </div>
                 ) : (
@@ -767,7 +767,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                       <div className="text-center py-10 text-muted-foreground flex flex-col items-center">
                         <ShoppingCart className="h-10 w-10 mb-4 opacity-50" />
                         <p>Aún no has registrado ninguna compra.</p>
-                        <p className="text-sm mt-2">Usa el botón "Registrar Compra" para ingresar mercadería masivamente a tu Bodega.</p>
+                        <p className="text-sm mt-2">Usa el botón &quot;Registrar Compra&quot; para ingresar mercadería masivamente a tu Bodega.</p>
                       </div>
                     ) : (
                       <div className="overflow-x-auto">

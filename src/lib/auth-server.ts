@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { hasPermission } from '@/lib/permissions';
+import { cache } from 'react';
+import { isSuperAdmin } from '@/lib/super-admin';
 
-export async function getCurrentUserServer() {
+export const getCurrentUserServer = cache(async () => {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,6 +22,8 @@ export async function getCurrentUserServer() {
         .from('organization_members')
         .select('organization_id, role, custom_permissions')
         .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
         .limit(1);
       
       if (orgError) {
@@ -27,14 +31,11 @@ export async function getCurrentUserServer() {
       }
       const orgMember = _orgMembers?.[0] as any;
 
-      if (!orgMember) {
-        console.warn(`[auth-server] User ${user.email} has no assigned organization_members.`);
-      }
-
       return {
         userId: user.id,
         email: user.email,
         user_metadata: user.user_metadata,
+        app_metadata: user.app_metadata,
         role: orgMember?.role || 'viewer',
         custom_permissions: orgMember?.custom_permissions || null,
         workshopId: orgMember?.organization_id || null,
@@ -46,7 +47,7 @@ export async function getCurrentUserServer() {
   }
 
   return null;
-}
+});
 
 export async function requireWorkshop() {
   const user = await getCurrentUserServer();
@@ -54,9 +55,7 @@ export async function requireWorkshop() {
     redirect('/login');
   }
   if (!user.workshopId) {
-    const { data: authData } = await (await createClient()).auth.getUser();
-    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.toLowerCase().startsWith('admin@') || authData?.user?.email?.toLowerCase() === 'juanurian31@gmail.com';
-    if (isSuperAdmin) {
+    if (isSuperAdmin(user)) {
         redirect('/admin');
     }
     redirect('/no-workshop');
@@ -70,9 +69,7 @@ export async function authorize(path: string) {
     redirect('/login');
   }
   if (!user.workshopId) {
-    const { data: authData } = await (await createClient()).auth.getUser();
-    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.toLowerCase().startsWith('admin@') || authData?.user?.email?.toLowerCase() === 'juanurian31@gmail.com';
-    if (isSuperAdmin) {
+    if (isSuperAdmin(user)) {
         redirect('/admin');
     }
     redirect('/no-workshop');
@@ -90,10 +87,9 @@ export async function authorize(path: string) {
   return user;
 }
 
-export async function getWorkshopDetails(knownUser?: any) {
+export const getWorkshopDetails = cache(async (knownUser?: any) => {
   const user = knownUser || await getCurrentUserServer();
   if (!user || (!user.workshopId && !user.id)) {
-    console.warn(`[auth-server] getWorkshopDetails - User or user.workshopId is missing. user:`, user);
     return null;
   }
 
@@ -114,6 +110,8 @@ export async function getWorkshopDetails(knownUser?: any) {
         .from('organization_members')
         .select('organization_id, role, custom_permissions')
         .eq('user_id', actualUserId)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
         .limit(1);
        if (_orgMembers && _orgMembers.length > 0) {
            workshopId = _orgMembers[0].organization_id;
@@ -162,7 +160,7 @@ export async function getWorkshopDetails(knownUser?: any) {
   }
 
   return null;
-}
+});
 
 export async function requireSuperAdmin() {
   const user = await getCurrentUserServer();
@@ -171,6 +169,7 @@ export async function requireSuperAdmin() {
   if (!user) {
     redirect('/login');
   }
+  if (!isSuperAdmin(user)) redirect('/dashboard');
   return { ...user, isSuperAdmin: true };
 }
 

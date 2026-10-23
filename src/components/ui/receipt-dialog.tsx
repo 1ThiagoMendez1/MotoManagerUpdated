@@ -12,12 +12,11 @@ import {
 } from '@/components/ui/dialog';
 import { ReceiptData, generateReceiptPDF } from '@/lib/pdfGenerator';
 import { Download, Printer } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { WompiButton } from '@/components/payments/WompiButton';
 import { formatExactDateTime } from '@/lib/dateUtils';
 
 async function printReceipt(receiptData: ReceiptData) {
+  const { default: jsPDF } = await import('jspdf');
   try {
     // Generate the PDF blob
     const pdf = new jsPDF({
@@ -456,7 +455,7 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
             <p className="mb-1">No constituye factura electrónica ni documento equivalente autorizado por la DIAN.</p>
             <p className="mb-1">No otorga derechos de deducción de impuestos ni soporta créditos fiscales.</p>
             <p className="mb-2">El valor aquí registrado corresponde a una transacción comercial interna entre las partes.</p>
-            <p className="italic">"Documento generado automáticamente por {receiptData.workshopName || 'MotoManager'} — Sin validez tributaria."</p>
+            <p className="italic">&quot;Documento generado automáticamente por {receiptData.workshopName || 'MotoManager'} — Sin validez tributaria.&quot;</p>
           </div>
 
           <div className="text-center text-[10px] text-gray-500 border-b border-gray-300 pb-2 mb-2">

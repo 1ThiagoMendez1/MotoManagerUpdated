@@ -1,4 +1,5 @@
 'use server';
+import { requireSuperAdmin } from '@/lib/auth-server';
 
 import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
@@ -20,6 +21,7 @@ const registrationSchema = z.object({
 })
 
 export async function registerWorkshop(prevState: any, formData: FormData) {
+    await requireSuperAdmin();
     const data = Object.fromEntries(formData)
 
     if (typeof data.slug === 'string') {

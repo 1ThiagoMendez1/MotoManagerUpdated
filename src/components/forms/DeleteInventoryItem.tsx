@@ -76,7 +76,7 @@ export function DeleteInventoryItem({ item }: DeleteInventoryItemProps) {
           <DialogHeader>
             <DialogTitle className="text-foreground">Eliminar Artículo</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              ¿Estás seguro de que deseas eliminar el artículo "<span className="font-semibold">{item.name}</span>"? Esta acción no se puede deshacer.
+              ¿Estás seguro de que deseas eliminar el artículo &quot;<span className="font-semibold">{item.name}</span>&quot;? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <form action={formAction} className="space-y-4">
