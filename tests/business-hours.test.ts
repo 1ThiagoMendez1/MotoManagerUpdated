@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyBusinessHours, formatBusinessHours, parseBusinessHours } from '../src/lib/business-hours';
-import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName } from '../src/lib/whatsapp-ready';
+import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName, shouldSendReadyNotice } from '../src/lib/whatsapp-ready';
 
 const base = () => {
   const hours = emptyBusinessHours();
@@ -90,4 +90,13 @@ test('días cerrados se distinguen de días abiertos y validan el formato', () =
   assert.match(formatBusinessHours(hours), /Lunes a sábado: Cerrado/);
   assert.match(formatBusinessHours(hours), /Domingo: 10:00 a. m. a 12:00 p. m./);
   assert.ok(parseBusinessHours(hours));
+});
+
+test('avisa moto lista al completar una reparación desde cualquiera de las etapas', () => {
+  assert.equal(shouldSendReadyNotice('diagnosis', 'completed'), true);
+  assert.equal(shouldSendReadyNotice('in_progress', 'completed'), true);
+  assert.equal(shouldSendReadyNotice('pending', 'completed'), true);
+  assert.equal(shouldSendReadyNotice('completed', 'completed'), false);
+  assert.equal(shouldSendReadyNotice('completed', 'delivered'), false);
+  assert.equal(shouldSendReadyNotice(null, 'completed'), false);
 });

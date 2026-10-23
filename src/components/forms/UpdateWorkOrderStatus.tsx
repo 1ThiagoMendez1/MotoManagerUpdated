@@ -24,6 +24,7 @@ import {
 import { updateWorkOrderStatus } from '@/lib/actions/work-orders';
 import type { WorkOrder } from '@/lib/types';
 import { formatExactDateTime } from '@/lib/dateUtils';
+import { useToast } from '@/hooks/use-toast';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -44,6 +45,7 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
   const [isOpen, setIsOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<string>(workOrder.status);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { toast } = useToast();
   // @ts-ignore
   const [state, formAction] = useActionState(updateWorkOrderStatus, undefined);
 
@@ -60,10 +62,17 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
     if (state?.success) {
       setIsOpen(false);
       setErrorMsg(null);
+      if ('whatsappWarning' in state && state.whatsappWarning) {
+        toast({
+          title: 'Estado guardado, pero no se envió WhatsApp',
+          description: state.whatsappWarning,
+          variant: 'destructive',
+        });
+      }
     } else if (state?.message) {
       setErrorMsg(state.message);
     }
-  }, [state]);
+  }, [state, toast]);
 
   const statusOptions = [
     { value: 'Ingreso a revisión', label: 'Ingreso a revisión' },
@@ -149,4 +158,4 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
       </DialogContent>
     </Dialog>
   );
-}
+}

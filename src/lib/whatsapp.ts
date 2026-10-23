@@ -1427,6 +1427,7 @@ export async function sendDiagnosticadoReparadoNotification(
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   // Una plantilla NUEVA y aprobada: la anterior contiene horarios escritos de forma fija.
   const templateName = readyDynamicTemplateName(process.env.WHATSAPP_READY_DYNAMIC_TEMPLATE);
+  let rejection: { httpStatus: number; metaCode: number | null } | null = null;
 
   // A stale WHATSAPP_READY_DYNAMIC_TEMPLATE must never select the old fixed-hours template.
   // Evolution's free-text fallback remains safe because it uses workshop-specific data.
@@ -1454,8 +1455,18 @@ export async function sendDiagnosticadoReparadoNotification(
       // Una red interrumpida no significa que Meta no haya entregado el mensaje.
       // Evitar segundo envío en caso de fallo indeterminado.
       const status = error?.response?.status;
+      const rawCode = error?.response?.data?.error?.code;
+      const metaCode = typeof rawCode === 'number' ? rawCode : null;
+      console.warn('[whatsapp:ready] Meta request failed', {
+        httpStatus: typeof status === 'number' ? status : null,
+        metaCode,
+        // Never log the phone, customer data, response body or bearer token.
+      });
+      if (typeof status === 'number') rejection = { httpStatus: status, metaCode };
       if (status !== 400 && status !== 404) {
-        return { success: false, error: 'No se pudo confirmar el envío mediante Meta.' };
+        return { success: false, error: status ?
+          'Meta no confirmó el envío (HTTP ' + status + (metaCode ? ', código ' + metaCode : '') + ').' :
+          'No se pudo confirmar el envío mediante Meta.' };
       }
       // Solo un rechazo HTTP explícito permite intentar el otro proveedor.
     }
@@ -1476,7 +1487,10 @@ export async function sendDiagnosticadoReparadoNotification(
 
   return {
     success: false,
-    error: 'No existe un proveedor disponible con una plantilla aprobada de horarios dinámicos.',
+    error: rejection ?
+      'Meta rechazó la plantilla de horarios (HTTP ' + rejection.httpStatus +
+      (rejection.metaCode ? ', código ' + rejection.metaCode : '') + ').' :
+      'No existe un proveedor disponible con una plantilla aprobada de horarios dinámicos.',
   };
 }
 

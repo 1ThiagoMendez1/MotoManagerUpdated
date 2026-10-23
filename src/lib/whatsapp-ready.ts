@@ -13,6 +13,12 @@ export function readyDynamicTemplateName(configured: string | undefined): string
 }
 
 
+/** Notify when an order genuinely becomes repaired, regardless of whether it
+ * went directly from diagnosis or passed through in_progress first. */
+export function shouldSendReadyNotice(previousStatus: string | null | undefined, nextStatus: string): boolean {
+  return Boolean(previousStatus) && nextStatus === 'completed' && previousStatus !== 'completed';
+}
+
 export type ReadyNotice = {
   customerName: string;
   workshopName: string;
