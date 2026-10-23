@@ -212,7 +212,7 @@ export default function CancellationsTab({ records }: Props) {
           <p className="text-foreground/70 dark:text-white/70 text-sm">
             El motivo más frecuente de cancelación es{' '}
             <span className="text-purple-600 dark:text-purple-300 font-semibold">
-              "{records.find(r => r.reason_code === topReason[0])?.reason_label}"
+              &quot;{records.find(r => r.reason_code === topReason[0])?.reason_label}&quot;
             </span>{' '}
             con <span className="text-purple-600 dark:text-purple-300 font-semibold">{topReason[1]}</span> caso{topReason[1] > 1 ? 's' : ''}.
           </p>

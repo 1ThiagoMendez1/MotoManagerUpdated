@@ -112,7 +112,7 @@ export function LandingTestimonialsAndFAQ() {
                     <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
-                <p className="text-muted-foreground text-sm leading-relaxed italic flex-1">"{t.text}"</p>
+                <p className="text-muted-foreground text-sm leading-relaxed italic flex-1">&quot;{t.text}&quot;</p>
                 <div className="flex items-center gap-3 pt-2 border-t border-border/30">
                   <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-foreground font-bold text-sm shrink-0`}>
                     {t.avatar}

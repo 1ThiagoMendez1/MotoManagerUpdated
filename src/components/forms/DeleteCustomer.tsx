@@ -47,7 +47,7 @@ export function DeleteCustomer({ customer }: DeleteCustomerProps) {
           <DialogHeader>
             <DialogTitle className="text-foreground">Eliminar Cliente</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              ¿Estás seguro de que deseas eliminar el cliente "<span className="font-semibold">{customer.name}</span>"? Esta acción no se puede deshacer.
+              ¿Estás seguro de que deseas eliminar el cliente &quot;<span className="font-semibold">{customer.name}</span>&quot;? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           {isOpen && <DeleteCustomerForm customer={customer} onClose={() => setIsOpen(false)} />}

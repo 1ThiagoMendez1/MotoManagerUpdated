@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -9,9 +9,10 @@ import {
   Wrench, Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getProfileData, updateProfileData } from '@/lib/actions/profile';
+import { updateProfileData } from '@/lib/actions/profile';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import WorkshopQR from '@/components/workshops/WorkshopQR';
 
 interface ProfileData {
   workshopName: string;
@@ -24,28 +25,20 @@ interface ProfileData {
   email: string;
   userRole?: string;
   workshopMapsLink?: string;
+  workshopSlug: string;
+  enrollmentEnabled: boolean;
 }
 
-export default function ProfileClient() {
+export default function ProfileClient({ initialData }: { initialData: ProfileData }) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-  const [mapsLinkText, setMapsLinkText] = useState('');
+  const [mapsLinkText, setMapsLinkText] = useState(initialData.workshopMapsLink || '');
   const [editingSections, setEditingSections] = useState({ workshop: false, owner: false });
   const [manualAddressEdited, setManualAddressEdited] = useState(false);
-  const [data, setData] = useState<ProfileData>({
-    workshopName: '',
-    workshopPhone: '',
-    workshopAddress: '',
-    workshopCity: '',
-    workshopNit: '',
-    ownerName: '',
-    ownerPhone: '',
-    email: '',
-  });
+  const [data, setData] = useState<ProfileData>(initialData);
 
   const toggleSectionEdit = (section: 'workshop' | 'owner') => {
     setEditingSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -60,7 +53,7 @@ export default function ProfileClient() {
     isEditing: boolean,
     required: boolean = false
   ) => {
-    const val = data[id] || '';
+    const val = typeof data[id] === 'string' ? data[id] as string : '';
     return (
       <div className="flex flex-col gap-1.5">
         <label htmlFor={id as string} className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -88,13 +81,6 @@ export default function ProfileClient() {
     );
   };
 
-  useEffect(() => {
-    getProfileData().then((d) => {
-      setData(d as any);
-      setMapsLinkText(d.workshopMapsLink || '');
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -184,14 +170,6 @@ export default function ProfileClient() {
       }
     });
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
@@ -393,6 +371,9 @@ export default function ProfileClient() {
 
           </div>
         </form>
+        {['owner', 'admin'].includes(data.userRole || '') && data.workshopSlug && (
+          <WorkshopQR name={data.workshopName} slug={data.workshopSlug} enabled={data.enrollmentEnabled} />
+        )}
       </div>
     </div>
   );

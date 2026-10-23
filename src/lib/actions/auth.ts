@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { isSuperAdmin } from '@/lib/super-admin';
 import { getWorkshopDetails } from '@/lib/auth-server';
 
 export async function loginAction(formData: FormData) {
@@ -33,9 +34,8 @@ export async function loginAction(formData: FormData) {
     redirect('/change-password');
   }
 
-  const isSuperAdmin = user?.user_metadata?.is_super_admin === true || user?.email?.startsWith('admin@') || user?.email?.toLowerCase() === 'juanurian31@gmail.com';
 
-  if (isSuperAdmin) {
+  if (isSuperAdmin(user)) {
     redirect('/admin');
   } else {
     const workshop = await getWorkshopDetails(user);

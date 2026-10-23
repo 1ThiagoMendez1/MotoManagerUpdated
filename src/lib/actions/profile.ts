@@ -42,9 +42,25 @@ export async function getProfileData() {
     workshopMapsLink: settings.maps_link || '',
     ownerName: profileNameFallback || ownerNameFallback || '',
     ownerPhone: profile?.phone || '',
-    email: user.email,
+    email: user.email || '',
     userRole: user.role,
+    workshopSlug: workshop?.slug || '',
+    enrollmentEnabled: settings.customer_enrollment_enabled === true,
   }
+}
+
+export async function setCustomerEnrollment(enabled: boolean) {
+  const user = await requireWorkshop();
+  if (!['owner', 'admin'].includes(user.role) || typeof enabled !== 'boolean') {
+    return { error: 'Solo el propietario o administrador puede gestionar las inscripciones.' };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('set_workshop_enrollment', {
+    p_organization_id: user.workshopId, p_enabled: enabled,
+  });
+  if (error) return { error: 'No se pudo cambiar el registro de clientes.' };
+  revalidatePath('/dashboard/profile');
+  return { success: true };
 }
 
 /**

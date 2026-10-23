@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
-import * as XLSX from "xlsx";
+import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 import type { InventoryItem } from "@/lib/types";
 
 type ExportInventoryButtonProps = {
@@ -10,7 +10,7 @@ type ExportInventoryButtonProps = {
 };
 
 export function ExportInventoryButton({ inventory }: ExportInventoryButtonProps) {
-  const handleExport = () => {
+  const handleExport = () => exportSpreadsheet((XLSX) => {
     const dataToExport = inventory.map((item) => ({
       "ID": item.id,
       "Nombre": item.name,
@@ -43,7 +43,7 @@ export function ExportInventoryButton({ inventory }: ExportInventoryButtonProps)
     ];
 
     XLSX.writeFile(workbook, "Reporte_Inventario.xlsx");
-  };
+  });
 
   return (
     <Button variant="outline" onClick={handleExport}>

@@ -1,10 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { isSuperAdmin } from '@/lib/super-admin'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
+
+  // Public visits without a session do not need an Auth network round trip.
+  const protectedPaths = ['/dashboard', '/inventory', '/work-orders', '/admin', '/sales', '/customers', '/motorcycles', '/appointments', '/team', '/settings', '/accounting', '/services', '/technicians', '/tickets'];
+  const isProtectedRoute = protectedPaths.some(path => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + '/'));
+  const hasSession = request.cookies.getAll().some(cookie => /^sb-.*-auth-token(?:\.\d+)?$/.test(cookie.name));
+  if (!hasSession && !isProtectedRoute) return supabaseResponse;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,14 +38,10 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Proteger rutas que requieran sesión
-  const protectedPaths = ['/dashboard', '/inventory', '/work-orders', '/admin', '/sales', '/customers', '/motorcycles', '/appointments', '/team', '/settings', '/accounting']
-  const isProtectedRoute = protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))
-  
-
   // Forzar cambio de contraseña si es requerido
   if (user && user.user_metadata?.needs_password_change === true) {
     const isChangePasswordRoute = request.nextUrl.pathname === '/change-password';
-    const isApiRoute = request.nextUrl.pathname.startsWith('/api/');
+    const isApiRoute = request.nextUrl.pathname.startsWith('/api/') || request.nextUrl.pathname === '/auth/callback';
     
     if (!isChangePasswordRoute && !isApiRoute) {
       const url = request.nextUrl.clone();
@@ -55,12 +58,7 @@ export async function middleware(request: NextRequest) {
 
   // Proteger la ruta de admin
   if (user && request.nextUrl.pathname.startsWith('/admin')) {
-    const isSuperAdmin = user.user_metadata?.is_super_admin === true;
-    const isAllowedEmail = 
-      user.email?.toLowerCase() === 'juanurian31@gmail.com' || 
-      user.email?.toLowerCase() === 'mivraadmin@motomanager.com.co';
-
-    if (!isSuperAdmin && !isAllowedEmail) {
+    if (!isSuperAdmin(user)) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

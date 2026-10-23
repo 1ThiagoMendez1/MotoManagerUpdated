@@ -67,7 +67,7 @@ export function DeleteTechnician({ technician }: DeleteTechnicianProps) {
         <DialogHeader>
           <DialogTitle className="text-foreground">Eliminar Técnico</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            ¿Estás seguro de que deseas eliminar el técnico "<span className="font-semibold">{technician.name}</span>"? Esta acción no se puede deshacer.
+            ¿Estás seguro de que deseas eliminar el técnico &quot;<span className="font-semibold">{technician.name}</span>&quot;? Esta acción no se puede deshacer.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="space-y-4">

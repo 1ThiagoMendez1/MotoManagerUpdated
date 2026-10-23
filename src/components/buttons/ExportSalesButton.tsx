@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
-import * as XLSX from "xlsx";
+import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale } from "@/lib/types";
 
@@ -11,7 +11,7 @@ type ExportSalesButtonProps = {
 };
 
 export function ExportSalesButton({ sales }: ExportSalesButtonProps) {
-  const handleExport = () => {
+  const handleExport = () => exportSpreadsheet((XLSX) => {
     const dataToExport = sales.map((sale) => {
         let details = '';
         if (sale.workOrderId && sale.workOrder) {
@@ -50,7 +50,7 @@ export function ExportSalesButton({ sales }: ExportSalesButtonProps) {
     ];
 
     XLSX.writeFile(workbook, "Historial_de_Ventas.xlsx");
-  };
+  });
 
   return (
     <Button variant="outline" onClick={handleExport}>

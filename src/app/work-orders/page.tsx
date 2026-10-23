@@ -39,7 +39,7 @@ export default async function WorkOrdersPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  await authorize('/work-orders');
+  const user = await authorize('/work-orders');
   const resolvedSearchParams = await searchParams;
   const query = (resolvedSearchParams.query as string) || '';
   const activePage = Number(resolvedSearchParams.activePage) || 1;
@@ -69,7 +69,7 @@ export default async function WorkOrdersPage({
 
   return (
     <div className="w-full space-y-4">
-      <WorkOrdersRealtime />
+      <WorkOrdersRealtime organizationId={user.workshopId!} />
 
       {/* Header Estandarizado */}
       <PageHeader

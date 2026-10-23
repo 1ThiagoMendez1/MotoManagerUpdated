@@ -34,6 +34,7 @@ export function LayoutWrapper({ children, header, sidebar, footer, workshopSlug 
     pathname === '/no-workshop' || 
     pathname === '/tenant-select' ||
     pathname.startsWith('/clientes') ||
+    pathname.startsWith('/talleres/') ||
     pathname.startsWith('/cotizacion');
   
   if (isPublicRoute) {
