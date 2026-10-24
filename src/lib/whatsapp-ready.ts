@@ -5,8 +5,12 @@ import { formatBusinessHours } from './business-hours';
  * schedule. Never select it, including through an outdated environment value.
  * A provider-specific name is permitted only if it is syntactically valid.
  */
+export const READY_META_TEMPLATE_NAME = 'estado_reparado';
+
 export function readyDynamicTemplateName(configured: string | undefined): string | null {
-  const name = configured === undefined ? 'diagnosticado_reparado_horarios' : configured.trim();
+  const rawName = configured === undefined ? READY_META_TEMPLATE_NAME : configured.trim();
+  // Redirect the old deployment override to the currently approved layout.
+  const name = rawName === 'diagnosticado_reparado_horarios' ? READY_META_TEMPLATE_NAME : rawName;
   if (!/^[a-z][a-z0-9_]{0,511}$/.test(name) ||
       name === 'diagnosticado_reparado') return null;
   return name;
@@ -53,7 +57,7 @@ export function composeReadyNotice(data: ReadyNotice): string {
 }
 
 /**
- * Parámetros EXCLUSIVOS de la plantilla Meta diagnosticado_reparado_horarios:
+ * Parámetros EXCLUSIVOS de la plantilla Meta estado_reparado:
  * {{1}} nombre, {{2}} taller, {{3}} moto, {{4}} placa,
  * {{5}} orden, {{6}} dirección, {{7}} horario completo, {{8}} taller.
  * La plantilla antigua NO es compatible: contiene horarios literales.
@@ -76,4 +80,21 @@ export function readyNoticeTemplateParameters(data: ReadyNotice): string[] {
     formatBusinessHours(data.businessHours).replace(/\r?\n/g, '; '),
     data.workshopName.trim(),
   ].map(safeMetaParameter);
+}
+
+/** Exact layout of Meta's Spanish (Colombia) "estado_reparado" template:
+ * no HEADER, eight BODY values. The footer and URL CTA are static in Meta.
+ */
+export function buildReadyMetaTemplate(data: ReadyNotice, configuredName?: string) {
+  const name = readyDynamicTemplateName(configuredName);
+  if (!name) return null;
+  return {
+    name,
+    language: { code: 'es_CO' as const },
+    components: [{
+      type: 'body' as const,
+      parameters: readyNoticeTemplateParameters(data)
+        .map(text => ({ type: 'text' as const, text })),
+    }],
+  };
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyBusinessHours, formatBusinessHours, parseBusinessHours } from '../src/lib/business-hours';
-import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName, shouldSendReadyNotice } from '../src/lib/whatsapp-ready';
+import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName, shouldSendReadyNotice, buildReadyMetaTemplate } from '../src/lib/whatsapp-ready';
 
 const base = () => {
   const hours = emptyBusinessHours();
@@ -77,9 +77,10 @@ test('Meta recibe horarios completos por taller sin saltos de línea ni tabulaci
 });
 
 test('una configuración vieja nunca selecciona la plantilla Meta con horas fijas', () => {
-  assert.equal(readyDynamicTemplateName(undefined), 'diagnosticado_reparado_horarios');
+  assert.equal(readyDynamicTemplateName(undefined), 'estado_reparado');
   assert.equal(readyDynamicTemplateName('diagnosticado_reparado'), null);
-  assert.equal(readyDynamicTemplateName('diagnosticado_reparado_horarios'), 'diagnosticado_reparado_horarios');
+  assert.equal(readyDynamicTemplateName('diagnosticado_reparado_horarios'), 'estado_reparado');
+  assert.equal(readyDynamicTemplateName('estado_reparado'), 'estado_reparado');
   assert.equal(readyDynamicTemplateName('bad template'), null);
   assert.equal(readyDynamicTemplateName(''), null);
 });
@@ -99,4 +100,21 @@ test('avisa moto lista al completar una reparación desde cualquiera de las etap
   assert.equal(shouldSendReadyNotice('completed', 'completed'), false);
   assert.equal(shouldSendReadyNotice('completed', 'delivered'), false);
   assert.equal(shouldSendReadyNotice(null, 'completed'), false);
+});
+
+test('Meta estado_reparado matches real approved layout: es_CO, no header, 8 body fields', () => {
+  const data = notice(base());
+  const payload = buildReadyMetaTemplate(data);
+  assert.ok(payload);
+  assert.equal(payload.name, 'estado_reparado');
+  assert.deepEqual(payload.language, { code: 'es_CO' });
+  assert.equal(payload.components.length, 1);
+  assert.equal(payload.components[0].type, 'body');
+  assert.equal(payload.components[0].parameters.length, 8);
+  assert.deepEqual(payload.components[0].parameters.map(param => param.text).slice(0, 6),
+    ['Santiago', 'FrankorMotos', 'General Moto', 'JUH12K', '83', 'Calle 8']);
+  assert.match(payload.components[0].parameters[6].text, /Lunes a viernes/);
+  assert.equal(payload.components[0].parameters[7].text, 'FrankorMotos');
+  assert.equal(buildReadyMetaTemplate(data, 'diagnosticado_reparado_horarios')?.name, 'estado_reparado');
+  assert.equal(buildReadyMetaTemplate(data, 'diagnosticado_reparado'), null);
 });

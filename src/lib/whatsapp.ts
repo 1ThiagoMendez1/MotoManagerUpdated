@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName } from './whatsapp-ready';
+import { composeReadyNotice, buildReadyMetaTemplate } from './whatsapp-ready';
 import type { ReadyNotice } from './whatsapp-ready';
 import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
 import { ai } from '@/ai/genkit';
@@ -1463,12 +1463,12 @@ export async function sendDiagnosticadoReparadoNotification(
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   // Una plantilla NUEVA y aprobada: la anterior contiene horarios escritos de forma fija.
-  const templateName = readyDynamicTemplateName(process.env.WHATSAPP_READY_DYNAMIC_TEMPLATE);
+  const template = buildReadyMetaTemplate(details, process.env.WHATSAPP_READY_DYNAMIC_TEMPLATE);
   let rejection: { httpStatus: number; metaCode: number | null } | null = null;
 
   // A stale WHATSAPP_READY_DYNAMIC_TEMPLATE must never select the old fixed-hours template.
   // Evolution's free-text fallback remains safe because it uses workshop-specific data.
-  if (wpToken && wpPhoneId && templateName) {
+  if (wpToken && wpPhoneId && template) {
     try {
       const response = await axios.post(
         'https://graph.facebook.com/v19.0/' + wpPhoneId + '/messages',
@@ -1476,14 +1476,7 @@ export async function sendDiagnosticadoReparadoNotification(
           messaging_product: 'whatsapp',
           to: formattedPhone,
           type: 'template',
-          template: {
-            name: templateName,
-            language: { code: 'es_CO' },
-            components: [{
-              type: 'body',
-              parameters: readyNoticeTemplateParameters(details).map(text => ({ type: 'text', text })),
-            }],
-          },
+          template,
         },
         { headers: { Authorization: 'Bearer ' + wpToken, 'Content-Type': 'application/json' } }
       );
