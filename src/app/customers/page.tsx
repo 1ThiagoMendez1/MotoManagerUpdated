@@ -7,7 +7,8 @@ import {
 } from '@/components/ui/card';
 import { AddCustomer } from '@/components/forms/AddCustomer';
 import { ImportCustomers } from '@/components/forms/ImportCustomers';
-import { Users } from 'lucide-react';
+import { Users, Inbox, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 import { SearchCustomers } from '@/components/forms/SearchCustomers';
 import { CustomerTable } from '@/components/customers/CustomerTable';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -50,6 +51,11 @@ export default async function CustomersPage({
           </span>
         }
       />
+
+      <Link href="/customers/intake" className="flex items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-5 transition hover:bg-primary/10">
+        <span className="flex items-center gap-3"><Inbox className="h-6 w-6 text-primary" /><span><strong className="block">Nuevos clientes del QR</strong><small className="text-muted-foreground">Recibe clientes, verifica la placa e ingresa su moto rápidamente.</small></span></span>
+        <ArrowRight className="h-5 w-5 shrink-0 text-primary" />
+      </Link>
 
       {/* Toolbar con Búsqueda e Importación */}
       <ModuleToolbar
