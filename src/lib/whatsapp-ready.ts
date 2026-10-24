@@ -82,7 +82,7 @@ export function readyNoticeTemplateParameters(data: ReadyNotice): string[] {
   ].map(safeMetaParameter);
 }
 
-/** Exact layout of Meta's Spanish (Colombia) "estado_reparado" template:
+/** Exact layout shown in Meta's Spanish (Colombia) "estado_reparado" editor:
  * no HEADER, eight BODY values. The footer and URL CTA are static in Meta.
  */
 export function buildReadyMetaTemplate(data: ReadyNotice, configuredName?: string) {
