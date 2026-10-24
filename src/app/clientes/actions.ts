@@ -257,3 +257,60 @@ export async function cancelCustomerAppointment(appointmentId: string) {
   revalidatePath('/clientes');
   return { success: true, message: 'Cita cancelada correctamente.' };
 }
+
+
+export type CustomerPortalOverview = {
+  verified: boolean;
+  workshops: Array<{ id: string; name: string }>;
+  motorcycles: Array<{ id: string; brand: string; model: string; licensePlate: string; workshopName: string }>;
+};
+
+/** A verified customer's linked motorcycles, without asking them to retype plates.
+ * Every returned pair must match a row in workshop_customer_accounts for auth.uid().
+ */
+export async function getCustomerPortalOverview(): Promise<CustomerPortalOverview> {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const empty: CustomerPortalOverview = { verified: false, workshops: [], motorcycles: [] };
+  if (authError || !user?.email_confirmed_at) return empty;
+
+  const admin = await createAdminClient();
+  const { data: links, error: linkError } = await admin
+    .from('workshop_customer_accounts')
+    .select('organization_id, customer_id')
+    .eq('user_id', user.id)
+    .limit(100);
+  if (linkError) {
+    console.error('[customer-overview] Failed to load account associations');
+    return { ...empty, verified: true };
+  }
+  if (!links?.length) return { ...empty, verified: true };
+
+  const organizationIds = [...new Set(links.map(link => link.organization_id))];
+  const customerIds = [...new Set(links.map(link => link.customer_id))];
+  const [{ data: organizations, error: orgError }, { data: motorcycles, error: motoError }] = await Promise.all([
+    admin.from('organizations').select('id, name').in('id', organizationIds).limit(100),
+    admin.from('motorcycles').select('id, brand, model, license_plate, organization_id, customer_id')
+      .in('customer_id', customerIds).limit(100),
+  ]);
+  if (orgError || motoError) {
+    console.error('[customer-overview] Failed to load connected vehicles');
+    return { ...empty, verified: true };
+  }
+
+  const workshopNames = new Map((organizations || []).map(org => [org.id, org.name]));
+  // Restrict by BOTH IDs, not just the customer_id (which alone is insufficient in a multi-tenant app).
+  const permittedPairs = new Set(links.map(link => link.organization_id + ':' + link.customer_id));
+  const accessible = (motorcycles || []).filter(moto =>
+    permittedPairs.has(moto.organization_id + ':' + moto.customer_id) &&
+    workshopNames.has(moto.organization_id));
+  return {
+    verified: true,
+    workshops: (organizations || []).map(org => ({ id: org.id, name: org.name })),
+    motorcycles: accessible.map(moto => ({
+      id: moto.id, brand: moto.brand || '', model: moto.model || '',
+      licensePlate: moto.license_plate || '',
+      workshopName: workshopNames.get(moto.organization_id) || 'Mi taller',
+    })),
+  };
+}
