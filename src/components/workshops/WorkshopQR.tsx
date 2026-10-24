@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { QrCode, Download, Copy, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { setCustomerEnrollment } from '@/lib/actions/profile';
@@ -9,6 +10,7 @@ import { workshopPoster } from '@/lib/workshops/poster';
 import Image from 'next/image';
 
 export default function WorkshopQR({ name, slug, enabled: initialEnabled }: { name: string; slug: string; enabled: boolean }) {
+  const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [busy, setBusy] = useState(false);
   const [qr, setQR] = useState('');
@@ -30,7 +32,7 @@ export default function WorkshopQR({ name, slug, enabled: initialEnabled }: { na
     try {
       const result = await setCustomerEnrollment(!enabled);
       if (result.error) setError(result.error);
-      else { setEnabled(!enabled); setMessage(enabled ? 'Inscripciones desactivadas. El QR impreso deja de aceptar registros.' : '¡Tu taller ya puede recibir registros!'); }
+      else { setEnabled(!enabled); setMessage(enabled ? 'Registro pausado. El QR sigue abriendo la página del taller e informa a tus clientes.' : '¡Tu taller ya puede recibir registros!'); router.refresh(); }
     } catch { setError('No se pudo guardar. Intenta de nuevo.'); }
     finally { setBusy(false); }
   }
@@ -53,11 +55,11 @@ export default function WorkshopQR({ name, slug, enabled: initialEnabled }: { na
         <Button type="button" disabled={!qr || !enabled} onClick={() => download(true)}><Download className="mr-2 h-4 w-4" />Cartel para vitrina</Button>
         <Button type="button" variant="outline" disabled={!qr || !enabled} onClick={() => download(false)}>Solo QR (SVG)</Button>
         <Button type="button" variant="outline" disabled={!url} onClick={async () => { try { await navigator.clipboard.writeText(url); setMessage('Enlace copiado.'); } catch { setError('Copia el enlace que aparece arriba.'); } }}><Copy className="mr-2 h-4 w-4" />Copiar enlace</Button>
-        {enabled && <Button type="button" variant="ghost" asChild><a href={workshopPath(slug)} target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Ver página</a></Button>}
+        <Button type="button" variant="ghost" asChild><a href={workshopPath(slug)} target="_blank" rel="noreferrer"><ExternalLink className="mr-2 h-4 w-4" />Probar página del QR</a></Button>
       </div>
       {message && <p role="status" className="text-sm text-primary">{message}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <p className="text-xs text-muted-foreground">El QR contiene únicamente la dirección pública del taller. No expone datos de clientes ni credenciales.</p>
+      <p className="text-xs text-muted-foreground">El enlace del QR es permanente. Si desactivas los registros, tus clientes verán una explicación clara en lugar de un error 404. El QR no expone datos ni credenciales.</p>
     </div>
   </section>;
 }

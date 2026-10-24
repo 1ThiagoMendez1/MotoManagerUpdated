@@ -53,3 +53,26 @@ test('dashboard preserves zeroes, labels Bogotá days and rejects malformed summ
   assert.equal(formatted.alerts.length, 1);
   assert.equal(dashboardSummarySchema.safeParse({}).success, false);
 });
+
+test('existing QR always shows a safe public storefront, including paused registrations', async () => {
+  const { publicStorefrontFromRow } = await import('../src/lib/workshops/enrollment');
+  const base = {
+    id: '00000000-0000-4000-a000-000000000001', name: 'FrankorMotos',
+    slug: 'frankormotos', phone: '3001234567', status: 'active',
+    settings: { customer_enrollment_enabled: true, address: 'Calle principal',
+      internal_token: 'DO_NOT_LEAK' },
+  };
+  const open = publicStorefrontFromRow(base);
+  assert.equal(open?.enrollmentEnabled, true);
+  assert.equal(open?.slug, 'frankormotos');
+  assert.ok(!JSON.stringify(open).includes('DO_NOT_LEAK'));
+  const paused = publicStorefrontFromRow({ ...base,
+    settings: { ...base.settings, customer_enrollment_enabled: false } });
+  assert.equal(paused?.name, 'FrankorMotos');
+  assert.equal(paused?.enrollmentEnabled, false);
+  assert.equal(publicStorefrontFromRow({ ...base, settings: null })?.enrollmentEnabled, false);
+  assert.equal(publicStorefrontFromRow({ ...base, status: 'trial' })?.enrollmentEnabled, false);
+  assert.equal(publicStorefrontFromRow({ ...base, status: 'suspended' }), null);
+  assert.equal(publicStorefrontFromRow({ ...base, slug: '../admin' }), null);
+  assert.equal(publicStorefrontFromRow(null), null);
+});
