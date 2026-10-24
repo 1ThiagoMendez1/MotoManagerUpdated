@@ -32,6 +32,22 @@ SELECT w.organization_id, w.user_id, w.customer_id, w.consent_at
 FROM public.workshop_customer_accounts w
 ON CONFLICT DO NOTHING;
 
+-- The first rollout must also alert staff about QR clients who already registered.
+-- Idempotent per staff recipient and request (metadata contains only an internal UUID).
+INSERT INTO public.notifications (organization_id,user_id,type,title,message,link,urgent,metadata)
+SELECT r.organization_id, om.user_id, 'qr_customer_registered',
+  'Cliente del QR pendiente de recepción',
+  'Tienes un cliente registrado por QR. Confirma sus datos e ingresa la moto.',
+  '/customers/intake', true, jsonb_build_object('request_id',r.id)
+FROM public.customer_intake_requests r
+JOIN public.organization_members om ON om.organization_id=r.organization_id
+ AND om.status='active' AND om.role IN ('owner','admin')
+WHERE r.status='pending' AND NOT EXISTS (
+  SELECT 1 FROM public.notifications n
+  WHERE n.organization_id=r.organization_id AND n.user_id=om.user_id
+    AND n.type='qr_customer_registered' AND n.metadata->>'request_id'=r.id::text
+);
+
 CREATE OR REPLACE FUNCTION public.submit_customer_intake(
   p_slug text, p_plate text DEFAULT NULL,
   p_brand text DEFAULT NULL, p_model text DEFAULT NULL
