@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyBusinessHours, formatBusinessHours, parseBusinessHours } from '../src/lib/business-hours';
-import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName, shouldSendReadyNotice } from '../src/lib/whatsapp-ready';
+import { composeReadyNotice, readyNoticeTemplateParameters, readyNoticeTemplateComponents, readyNoticeTemplateLanguage, readyDynamicTemplateName, shouldSendReadyNotice } from '../src/lib/whatsapp-ready';
 
 const base = () => {
   const hours = emptyBusinessHours();
@@ -99,4 +99,24 @@ test('avisa moto lista al completar una reparación desde cualquiera de las etap
   assert.equal(shouldSendReadyNotice('completed', 'completed'), false);
   assert.equal(shouldSendReadyNotice('completed', 'delivered'), false);
   assert.equal(shouldSendReadyNotice(null, 'completed'), false);
+});
+
+test('Meta approved Spanish template has 1 header and exactly 7 body parameters', () => {
+  const workshop = notice(base());
+  const components = readyNoticeTemplateComponents(workshop);
+  assert.equal(components.length, 2);
+  assert.equal(components[0].type, 'header');
+  assert.equal(components[0].parameters.length, 1);
+  assert.equal(components[0].parameters[0].text, 'Santiago');
+  assert.equal(components[1].type, 'body');
+  assert.equal(components[1].parameters.length, 7);
+  assert.deepEqual(components[1].parameters.map(p => p.text).slice(0, 5),
+    ['FrankorMotos','General Moto','JUH12K','83','Calle 8']);
+  assert.match(components[1].parameters[5].text, /Lunes a viernes/);
+  assert.equal(components[1].parameters[6].text, 'FrankorMotos');
+  assert.ok(components.flatMap(c => c.parameters)
+    .every(p => !/[\\r\\n\\t]| {5,}/.test(p.text)));
+  assert.equal(readyNoticeTemplateLanguage(undefined), 'es');
+  assert.equal(readyNoticeTemplateLanguage('es'), 'es');
+  assert.equal(readyNoticeTemplateLanguage('es_CO'), 'es_CO');
 });

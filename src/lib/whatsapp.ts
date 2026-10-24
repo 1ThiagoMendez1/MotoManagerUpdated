@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName } from './whatsapp-ready';
+import { composeReadyNotice, readyNoticeTemplateComponents, readyNoticeTemplateLanguage, readyDynamicTemplateName } from './whatsapp-ready';
 import type { ReadyNotice } from './whatsapp-ready';
 import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
 import { ai } from '@/ai/genkit';
@@ -1478,11 +1478,8 @@ export async function sendDiagnosticadoReparadoNotification(
           type: 'template',
           template: {
             name: templateName,
-            language: { code: 'es_CO' },
-            components: [{
-              type: 'body',
-              parameters: readyNoticeTemplateParameters(details).map(text => ({ type: 'text', text })),
-            }],
+            language: { code: readyNoticeTemplateLanguage(process.env.WHATSAPP_READY_TEMPLATE_LANGUAGE) },
+            components: readyNoticeTemplateComponents(details),
           },
         },
         { headers: { Authorization: 'Bearer ' + wpToken, 'Content-Type': 'application/json' } }
@@ -1497,6 +1494,7 @@ export async function sendDiagnosticadoReparadoNotification(
       console.warn('[whatsapp:ready] Meta request failed', {
         httpStatus: typeof status === 'number' ? status : null,
         metaCode,
+        templateLocale: readyNoticeTemplateLanguage(process.env.WHATSAPP_READY_TEMPLATE_LANGUAGE),
         // Never log the phone, customer data, response body or bearer token.
       });
       if (typeof status === 'number') rejection = { httpStatus: status, metaCode };

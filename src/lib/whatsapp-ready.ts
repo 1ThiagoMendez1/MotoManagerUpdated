@@ -77,3 +77,21 @@ export function readyNoticeTemplateParameters(data: ReadyNotice): string[] {
     data.workshopName.trim(),
   ].map(safeMetaParameter);
 }
+
+/** The Meta screenshot has ONE greeting variable in HEADER and SEVEN variables in BODY.
+ * It is not an eight-variable body template.
+ */
+export function readyNoticeTemplateComponents(data: ReadyNotice) {
+  const [customerName, ...body] = readyNoticeTemplateParameters(data);
+  return [
+    { type: 'header' as const, parameters: [{ type: 'text' as const, text: customerName }] },
+    { type: 'body' as const, parameters: body.map(text => ({ type: 'text' as const, text })) },
+  ];
+}
+
+/** "Spanish" (without region) in WhatsApp Manager is the "es" locale, not es_CO.
+ * Keep the locale overridable if Meta later approves a regional translation.
+ */
+export function readyNoticeTemplateLanguage(configured: string | undefined): 'es' | 'es_CO' {
+  return configured === 'es_CO' ? 'es_CO' : 'es';
+}
