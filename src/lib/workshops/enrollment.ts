@@ -40,6 +40,10 @@ export const enrollmentSchema = z.object({
   firstName: z.string().trim().min(1).max(80),
   lastName: z.string().trim().min(1).max(100),
   phone: z.string().transform(value => value.replace(/[\s()-]/g, '')).pipe(z.string().regex(/^\+?[0-9]{10,15}$/)),
+  plate: z.string().trim().max(16).transform(v => v.replace(/[\s-]/g, '').toUpperCase())
+    .refine(v => v === '' || /^[A-Z0-9]{5,8}$/.test(v), 'Placa inválida').optional().default(''),
+  brand: z.string().trim().max(60).optional().default(''),
+  model: z.string().trim().max(60).optional().default(''),
   consent: z.literal('on'),
 });
 

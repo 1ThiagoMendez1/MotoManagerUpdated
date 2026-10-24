@@ -25,6 +25,7 @@ import { updateWorkOrderStatus } from '@/lib/actions/work-orders';
 import type { WorkOrder } from '@/lib/types';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -67,6 +68,10 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
           title: 'Estado guardado, pero no se envió WhatsApp',
           description: state.whatsappWarning,
           variant: 'destructive',
+          action: ('whatsappManualUrl' in state && state.whatsappManualUrl)
+            ? <ToastAction altText="Enviar aviso manual por WhatsApp" onClick={() => {
+                window.open(state.whatsappManualUrl, '_blank', 'noopener,noreferrer');
+              }}>Abrir WhatsApp</ToastAction> : undefined,
         });
       }
     } else if (state?.message) {

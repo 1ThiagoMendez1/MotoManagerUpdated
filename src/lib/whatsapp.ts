@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { composeReadyNotice, readyNoticeTemplateParameters, readyDynamicTemplateName } from './whatsapp-ready';
 import type { ReadyNotice } from './whatsapp-ready';
+import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
 import { ai } from '@/ai/genkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getPlanLimits } from '@/lib/constants/plans';
@@ -122,14 +123,50 @@ export async function sendOrderStatusUpdate(
     workshopAddress?: string;
   }
 ) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const digits = customerPhone.replace(/[^0-9]/g, '');
+  const recipient = digits.length === 10 ? '57' + digits : digits;
+  if (!/^\d{11,15}$/.test(recipient)) return { success: false, error: 'Número WhatsApp inválido.' };
+  if (wpToken && wpPhoneId) {
+    const templateName = process.env.WHATSAPP_STATUS_TEMPLATE || STATUS_TEMPLATE_NAME;
+    try {
+      const response = await axios.post('https://graph.facebook.com/v19.0/' + wpPhoneId + '/messages', {
+        messaging_product: 'whatsapp', to: recipient, type: 'template',
+        template: {
+          name: templateName, language: { code: 'es_CO' },
+          components: [{ type: 'body', parameters: statusTemplateParameters({
+            customerName: orderData.customerName,
+            workshopName: orderData.workshopName || 'Mi taller',
+            motorcycleInfo: orderData.motorcycleInfo,
+            orderNumber: orderData.orderNumber,
+            status: orderData.status,
+          }).map(text => ({ type: 'text', text })) }],
+        },
+      }, { headers: { Authorization: 'Bearer ' + wpToken, 'Content-Type': 'application/json' }, timeout: 18000 });
+      return { success: true, provider: 'meta', data: response.data };
+    } catch (error: any) {
+      const httpStatus = error?.response?.status;
+      const metaCode = error?.response?.data?.error?.code;
+      console.warn('[whatsapp:status] Meta rejected status template:', {
+        httpStatus: typeof httpStatus === 'number' ? httpStatus : null,
+        metaCode: typeof metaCode === 'number' ? metaCode : null,
+      });
+      // An uncertain HTTP/network failure could already have delivered.
+      if (httpStatus !== 400 && httpStatus !== 404)
+        return { success: false, error: 'Meta no confirmó el envío (HTTP ' + (httpStatus || 'red') + ').' };
+      if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance)
+        return { success: false, error: 'Meta rechazó ' + templateName +
+          ' (HTTP ' + httpStatus + (metaCode ? ', código ' + metaCode : '') +
+          '). Verifica que esté aprobada en español de Colombia para este número.' };
+    }
+  }
   if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
-    console.log('Evolution API not configured, skipping WhatsApp notification');
-    return { success: false, error: 'Evolution API not configured' };
+    return { success: false, error: 'Para estos estados falta aprobar la plantilla Meta actualizacion_estado_moto o configurar Evolution API.' };
   }
 
   try {
-    // Format phone number for WhatsApp (remove + and add country code if needed)
-    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+    const formattedPhone = recipient;
 
     const statusEmojis = {
       'Diagnosticando': '🔍',

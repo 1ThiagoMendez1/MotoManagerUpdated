@@ -283,6 +283,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
     }
 
     let whatsappWarning: string | undefined;
+    let whatsappManualUrl: string | undefined;
     if (updatedWo) {
         const mc = Array.isArray(updatedWo.motorcycles) ? updatedWo.motorcycles[0] : updatedWo.motorcycles;
         const customer = mc?.customers;
@@ -339,8 +340,8 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                 process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE_NAME
             );
             const metaAvailable = Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
-            if (!isReadyTransition && !evolutionAvailable) {
-                whatsappWarning = 'Los cambios de estado distintos de Reparado necesitan una plantilla Meta específica o Evolution API configurada.';
+            if (!isReadyTransition && !evolutionAvailable && !metaAvailable) {
+                whatsappWarning = 'No hay un proveedor WhatsApp configurado para cambios de estado.';
             } else if (isReadyTransition && !metaAvailable && !evolutionAvailable) {
                 whatsappWarning = 'No hay un proveedor de WhatsApp configurado para avisar que la moto está lista.';
             } else {
@@ -389,7 +390,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                             }
                         );
                         if (!delivery.success) {
-                            whatsappWarning = 'El proveedor no aceptó el aviso de cambio de estado.';
+                            whatsappWarning = delivery.error || 'El proveedor no aceptó el aviso de cambio de estado.';
                             console.warn('[work-orders] WhatsApp status notice rejected:', delivery.error === 'Evolution API not configured' ? 'Evolution not configured' : 'provider failure');
                         }
                     } catch {
@@ -405,10 +406,22 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         } else {
             whatsappWarning = 'El cliente no tiene un teléfono registrado para WhatsApp.';
         }
+        // Manual fallback is deliberately click-to-send; never claim automatic delivery.
+        if (whatsappWarning && customer?.phone) {
+            const digits = customer.phone.replace(/[^0-9]/g, '');
+            const recipient = digits.length === 10 ? '57' + digits : digits;
+            if (/^\d{11,15}$/.test(recipient)) {
+                const message = 'Hola ' + (customer.first_name || 'cliente') + ', tu orden ' +
+                    (updatedWo.order_number || id.substring(0, 8)) + ' en ' +
+                    (workshop?.name || 'el taller') + ' tiene el estado: ' + uiStatus +
+                    '. Comunícate con el taller si necesitas información.';
+                whatsappManualUrl = 'https://wa.me/' + recipient + '?text=' + encodeURIComponent(message);
+            }
+        }
     }
 
     revalidatePath('/work-orders');
-    return { success: true, whatsappWarning };
+    return { success: true, whatsappWarning, whatsappManualUrl };
 }
 
 export async function reassignWorkOrderTechnician(prevState: any, formData: FormData) {

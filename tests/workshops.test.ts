@@ -76,3 +76,13 @@ test('existing QR always shows a safe public storefront, including paused regist
   assert.equal(publicStorefrontFromRow({ ...base, slug: '../admin' }), null);
   assert.equal(publicStorefrontFromRow(null), null);
 });
+
+test('the QR captures optional plate and model but refuses invalid plates', () => {
+  const base = { slug: 'frankormotos', firstName: 'Ana', lastName: 'Pérez',
+    phone: '3001234567', consent: 'on' };
+  const parsed = enrollmentSchema.parse({ ...base, plate: 'abc-12d', brand: 'Yamaha', model: 'FZ' });
+  assert.equal(parsed.plate, 'ABC12D');
+  assert.equal(parsed.brand, 'Yamaha');
+  assert.equal(enrollmentSchema.parse(base).plate, '');
+  assert.equal(enrollmentSchema.safeParse({ ...base, plate: 'XXX!12' }).success, false);
+});
