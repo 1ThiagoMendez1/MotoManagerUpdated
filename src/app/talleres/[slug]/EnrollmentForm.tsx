@@ -62,7 +62,7 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
     <div className="flex items-center gap-3"><LockKeyhole className="h-9 w-9 text-primary" /><h2 className="text-xl font-bold">Registro temporalmente pausado</h2></div>
     <p className="text-sm leading-relaxed text-muted-foreground">Este QR sí es de {workshop.name}. Por ahora el taller no está recibiendo registros nuevos. No necesitas escanear otro código.</p>
     {workshop.phone && <Button className="w-full" variant="outline" asChild>
-      <a href={`tel:${workshop.phone.replace(/[^+\\d]/g, '')}`}><Phone className="mr-2 h-4 w-4" />Llamar al taller</a>
+      <a href={`tel:${workshop.phone.replace(/[^+\d]/g, '')}`}><Phone className="mr-2 h-4 w-4" />Llamar al taller</a>
     </Button>}
     <Button className="w-full" variant="outline" onClick={() => router.refresh()}>Volver a comprobar</Button>
     <p className="text-xs text-muted-foreground">Si administras el taller, activa el registro desde Mi perfil → QR del taller.</p>
