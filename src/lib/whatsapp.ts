@@ -2,6 +2,7 @@ import axios from 'axios';
 import { composeReadyNotice, buildReadyMetaTemplate } from './whatsapp-ready';
 import type { ReadyNotice } from './whatsapp-ready';
 import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
+import { buildDiagnosisMetaTemplate } from './whatsapp-diagnosis';
 import { ai } from '@/ai/genkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getPlanLimits } from '@/lib/constants/plans';
@@ -116,6 +117,7 @@ export async function sendOrderStatusUpdate(
     status: 'Diagnosticando' | 'Reparado' | 'Entregado';
     customerName: string;
     motorcycleInfo: string;
+    plate: string;
     technicianName: string;
     items?: Array<{ name: string; quantity: number; price: number }>;
     workshopName?: string;
@@ -129,20 +131,33 @@ export async function sendOrderStatusUpdate(
   const recipient = digits.length === 10 ? '57' + digits : digits;
   if (!/^\d{11,15}$/.test(recipient)) return { success: false, error: 'Número WhatsApp inválido.' };
   if (wpToken && wpPhoneId) {
-    const templateName = process.env.WHATSAPP_STATUS_TEMPLATE || STATUS_TEMPLATE_NAME;
+    const isDiagnosis = orderData.status === 'Diagnosticando';
+    const templateName = isDiagnosis
+      ? 'actualizacion_estado_diagnosticando'
+      : (process.env.WHATSAPP_STATUS_TEMPLATE || STATUS_TEMPLATE_NAME);
+    const motorcycleOnly = orderData.motorcycleInfo.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const template = isDiagnosis
+      ? buildDiagnosisMetaTemplate({
+        customerName: orderData.customerName,
+        workshopName: orderData.workshopName || 'Mi taller',
+        motorcycleInfo: motorcycleOnly,
+        plate: orderData.plate,
+        orderNumber: orderData.orderNumber,
+        workshopAddress: orderData.workshopAddress || '',
+      })
+      : {
+        name: templateName, language: { code: 'es_CO' as const },
+        components: [{ type: 'body' as const, parameters: statusTemplateParameters({
+          customerName: orderData.customerName,
+          workshopName: orderData.workshopName || 'Mi taller',
+          motorcycleInfo: orderData.motorcycleInfo,
+          orderNumber: orderData.orderNumber,
+          status: orderData.status,
+        }).map(text => ({ type: 'text' as const, text })) }],
+      };
     try {
       const response = await axios.post('https://graph.facebook.com/v19.0/' + wpPhoneId + '/messages', {
-        messaging_product: 'whatsapp', to: recipient, type: 'template',
-        template: {
-          name: templateName, language: { code: 'es_CO' },
-          components: [{ type: 'body', parameters: statusTemplateParameters({
-            customerName: orderData.customerName,
-            workshopName: orderData.workshopName || 'Mi taller',
-            motorcycleInfo: orderData.motorcycleInfo,
-            orderNumber: orderData.orderNumber,
-            status: orderData.status,
-          }).map(text => ({ type: 'text', text })) }],
-        },
+        messaging_product: 'whatsapp', to: recipient, type: 'template', template,
       }, { headers: { Authorization: 'Bearer ' + wpToken, 'Content-Type': 'application/json' }, timeout: 18000 });
       return { success: true, provider: 'meta', data: response.data };
     } catch (error: any) {

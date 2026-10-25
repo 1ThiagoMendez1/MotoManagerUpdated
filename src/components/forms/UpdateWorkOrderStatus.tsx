@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { updateWorkOrderStatus } from '@/lib/actions/work-orders';
+import { WORK_ORDER_STATUS_OPTIONS, isChangeableOrderStatus } from '@/lib/work-order-status';
 import type { WorkOrder } from '@/lib/types';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +45,7 @@ interface UpdateWorkOrderStatusProps {
 
 export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string>(workOrder.status);
+  const [selectedStatus, setSelectedStatus] = useState<string>(isChangeableOrderStatus(workOrder.status) ? workOrder.status : '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { toast } = useToast();
   // @ts-ignore
@@ -53,7 +54,7 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
   // Reset selected status whenever the dialog opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedStatus(workOrder.status);
+      setSelectedStatus(isChangeableOrderStatus(workOrder.status) ? workOrder.status : '');
       setErrorMsg(null);
     }
   }, [isOpen, workOrder.status]);
@@ -79,16 +80,11 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
     }
   }, [state, toast]);
 
-  const statusOptions = [
-    { value: 'Ingreso a revisión', label: 'Ingreso a revisión' },
-    { value: 'Diagnosticando', label: 'Diagnosticando' },
-    { value: 'En proceso', label: 'En proceso' },
-    { value: 'Reparado', label: 'Reparado' },
-    { value: 'Entregado', label: 'Entregado' },
-    { value: 'Moto entregada por cotización rechazada', label: 'Moto entregada por cotización rechazada' },
-  ];
-
   const handleSubmit = (formData: FormData) => {
+    if (!isChangeableOrderStatus(selectedStatus)) {
+      setErrorMsg('Selecciona un estado disponible.');
+      return;
+    }
     if (selectedStatus === workOrder.status) {
       setErrorMsg('Seleccioná un estado diferente al actual.');
       return;
@@ -129,9 +125,9 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
                 <SelectValue placeholder="Selecciona un estado" />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                {WORK_ORDER_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
                   </SelectItem>
                 ))}
               </SelectContent>
