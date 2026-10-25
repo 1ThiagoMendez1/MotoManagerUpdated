@@ -68,18 +68,18 @@ export default async function WorkshopStorefront({ params, searchParams }: {
               “{reputation.recent_public_comment}” — Cliente verificado
             </blockquote>}
           </div>}
-          <p className="mt-5 text-muted-foreground">Regístrate una sola vez, vincula tu cuenta con el taller y accede a tus motos, órdenes y citas desde tu celular.</p>
+          <p className="mt-5 text-muted-foreground">Regístrate con un código de WhatsApp, vincula tu cuenta con el taller y consulta tus motos, órdenes y citas.</p>
         </div>
         <div className="p-7 sm:p-9">
           <EnrollmentForm workshop={data} email={email} alreadyLinked={alreadyLinked} authError={!!query.auth_error} />
         </div>
       </section>
       <div className="mt-6 grid gap-3 text-sm sm:grid-cols-3">
-        <div className="rounded-xl border bg-card p-4"><strong className="text-primary">01 · Identifícate</strong><p className="mt-1 text-xs text-muted-foreground">Verifica tu correo de forma segura.</p></div>
+        <div className="rounded-xl border bg-card p-4"><strong className="text-primary">01 · Identifícate</strong><p className="mt-1 text-xs text-muted-foreground">Verifica tu celular con un código de WhatsApp.</p></div>
         <div className="rounded-xl border bg-card p-4"><strong className="text-primary">02 · Vincúlate</strong><p className="mt-1 text-xs text-muted-foreground">Tu ficha queda en {data.name}.</p></div>
         <div className="rounded-xl border bg-card p-4"><strong className="text-primary">03 · Conecta</strong><p className="mt-1 text-xs text-muted-foreground">Tus motos e historial, desde el portal.</p></div>
       </div>
-      <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0" />Solo tú verificas tu correo. El QR no permite consultar historias de servicio ni da acceso a la administración del taller.</p>
+      <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0" />Tu acceso se verifica con un código privado de WhatsApp o con una contraseña existente. El QR no permite consultar historias de servicio ni da acceso a la administración del taller.</p>
       <Link href="/clientes" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Ir al portal de clientes <ArrowRight className="h-4 w-4" /></Link>
     </main>
   );
