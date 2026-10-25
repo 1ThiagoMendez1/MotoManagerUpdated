@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { shouldSendReadyNotice } from '@/lib/whatsapp-ready';
-import { isChangeableOrderStatus } from '@/lib/work-order-status';
+import { isChangeableOrderStatus, NEW_WORK_ORDER_DB_STATUS } from '@/lib/work-order-status';
 import { createNotification } from '@/lib/actions/notifications';
 import { formatBusinessHours } from '@/lib/business-hours';
 
@@ -113,7 +113,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
                 organization_id: user.workshopId,
                 motorcycle_id: motorcycleId,
                 assigned_mechanic_id: technicianId,
-                status: 'received',
+                status: NEW_WORK_ORDER_DB_STATUS,
                 reported_symptoms: issueDescription,
                 created_by: user.userId || null
             })
@@ -129,7 +129,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         // Asignar mecánico a la orden creada por RPC
         const { error: updateError } = await supabase
             .from('work_orders')
-            .update({ assigned_mechanic_id: technicianId, status: 'received' })
+            .update({ assigned_mechanic_id: technicianId, status: NEW_WORK_ORDER_DB_STATUS })
             .eq('id', newOrderId)
             .eq('organization_id', user.workshopId);
             

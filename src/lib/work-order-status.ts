@@ -9,3 +9,6 @@ export type ChangeableWorkOrderStatus = typeof WORK_ORDER_STATUS_OPTIONS[number]
 export function isChangeableOrderStatus(value: unknown): value is ChangeableWorkOrderStatus {
   return typeof value === 'string' && WORK_ORDER_STATUS_OPTIONS.some(item => item === value);
 }
+
+/** New orders begin in diagnosis; legacy received remains readable only. */
+export const NEW_WORK_ORDER_DB_STATUS = 'diagnosis' as const;
