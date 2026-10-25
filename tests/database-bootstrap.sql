@@ -28,3 +28,18 @@ CREATE TABLE public.inventory_item_stock (
 \ir ../supabase/migrations/20261023203000_atomic_whatsapp_quota.sql
 GRANT SELECT ON public.organization_members, public.organizations TO authenticated;
 \ir database-regression.sql
+
+-- Minimal Storage metadata fixture for the public-image migration. This is not a Storage server.
+CREATE SCHEMA storage;
+CREATE TABLE storage.buckets(id text PRIMARY KEY, name text, public boolean,
+  file_size_limit bigint, allowed_mime_types text[]);
+CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  bucket_id text REFERENCES storage.buckets(id), name text);
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT USAGE ON SCHEMA storage TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
+-- Deliberately broad fixture: the new restrictive policy must still block this bucket.
+CREATE POLICY "Test legacy broad policy" ON storage.objects FOR ALL TO authenticated
+  USING (true) WITH CHECK (true);
+\ir ../supabase/migrations/20261025155215_public_workshop_images.sql
+\ir workshop-image-regression.sql

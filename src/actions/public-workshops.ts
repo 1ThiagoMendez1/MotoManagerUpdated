@@ -1,6 +1,7 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { publicWorkshopImageUrl } from '@/lib/workshops/public-image';
 
 // Define the Workshop interface based on what we need for the public UI
 export interface PublicWorkshop {
@@ -11,6 +12,7 @@ export interface PublicWorkshop {
   address: string | null;
   city: string | null;
   maps_link: string | null;
+  image_url: string | null;
   average_rating?: number | null;
   review_count?: number;
   recommendation_count?: number;
@@ -73,6 +75,7 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
         address: org.settings?.address || null,
         city: org.settings?.city || null,
         maps_link: org.settings?.maps_link || null,
+        image_url: publicWorkshopImageUrl(org.settings, org.id, process.env.NEXT_PUBLIC_SUPABASE_URL!),
         average_rating: rating ? Number(rating.average_rating) : null,
         review_count: rating ? Number(rating.review_count) : 0,
         recommendation_count: rating ? Number(rating.recommendation_count) : 0,

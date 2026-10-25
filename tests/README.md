@@ -17,3 +17,9 @@ Para staging, seguir [la revisión y el orden de despliegue](../docs/production-
 - `npm run test:db` también aplica las migraciones de horarios, OTP, perfil atómico y cuota WhatsApp (`20261023200000` a `20261023203000`) sobre el contenedor descartable. Prueba aislamiento de horarios, preservación de ajustes, límites de intentos, no reutilización OTP y que el contador del mes no borre preferencias de otros talleres.
 - Las pruebas aisladas no envían WhatsApp ni confirman la aprobación de la nueva plantilla Meta. Ver `docs/whatsapp-business-hours.md`.
 - Antes de activar OTP renovado, configurar `MOBILE_OTP_PEPPER` con al menos 32 caracteres aleatorios protegidos y verificar un flujo de inicio de sesión móvil real en staging.
+
+## Registro e imagen pública del taller
+
+- `workshop-access.test.ts` comprueba mensajes de Auth, normalización del correo, retorno PKCE, aislamiento de rutas de imágenes y rechazo de archivos SVG/MIME falsificados.
+- `test:db` aplica `20261025155215_public_workshop_images.sql` con una tabla mínima de metadatos Storage y ejecuta `workshop-image-regression.sql`. Valida permisos reales de PostgreSQL, aislamiento entre talleres, conservación de ajustes y una política restrictiva que bloquea escrituras/listado desde clientes incluso frente a una política permisiva previa. Este fixture no valida el servidor HTTP de Storage ni SMTP.
+- En entornos donde el socket IPC de la CLI `tsx` esté restringido, ejecutar la misma suite con `node --import tsx --test tests/*.test.ts`.

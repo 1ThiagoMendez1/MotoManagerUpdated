@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Storefront, workshopPath } from '@/lib/workshops/enrollment';
-import { enrollCustomer, requestAnotherMotorcycle } from './actions';
+import { Storefront } from '@/lib/workshops/enrollment';
+import { workshopAuthFailure } from '@/lib/workshops/email-auth';
+import { enrollCustomer, requestAnotherMotorcycle, requestWorkshopEmail } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowRight, CheckCircle2, LockKeyhole, Mail, Loader2, Phone } from 'lucide-react';
@@ -17,25 +18,55 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sentTo, setSentTo] = useState('');
+  const [accessMethod, setAccessMethod] = useState<'email' | 'password'>('email');
+  const [retryAt, setRetryAt] = useState(0);
+  const [retrySeconds, setRetrySeconds] = useState(0);
   const [complete, setComplete] = useState(false);
   const [intakeNotice, setIntakeNotice] = useState('');
   const [addMoto, setAddMoto] = useState(false);
   const [error, setError] = useState(authError ? 'El enlace expiró o ya se utilizó. Solicita uno nuevo y ábrelo en este navegador.' : '');
 
+  useEffect(() => {
+    if (!retryAt) return;
+    const tick = () => setRetrySeconds(Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [retryAt]);
+
+  async function sendLink(address: string) {
+    if (busy || Date.now() < retryAt) return;
+    setBusy(true); setError('');
+    try {
+      const result = await requestWorkshopEmail({ slug: workshop.slug, email: address, mode });
+      if (result.retryAfterSeconds) {
+        setRetrySeconds(result.retryAfterSeconds);
+        setRetryAt(Date.now() + result.retryAfterSeconds * 1000);
+      }
+      if (result.error) setError(result.error);
+      else if (result.success) { setSentTo(address); setSent(true); }
+    } catch { setError('Comprueba tu conexión e intenta de nuevo.'); }
+    finally { setBusy(false); }
+  }
+
   async function verifyEmail(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault();
+    if (busy) return;
     const data = new FormData(event.currentTarget);
+    const address = String(data.get('email')).trim().toLowerCase();
+    if (mode !== 'existing' || accessMethod !== 'password') {
+      await sendLink(address);
+      return;
+    }
+    setBusy(true); setError('');
     try {
       const supabase = createClient();
-      const returnPath = workshopPath(workshop.slug);
-      const callback = new URL('/auth/callback', window.location.origin);
-      callback.searchParams.set('next', returnPath);
-      const { error } = await supabase.auth.signInWithOtp({
-        email: String(data.get('email')).trim().toLowerCase(),
-        options: { emailRedirectTo: callback.toString(), shouldCreateUser: mode === 'new' },
+      const { error } = await supabase.auth.signInWithPassword({
+        email: address, password: String(data.get('password') || ''),
       });
-      if (error) setError('No se pudo enviar el enlace. Espera un momento e intenta de nuevo.');
-      else setSent(true);
+      if (error) setError(workshopAuthFailure(error, 'password').error);
+      else router.refresh();
     } catch { setError('Comprueba tu conexión e intenta de nuevo.'); }
     finally { setBusy(false); }
   }
@@ -91,7 +122,16 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
     <p className="text-xs text-muted-foreground">Si administras el taller, activa el registro desde Mi perfil → QR del taller.</p>
   </div>;
 
-  if (sent) return <div role="status" className="space-y-4"><Mail className="h-9 w-9 text-primary" /><h2 className="text-xl font-semibold">Revisa tu correo</h2><p className="text-sm text-muted-foreground">Abre el enlace de acceso en este mismo navegador para verificar tu correo y terminar tu registro. Revisa también la carpeta de spam.</p><Button variant="outline" onClick={() => setSent(false)}>Usar otro correo</Button></div>;
+  if (sent && !email) return <div role="status" className="space-y-4">
+    <Mail className="h-9 w-9 text-primary" /><h2 className="text-xl font-semibold">Revisa tu correo</h2>
+    <p className="break-words text-sm font-medium">Enviamos el enlace a {sentTo}.</p>
+    <p className="text-sm text-muted-foreground">Abre el enlace de acceso en este mismo navegador para verificar tu correo y terminar tu registro. Revisa también la carpeta de spam.</p>
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <Button className="w-full" variant="outline" disabled={busy || retrySeconds > 0} onClick={() => void sendLink(sentTo)}>
+      {busy ? 'Enviando...' : retrySeconds > 0 ? `Reenviar en ${retrySeconds} s` : 'Reenviar enlace'}
+    </Button>
+    <Button variant="ghost" onClick={() => { setSent(false); setError(''); }}>Usar otro correo o acceder con contraseña</Button>
+  </div>;
   return <>
     {error && <p role="alert" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
     {!email ? <form onSubmit={verifyEmail} className="space-y-5">
@@ -105,11 +145,20 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
         <button type="button" aria-pressed={mode === 'existing'} onClick={() => { setMode('existing'); setError(''); }}
           className={`rounded-lg px-3 py-3 text-sm font-semibold ${mode === 'existing' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>Ya tengo cuenta</button>
       </div>
+      {mode === 'existing' && <div className="flex gap-2" role="group" aria-label="Método de acceso">
+        <Button type="button" variant={accessMethod === 'email' ? 'secondary' : 'ghost'} onClick={() => { setAccessMethod('email'); setError(''); }}>Recibir enlace</Button>
+        <Button type="button" variant={accessMethod === 'password' ? 'secondary' : 'ghost'} onClick={() => { setAccessMethod('password'); setError(''); }}>Usar contraseña</Button>
+      </div>}
       <p className="text-sm text-muted-foreground">{mode === 'new'
         ? 'Regístrate sin crear otra contraseña.'
+        : accessMethod === 'password' ? 'Ingresa con el correo y la contraseña de tu cuenta MotoManager.'
         : 'Usa el correo de tu cuenta MotoManager. Te enviaremos un enlace seguro para entrar.'}</p>
       <label className="block space-y-2 text-sm font-medium">Correo electrónico<Input name="email" type="email" autoComplete="email" required maxLength={254} placeholder="tu@correo.com" /></label>
-      <Button className="h-12 w-full" disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{mode === 'new' ? 'Continuar con mi correo' : 'Acceder a mi cuenta'}</Button>
+      {mode === 'existing' && accessMethod === 'password' && <label className="block space-y-2 text-sm font-medium">Contraseña<Input name="password" type="password" autoComplete="current-password" required maxLength={200} /></label>}
+      <Button className="h-12 w-full" disabled={busy || ((mode === 'new' || accessMethod === 'email') && retrySeconds > 0)}>
+        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {(mode === 'new' || accessMethod === 'email') && retrySeconds > 0 ? `Volver a intentar en ${retrySeconds} s` : mode === 'new' ? 'Continuar con mi correo' : 'Acceder a mi cuenta'}
+      </Button>
     </form> : <form onSubmit={join} className="space-y-5">
       <div><h2 className="text-xl font-semibold">Un último paso</h2><p className="mt-2 break-words text-sm text-muted-foreground">Correo verificado: {email}</p><p className="mt-2 text-sm text-muted-foreground">Estos datos se utilizarán solo para vincular tu ficha con {workshop.name}.</p></div>
       <div className="grid gap-4 sm:grid-cols-2">

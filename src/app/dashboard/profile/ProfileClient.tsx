@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import WorkshopQR from '@/components/workshops/WorkshopQR';
 import { BusinessHoursEditor } from './BusinessHoursEditor';
 import { ProfileAvatarUploader } from '@/components/profile/ProfileAvatarUploader';
+import { WorkshopImageUploader } from '@/components/workshops/WorkshopImageUploader';
 import type { BusinessHours } from '@/lib/business-hours';
 
 interface ProfileData {
@@ -27,6 +28,7 @@ interface ProfileData {
   ownerPhone: string;
   email: string;
   avatarUrl?: string | null;
+  workshopImageUrl?: string | null;
   userRole?: string;
   workshopMapsLink?: string;
   workshopSlug: string;
@@ -206,6 +208,10 @@ export default function ProfileClient({ initialData }: { initialData: ProfileDat
           <h2 className="mb-4 text-sm font-semibold">Mi foto de perfil</h2>
           <ProfileAvatarUploader initialUrl={data.avatarUrl} name={data.ownerName} />
         </section>
+        {['owner', 'admin'].includes(data.userRole || '') && <section className="mb-6 rounded-2xl border border-border/60 bg-card p-6">
+          <h2 className="mb-4 text-sm font-semibold">Imagen pública del taller</h2>
+          <WorkshopImageUploader initialUrl={data.workshopImageUrl} name={data.workshopName} />
+        </section>}
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-6">
 

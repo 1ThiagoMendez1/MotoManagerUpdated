@@ -5,6 +5,7 @@ import { Search, MapPin, X, Loader2, Navigation, Phone, Wrench, Clock, Car } fro
 import { PublicWorkshop, getPublicWorkshops } from '@/actions/public-workshops';
 import Link from 'next/link';
 import { getWhatsAppLink } from '@/lib/utils';
+import { WorkshopImage } from '@/components/workshops/WorkshopImage';
 import { Map, MapMarker, MarkerContent, MarkerTooltip, MapControls, MapRoute, MapPopup } from '@/components/ui/mapcn-map-route';
 
 interface WorkshopSearchModalProps {
@@ -319,9 +320,7 @@ export function WorkshopSearchModal({ isOpen, onClose }: WorkshopSearchModalProp
                             </div>
                           )}
                         </div>
-                        <div className={`p-2 rounded-lg ${style.bg}`}>
-                          <Wrench className={`w-5 h-5 ${style.accent}`} />
-                        </div>
+                        <WorkshopImage src={workshop.image_url} name={workshop.name} className="ml-3 h-16 w-16 shrink-0 rounded-xl" />
                       </div>
 
                       <div className="mt-auto pt-4 flex gap-2">

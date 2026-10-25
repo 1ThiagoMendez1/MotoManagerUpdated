@@ -4,6 +4,8 @@ import { publicStorefrontFromRow } from '@/lib/workshops/enrollment';
 import { createAdminClient } from '@/lib/supabase/admin';
 import Link from 'next/link';
 import EnrollmentForm from './EnrollmentForm';
+import { WorkshopImage } from '@/components/workshops/WorkshopImage';
+import { publicWorkshopImageUrl } from '@/lib/workshops/public-image';
 import { ArrowRight, CheckCircle2, MapPin, ShieldCheck, Wrench, Star, ThumbsUp } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +49,8 @@ export default async function WorkshopStorefront({ params, searchParams }: {
     <main className="mx-auto max-w-xl px-5 py-12 sm:py-20">
       <div className="mb-8 flex items-center gap-2 text-sm font-semibold tracking-widest text-primary"><Wrench className="h-5 w-5" /> MI TALLER · MOTOMANAGER</div>
       <section className="overflow-hidden rounded-3xl border bg-card shadow-xl">
+        <WorkshopImage name={data.name} className="h-48 w-full sm:h-56"
+          src={publicWorkshopImageUrl(organization?.settings, data.id, process.env.NEXT_PUBLIC_SUPABASE_URL!)} />
         <div className="border-b bg-primary/5 p-7 sm:p-9">
           <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary"><CheckCircle2 className="h-4 w-4" /> Escaneaste el QR correcto</span>
           <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Bienvenido a {data.name}</h1>
