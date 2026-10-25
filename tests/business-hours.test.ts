@@ -77,10 +77,10 @@ test('Meta recibe horarios completos por taller sin saltos de línea ni tabulaci
 });
 
 test('una configuración vieja nunca selecciona la plantilla Meta con horas fijas', () => {
-  assert.equal(readyDynamicTemplateName(undefined), 'estado_reparado');
+  assert.equal(readyDynamicTemplateName(undefined), 'actualizacion_estado_reparado');
   assert.equal(readyDynamicTemplateName('diagnosticado_reparado'), null);
-  assert.equal(readyDynamicTemplateName('diagnosticado_reparado_horarios'), 'estado_reparado');
-  assert.equal(readyDynamicTemplateName('estado_reparado'), 'estado_reparado');
+  assert.equal(readyDynamicTemplateName('diagnosticado_reparado_horarios'), 'actualizacion_estado_reparado');
+  assert.equal(readyDynamicTemplateName('estado_reparado'), 'actualizacion_estado_reparado');
   assert.equal(readyDynamicTemplateName('bad template'), null);
   assert.equal(readyDynamicTemplateName(''), null);
 });
@@ -102,11 +102,11 @@ test('avisa moto lista al completar una reparación desde cualquiera de las etap
   assert.equal(shouldSendReadyNotice(null, 'completed'), false);
 });
 
-test('Meta estado_reparado matches real approved layout: es_CO, no header, 8 body fields', () => {
+test('Meta actualizacion_estado_reparado matches real approved layout: es_CO, no header, 8 body fields', () => {
   const data = notice(base());
   const payload = buildReadyMetaTemplate(data);
   assert.ok(payload);
-  assert.equal(payload.name, 'estado_reparado');
+  assert.equal(payload.name, 'actualizacion_estado_reparado');
   assert.deepEqual(payload.language, { code: 'es_CO' });
   assert.equal(payload.components.length, 1);
   assert.equal(payload.components[0].type, 'body');
@@ -115,6 +115,6 @@ test('Meta estado_reparado matches real approved layout: es_CO, no header, 8 bod
     ['Santiago', 'FrankorMotos', 'General Moto', 'JUH12K', '83', 'Calle 8']);
   assert.match(payload.components[0].parameters[6].text, /Lunes a viernes/);
   assert.equal(payload.components[0].parameters[7].text, 'FrankorMotos');
-  assert.equal(buildReadyMetaTemplate(data, 'diagnosticado_reparado_horarios')?.name, 'estado_reparado');
+  assert.equal(buildReadyMetaTemplate(data, 'diagnosticado_reparado_horarios')?.name, 'actualizacion_estado_reparado');
   assert.equal(buildReadyMetaTemplate(data, 'diagnosticado_reparado'), null);
 });
