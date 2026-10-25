@@ -5,12 +5,12 @@ import { formatBusinessHours } from './business-hours';
  * schedule. Never select it, including through an outdated environment value.
  * A provider-specific name is permitted only if it is syntactically valid.
  */
-export const READY_META_TEMPLATE_NAME = 'estado_reparado';
+export const READY_META_TEMPLATE_NAME = 'actualizacion_estado_reparado';
 
 export function readyDynamicTemplateName(configured: string | undefined): string | null {
   const rawName = configured === undefined ? READY_META_TEMPLATE_NAME : configured.trim();
   // Redirect the old deployment override to the currently approved layout.
-  const name = rawName === 'diagnosticado_reparado_horarios' ? READY_META_TEMPLATE_NAME : rawName;
+  const name = ['diagnosticado_reparado_horarios', 'estado_reparado'].includes(rawName) ? READY_META_TEMPLATE_NAME : rawName;
   if (!/^[a-z][a-z0-9_]{0,511}$/.test(name) ||
       name === 'diagnosticado_reparado') return null;
   return name;
@@ -57,7 +57,7 @@ export function composeReadyNotice(data: ReadyNotice): string {
 }
 
 /**
- * Parámetros EXCLUSIVOS de la plantilla Meta estado_reparado:
+ * Parámetros EXCLUSIVOS de la plantilla Meta actualizacion_estado_reparado:
  * {{1}} nombre, {{2}} taller, {{3}} moto, {{4}} placa,
  * {{5}} orden, {{6}} dirección, {{7}} horario completo, {{8}} taller.
  * La plantilla antigua NO es compatible: contiene horarios literales.
@@ -82,7 +82,7 @@ export function readyNoticeTemplateParameters(data: ReadyNotice): string[] {
   ].map(safeMetaParameter);
 }
 
-/** Exact layout shown in Meta's Spanish (Colombia) "estado_reparado" editor:
+/** Exact layout shown in Meta's Spanish (Colombia) "actualizacion_estado_reparado" editor:
  * no HEADER, eight BODY values. The footer and URL CTA are static in Meta.
  */
 export function buildReadyMetaTemplate(data: ReadyNotice, configuredName?: string) {
