@@ -1,8 +1,57 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { enrollmentSchema } from '@/lib/workshops/enrollment';
+import { enrollmentSchema, publicStorefrontFromRow } from '@/lib/workshops/enrollment';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { workshopEmailSchema, workshopAuthFailure, workshopAuthResponseFailure, workshopCallbackUrl } from '@/lib/workshops/email-auth';
+
+export async function requestWorkshopEmail(input: { slug: string; email: string; mode: 'new' | 'existing' }): Promise<{
+  success?: boolean; error?: string; retryAfterSeconds?: number;
+}> {
+  const parsed = workshopEmailSchema.safeParse(input);
+  if (!parsed.success) return { error: 'Revisa el correo electrónico y el taller.' };
+  const { slug, email, mode } = parsed.data;
+  // Next validates the Server Action's Origin against Host/X-Forwarded-Host.
+  // Keep PKCE cookies and the callback on the browser's public origin behind Dokploy.
+  const requestHeaders = await headers();
+  const callback = workshopCallbackUrl(requestHeaders.get('origin') || process.env.NEXT_PUBLIC_APP_URL || null, slug);
+  if (!callback) return { error: 'No se pudo preparar el enlace de acceso. Recarga la página e intenta de nuevo.' };
+  try {
+    const admin = createAdminClient();
+    const { data, error: lookupError } = await admin.from('organizations')
+      .select('id, name, slug, phone, status, settings').eq('slug', slug).maybeSingle();
+    if (lookupError) {
+      console.error('[workshop-email] Workshop lookup failed', { code: lookupError.code });
+      return { error: 'No se pudo consultar el taller. Intenta de nuevo en unos minutos.' };
+    }
+    if (!publicStorefrontFromRow(data)?.enrollmentEnabled) return { error: 'Este taller no está recibiendo registros en este momento.' };
+    let deliveryFailure: ReturnType<typeof workshopAuthResponseFailure> | undefined;
+    const supabase = await createClient(async (input, init) => {
+      const response = await fetch(input, init);
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (!response.ok && new URL(url).pathname.endsWith('/auth/v1/otp')) {
+        try { deliveryFailure = workshopAuthResponseFailure(response.status, await response.clone().json()); }
+        catch { /* A gateway may return non-JSON; retain the SDK's transport failure. */ }
+      }
+      return response;
+    });
+    const { error } = await supabase.auth.signInWithOtp({
+      email, options: { emailRedirectTo: callback, shouldCreateUser: mode === 'new' },
+    });
+    if (error) {
+      // Never log the address, passwords, tokens or full SMTP error.
+      const failure = deliveryFailure || error;
+      console.error('[workshop-email] Delivery failed', { code: failure.code || 'unknown', status: failure.status });
+      return workshopAuthFailure(failure);
+    }
+    return { success: true, retryAfterSeconds: 60 };
+  } catch {
+    console.error('[workshop-email] Auth service unavailable');
+    return { error: 'El servicio de acceso no está disponible. Intenta de nuevo en unos minutos.' };
+  }
+}
 
 export async function enrollCustomer(formData: FormData) {
   const parsed = enrollmentSchema.safeParse(Object.fromEntries(formData));

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { Database } from './types'
 import { cache } from 'react'
 
-export const createClient = cache(async () => {
+export const createClient = cache(async (fetchOverride?: typeof fetch) => {
   const cookieStore = await cookies()
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -16,6 +16,7 @@ export const createClient = cache(async () => {
     supabaseUrl,
     supabaseAnonKey,
     {
+      global: fetchOverride ? { fetch: fetchOverride } : undefined,
       cookies: {
         getAll() {
           return cookieStore.getAll()

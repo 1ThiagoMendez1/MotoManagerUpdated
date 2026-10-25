@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'
 import { parseBusinessHours } from '@/lib/business-hours';
 import { getOwnAvatarUrl } from '@/app/clientes/reputation-actions';
+import { publicWorkshopImageUrl } from '@/lib/workshops/public-image';
 
 /**
  * Obtiene los datos actuales del perfil del taller y del usuario dueño.
@@ -46,6 +47,7 @@ export async function getProfileData() {
     ownerPhone: profile?.phone || '',
     email: user.email || '',
     avatarUrl: await getOwnAvatarUrl(),
+    workshopImageUrl: publicWorkshopImageUrl(settings, user.workshopId!, process.env.NEXT_PUBLIC_SUPABASE_URL!),
     userRole: user.role,
     workshopSlug: workshop?.slug || '',
     enrollmentEnabled: settings.customer_enrollment_enabled === true,

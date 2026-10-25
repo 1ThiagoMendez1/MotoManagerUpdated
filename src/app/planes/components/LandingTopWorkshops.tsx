@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getWhatsAppLink } from '@/lib/utils';
 import { getPublicWorkshops, PublicWorkshop } from '@/actions/public-workshops';
 import { WorkshopSearchModal } from './WorkshopSearchModal';
+import { WorkshopImage } from '@/components/workshops/WorkshopImage';
 
 function getWorkshopVisuals(id: string) {
   const visuals = [
@@ -97,6 +98,7 @@ export function LandingTopWorkshops() {
               >
                 {/* Header/Banner area */}
                 <div className="h-48 relative overflow-hidden bg-muted dark:bg-[#090b11]">
+                  <WorkshopImage src={workshop.image_url} name={workshop.name} className="absolute inset-0 h-full w-full" />
                   <div className={`absolute inset-0 bg-gradient-to-br ${visuals.gradient} opacity-60 mix-blend-color`}></div>
                   <div className="absolute inset-0 bg-gradient-to-t from-background dark:from-[#090b11] via-transparent to-transparent opacity-80"></div>
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay"></div>
