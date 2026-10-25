@@ -42,7 +42,7 @@ cliente ni de un nombre fijo. Conserva la cuota de mensajes del taller.
 Si Meta rechaza el envío, la orden permanece guardada y se informa al usuario
 sin intentar mandar duplicados ante fallos de red inciertos.
 
-«Reparado» mantiene su plantilla separada estado_reparado del PR #6,
+«Reparado» mantiene su plantilla separada actualizacion_estado_reparado del PR #6,
 con es_CO y ocho variables en el cuerpo, y horarios de cada taller.
 
 ## Seguridad y publicación

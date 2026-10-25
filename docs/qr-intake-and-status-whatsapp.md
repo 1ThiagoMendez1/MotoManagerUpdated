@@ -41,7 +41,7 @@ Orden de variables:
 4. Número de orden — `123`
 5. Estado — `Diagnosticando`
 
-La plantilla `diagnosticado_reparado_horarios` (8 parámetros) se utiliza
+La plantilla `actualizacion_estado_reparado` (8 parámetros) se utiliza
 **solamente** cuando una orden pasa a estado `completed` (Reparado).
 El sistema nunca envía un mensaje de reparación para Diagnóstico/En proceso.
 
