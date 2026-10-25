@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { workshopEmailSchema, workshopAuthFailure, workshopAuthResponseFailure, workshopCallbackUrl } from '@/lib/workshops/email-auth';
+import { phoneMatchesAccount } from '@/lib/workshops/whatsapp-auth';
 
 export async function requestWorkshopEmail(input: { slug: string; email: string; mode: 'new' | 'existing' }): Promise<{
   success?: boolean; error?: string; retryAfterSeconds?: number;
@@ -58,8 +59,9 @@ export async function enrollCustomer(formData: FormData) {
   if (!parsed.success) return { error: 'Revisa tu nombre, apellidos, teléfono y autorización.' };
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user?.email_confirmed_at) return { error: 'Verifica tu correo para continuar.' };
+  if (error || !user?.email_confirmed_at) return { error: 'Verifica tu cuenta para continuar.' };
   const { slug, firstName, lastName, phone, plate, brand, model } = parsed.data;
+  if (!phoneMatchesAccount(user.email, phone)) return { error: 'Utiliza el mismo celular que verificaste por WhatsApp.' };
   const result = await supabase.rpc('join_workshop_as_customer', {
     p_slug: slug, p_first_name: firstName, p_last_name: lastName, p_phone: phone, p_consent: true,
   });
@@ -93,7 +95,7 @@ export async function requestAnotherMotorcycle(formData: FormData) {
   }
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user?.email_confirmed_at) return { error: 'Verifica tu correo primero.' };
+  if (authError || !user?.email_confirmed_at) return { error: 'Verifica tu cuenta primero.' };
   const { error } = await supabase.rpc('submit_customer_intake', {
     p_slug: slug, p_plate: plate, p_brand: brand || null, p_model: model || null,
   });
