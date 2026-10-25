@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { getOwnAvatarUrl } from './reputation-actions';
 
 /** Solo clientes con correo confirmado; una placa o un ID nunca prueba titularidad. */
 async function getVerifiedCustomerLinks() {
@@ -18,6 +19,12 @@ async function getVerifiedCustomerLinks() {
   return { userId: user.id, links, admin };
 }
 
+
+async function adminReviewLookup(admin: any, userId: string, orderIds: string[]) {
+  return admin.from('customer_service_reviews')
+    .select('work_order_id,rating,recommended,comment,publish_comment')
+    .eq('reviewer_user_id', userId).in('work_order_id', orderIds).limit(100);
+}
 
 /**
  * Fetches all customer data by license plate: motorcycle, customer info,
@@ -55,7 +62,8 @@ export async function getCustomerPortalData(licensePlate: string) {
         phone
       ),
       organizations (
-        name
+        name,
+        slug
       )
     `)
     .in('customer_id', customerIds)
@@ -105,6 +113,12 @@ export async function getCustomerPortalData(licensePlate: string) {
     .eq('organization_id', (motorcycle as any).organization_id)
     .order('created_at', { ascending: false });
 
+  const ids = (workOrders || []).map(item => item.id);
+  const { data: reviews } = ids.length
+    ? await adminReviewLookup(supabase, verified.userId, ids)
+    : { data: [] as any[] };
+  const reviewed = new Map<string, any>((reviews || []).map((review: any) => [review.work_order_id, review]));
+
   // Fetch appointments for this motorcycle
   const { data: appointments } = await supabase
     .from('appointments')
@@ -125,6 +139,8 @@ export async function getCustomerPortalData(licensePlate: string) {
     success: true,
     data: {
       workshopName: (motorcycle as any).organizations?.name || 'Portal del Cliente',
+      workshopSlug: (motorcycle as any).organizations?.slug || '',
+      avatarUrl: await getOwnAvatarUrl(),
       customer: {
         id: customer.id,
         name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
@@ -151,6 +167,12 @@ export async function getCustomerPortalData(licensePlate: string) {
         mechanicName: wo.mechanic
           ? `${(wo.mechanic as any).first_name || ''} ${(wo.mechanic as any).last_name || ''}`.trim()
           : null,
+        review: reviewed.has(wo.id) ? {
+          rating: reviewed.get(wo.id).rating,
+          recommended: reviewed.get(wo.id).recommended,
+          comment: reviewed.get(wo.id).comment || '',
+          publishComment: reviewed.get(wo.id).publish_comment === true,
+        } : null,
       })),
       appointments: (appointments || []).map((apt: any) => ({
         id: apt.id,
@@ -261,6 +283,7 @@ export async function cancelCustomerAppointment(appointmentId: string) {
 
 export type CustomerPortalOverview = {
   verified: boolean;
+  avatarUrl?: string | null;
   workshops: Array<{ id: string; name: string }>;
   motorcycles: Array<{ id: string; brand: string; model: string; licensePlate: string; workshopName: string }>;
 };
@@ -284,7 +307,7 @@ export async function getCustomerPortalOverview(): Promise<CustomerPortalOvervie
     console.error('[customer-overview] Failed to load account associations');
     return { ...empty, verified: true };
   }
-  if (!links?.length) return { ...empty, verified: true };
+  if (!links?.length) return { ...empty, verified: true, avatarUrl: await getOwnAvatarUrl() };
 
   const organizationIds = [...new Set(links.map(link => link.organization_id))];
   const customerIds = [...new Set(links.map(link => link.customer_id))];
@@ -306,6 +329,7 @@ export async function getCustomerPortalOverview(): Promise<CustomerPortalOvervie
     workshopNames.has(moto.organization_id));
   return {
     verified: true,
+    avatarUrl: await getOwnAvatarUrl(),
     workshops: (organizations || []).map(org => ({ id: org.id, name: org.name })),
     motorcycles: accessible.map(moto => ({
       id: moto.id, brand: moto.brand || '', model: moto.model || '',

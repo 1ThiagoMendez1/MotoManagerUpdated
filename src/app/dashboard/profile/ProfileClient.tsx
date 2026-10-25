@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import WorkshopQR from '@/components/workshops/WorkshopQR';
 import { BusinessHoursEditor } from './BusinessHoursEditor';
+import { ProfileAvatarUploader } from '@/components/profile/ProfileAvatarUploader';
 import type { BusinessHours } from '@/lib/business-hours';
 
 interface ProfileData {
@@ -25,6 +26,7 @@ interface ProfileData {
   ownerName: string;
   ownerPhone: string;
   email: string;
+  avatarUrl?: string | null;
   userRole?: string;
   workshopMapsLink?: string;
   workshopSlug: string;
@@ -195,6 +197,15 @@ export default function ProfileClient({ initialData }: { initialData: ProfileDat
           </div>
         </motion.div>
 
+        {data.userRole === 'owner' && <Link href="/dashboard/reviews"
+          className="mb-6 flex items-center justify-between rounded-2xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10">
+          <span>⭐ Opiniones de clientes y reputación del taller</span>
+          <span>Ver resultados →</span>
+        </Link>}
+        <section className="mb-6 rounded-2xl border border-border/60 bg-card p-6">
+          <h2 className="mb-4 text-sm font-semibold">Mi foto de perfil</h2>
+          <ProfileAvatarUploader initialUrl={data.avatarUrl} name={data.ownerName} />
+        </section>
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-6">
 

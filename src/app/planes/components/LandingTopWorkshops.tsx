@@ -7,42 +7,6 @@ import { getWhatsAppLink } from '@/lib/utils';
 import { getPublicWorkshops, PublicWorkshop } from '@/actions/public-workshops';
 import { WorkshopSearchModal } from './WorkshopSearchModal';
 
-const fallbackWorkshops = [
-  {
-    id: 'mock-1',
-    name: 'MotoCenter Elite',
-    location: 'Bogotá',
-    address: 'Av. Caracas #45-20, Chapinero',
-    phone: '+57 300 123 4567',
-    rating: 4.9,
-    reviews: 128,
-    specialty: 'Alto Cilindraje',
-    features: ['Diagnóstico computarizado', 'Pintura horneable', 'Banco de pruebas'],
-  },
-  {
-    id: 'mock-2',
-    name: 'SpeedShop Med',
-    location: 'Medellín',
-    address: 'Cra. 43A #14-104, Poblado',
-    phone: '+57 310 987 6543',
-    rating: 4.8,
-    reviews: 95,
-    specialty: 'Racing & Modificaciones',
-    features: ['Reprogramación Ecu', 'Suspensión racing', 'Frenos de alto rendimiento'],
-  },
-  {
-    id: 'mock-3',
-    name: 'Taller Multimarca Pro',
-    location: 'Cali',
-    address: 'Calle 5 #38-25, San Fernando',
-    phone: '+57 315 456 7890',
-    rating: 4.7,
-    reviews: 210,
-    specialty: 'Servicio Integral',
-    features: ['Mantenimiento preventivo', 'Electricidad', 'Venta de repuestos'],
-  },
-];
-
 function getWorkshopVisuals(id: string) {
   const visuals = [
     {
@@ -79,35 +43,18 @@ function getWorkshopVisuals(id: string) {
 }
 
 export function LandingTopWorkshops() {
-  const [workshops, setWorkshops] = useState<any[]>([]);
+  const [workshops, setWorkshops] = useState<PublicWorkshop[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     async function loadWorkshops() {
       const realWorkshops = await getPublicWorkshops('');
-      if (realWorkshops.length > 0) {
-        // Map to format
-        const formatted = realWorkshops.slice(0, 3).map(w => ({
-          id: w.id,
-          name: w.name,
-          location: w.city || 'Ubicación no especificada',
-          address: w.address || '',
-          phone: w.phone || '',
-          rating: 5.0,
-          reviews: Math.floor(Math.random() * 50) + 10,
-          specialty: 'Servicio Especializado',
-          features: ['Diagnóstico experto', 'Atención garantizada', 'Mantenimiento'],
-          maps_link: w.maps_link
-        }));
-        // Si hay menos de 3 reales, rellenamos con fallbacks para que se vea bien
-        const missing = 3 - formatted.length;
-        if (missing > 0) {
-          formatted.push(...(fallbackWorkshops as any[]).slice(0, missing));
-        }
-        setWorkshops(formatted);
-      } else {
-        setWorkshops(fallbackWorkshops);
-      }
+      const ranked = [...realWorkshops].sort((a,b) =>
+        (Number(b.review_count || 0) > 0 ? 1 : 0) - (Number(a.review_count || 0) > 0 ? 1 : 0) ||
+        Number(b.average_rating || 0) - Number(a.average_rating || 0) ||
+        Number(b.review_count || 0) - Number(a.review_count || 0)
+      );
+      setWorkshops(ranked.slice(0,3));
     }
     loadWorkshops();
   }, []);
@@ -122,19 +69,27 @@ export function LandingTopWorkshops() {
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/40 border border-border/50 text-sm font-medium backdrop-blur-md shadow-lg">
             <Trophy className="w-5 h-5 text-yellow-500" />
-            <span className="text-foreground">Nuestra Red de Excelencia</span>
+            <span className="text-foreground">Talleres de nuestra comunidad</span>
           </div>
           <h2 className="text-4xl md:text-6xl font-extrabold text-foreground tracking-tight">
-            Descubre los <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-cyan-400 to-blue-500">mejores talleres</span>
+            Descubre <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-cyan-400 to-blue-500">talleres reales</span>
           </h2>
           <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto">
-            Encuentra tu taller ideal. Estos son los centros de servicio mejor calificados que utilizan nuestra tecnología para brindarte una experiencia superior.
+            Conoce talleres que usan MotoManager. Las estrellas y opiniones proceden exclusivamente de clientes con servicios entregados; nunca inventamos valoraciones.
           </p>
         </div>
 
+        {workshops.length === 0 && <p className="rounded-2xl border border-border p-8 text-center text-muted-foreground">
+          Estamos incorporando talleres a nuestra red. Explora el directorio para descubrir nuevas opciones.
+        </p>}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {workshops.map((workshop) => {
             const visuals = getWorkshopVisuals(workshop.id);
+            const location = workshop.city || 'Ubicación no especificada';
+            const address = workshop.address || '';
+            const phone = workshop.phone || '';
+            const specialty = 'Taller en MotoManager';
+            const features = ['Consulta sus servicios', 'Solicita información', 'Conecta con el taller'];
             return (
               <div 
                 key={workshop.id}
@@ -147,9 +102,11 @@ export function LandingTopWorkshops() {
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay"></div>
                   
                   <div className="absolute top-4 right-4 bg-background/80 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/30 flex items-center gap-1.5 shadow-xl">
-                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                    <span className="font-bold text-sm text-foreground">{workshop.rating.toFixed(1)}</span>
-                    <span className="text-muted-foreground text-xs">({workshop.reviews})</span>
+                    {workshop.review_count ? <>
+                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                      <span className="font-bold text-sm text-foreground">{Number(workshop.average_rating).toFixed(1)}</span>
+                      <span className="text-muted-foreground text-xs">({workshop.review_count} opiniones verificadas)</span>
+                    </> : <span className="text-xs text-muted-foreground">Aún sin reseñas verificadas</span>}
                   </div>
 
                   <div className="absolute -bottom-8 left-8 p-4 bg-background dark:bg-[#090b11] rounded-2xl border border-border/60 shadow-2xl group-hover:scale-110 transition-transform duration-500">
@@ -166,8 +123,8 @@ export function LandingTopWorkshops() {
                       <div className="flex items-start gap-2 text-muted-foreground text-sm">
                         <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-foreground/50" />
                         <div>
-                          <span className="block font-medium text-foreground/80">{workshop.location}</span>
-                          <span className="block text-foreground/60">{workshop.address}</span>
+                          <span className="block font-medium text-foreground/80">{location}</span>
+                          <span className="block text-foreground/60">{address}</span>
                         </div>
                       </div>
                       
@@ -180,11 +137,11 @@ export function LandingTopWorkshops() {
 
                   <div className="space-y-4 pt-2 border-t border-border/30">
                     <div className={`inline-block px-3 py-1 rounded-lg bg-background/50 border border-border/50 text-sm font-semibold shadow-inner ${visuals.accent}`}>
-                      {workshop.specialty}
+                      {specialty}
                     </div>
                     
                     <ul className="space-y-2.5">
-                      {workshop.features.map((feature: string, idx: number) => (
+                      {features.map((feature: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-3 text-sm text-muted-foreground">
                           <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${visuals.accent}`} />
                           <span className="font-medium">{feature}</span>
@@ -192,6 +149,14 @@ export function LandingTopWorkshops() {
                       ))}
                     </ul>
                   </div>
+
+                  {workshop.review_count ? <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-3 text-xs text-muted-foreground">
+                    {Math.round((Number(workshop.recommendation_count || 0) / workshop.review_count) * 100)}% de clientes lo recomiendan
+                    {workshop.recent_public_comment &&
+                      <blockquote className="mt-2 line-clamp-3 italic text-foreground/85">
+                        “{workshop.recent_public_comment}” <span className="not-italic text-muted-foreground">— Cliente verificado</span>
+                      </blockquote>}
+                  </div> : null}
 
                   <div className="pt-4 flex gap-3">
                     {workshop.phone ? (
@@ -208,12 +173,14 @@ export function LandingTopWorkshops() {
                       </button>
                     )}
                     
-                    <Link href={workshop.maps_link || `https://maps.google.com/?q=${encodeURIComponent(workshop.address + ', ' + workshop.location)}`} target="_blank" className="flex-1">
+                    {(workshop.maps_link || address) ? <Link href={workshop.maps_link || `https://maps.google.com/?q=${encodeURIComponent(address + ", " + location)}`} target="_blank" className="flex-1">
                       <button className="w-full py-2.5 px-4 rounded-xl bg-card hover:bg-muted text-foreground border border-border transition-colors flex items-center justify-center gap-2 font-semibold text-sm shadow-sm hover:shadow-md">
                         <Navigation className="w-4 h-4" />
                         Ubicación
                       </button>
-                    </Link>
+                    </Link> : <button disabled className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm text-muted-foreground opacity-60">
+                      Ubicación pendiente
+                    </button>}
                   </div>
                 </div>
               </div>
