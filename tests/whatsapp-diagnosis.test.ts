@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDiagnosisMetaTemplate, DIAGNOSIS_TEMPLATE_NAME } from '../src/lib/whatsapp-diagnosis';
-import { WORK_ORDER_STATUS_OPTIONS, isChangeableOrderStatus, NEW_WORK_ORDER_DB_STATUS } from '../src/lib/work-order-status';
+import { WORK_ORDER_STATUS_OPTIONS, isChangeableOrderStatus } from '../src/lib/work-order-status';
 
 test('solo cuatro estados visibles, excluye estados obsoletos y entradas forzadas', () => {
   assert.deepEqual(WORK_ORDER_STATUS_OPTIONS, [
@@ -65,6 +65,7 @@ test('Meta recibe parámetros planos y valores alternativos válidos', () => {
   assert.equal(v[5], 'Consulta la dirección con el taller');
 });
 
-test('las nuevas órdenes comienzan en diagnóstico, no en ingreso a revisión', () => {
-  assert.equal(NEW_WORK_ORDER_DB_STATUS, 'diagnosis');
+test('la nueva orden sigue pendiente hasta que el taller la pase a Diagnosticando', () => {
+  assert.equal(isChangeableOrderStatus('Nueva orden'), false);
+  assert.equal(isChangeableOrderStatus('Diagnosticando'), true);
 });

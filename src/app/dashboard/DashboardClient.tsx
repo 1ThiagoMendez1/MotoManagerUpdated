@@ -470,7 +470,7 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">{Number(stats.activeWorkOrdersCount) || 0}</div>
                 <p className="text-xs text-emerald-500 flex items-center mt-1">
-                  En proceso
+                  En atención
                 </p>
               </CardContent>
             </Card>

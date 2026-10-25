@@ -7,8 +7,9 @@ En el selector de órdenes de trabajo únicamente:
 3. Entregado
 4. Moto entregada por cotización rechazada
 
-Las nuevas órdenes comienzan en Diagnosticando. Ingreso a revisión y En proceso
-ya no se pueden seleccionar, tampoco mediante
+Las órdenes nuevas muestran Nueva orden (estado interno received), para poder
+notificar al cliente cuando el taller comience Diagnosticando.
+Ingreso a revisión y En proceso ya no se pueden seleccionar, tampoco mediante
 un formulario enviado directamente al servidor. Los estados antiguos received
 e in_progress se conservan en PostgreSQL y se pueden seguir leyendo en
 órdenes históricas, evitando borrados de información.

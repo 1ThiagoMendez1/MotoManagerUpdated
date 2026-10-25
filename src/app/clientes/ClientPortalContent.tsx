@@ -135,7 +135,7 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
   const getWorkOrderStatusInfo = (status: string) => {
     switch (status) {
       case 'intake':
-        return { label: 'Ingreso a revisión', color: 'bg-blue-500/15 text-blue-400' }
+        return { label: 'Nueva orden', color: 'bg-blue-500/15 text-blue-400' }
       case 'diagnosis':
         return { label: 'Diagnosticando', color: 'bg-amber-500/15 text-amber-400' }
       case 'repair':

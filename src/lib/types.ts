@@ -69,7 +69,7 @@ export type WorkOrder = {
   reparadoDate?: string;
   entregadoDate?: string;
   completedDate?: string;
-  status: 'Ingreso a revisión' | 'Diagnosticando' | 'Reparado' | 'Entregado' | 'Moto entregada por cotización rechazada';
+  status: 'Nueva orden' | 'Ingreso a revisión' | 'Diagnosticando' | 'Reparado' | 'Entregado' | 'Moto entregada por cotización rechazada';
   quoteStatus?: 'Pendiente' | 'Aprobada' | 'Rechazada';
   quote_status?: 'pending' | 'approved' | 'rejected' | null;
   quote_responded_at?: string | null;
