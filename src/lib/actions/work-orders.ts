@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { shouldSendReadyNotice } from '@/lib/whatsapp-ready';
+import { isChangeableOrderStatus } from '@/lib/work-order-status';
 import { createNotification } from '@/lib/actions/notifications';
 import { formatBusinessHours } from '@/lib/business-hours';
 
@@ -30,7 +31,7 @@ function mapStatusToUi(dbStatus: string) {
     if (dbStatus === 'completed') return 'Reparado';
     if (dbStatus === 'delivered') return 'Entregado';
     if (dbStatus === 'delivered_quote_rejected') return 'Moto entregada por cotización rechazada';
-    if (dbStatus === 'received') return 'Ingreso a revisión';
+    if (dbStatus === 'received') return 'Nueva orden';
     return dbStatus;
 }
 
@@ -227,7 +228,10 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
   );
 
     const id = formData.get('id') as string;
-    const uiStatus = formData.get('status') as string;
+    const uiStatus = formData.get('status');
+    if (!id || !isChangeableOrderStatus(uiStatus)) {
+        return { message: 'Selecciona un estado válido. Los estados antiguos ya no están disponibles.' };
+    }
     const status = mapStatusToDb(uiStatus);
 
     const updateData: any = { status };
@@ -247,6 +251,10 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         .eq('organization_id', user.workshopId)
         .single();
     const oldStatus = oldWo?.status;
+    if (!oldStatus) return { message: 'La orden no existe en este taller.' };
+    if (oldStatus === status) {
+        return { message: 'La orden ya tiene ese estado. No se enviará un mensaje repetido.' };
+    }
 
     const { error, data: _updatedWo } = await supabase
         .from('work_orders')
@@ -382,6 +390,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                                 status: uiStatus as any,
                                 customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
                                 motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
+                                plate: mc?.license_plate || '',
                                 technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
                                 items: usedPartsItems,
                                 workshopName: workshop?.name,

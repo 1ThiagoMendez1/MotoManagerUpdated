@@ -274,7 +274,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
-            wo.status === 'received' ? 'Ingreso a revisión' :
+            wo.status === 'received' ? 'Nueva orden' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
             'Diagnosticando',
@@ -374,7 +374,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
-            wo.status === 'received' ? 'Ingreso a revisión' :
+            wo.status === 'received' ? 'Nueva orden' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
             'Diagnosticando',
@@ -482,7 +482,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
         solutionDescription: woData.technical_diagnosis,
         status: woData.status === 'delivered' ? 'Entregado' : 
                 woData.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
-                woData.status === 'received' ? 'Ingreso a revisión' :
+                woData.status === 'received' ? 'Nueva orden' :
                 woData.status === 'diagnosis' ? 'Diagnosticando' :
                 woData.status === 'completed' ? 'Reparado' :
                 'Diagnosticando',
