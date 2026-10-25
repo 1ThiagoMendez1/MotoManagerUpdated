@@ -15,6 +15,14 @@ export function publicWorkshopImageUrl(settings: unknown, organizationId: string
   return `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${WORKSHOP_IMAGE_BUCKET}/${path}`;
 }
 
+/** Never accept an untrusted path outside the authenticated user's private avatar folder. */
+export function ownProfileAvatarPath(rawPath: unknown, userId: string): string | null {
+  if (typeof rawPath !== 'string' || !/^[a-f0-9-]{36}$/i.test(userId)) return null;
+  const prefix = userId + '/';
+  if (!rawPath.startsWith(prefix)) return null;
+  return /^[a-f0-9-]{36}\.(jpg|png|webp)$/i.test(rawPath.slice(prefix.length)) ? rawPath : null;
+}
+
 export function workshopImageKind(bytes: Uint8Array, mime: string) {
   if (mime === 'image/jpeg' && bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255)
     return { ext: 'jpg', mime };

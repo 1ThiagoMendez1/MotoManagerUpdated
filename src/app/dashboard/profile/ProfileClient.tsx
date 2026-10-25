@@ -206,11 +206,11 @@ export default function ProfileClient({ initialData }: { initialData: ProfileDat
         </Link>}
         <section className="mb-6 rounded-2xl border border-border/60 bg-card p-6">
           <h2 className="mb-4 text-sm font-semibold">Mi foto de perfil</h2>
-          <ProfileAvatarUploader initialUrl={data.avatarUrl} name={data.ownerName} />
+          <ProfileAvatarUploader initialUrl={data.avatarUrl} name={data.ownerName} onUploaded={url => setData(previous => ({ ...previous, avatarUrl: url }))} />
         </section>
         {['owner', 'admin'].includes(data.userRole || '') && <section className="mb-6 rounded-2xl border border-border/60 bg-card p-6">
           <h2 className="mb-4 text-sm font-semibold">Imagen pública del taller</h2>
-          <WorkshopImageUploader initialUrl={data.workshopImageUrl} name={data.workshopName} />
+          <WorkshopImageUploader initialUrl={data.workshopImageUrl} name={data.workshopName} hasPrivateAvatar={Boolean(data.avatarUrl)} />
         </section>}
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-6">
