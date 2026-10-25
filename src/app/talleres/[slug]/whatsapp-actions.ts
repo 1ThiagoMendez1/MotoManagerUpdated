@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateMobileCode, generateTemporaryPassword, hashMobileCode } from '@/lib/mobile-otp';
 import { publicStorefrontFromRow } from '@/lib/workshops/enrollment';
+import { deriveWorkshopQrPepper } from '@/lib/workshops/qr-secret';
 import {
   qrCodeRequestSchema, qrCodeVerificationSchema, phoneAccountEmail, sendQrCodeViaMeta,
 } from '@/lib/workshops/whatsapp-auth';
@@ -17,9 +18,12 @@ async function activeWorkshop(slug: string) {
   return publicStorefrontFromRow(data)?.enrollmentEnabled === true;
 }
 
+function qrSecret() {
+  return deriveWorkshopQrPepper(process.env.MOBILE_OTP_PEPPER, process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function configured() {
-  return Boolean(process.env.MOBILE_OTP_PEPPER?.length && process.env.MOBILE_OTP_PEPPER.length >= 32 &&
-    process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+  return Boolean(qrSecret() && process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
 }
 
 export async function requestWorkshopWhatsApp(input: { slug: string; phone: string }): Promise<{
@@ -34,7 +38,7 @@ export async function requestWorkshopWhatsApp(input: { slug: string; phone: stri
     const code = generateMobileCode();
     const admin = createAdminClient();
     const { data: issued, error } = await admin.rpc('issue_workshop_qr_otp', {
-      p_phone: phone, p_slug: slug, p_code_hash: hashMobileCode(phone, code),
+      p_phone: phone, p_slug: slug, p_code_hash: hashMobileCode(phone, code, qrSecret()!),
     });
     if (error) {
       console.error('[qr-whatsapp] OTP reservation unavailable', { code: error.code });
@@ -61,7 +65,7 @@ export async function verifyWorkshopWhatsApp(input: { slug: string; phone: strin
     if (!await activeWorkshop(slug)) return { error: 'El taller no está recibiendo registros.' };
     const admin = createAdminClient();
     const { data: valid, error: verifyError } = await admin.rpc('consume_workshop_qr_otp', {
-      p_phone: phone, p_slug: slug, p_code_hash: hashMobileCode(phone, code),
+      p_phone: phone, p_slug: slug, p_code_hash: hashMobileCode(phone, code, qrSecret()!),
     });
     if (verifyError) return { error: 'No se pudo verificar el código. Intenta de nuevo.' };
     if (!valid) return { error: 'Código incorrecto, vencido o ya utilizado.' };

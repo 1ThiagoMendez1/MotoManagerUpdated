@@ -45,8 +45,12 @@ cambió en Meta, debes alinear los 8 valores antes de enviar.
 
 - `WHATSAPP_API_TOKEN`: token de Meta con permisos para enviar mensajes.
 - `WHATSAPP_PHONE_NUMBER_ID`: ID del número emisor en la misma WABA.
-- `MOBILE_OTP_PEPPER`: secreto aleatorio de al menos 32 caracteres, solo
-  del backend (puede ser el ya usado por el OTP móvil); no agregarlo a GitHub.
+- `MOBILE_OTP_PEPPER`: opcional pero recomendado para separar los OTP del QR.
+  Si no está definido, el backend deriva un secreto mediante HMAC-SHA256 a partir de
+  `SUPABASE_SERVICE_ROLE_KEY` con etiqueta exclusiva del QR. No se imprime, envía
+  al navegador ni guarda en GitHub. Cambiar la clave de servicio invalida los
+  códigos de QR pendientes (expiran en cinco minutos). Un valor configurado
+  de menos de 32 caracteres no se acepta.
 - Opcional: `WHATSAPP_GRAPH_API_VERSION`, por defecto `v23.0`.
 - Supabase: clave service-role configurada y sesiones SSR habilitadas.
 - Aplicar PRIMERO la migración

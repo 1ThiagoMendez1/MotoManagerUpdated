@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { deriveWorkshopQrPepper } from '../src/lib/workshops/qr-secret';
 import assert from 'node:assert/strict';
 import {
   QR_WHATSAPP_TEMPLATE, QR_WHATSAPP_LANGUAGE, buildQrCodeTemplate,
@@ -33,4 +34,15 @@ test('internally verified QR accounts cannot register under a different phone', 
   assert.equal(phoneMatchesAccount('573001234567@clientes.motomanager.com.co', '300 123 4568'), false);
   assert.equal(phoneMatchesAccount('ana@personal.test', '+57 300 123 4568'), true);
   assert.throws(() => phoneAccountEmail('invalid'));
+});
+
+test('QR OTP key is domain-separated, deterministic, and server-only', () => {
+  const serverKey = 'very-long-private-service-role-value-1234567890-abcdef-0123456789abcdef';
+  const derived = deriveWorkshopQrPepper(undefined, serverKey);
+  assert.match(derived!, /^[0-9a-f]{64}$/);
+  assert.equal(derived, deriveWorkshopQrPepper(undefined, serverKey));
+  assert.notEqual(derived, deriveWorkshopQrPepper(undefined, serverKey + 'different'));
+  assert.equal(deriveWorkshopQrPepper('A'.repeat(48), serverKey), 'A'.repeat(48));
+  assert.equal(deriveWorkshopQrPepper('too-short', serverKey), null);
+  assert.equal(deriveWorkshopQrPepper(undefined, 'too-short'), null);
 });
