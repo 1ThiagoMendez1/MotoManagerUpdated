@@ -25,7 +25,7 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
   const [complete, setComplete] = useState(false);
   const [intakeNotice, setIntakeNotice] = useState('');
   const [addMoto, setAddMoto] = useState(false);
-  const [error, setError] = useState(authError ? 'El enlace expiró o ya se utilizó. Solicita uno nuevo y ábrelo en este navegador.' : '');
+  const [error, setError] = useState(authError ? 'El enlace anterior ya no está disponible. Accede con WhatsApp o utiliza tu contraseña.' : '');
 
   useEffect(() => {
     if (!retryAt) return;
@@ -179,7 +179,7 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
           </Button>
         </form>)
         : <form onSubmit={signInWithPassword} className="space-y-4">
-          <p className="text-sm text-muted-foreground">Si ya tenías una cuenta con correo y contraseña, puedes seguir utilizándola sin solicitar ningún mensaje.</p>
+          <p className="text-sm text-muted-foreground">Si ya tienes un historial asociado a tu correo, entra con tu contraseña para conservar tus motos y órdenes.</p>
           <label className="block space-y-2 text-sm font-medium">Correo electrónico
             <Input name="email" type="email" autoComplete="email" required maxLength={254} placeholder="tu@correo.com" />
           </label>
