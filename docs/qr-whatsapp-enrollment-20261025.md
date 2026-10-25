@@ -10,9 +10,9 @@ históricos. Los registros de clientes siguen creando una solicitud pendiente pa
 recepción. No se asigna una moto ni se da acceso a una ficha por introducir una placa.
 
 Para un número verificado se usa una cuenta técnica:
-\`57XXXXXXXXXX@clientes.motomanager.com.co\`. No es una dirección de contacto;
+`57XXXXXXXXXX@clientes.motomanager.com.co`. No es una dirección de contacto;
 solo permite compatibilidad con el esquema de Supabase Auth y el RPC actual
-que exige \`email_confirmed_at\`. Solo el servidor puede crearla, después de
+que exige `email_confirmed_at`. Solo el servidor puede crearla, después de
 consumir correctamente el código. El usuario no recibe nunca la contraseña
 temporal. Las cuentas con correo real NO se vinculan automáticamente por un
 teléfono que coincida: deben acceder con su contraseña habitual.
@@ -21,37 +21,37 @@ teléfono que coincida: deben acceder con su contraseña habitual.
 
 1. Ingresa a **WhatsApp Manager → Plantillas de mensajes → Crear plantilla**,
    dentro de la cuenta empresarial (WABA) que contiene el número emisor usado por
-   \`WHATSAPP_PHONE_NUMBER_ID\`.
+   `WHATSAPP_PHONE_NUMBER_ID`.
 2. Elige la categoría **Autenticación** y el modelo de **Código de un solo uso**.
    Para el botón elige **Copiar código** (no autocompletar en una app nativa).
-3. Nombre EXACTO: \`codigo_registro_qr\`.
+3. Nombre EXACTO: `codigo_registro_qr`.
 4. Idioma EXACTO: **Español (Colombia), es_CO**, si está disponible para la WABA.
-   No sustituyas silenciosamente por \`es\` o \`es_ES\`: el código pide \`es_CO\`.
+   No sustituyas silenciosamente por `es` o `es_ES`: el código pide `es_CO`.
 5. Meta genera el texto obligatorio de verificación con **una variable** para el
    código. Habilita la recomendación de seguridad y la caducidad **5 minutos**.
    No uses plantilla de marketing, botones de enlace personalizados ni encabezados.
 6. Envía a revisión; comprueba estado **APPROVED** y el mismo número/WABA antes
-   de activar el flujo. El servidor envía el código en \`body {{1}}\` y en el
+   de activar el flujo. El servidor envía el código en `body {{1}}` y en el
    parámetro del botón **Copiar código**.
 
 La plantilla de aviso del estado reparado, previamente renombrada en Meta,
-mantiene nombre EXACTO \`actualizacion_estado_reparado\`, idioma \`es_CO\`
+mantiene nombre EXACTO `actualizacion_estado_reparado`, idioma `es_CO`
 y **8 parámetros de cuerpo, sin encabezado**. El código antiguo
-\`estado_reparado\` se transforma al nuevo nombre, incluso si llega desde
-\`WHATSAPP_READY_DYNAMIC_TEMPLATE\`. Si el cuerpo u orden de parámetros
+`estado_reparado` se transforma al nuevo nombre, incluso si llega desde
+`WHATSAPP_READY_DYNAMIC_TEMPLATE`. Si el cuerpo u orden de parámetros
 cambió en Meta, debes alinear los 8 valores antes de enviar.
 
 ## Requisitos del servidor
 
-- \`WHATSAPP_API_TOKEN\`: token de Meta con permisos para enviar mensajes.
-- \`WHATSAPP_PHONE_NUMBER_ID\`: ID del número emisor en la misma WABA.
-- \`MOBILE_OTP_PEPPER\`: secreto aleatorio de al menos 32 caracteres, solo
+- `WHATSAPP_API_TOKEN`: token de Meta con permisos para enviar mensajes.
+- `WHATSAPP_PHONE_NUMBER_ID`: ID del número emisor en la misma WABA.
+- `MOBILE_OTP_PEPPER`: secreto aleatorio de al menos 32 caracteres, solo
   del backend (puede ser el ya usado por el OTP móvil); no agregarlo a GitHub.
-- Opcional: \`WHATSAPP_GRAPH_API_VERSION\`, por defecto \`v23.0\`.
+- Opcional: `WHATSAPP_GRAPH_API_VERSION`, por defecto `v23.0`.
 - Supabase: clave service-role configurada y sesiones SSR habilitadas.
 - Aplicar PRIMERO la migración
-  \`supabase/migrations/20261025183000_workshop_qr_whatsapp_otp.sql\`
-  con respaldo. Añade tabla y tres funciones RPC solo para \`service_role\`.
+  `supabase/migrations/20261025183000_workshop_qr_whatsapp_otp.sql`
+  con respaldo. Añade tabla y tres funciones RPC solo para `service_role`.
 - Después desplegar esta rama y verificar que el servicio reconoce la plantilla
   y que el código de Meta se recibe en un **número propio autorizado**.
 
@@ -64,11 +64,11 @@ pero otras funcionalidades heredadas podrían seguir utilizándolo.
 - Cada código vence en cinco minutos, se consume una única vez y admite
   cinco intentos como máximo; reenvío no antes de 60 segundos y como máximo
   cinco solicitudes en 24 horas por teléfono y taller.
-- La tabla de desafíos carece de acceso para \`anon\` y \`authenticated\`;
+- La tabla de desafíos carece de acceso para `anon` y `authenticated`;
   guarda HMAC, jamás el código en claro.
 - El alta nueva solo crea la cuenta después de comprobar el código. Una
   cuenta real de email nunca se reasigna por coincidencia de teléfono.
-- En \`enrollCustomer\` se impide que la cuenta técnica use un número de
+- En `enrollCustomer` se impide que la cuenta técnica use un número de
   contacto diferente del que verificó, y se preservan las reglas del taller.
 - **Antes de producción**: añadir protección antiabuso por IP/ASN en el
   reverse proxy/CDN (rate limiting y desafío antibots) para impedir
@@ -83,7 +83,7 @@ pero otras funcionalidades heredadas podrían seguir utilizándolo.
 
 ## Prueba manual de extremo a extremo (pendiente de un entorno autorizado)
 
-1. Crear/aprobar \`codigo_registro_qr\` y aplicar la migración SQL.
+1. Crear/aprobar `codigo_registro_qr` y aplicar la migración SQL.
 2. Activar QR en un taller de pruebas, pedir código con celular propio,
    validar bloqueo antes de 60 s y caducidad tras 5 min.
 3. Probar cinco códigos incorrectos; no debe crearse ni abrirse una sesión.
