@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { workshopAuthFailure, workshopAuthResponseFailure, workshopCallbackUrl, workshopEmailSchema } from '../src/lib/workshops/email-auth';
-import { publicWorkshopImageUrl, workshopImageKind, workshopImagePath } from '../src/lib/workshops/public-image';
+import { publicWorkshopImageUrl, workshopImageKind, workshopImagePath, ownProfileAvatarPath } from '../src/lib/workshops/public-image';
 
 const org = '20000000-0000-4000-a000-000000000001';
 const other = '20000000-0000-4000-a000-000000000002';
@@ -58,4 +58,15 @@ test('email failures distinguish throttling, SMTP and disabled signups without l
   assert.equal(workshopAuthResponseFailure(500, { code: 'personal-data@example.test' }).code, undefined);
   assert.match(workshopAuthFailure({ code: 'invalid_credentials', status: 400 }, 'password').error, /incorrectos/);
   assert.match(workshopAuthFailure({ code: 'email_not_confirmed', status: 400 }, 'password').error, /verifica tu correo/);
+});
+
+test('private avatar can only be explicitly copied from the signed-in user folder', () => {
+  const own = 'b14f0ec8-0cb1-4a14-b913-6cfb25059c08';
+  const other = 'b14f0ec8-0cb1-4a14-b913-6cfb25059c09';
+  const valid = own + '/3caa5049-1502-45f0-a9ae-0252f53862ce.jpg';
+  assert.equal(ownProfileAvatarPath(valid, own), valid);
+  for (const candidate of [valid.replace(own, other), own + '/../other.jpg',
+      own + '/not-a-uuid.jpg', own + '/file.svg', 'https://site.test/file.jpg', null]) {
+    assert.equal(ownProfileAvatarPath(candidate, own), null);
+  }
 });

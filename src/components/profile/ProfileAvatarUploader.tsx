@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { Camera, Loader2, UserRound } from 'lucide-react';
 import { uploadOwnAvatar } from '@/app/clientes/reputation-actions';
-export function ProfileAvatarUploader({ initialUrl, name }: { initialUrl?: string | null; name?: string }) {
+export function ProfileAvatarUploader({ initialUrl, name, onUploaded }: { initialUrl?: string | null; name?: string; onUploaded?: (url: string) => void }) {
   const [url, setUrl] = useState(initialUrl);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -16,7 +16,7 @@ export function ProfileAvatarUploader({ initialUrl, name }: { initialUrl?: strin
       form.set('avatar', file);
       const res = await uploadOwnAvatar(form);
       setMessage(res.message);
-      if (res.success && res.url) setUrl(res.url);
+      if (res.success && res.url) { setUrl(res.url); onUploaded?.(res.url); }
     } catch { setMessage('No se pudo cargar la imagen.'); }
     finally { setLoading(false); if (fileRef.current) fileRef.current.value = ''; }
   }

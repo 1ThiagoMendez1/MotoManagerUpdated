@@ -112,7 +112,9 @@ export function LandingTopWorkshops() {
                   </div>
 
                   <div className="absolute -bottom-8 left-8 p-4 bg-background dark:bg-[#090b11] rounded-2xl border border-border/60 shadow-2xl group-hover:scale-110 transition-transform duration-500">
-                    <Wrench className={`w-8 h-8 ${visuals.accent}`} />
+                    {workshop.image_url
+                      ? <WorkshopImage src={workshop.image_url} name={workshop.name} className="h-10 w-10 rounded-lg" imageClassName="object-cover" />
+                      : <Wrench className={`w-8 h-8 ${visuals.accent}`} />}
                   </div>
                 </div>
 
