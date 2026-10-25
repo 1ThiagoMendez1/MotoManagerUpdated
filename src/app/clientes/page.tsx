@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Wrench } from 'lucide-react'
 import Link from 'next/link'
+import { ProfileAvatarUploader } from '@/components/profile/ProfileAvatarUploader'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,11 @@ function CustomerOverview({ overview }: { overview: Awaited<ReturnType<typeof ge
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-3 text-blue-400"><Wrench className="h-7 w-7" /><span className="text-xs font-bold uppercase tracking-widest">MotoManager · Mi garaje</span></div>
       <h1 className="text-3xl font-bold">Tus motos. Tus talleres. Todo en un lugar.</h1>
+      {overview.verified && <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+        <h2 className="mb-3 text-lg font-semibold">Mi perfil</h2>
+        <ProfileAvatarUploader initialUrl={overview.avatarUrl} />
+        <p className="mt-3 text-xs text-slate-400">Tu fotografía es privada y no se muestra junto a tus opiniones públicas.</p>
+      </div>}
       {!overview.verified ? <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
         <h2 className="text-xl font-semibold">Accede con tu cuenta verificada</h2>
         <p className="mt-3 text-slate-300">Escanea el QR de tu taller y verifica tu correo para conectar tus motocicletas de forma segura.</p>

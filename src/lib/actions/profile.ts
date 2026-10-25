@@ -3,6 +3,7 @@ import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminC
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'
 import { parseBusinessHours } from '@/lib/business-hours';
+import { getOwnAvatarUrl } from '@/app/clientes/reputation-actions';
 
 /**
  * Obtiene los datos actuales del perfil del taller y del usuario dueño.
@@ -44,6 +45,7 @@ export async function getProfileData() {
     ownerName: profileNameFallback || ownerNameFallback || '',
     ownerPhone: profile?.phone || '',
     email: user.email || '',
+    avatarUrl: await getOwnAvatarUrl(),
     userRole: user.role,
     workshopSlug: workshop?.slug || '',
     enrollmentEnabled: settings.customer_enrollment_enabled === true,

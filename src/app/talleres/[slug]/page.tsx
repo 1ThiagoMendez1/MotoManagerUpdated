@@ -4,7 +4,7 @@ import { publicStorefrontFromRow } from '@/lib/workshops/enrollment';
 import { createAdminClient } from '@/lib/supabase/admin';
 import Link from 'next/link';
 import EnrollmentForm from './EnrollmentForm';
-import { ArrowRight, CheckCircle2, MapPin, ShieldCheck, Wrench } from 'lucide-react';
+import { ArrowRight, CheckCircle2, MapPin, ShieldCheck, Wrench, Star, ThumbsUp } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +25,8 @@ export default async function WorkshopStorefront({ params, searchParams }: {
   if (lookupError) throw new Error('No se pudo cargar el taller. Intenta de nuevo más tarde.');
   const data = publicStorefrontFromRow(organization);
   if (!data) notFound();
+  const { data: reputationRows } = await (admin as any).rpc('get_public_workshop_reputation');
+  const reputation = ((reputationRows || []) as any[]).find(item => item.organization_id === data.id);
 
   const supabase = await createClient();
   const [auth, query] = await Promise.all([supabase.auth.getUser(), searchParams]);
@@ -49,6 +51,19 @@ export default async function WorkshopStorefront({ params, searchParams }: {
           <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary"><CheckCircle2 className="h-4 w-4" /> Escaneaste el QR correcto</span>
           <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Bienvenido a {data.name}</h1>
           {(data.address || data.city) && <p className="mt-4 flex gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4 shrink-0" />{[data.address, data.city].filter(Boolean).join(' · ')}</p>}
+          {reputation?.review_count > 0 && <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm">
+            <p className="flex flex-wrap items-center gap-2 font-semibold">
+              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+              {Number(reputation.average_rating).toFixed(1)} / 5 · {reputation.review_count} opiniones verificadas
+            </p>
+            <p className="mt-2 flex items-center gap-2 text-muted-foreground">
+              <ThumbsUp className="h-4 w-4" />
+              {Math.round(100 * Number(reputation.recommendation_count) / Number(reputation.review_count))}% lo recomienda
+            </p>
+            {reputation.recent_public_comment && <blockquote className="mt-3 border-l-2 border-amber-500/50 pl-3 italic">
+              “{reputation.recent_public_comment}” — Cliente verificado
+            </blockquote>}
+          </div>}
           <p className="mt-5 text-muted-foreground">Regístrate una sola vez, vincula tu cuenta con el taller y accede a tus motos, órdenes y citas desde tu celular.</p>
         </div>
         <div className="p-7 sm:p-9">
