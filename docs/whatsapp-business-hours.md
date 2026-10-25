@@ -20,9 +20,9 @@ la entrega: contiene horarios literales y su texto no puede corregirse cambiando
 parámetros en la API.
 
 Crear y solicitar aprobación de la plantilla de utilidad (en Meta debe aparecer **Aprobada**, no únicamente en el editor):
-- Nombre: `estado_reparado` (nombre exacto de la plantilla creada en Meta).
+- Nombre: `actualizacion_estado_reparado` (nombre exacto de la plantilla creada en Meta).
   El código actual usa este nombre por defecto y redirige el override anterior
-  `diagnosticado_reparado_horarios` a `estado_reparado` para evitar envíos a la plantilla obsoleta.
+  `diagnosticado_reparado_horarios` a `actualizacion_estado_reparado` para evitar envíos a la plantilla obsoleta.
 - Idioma: `es_CO`.
 - **Sin encabezado** y con **ocho parámetros de cuerpo**, en este orden. El botón de URL y el pie de página, si están configurados como estáticos en Meta, no requieren parámetros adicionales:
 
