@@ -1,7 +1,7 @@
 # Registro QR + recepción de clientes + estados de WhatsApp
 
 ## Cliente
-1. Escanea el QR del taller, verifica el correo y acepta el tratamiento de datos.
+1. Escanea el QR del taller, verifica el celular por código WhatsApp (o entra con tu contraseña anterior) y acepta el tratamiento de datos.
 2. Captura la placa (recomendada), marca y modelo (opcionales).
 3. La solicitud se crea **pendiente**, no se vincula ninguna moto automáticamente.
 4. La cuenta ya vinculada puede informar otra moto sin volver a registrarse.
@@ -14,7 +14,7 @@
 4. `confirm_customer_intake` bloquea solicitudes repetidas y motos de otras fichas. Es atómica: crea el vehículo y marca la solicitud atendida en la misma transacción.
 5. `/motorcycles` permite continuar recepción de la moto y gestionar la orden.
 
-**No** se envía un WhatsApp automático al dueño por el QR; la notificación aparece en MotoManager.
+**No** se envía un WhatsApp automático al dueño por el QR; la notificación aparece en MotoManager. El WhatsApp de código de acceso se envía al **cliente**, mediante la plantilla de Autenticación `codigo_registro_qr`; ver `docs/qr-whatsapp-enrollment-20261025.md`.
 
 ## Meta Cloud API: plantilla para estados distintos de Reparado
 
@@ -56,7 +56,7 @@ no declara que fue enviado automáticamente.
 - La placa informada por un QR es una **propuesta**, nunca prueba titularidad.
 - RLS y permisos: el cliente no tiene acceso directo a solicitudes ni puede
   modificar la tabla de motos; las RPC solo le permiten crear solicitudes
-  para una cuenta ya vinculada y con correo verificado.
+  para una cuenta ya vinculada con acceso verificado.
 - Las RPC de administración vuelven a comprobar que el actor es propietario
   o administrador activo del taller de la solicitud.
 - Los IDs de taller y cliente de una moto siempre coinciden; otra ficha con

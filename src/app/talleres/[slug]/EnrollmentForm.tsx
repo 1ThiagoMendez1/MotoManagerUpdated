@@ -6,26 +6,26 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Storefront } from '@/lib/workshops/enrollment';
 import { workshopAuthFailure } from '@/lib/workshops/email-auth';
-import { enrollCustomer, requestAnotherMotorcycle, requestWorkshopEmail } from './actions';
+import { enrollCustomer, requestAnotherMotorcycle } from './actions';
+import { requestWorkshopWhatsApp, verifyWorkshopWhatsApp } from './whatsapp-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowRight, CheckCircle2, LockKeyhole, Mail, Loader2, Phone } from 'lucide-react';
+import { ArrowRight, CheckCircle2, LockKeyhole, Loader2, Phone, ShieldCheck } from 'lucide-react';
 
 export default function EnrollmentForm({ workshop, email, alreadyLinked, authError }: {
   workshop: Storefront; email: string | null; alreadyLinked: boolean; authError: boolean;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<'new' | 'existing'>('new');
+  const [mode, setMode] = useState<'whatsapp' | 'password'>('whatsapp');
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [sentTo, setSentTo] = useState('');
-  const [accessMethod, setAccessMethod] = useState<'email' | 'password'>('email');
+  const [phone, setPhone] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
   const [retryAt, setRetryAt] = useState(0);
   const [retrySeconds, setRetrySeconds] = useState(0);
   const [complete, setComplete] = useState(false);
   const [intakeNotice, setIntakeNotice] = useState('');
   const [addMoto, setAddMoto] = useState(false);
-  const [error, setError] = useState(authError ? 'El enlace expiró o ya se utilizó. Solicita uno nuevo y ábrelo en este navegador.' : '');
+  const [error, setError] = useState(authError ? 'El enlace anterior ya no está disponible. Accede con WhatsApp o utiliza tu contraseña.' : '');
 
   useEffect(() => {
     if (!retryAt) return;
@@ -35,35 +35,46 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
     return () => clearInterval(timer);
   }, [retryAt]);
 
-  async function sendLink(address: string) {
+  async function sendCode(phoneNumber: string) {
     if (busy || Date.now() < retryAt) return;
     setBusy(true); setError('');
     try {
-      const result = await requestWorkshopEmail({ slug: workshop.slug, email: address, mode });
+      const result = await requestWorkshopWhatsApp({ slug: workshop.slug, phone: phoneNumber });
       if (result.retryAfterSeconds) {
-        setRetrySeconds(result.retryAfterSeconds);
         setRetryAt(Date.now() + result.retryAfterSeconds * 1000);
+        setRetrySeconds(result.retryAfterSeconds);
       }
       if (result.error) setError(result.error);
-      else if (result.success) { setSentTo(address); setSent(true); }
+      else if (result.success) { setPhone(phoneNumber); setCodeSent(true); }
     } catch { setError('Comprueba tu conexión e intenta de nuevo.'); }
     finally { setBusy(false); }
   }
 
-  async function verifyEmail(event: React.FormEvent<HTMLFormElement>) {
+  async function verifyCode(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy) return;
-    const data = new FormData(event.currentTarget);
-    const address = String(data.get('email')).trim().toLowerCase();
-    if (mode !== 'existing' || accessMethod !== 'password') {
-      await sendLink(address);
-      return;
-    }
+    const form = new FormData(event.currentTarget);
+    setBusy(true); setError('');
+    try {
+      const result = await verifyWorkshopWhatsApp({
+        slug: workshop.slug, phone, code: String(form.get('code') || ''),
+      });
+      if (result.error) setError(result.error);
+      else if (result.success) router.refresh();
+    } catch { setError('No fue posible verificar el código.'); }
+    finally { setBusy(false); }
+  }
+
+  async function signInWithPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const form = new FormData(event.currentTarget);
     setBusy(true); setError('');
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({
-        email: address, password: String(data.get('password') || ''),
+        email: String(form.get('email') || '').trim().toLowerCase(),
+        password: String(form.get('password') || ''),
       });
       if (error) setError(workshopAuthFailure(error, 'password').error);
       else router.refresh();
@@ -122,50 +133,70 @@ export default function EnrollmentForm({ workshop, email, alreadyLinked, authErr
     <p className="text-xs text-muted-foreground">Si administras el taller, activa el registro desde Mi perfil → QR del taller.</p>
   </div>;
 
-  if (sent && !email) return <div role="status" className="space-y-4">
-    <Mail className="h-9 w-9 text-primary" /><h2 className="text-xl font-semibold">Revisa tu correo</h2>
-    <p className="break-words text-sm font-medium">Enviamos el enlace a {sentTo}.</p>
-    <p className="text-sm text-muted-foreground">Abre el enlace de acceso en este mismo navegador para verificar tu correo y terminar tu registro. Revisa también la carpeta de spam.</p>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <Button className="w-full" variant="outline" disabled={busy || retrySeconds > 0} onClick={() => void sendLink(sentTo)}>
-      {busy ? 'Enviando...' : retrySeconds > 0 ? `Reenviar en ${retrySeconds} s` : 'Reenviar enlace'}
-    </Button>
-    <Button variant="ghost" onClick={() => { setSent(false); setError(''); }}>Usar otro correo o acceder con contraseña</Button>
-  </div>;
   return <>
     {error && <p role="alert" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-    {!email ? <form onSubmit={verifyEmail} className="space-y-5">
+    {!email ? <div className="space-y-5">
       <div>
-        <h2 className="text-xl font-semibold">Tu taller, a un escaneo</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Verifica tu correo y vincúlate de forma segura con {workshop.name}.</p>
+        <h2 className="text-xl font-semibold">Accede a tu taller por WhatsApp</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Confirma tu celular mediante un código seguro y vincúlate con {workshop.name}. No necesitas recibir correos.</p>
       </div>
-      <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1" role="group" aria-label="Tipo de acceso">
-        <button type="button" aria-pressed={mode === 'new'} onClick={() => { setMode('new'); setError(''); }}
-          className={`rounded-lg px-3 py-3 text-sm font-semibold ${mode === 'new' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>Soy nuevo</button>
-        <button type="button" aria-pressed={mode === 'existing'} onClick={() => { setMode('existing'); setError(''); }}
-          className={`rounded-lg px-3 py-3 text-sm font-semibold ${mode === 'existing' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>Ya tengo cuenta</button>
+      <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1" role="group" aria-label="Método de acceso">
+        <button type="button" aria-pressed={mode === 'whatsapp'}
+          onClick={() => { setMode('whatsapp'); setError(''); }}
+          className={'rounded-lg px-2 py-3 text-sm font-semibold ' +
+            (mode === 'whatsapp' ? 'bg-background shadow-sm' : 'text-muted-foreground')}>Por WhatsApp</button>
+        <button type="button" aria-pressed={mode === 'password'}
+          onClick={() => { setMode('password'); setError(''); }}
+          className={'rounded-lg px-2 py-3 text-sm font-semibold ' +
+            (mode === 'password' ? 'bg-background shadow-sm' : 'text-muted-foreground')}>Correo y contraseña</button>
       </div>
-      {mode === 'existing' && <div className="flex gap-2" role="group" aria-label="Método de acceso">
-        <Button type="button" variant={accessMethod === 'email' ? 'secondary' : 'ghost'} onClick={() => { setAccessMethod('email'); setError(''); }}>Recibir enlace</Button>
-        <Button type="button" variant={accessMethod === 'password' ? 'secondary' : 'ghost'} onClick={() => { setAccessMethod('password'); setError(''); }}>Usar contraseña</Button>
-      </div>}
-      <p className="text-sm text-muted-foreground">{mode === 'new'
-        ? 'Regístrate sin crear otra contraseña.'
-        : accessMethod === 'password' ? 'Ingresa con el correo y la contraseña de tu cuenta MotoManager.'
-        : 'Usa el correo de tu cuenta MotoManager. Te enviaremos un enlace seguro para entrar.'}</p>
-      <label className="block space-y-2 text-sm font-medium">Correo electrónico<Input name="email" type="email" autoComplete="email" required maxLength={254} placeholder="tu@correo.com" /></label>
-      {mode === 'existing' && accessMethod === 'password' && <label className="block space-y-2 text-sm font-medium">Contraseña<Input name="password" type="password" autoComplete="current-password" required maxLength={200} /></label>}
-      <Button className="h-12 w-full" disabled={busy || ((mode === 'new' || accessMethod === 'email') && retrySeconds > 0)}>
-        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {(mode === 'new' || accessMethod === 'email') && retrySeconds > 0 ? `Volver a intentar en ${retrySeconds} s` : mode === 'new' ? 'Continuar con mi correo' : 'Acceder a mi cuenta'}
-      </Button>
-    </form> : <form onSubmit={join} className="space-y-5">
-      <div><h2 className="text-xl font-semibold">Un último paso</h2><p className="mt-2 break-words text-sm text-muted-foreground">Correo verificado: {email}</p><p className="mt-2 text-sm text-muted-foreground">Estos datos se utilizarán solo para vincular tu ficha con {workshop.name}.</p></div>
+      {mode === 'whatsapp' ? (codeSent
+        ? <form onSubmit={verifyCode} className="space-y-4">
+          <p className="text-sm text-muted-foreground">Solicitamos un código de seis dígitos para <strong>{phone}</strong>. Consulta tu WhatsApp.</p>
+          <label className="block space-y-2 text-sm font-medium">Código de verificación
+            <Input name="code" type="text" inputMode="numeric" pattern="[0-9]{6}" autoComplete="one-time-code"
+              minLength={6} maxLength={6} required placeholder="123456" />
+          </label>
+          <Button className="h-12 w-full" disabled={busy}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verificar y continuar</Button>
+          <Button type="button" className="w-full" variant="outline" disabled={busy || retrySeconds > 0}
+            onClick={() => void sendCode(phone)}>
+            {retrySeconds > 0 ? 'Reenviar en ' + retrySeconds + ' s' : 'Solicitar otro código'}
+          </Button>
+          <Button type="button" className="w-full" variant="ghost" onClick={() => { setCodeSent(false); setError(''); }}>
+            Cambiar celular
+          </Button>
+        </form>
+        : <form onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget);
+            void sendCode(String(form.get('phone') || '')); }} className="space-y-4">
+          <label className="block space-y-2 text-sm font-medium">Tu celular con WhatsApp
+            <Input name="phone" type="tel" autoComplete="tel" required minLength={10} maxLength={22}
+              defaultValue={phone} placeholder="300 123 4567" />
+          </label>
+          <p className="text-xs text-muted-foreground">Te enviaremos un único código de acceso. No compartas el código con nadie. Por ahora se admiten números de Colombia (+57).</p>
+          <Button className="h-12 w-full" disabled={busy || retrySeconds > 0}>
+            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {retrySeconds > 0 ? 'Reintentar en ' + retrySeconds + ' s' : 'Recibir código por WhatsApp'}
+          </Button>
+        </form>)
+        : <form onSubmit={signInWithPassword} className="space-y-4">
+          <p className="text-sm text-muted-foreground">Si ya tienes un historial asociado a tu correo, entra con tu contraseña para conservar tus motos y órdenes.</p>
+          <label className="block space-y-2 text-sm font-medium">Correo electrónico
+            <Input name="email" type="email" autoComplete="email" required maxLength={254} placeholder="tu@correo.com" />
+          </label>
+          <label className="block space-y-2 text-sm font-medium">Contraseña
+            <Input name="password" type="password" autoComplete="current-password" required maxLength={200} />
+          </label>
+          <Button className="h-12 w-full" disabled={busy}>Entrar con mi contraseña</Button>
+        </form>}
+      <p className="flex items-start gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0" />
+        Verificar el número no vincula ninguna motocicleta automáticamente: el taller debe confirmar sus datos.</p>
+    </div> : <form onSubmit={join} className="space-y-5">
+      <div><h2 className="text-xl font-semibold">Un último paso</h2><p className="mt-2 break-words text-sm text-muted-foreground">Acceso verificado</p><p className="mt-2 text-sm text-muted-foreground">Estos datos se utilizarán solo para vincular tu ficha con {workshop.name}.</p></div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-2 text-sm font-medium">Nombres<Input name="firstName" autoComplete="given-name" required maxLength={80} /></label>
         <label className="space-y-2 text-sm font-medium">Apellidos<Input name="lastName" autoComplete="family-name" required maxLength={100} /></label>
       </div>
-      <label className="block space-y-2 text-sm font-medium">Celular de contacto<Input name="phone" type="tel" autoComplete="tel" required minLength={10} maxLength={22} placeholder="300 123 4567" /><span className="block text-xs font-normal text-muted-foreground">Incluye el indicativo si tu número es de otro país.</span></label>
+      <label className="block space-y-2 text-sm font-medium">Celular de contacto<Input name="phone" type="tel" autoComplete="tel" required minLength={10} maxLength={22} defaultValue={phone} placeholder="300 123 4567" /><span className="block text-xs font-normal text-muted-foreground">Incluye el indicativo si tu número es de otro país.</span></label>
       <div className="space-y-3 rounded-xl border bg-primary/5 p-4">
         <h3 className="font-semibold">🏍️ ¿Qué moto tienes?</h3>
         <p className="text-xs text-muted-foreground">Con la placa, el taller podrá prepararte una recepción rápida. No se agregará a tu historial hasta que el taller la confirme.</p>

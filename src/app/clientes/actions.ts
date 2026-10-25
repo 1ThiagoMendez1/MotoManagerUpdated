@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getOwnAvatarUrl } from './reputation-actions';
 
-/** Solo clientes con correo confirmado; una placa o un ID nunca prueba titularidad. */
+/** Solo clientes con acceso verificado (correo o WhatsApp); la placa no prueba titularidad. */
 async function getVerifiedCustomerLinks() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -36,7 +36,7 @@ export async function getCustomerPortalData(licensePlate: string) {
   }
 
   const verified = await getVerifiedCustomerLinks();
-  if (!verified) return { success: false, message: 'Para consultar datos privados, inicia sesión y verifica tu correo con el enlace de tu taller.' };
+  if (!verified) return { success: false, message: 'Para consultar datos privados, inicia sesión con WhatsApp o con tu contraseña desde el QR del taller.' };
   const supabase = verified.admin;
   const normalizedPlate = licensePlate.replace(/[\s-]/g, '').toUpperCase();
   if (!/^[A-Z0-9]{5,8}$/.test(normalizedPlate)) {
@@ -202,7 +202,7 @@ export async function createCustomerAppointment(formData: FormData) {
   }
 
   const verified = await getVerifiedCustomerLinks();
-  if (!verified) return { success: false, message: 'Debes verificar tu correo y vincular tu cuenta al taller.' };
+  if (!verified) return { success: false, message: 'Debes verificar tu acceso y vincular tu cuenta al taller.' };
   const supabase = verified.admin;
 
   const { data: moto } = await supabase
