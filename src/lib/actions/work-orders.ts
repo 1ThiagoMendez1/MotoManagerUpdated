@@ -3,7 +3,7 @@ import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
+import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit, checkAndUpdateWhatsAppLimitDetailed } from '@/lib/whatsapp';
 import { shouldSendReadyNotice } from '@/lib/whatsapp-ready';
 import { isChangeableOrderStatus } from '@/lib/work-order-status';
 import { createNotification } from '@/lib/actions/notifications';
@@ -353,7 +353,8 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
             } else if (isReadyTransition && !metaAvailable && !evolutionAvailable) {
                 whatsappWarning = 'No hay un proveedor de WhatsApp configurado para avisar que la moto está lista.';
             } else {
-              const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+              const quota = await checkAndUpdateWhatsAppLimitDetailed(user.workshopId);
+              const canSend = quota.allowed;
               if (canSend) {
                 if (isReadyTransition) {
                     const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Cliente';
@@ -408,7 +409,9 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                     }
                 }
               } else {
-                  whatsappWarning = 'Se alcanzó el límite de WhatsApp del taller o falló la comprobación de cuota.';
+                  whatsappWarning = quota.allowed ? undefined : quota.reason === 'limit_reached'
+                    ? 'Se alcanzó el límite mensual de WhatsApp de este taller.'
+                    : 'No se pudo comprobar la cuota de WhatsApp. El plan del taller no ha cambiado.';
                   console.warn('[work-orders] WhatsApp notification skipped: quota unavailable.');
               }
             }
