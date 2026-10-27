@@ -6,6 +6,7 @@ import { buildDiagnosisMetaTemplate } from './whatsapp-diagnosis';
 import { ai } from '@/ai/genkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getPlanLimits } from '@/lib/constants/plans';
+import { resolveWorkshopWhatsAppPlan } from '@/lib/whatsapp-quota-plan';
 
 const evolutionApiUrl = process.env.EVOLUTION_API_URL;
 const evolutionApiKey = process.env.EVOLUTION_API_KEY;
@@ -2263,13 +2264,19 @@ export default {
   sendCitaConfirmadaNotification
 }
 
-export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<boolean> {
-  if (!workshopId) return false;
+export type WorkshopWhatsAppQuotaResult =
+  | { allowed: true; plan: 'basic' | 'pro' | 'full' }
+  | { allowed: false; reason: 'limit_reached' | 'lookup_failed' | 'reservation_failed'; plan?: 'basic' | 'pro' | 'full' };
+
+/** Performs an atomic reservation for finite plans. Full has no quota. */
+export async function checkAndUpdateWhatsAppLimitDetailed(workshopId: string): Promise<WorkshopWhatsAppQuotaResult> {
+  if (!workshopId) return { allowed: false, reason: 'lookup_failed' };
 
   try {
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
     );
 
     const { data: org, error } = await supabaseAdmin
@@ -2278,20 +2285,17 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
       .eq('id', workshopId)
       .single();
 
-    // Never allow a send on lookup failure: failing open bypasses paid plan limits.
     if (error || !org) {
-      console.error('Unable to verify workshop WhatsApp quota.');
-      return false;
+      console.error('[whatsapp-quota] workshop lookup unavailable');
+      return { allowed: false, reason: 'lookup_failed' };
     }
 
-    const settings = typeof org.settings === 'string' ? JSON.parse(org.settings) : (org.settings || {});
-    const subPlan = settings.sub_plan || 'basic';
-    const planLimits = getPlanLimits(subPlan);
-    if (planLimits.whatsapp_limit === -1) return true;
+    const plan = resolveWorkshopWhatsAppPlan(org.settings);
+    const planLimits = getPlanLimits(plan);
 
-    // The RPC serializes per-workshop reservations using a row lock and updates
-    // ONLY the month's JSON key. A read/modify/write of all settings could erase
-    // hours or QR changes saved concurrently by the workshop owner.
+    // Full Taller is unlimited: do not query or increment a monthly counter.
+    if (planLimits.whatsapp_limit === -1) return { allowed: true, plan };
+
     const currentMonth = new Date().toISOString().slice(0, 7);
     const { data: reserved, error: reservationError } = await supabaseAdmin.rpc(
       'reserve_workshop_whatsapp_quota',
@@ -2302,12 +2306,19 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
       }
     );
     if (reservationError) {
-      console.error('Unable to reserve workshop WhatsApp quota.');
-      return false;
+      console.error('[whatsapp-quota] reservation RPC unavailable');
+      return { allowed: false, reason: 'reservation_failed', plan };
     }
-    return reserved === true;
+    if (reserved !== true) return { allowed: false, reason: 'limit_reached', plan };
+    return { allowed: true, plan };
   } catch {
-    console.error('WhatsApp quota check failed.');
-    return false;
+    console.error('[whatsapp-quota] check failed');
+    return { allowed: false, reason: 'lookup_failed' };
   }
-};
+}
+
+/** Backward-compatible boolean helper used by other sending flows. */
+export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<boolean> {
+  const result = await checkAndUpdateWhatsAppLimitDetailed(workshopId);
+  return result.allowed;
+}
