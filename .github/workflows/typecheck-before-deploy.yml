@@ -1,0 +1,23 @@
+name: Typecheck before deployment
+on:
+  push:
+    branches:
+      - codex/v6.8.0-horarios-quota-hardening-20261023
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Validate TypeScript
+        run: npm run typecheck
+      - name: Run unit tests
+        run: npm test

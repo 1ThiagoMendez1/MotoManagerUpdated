@@ -102,11 +102,15 @@ export const getMotorcycles = async (params: { query?: string, page?: number, li
     q = q.or(`brand.ilike.%${params.query}%,model.ilike.%${params.query}%,license_plate.ilike.%${params.query}%`);
   }
 
-  const { data, count } = await q.range(offset, offset + limit - 1);
-  
-  if (!data) return { items: [], totalPages: 0 };
-  
-  const items = data.map((m: any) => ({
+  const { data, count, error } = await q.range(offset, offset + limit - 1);
+
+  // Errores de permisos/red no son lo mismo que ausencia de motos.
+  if (error) {
+    console.error('[motorcycles] No se pudo consultar el listado:', error.code || 'query_error');
+    throw new Error('No se pudieron cargar las motocicletas del taller. Intenta nuevamente.');
+  }
+
+  const items = (data || []).map((m: any) => ({
     id: m.id,
     make: m.brand || '',
     model: m.model || '',

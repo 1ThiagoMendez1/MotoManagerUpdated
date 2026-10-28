@@ -1,6 +1,5 @@
 import { authorize } from '@/lib/auth-server';
-import { getMotorcycles, getCustomers, getTechnicians, getWorkOrders } from '@/lib/data';
-import type { Motorcycle, Customer, Technician } from '@/lib/types';
+import { getMotorcycles, getTechnicians, getWorkOrders } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -36,11 +35,10 @@ export default async function MotorcyclesPage({
   const query = resolvedSearchParams.query || '';
   const page = Number(resolvedSearchParams.page) || 1;
 
-  const [motoResult, custResult, techResult, workOrdersData] = await Promise.all([
+  const [motoResult, techResult, workOrdersData] = await Promise.all([
     getMotorcycles({ query, page }),
-    getCustomers({ limit: 1000 } as any),
-    getTechnicians({ limit: 1000 } as any),
-    getWorkOrders({ limit: 1000 } as any),
+    getTechnicians({ limit: 1000 }),
+    getWorkOrders({ limit: 1000 }),
   ]);
 
   const motorcycles = motoResult.items;
@@ -48,27 +46,17 @@ export default async function MotorcyclesPage({
 
   const workOrders = workOrdersData.items;
 
-  // Show motorcycles that do NOT have any work order.
-  const workOrderMotorcycleIds = new Set(
-    workOrders
-      .map((wo) => wo.motorcycle?.id)
-      .filter(Boolean)
-  );
-  const motorcyclesInWorkshop = motorcycles.filter(
-    (moto) => !workOrderMotorcycleIds.has(moto.id)
-  );
-
   return (
     <div className="w-full space-y-4">
       {/* Header Estandarizado */}
       <PageHeader
-        title="Recepción de Motos"
-        description="Motos ingresadas en taller pendientes de crear u ordenar trabajo."
+        title="Motocicletas registradas"
+        description="Todas las motocicletas del taller, tengan o no una orden de trabajo."
         icon={Bike}
         iconBg="bg-primary/10 text-primary"
         badge={
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold border border-primary/20">
-            {motorcyclesInWorkshop.length} en espera
+            {motorcycles.length} en esta página
           </span>
         }
       />
@@ -78,7 +66,7 @@ export default async function MotorcyclesPage({
         searchComponent={<SearchMotorcycles />}
         primaryAction={<AddMotorcycle technicians={techResult.items} />}
         secondaryActions={[
-          { label: 'Exportar Motos en Espera', component: <ExportMotorcyclesButton motorcycles={motorcyclesInWorkshop} /> }
+          { label: 'Exportar motos de esta página', component: <ExportMotorcyclesButton motorcycles={motorcycles} /> }
         ]}
       />
 
@@ -98,14 +86,14 @@ export default async function MotorcyclesPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {motorcyclesInWorkshop.length === 0 ? (
+                {motorcycles.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-12 text-muted-foreground text-sm">
-                      No hay motocicletas pendientes de orden en este momento.
+                      No se encontraron motocicletas registradas. Si usaste la búsqueda, intenta borrarla.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  motorcyclesInWorkshop.map((moto) => (
+                  motorcycles.map((moto) => (
                     <TableRow key={moto.id} className="border-border/50 hover:bg-muted/30 transition-colors">
                       <TableCell className="py-2.5 pl-4">
                         <span className="font-mono font-bold text-xs bg-muted px-2 py-1 rounded text-foreground border border-border/50">

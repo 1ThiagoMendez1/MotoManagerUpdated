@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:22-alpine AS base
 
 # Install dependencies only when needed
@@ -8,7 +9,9 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps
+# Cache NPM downloads between Docker builds, without copying them into the image.
+RUN --mount=type=cache,id=motomanager-npm,target=/root/.npm,sharing=locked \
+    npm ci --legacy-peer-deps --prefer-offline --no-fund
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -42,7 +45,9 @@ ENV NEXT_PUBLIC_WOMPI_PUBLIC_KEY=$NEXT_PUBLIC_WOMPI_PUBLIC_KEY
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN npm run build
+# Reuse Next/Webpack incremental compilation cache on subsequent deployments.
+RUN --mount=type=cache,id=motomanager-next,target=/app/.next/cache,sharing=locked \
+    npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner

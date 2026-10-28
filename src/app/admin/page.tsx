@@ -61,6 +61,12 @@ export default async function AdminPage({
     slug: org.slug,
     subscription_status: org.settings?.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
     subscription_plan: resolveWorkshopPlan(org.settings),
+    // El ciclo de facturación es independiente del nivel basic/pro/full.
+    billing_cycle: ((): 'monthly' | 'biannual' | 'yearly' => {
+      const settings = org.settings || {};
+      const cycle = settings.billingCycle || settings.billing_cycle || settings.plan;
+      return cycle === 'biannual' || cycle === 'yearly' ? cycle : 'monthly';
+    })(),
     subscription_end_date: org.settings?.demoEndDate || null,
     created_at: org.created_at,
     members: org.members?.map((m: any) => ({
@@ -129,13 +135,13 @@ export default async function AdminPage({
   const trialingWorkshops = workshops?.filter(w => w.subscription_status === 'trialing').length || 0;
   const pastDueWorkshops = workshops?.filter(w => w.subscription_status === 'past_due' || w.subscription_status === 'unpaid').length || 0;
   
-  const monthlyPlans = workshops?.filter(w => w.subscription_plan === 'monthly').length || 0;
-  const annualPlans = workshops?.filter(w => w.subscription_plan === 'yearly').length || 0;
+  const monthlyPlans = workshops?.filter(w => w.billing_cycle === 'monthly').length || 0;
+  const annualPlans = workshops?.filter(w => w.billing_cycle === 'yearly').length || 0;
   
   // Calculate Active Plans for MRR
-  const activeMonthly = workshops?.filter(w => w.subscription_status === 'active' && w.subscription_plan === 'monthly').length || 0;
-  const activeBiannual = workshops?.filter(w => w.subscription_status === 'active' && w.subscription_plan === 'biannual').length || 0;
-  const activeYearly = workshops?.filter(w => w.subscription_status === 'active' && w.subscription_plan === 'yearly').length || 0;
+  const activeMonthly = workshops?.filter(w => w.subscription_status === 'active' && w.billing_cycle === 'monthly').length || 0;
+  const activeBiannual = workshops?.filter(w => w.subscription_status === 'active' && w.billing_cycle === 'biannual').length || 0;
+  const activeYearly = workshops?.filter(w => w.subscription_status === 'active' && w.billing_cycle === 'yearly').length || 0;
 
   // Real MRR calculation based on actual COP prices
   const mrr = 
