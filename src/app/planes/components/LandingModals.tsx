@@ -6,6 +6,7 @@ import { useFormStatus } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { WompiButton } from '@/components/payments/WompiButton';
+import { trackMarketingEvent } from '@/lib/analytics/metaPixel';
 import { registerWorkshopPublic } from '../actions';
 
 // Separate inner component so useActionState resets when key changes
@@ -312,6 +313,12 @@ export function PaymentModal({ plan, onClose, appUrl }: PayModalProps) {
     if (!name.trim() || !email.trim()) return;
     console.log('==== INICIO DE PAGO EN /PLANES ====', { name, email, planId: plan.id, billingCycle: plan.billingCycle, reference });
     localStorage.setItem('mm_prepayment', JSON.stringify({ name, email, plan: plan.id, billingCycle: plan.billingCycle }));
+    trackMarketingEvent('InitiateCheckout', {
+      content_name: `Plan ${plan.name}`,
+      content_category: 'subscription',
+      currency: 'COP',
+      value: plan.price,
+    });
     setStep(2);
   };
 

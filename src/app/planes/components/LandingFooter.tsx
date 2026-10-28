@@ -38,7 +38,11 @@ export function LandingFooter() {
       </div>
       <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-3 pt-6 text-xs text-slate-500">
         <p>© {new Date().getFullYear()} MotoManager.</p>
-        <p>Información de funcionalidades y planes sujeta a la configuración vigente del servicio.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p>Información de funcionalidades y planes sujeta a la configuración vigente del servicio.</p>
+          <button type="button" onClick={() => window.dispatchEvent(new Event('mm:marketing-consent-settings'))}
+            className="underline underline-offset-2 hover:text-white">Configurar cookies</button>
+        </div>
       </div>
     </footer>
   );

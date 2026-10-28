@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, BadgeCheck, ClipboardList, Handshake, PackageCheck } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { LandingNavbar } from './components/LandingNavbar';
+import { MetaPixelMarketing } from '@/components/MetaPixelMarketing';
+import { trackMarketingEvent } from '@/lib/analytics/metaPixel';
 import { LandingHero } from './components/LandingHero';
 import { LandingInteractiveDemo } from './components/LandingInteractiveDemo';
 import { LandingWhyChange } from './components/LandingWhyChange';
@@ -100,8 +102,19 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
 
   const scrollToPlanes = () => document.getElementById('planes')?.scrollIntoView({ behavior:'smooth' });
 
+  const selectPlan = (plan: Plan) => {
+    trackMarketingEvent('ViewContent', {
+      content_name: `Plan ${plan.name}`,
+      content_category: 'subscription',
+      currency: 'COP',
+      value: plan.price,
+    });
+    setActivePlan(plan);
+  };
+
   return (
     <div className="min-h-screen bg-[#081121] text-white">
+      <MetaPixelMarketing />
       <LandingNavbar user={user} />
       <main>
         <LandingHero onScrollToPlanes={scrollToPlanes} />
@@ -109,7 +122,7 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
         <LandingWhyChange />
         <LandingFeatures />
         <ProductFlow />
-        <LandingPricing plans={plans} features={features} onSelectPlan={setActivePlan} onScrollToPlanes={scrollToPlanes} />
+        <LandingPricing plans={plans} features={features} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes} />
         <LandingTopWorkshops initialWorkshops={workshops} />
         <LandingTestimonialsAndFAQ />
         <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
