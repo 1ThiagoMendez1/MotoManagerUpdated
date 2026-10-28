@@ -25,7 +25,7 @@ import { Breadcrumbs } from '@/components/navigation/Breadcrumbs';
 import { CommandPalette } from '@/components/navigation/CommandPalette';
 import { QuickCreateMenu } from '@/components/navigation/QuickCreateMenu';
 import { checkIsMainPage } from '@/lib/navigation';
-import { getNotificationsForUser, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/actions/notifications';
+import { markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/actions/notifications';
 import { createClient } from '@/lib/supabase/client';
 import { signOutAction } from '@/lib/actions/auth';
 
@@ -94,9 +94,15 @@ export default function Header({
   useEffect(() => {
     if (!userName) return;
 
+    const controller = new AbortController();
+    let inFlight = false;
     const fetchNotifications = async () => {
+      if (inFlight || document.hidden || controller.signal.aborted) return;
+      inFlight = true;
       try {
-        const res = await getNotificationsForUser();
+        const response = await fetch('/api/workshop/notifications', { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok) return;
+        const res = await response.json();
         if (res.success && res.data) {
           let currentReadIds: string[] = [];
           if (typeof window !== 'undefined') {
@@ -111,8 +117,8 @@ export default function Header({
           setNotifications(filtered);
         }
       } catch (err) {
-        console.error('Error loading notifications:', err);
-      }
+        if (!controller.signal.aborted) console.error('Error loading notifications');
+      } finally { inFlight = false; }
     };
 
     fetchNotifications();
@@ -141,6 +147,7 @@ export default function Header({
     }
 
     return () => {
+      controller.abort();
       clearInterval(interval);
       if (channel) {
         try {

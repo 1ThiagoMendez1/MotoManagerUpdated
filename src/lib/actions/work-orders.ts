@@ -62,7 +62,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
     }
 
     // Check for duplicate active work order across all workshops
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -225,7 +225,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
 
 export async function updateWorkOrderStatus(prevState: any, formData: FormData) {
     const user = await requireWorkshop();
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
     const supabase = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

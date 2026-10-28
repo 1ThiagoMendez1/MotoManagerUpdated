@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { requireWorkshop } from '@/lib/auth-server';
+import { workshopCache } from '@/lib/cache/redis';
 import { createClient } from '@/lib/supabase/server';
 import { getMotorcycles } from '@/lib/data';
 import type { Motorcycle } from '@/lib/types';
@@ -26,14 +28,17 @@ async function loadMatchingMotorcycles(query: string): Promise<Motorcycle[]> {
 }
 
 export async function getMotorcycleOrderList(query: string, organizationId: string) {
+  const user = await requireWorkshop();
+  if (user.workshopId !== organizationId) throw new Error('Workshop access denied');
   const motorcycles = await loadMatchingMotorcycles(query);
   if (motorcycles.length === 0) {
     return { motorcycles, orderIndex: buildMotorcycleOrderIndex([]) };
   }
 
   const supabase = await createClient();
-  const orders: MotorcycleOrderRow[] = [];
   const ids = motorcycles.map(motorcycle => motorcycle.id);
+  const orders = await workshopCache.remember(user, 'motorcycle-order-states', { ids }, async () => {
+  const orders: MotorcycleOrderRow[] = [];
 
   // Limit URL size; paginate order history instead of relying on PostgREST's
   // configurable max_rows (often 1000). Only the logged-in workshop is read.
@@ -60,5 +65,7 @@ export async function getMotorcycleOrderList(query: string, organizationId: stri
     }
   }
 
+  return orders;
+  });
   return { motorcycles, orderIndex: buildMotorcycleOrderIndex(orders) };
 }

@@ -1,5 +1,5 @@
 import { authorize } from '@/lib/auth-server';
-import { getTechnicians, getWorkOrders } from '@/lib/data';
+import { getTechnicians } from '@/lib/data';
 import { getMotorcycleOrderList } from '@/lib/motorcycle-order-list';
 import { motorcycleMatchesTab, type MotorcycleTab } from '@/lib/motorcycle-order-groups';
 import Link from 'next/link';
@@ -44,14 +44,12 @@ export default async function MotorcyclesPage({
       : 'all'
   );
 
-  const [motorcycleData, techResult, workOrdersData] = await Promise.all([
+  const [motorcycleData, techResult] = await Promise.all([
     getMotorcycleOrderList(query, user.workshopId!),
     getTechnicians({ limit: 1000 }),
-    getWorkOrders({ limit: 1000 }),
   ]);
 
   const { motorcycles: allMotorcycles, orderIndex } = motorcycleData;
-  const workOrders = workOrdersData.items;
   const tabs: { value: MotorcycleTab; label: string }[] = [
     { value: 'all', label: 'Todas' },
     { value: 'without', label: 'Sin orden' },
@@ -188,7 +186,6 @@ export default async function MotorcyclesPage({
                         <div className="flex justify-end">
                           <MotorcycleDetails
                             motorcycle={moto}
-                            workOrders={workOrders.filter(wo => wo.motorcycle && wo.motorcycle.id === moto.id)}
                           />
                         </div>
                       </TableCell>

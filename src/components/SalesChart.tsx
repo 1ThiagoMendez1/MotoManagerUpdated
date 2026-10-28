@@ -1,12 +1,10 @@
 "use client"
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
-import { getSalesDataForChart } from "@/lib/data"
 import {
   ChartContainer,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { useEffect, useState } from "react";
 
 type ChartData = {
     month: string;
@@ -24,13 +22,7 @@ const formatYAxis = (value: number) => {
 };
   
 
-export function SalesChart() {
-  const [data, setData] = useState<ChartData[]>([]);
-
-  useEffect(() => {
-    getSalesDataForChart().then(setData);
-  }, [])
-
+export function SalesChart({ data = [] }: { data?: ChartData[] }) {
   return (
     <ChartContainer config={{
         sales: {

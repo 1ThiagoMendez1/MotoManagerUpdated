@@ -1,5 +1,5 @@
 import { wompiService } from './WompiService';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/managed-client';
 
 // Cliente de Supabase con Service Role para operaciones desde el backend / webhooks
 const getAdminSupabase = () => {

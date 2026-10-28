@@ -3,7 +3,6 @@ import { DashboardMenu } from '@/components/dashboard/DashboardMenu';
 import { Suspense } from 'react';
 import { FirstLoginPasswordChangeModal } from '@/components/auth/FirstLoginPasswordChangeModal';
 import { TourHandler } from '@/components/dashboard/TourHandler';
-import { getOrderCreationOptions } from '@/lib/work-orders/order-creation-options';
 import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
 
@@ -24,8 +23,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
 
   const workshopDetails = await getWorkshopDetails();
   
-  // Fetch data for the "Nueva Orden" modal
-  const { motorcycles, technicians, unavailableMotorcycleIds } = await getOrderCreationOptions();
+  // Modal options are loaded only when the user opens it.
 
   return (
     <>
@@ -35,9 +33,6 @@ export default async function TenantPage({ params }: TenantPageProps) {
         userName={workshopDetails?.user_name || 'Usuario'}
         workshopName={workshopDetails?.slug || 'tu-taller'}
         subscriptionPlan={workshopDetails?.subscription_plan}
-        motorcycles={motorcycles}
-        technicians={technicians}
-        unavailableMotorcycleIds={unavailableMotorcycleIds}
       />
       <Suspense fallback={null}>
         <FirstLoginPasswordChangeModal />

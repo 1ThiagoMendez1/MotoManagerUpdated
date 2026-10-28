@@ -7,8 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function AccountingPage() {
   await authorize('/accounting');
   const workshop = await getWorkshopDetails();
-  const inventoryData = await getInventory({ limit: 1000 } as any);
-  const purchases = await getPurchases(workshop?.id || '');
+  const [inventoryData, purchases] = await Promise.all([getInventory({ limit: 1000 }), getPurchases(workshop?.id || '')]);
   
   return <AccountingClient subscriptionPlan={workshop?.subscription_plan} organizationId={workshop?.id || ''} inventory={inventoryData.items} purchases={purchases} />;
 }

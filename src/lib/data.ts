@@ -1,6 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
+import { workshopCache } from '@/lib/cache/redis';
 import { requireWorkshop } from '@/lib/auth-server';
 import type { Customer, Motorcycle, Technician, InventoryItem, WorkOrder, Sale, Reminder } from './types';
+
+
+function mapAssignedTechnician(value: any): Technician | null {
+  const profile = Array.isArray(value) ? value[0] : value;
+  return profile ? {
+    id: profile.id, name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Técnico',
+    specialty: 'Técnico', phone: profile.phone || '', avatarUrl: profile.avatar_path,
+  } : null;
+}
 
 const mapPaymentMethodToUi = (dbMethod: string | null | undefined): string => {
   if (!dbMethod) return 'Efectivo';
@@ -16,6 +26,7 @@ const mapPaymentMethodToUi = (dbMethod: string | null | undefined): string => {
 
 export const getCustomers = async (params: { query?: string, page?: number, limit?: number } = {}): Promise<{ items: Customer[], totalPages: number }> => {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'getCustomers', params, async () => {
   const supabase = await createClient();
   
   const page = params.page || 1;
@@ -31,8 +42,9 @@ export const getCustomers = async (params: { query?: string, page?: number, limi
     q = q.or(`first_name.ilike.%${params.query}%,last_name.ilike.%${params.query}%,document_number.ilike.%${params.query}%`);
   }
 
-  const { data, count } = await q.range(offset, offset + limit - 1);
+  const { data, count, error } = await q.range(offset, offset + limit - 1);
   
+  if (error) throw new Error('No se pudieron cargar los datos del taller.');
   if (!data) return { items: [], totalPages: 0 };
   
   const items = data.map((c: any) => ({
@@ -45,48 +57,30 @@ export const getCustomers = async (params: { query?: string, page?: number, limi
   }));
 
   return { items, totalPages: Math.ceil((count || 0) / limit) };
+  });
 };
 
 export const getTechnicians = async (params: { page?: number, limit?: number } = {}): Promise<{ items: Technician[], totalPages: number }> => {
   const user = await requireWorkshop();
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
-
-  const page = params.page || 1;
-  const limit = params.limit || 10;
-  const offset = (page - 1) * limit;
-
-  const { data, count } = await supabaseAdmin.from('organization_members')
-    .select('role, user_id, profiles ( id, first_name, last_name, avatar_path, phone )', { count: 'exact' })
-    .eq('organization_id', user.workshopId)
-    .range(offset, offset + limit - 1);
-  
-  if (!data) return { items: [], totalPages: 0 };
-  
-  const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
-  const usersMap = new Map();
-  if (authData && authData.users) {
-     authData.users.forEach(u => usersMap.set(u.id, u.email));
-  }
-
-  const allItems = data.map((m: any) => ({
-    id: m.profiles?.id || m.user_id,
-    name: `${m.profiles?.first_name || ''} ${m.profiles?.last_name || ''}`.trim() || 'Técnico',
-    specialty: m.role === 'mechanic' ? 'Técnico' : (m.role === 'service_advisor' ? 'Recepcionista' : m.role),
-    email: usersMap.get(m.user_id) || '',
-    phone: m.profiles?.phone || '',
-    avatarUrl: m.profiles?.avatar_path
-  })).filter(t => t.id && (t.specialty === 'Técnico' || t.specialty === 'mechanic'));
-
-  return { items: allItems, totalPages: Math.ceil((count || 0) / limit) };
+  return workshopCache.remember(user, 'technicians', params, async () => {
+    const supabase = await createClient();
+    const page = Math.max(1, Math.floor(params.page || 1));
+    const limit = Math.min(1000, Math.max(1, Math.floor(params.limit || 10)));
+    const { data, error } = await supabase.rpc('workshop_technicians', {
+      p_organization_id: user.workshopId, p_offset: (page - 1) * limit, p_limit: limit,
+    });
+    if (error) throw new Error('No se pudo cargar el equipo del taller.');
+    const rows = (data || []) as { id: string; name: string; email: string; phone: string; avatar_url: string | null; total_count: number }[];
+    return {
+      items: rows.map(row => ({ id: row.id, name: row.name, specialty: 'Técnico', email: row.email || '', phone: row.phone || '', avatarUrl: row.avatar_url })),
+      totalPages: Math.ceil(Number(rows[0]?.total_count || 0) / limit),
+    };
+  });
 };
 
 export const getMotorcycles = async (params: { query?: string, page?: number, limit?: number } = {}): Promise<{ items: Motorcycle[], totalPages: number }> => {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'getMotorcycles', params, async () => {
   const supabase = await createClient();
   
   const page = params.page || 1;
@@ -128,10 +122,12 @@ export const getMotorcycles = async (params: { query?: string, page?: number, li
   }));
 
   return { items, totalPages: Math.ceil((count || 0) / limit) };
+  });
 };
 
 export const getInventory = async (params: { query?: string, category?: string, page?: number, limit?: number } = {}): Promise<{ items: InventoryItem[], totalPages: number }> => {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'getInventory', params, async () => {
   const supabase = await createClient();
   
   const page = params.page || 1;
@@ -151,7 +147,8 @@ export const getInventory = async (params: { query?: string, category?: string, 
     q = q.or(`name.ilike.%${params.query}%,code.ilike.%${params.query}%`);
   }
 
-  const { data, count } = await q.range(offset, offset + limit - 1);
+  const { data, count, error } = await q.range(offset, offset + limit - 1);
+  if (error) throw new Error('No se pudieron cargar los datos del taller.');
   if (!data) return { items: [], totalPages: 0 };
   
   const items: InventoryItem[] = data.map((i: any) => {
@@ -214,10 +211,12 @@ export const getInventory = async (params: { query?: string, category?: string, 
     };
   });
   return { items, totalPages: Math.ceil((count || 0) / limit) };
+  });
 };
 
-export const getWorkOrders = async (params: { query?: string, page?: number, statusFilter?: 'active' | 'completed', limit?: number } = {}): Promise<{ items: WorkOrder[], totalPages: number }> => {
+export const getWorkOrders = async (params: { query?: string, page?: number, statusFilter?: 'active' | 'completed', limit?: number, motorcycleId?: string } = {}): Promise<{ items: WorkOrder[], totalPages: number }> => {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'getWorkOrders', params, async () => {
   const supabase = await createClient();
   
   const page = params.page || 1;
@@ -225,13 +224,15 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
   const offset = (page - 1) * limit;
 
   let q = supabase.from('work_orders')
-    .select('*, motorcycles(*), customers(*), sales(id, status), part_requests(id, status)', { count: 'exact' })
+    .select('*, motorcycles(*), customers(*), sales(id, status), part_requests(id, status), assigned_mechanic:profiles!work_orders_assigned_mechanic_id_fkey(id, first_name, last_name, phone, avatar_path)', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
   if (user.role === 'mechanic') {
     q = q.eq('assigned_mechanic_id', user.userId);
   }
+
+  if (params.motorcycleId) q = q.eq('motorcycle_id', params.motorcycleId);
 
   if (params.statusFilter === 'active') {
     q = q.neq('status', 'delivered').neq('status', 'delivered_quote_rejected');
@@ -243,11 +244,11 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
      q = q.or(`order_number.ilike.%${params.query}%`);
   }
 
-  const { data, count } = await q.range(offset, offset + limit - 1);
+  const { data, count, error } = await q.range(offset, offset + limit - 1);
 
+  if (error) throw new Error('No se pudieron cargar los datos del taller.');
   if (!data) return { items: [], totalPages: 0 };
 
-  const { items: technicians } = await getTechnicians();
 
   const items: WorkOrder[] = data.map((wo: any) => {
     const hasCompletedSale = wo.sales && wo.sales.some((s: any) => s.status === 'paid');
@@ -272,7 +273,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
         cedula: wo.customers.document_number
       } : { id: '', name: 'Desconocido', email: '' }
     } : null as any,
-    technician: technicians.find(t => t.id === wo.assigned_mechanic_id) || null,
+    technician: mapAssignedTechnician(wo.assigned_mechanic),
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
@@ -300,12 +301,13 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
   });
 
   return { items, totalPages: Math.ceil((count || 0) / limit) };
+  });
 };
 
 export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
   const user = await requireWorkshop();
   
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -313,7 +315,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   );
 
   let query = supabaseAdmin.from('work_orders')
-    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, created_by_profile:profiles!sales_created_by_fkey(first_name, last_name), sale_items(*, inventory_items(*))), work_order_services(*, service_catalog(*)), organizations(name)')
+    .select('*, motorcycles(*, customers(*)), work_order_evidences(*), sales(*, created_by_profile:profiles!sales_created_by_fkey(first_name, last_name), sale_items(*, inventory_items(*))), work_order_services(*, service_catalog(*)), organizations(name), assigned_mechanic:profiles!work_orders_assigned_mechanic_id_fkey(id, first_name, last_name, phone, avatar_path)')
     .eq('id', id)
     .eq('organization_id', user.workshopId);
 
@@ -327,7 +329,6 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
 
   if (!wo) return null;
 
-  const { items: technicians } = await getTechnicians();
 
   let parsedDeposit = 0;
   let depositHistory: any[] = [];
@@ -372,7 +373,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         cedula: wo.motorcycles.customers.document_number
       } : { id: '', name: 'Desconocido', email: '' }
     } : null as any,
-    technician: technicians.find(t => t.id === wo.assigned_mechanic_id) || null,
+    technician: mapAssignedTechnician(wo.assigned_mechanic),
     issueDescription: wo.reported_symptoms,
     solutionDescription: wo.technical_diagnosis,
     createdDate: wo.created_at,
@@ -421,8 +422,9 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   };
 };
 
-export const getSales = async (params: { type?: string, limit?: number, query?: string, page?: number } = {}): Promise<{ items: Sale[], totalPages: number }> => {
+export const getSales = async (params: { type?: string, limit?: number, query?: string, page?: number, dateFrom?: string, dateTo?: string } = {}): Promise<{ items: Sale[], totalPages: number }> => {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'getSales', params, async () => {
   const supabase = await createClient();
   
   const page = params.page || 1;
@@ -430,10 +432,16 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
   const offset = (page - 1) * limit;
 
   let query = supabase.from('sales')
-    .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, motorcycles(*, customers(*)))', { count: 'exact' })
+    .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, assigned_mechanic:profiles!work_orders_assigned_mechanic_id_fkey(id, first_name, last_name, phone, avatar_path), motorcycles(*, customers(*)))', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .not('sale_number', 'is', null);
     
+  if (params.dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(params.dateFrom)) query = query.gte('created_at', `${params.dateFrom}T00:00:00-05:00`);
+  if (params.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(params.dateTo)) {
+    const nextDay = new Date(`${params.dateTo}T00:00:00-05:00`);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    query = query.lt('created_at', nextDay.toISOString());
+  }
   if (params.type === 'direct') {
     query = query.is('work_order_id', null);
   } else if (params.type === 'service') {
@@ -444,14 +452,14 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
     query = query.or(`sale_number.ilike.%${params.query}%`);
   }
   
-  const [{ items: technicians }, { data, count }, orgResult] = await Promise.all([
-    getTechnicians(),
+  const [{ data, count, error }, orgResult] = await Promise.all([
     query.order('created_at', { ascending: false }).range(offset, offset + limit - 1),
     supabase.from('organizations').select('name').eq('id', user.workshopId).single()
   ]);
 
   const workshopName = orgResult.data?.name || 'MotoManager';
 
+  if (error) throw new Error('No se pudieron cargar los datos del taller.');
   if (!data) return { items: [], totalPages: 0 };
 
   const items: Sale[] = data.map((s: any) => {
@@ -490,7 +498,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
                 woData.status === 'diagnosis' ? 'Diagnosticando' :
                 woData.status === 'completed' ? 'Reparado' :
                 'Diagnosticando',
-        technician: technicians.find(t => t.id === woData.assigned_mechanic_id) || null,
+        technician: mapAssignedTechnician(woData.assigned_mechanic),
         motorcycle: mc ? {
           id: mc.id,
           make: mc.brand || '',
@@ -559,6 +567,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
   });
 
   return { items, totalPages: Math.ceil((count || 0) / limit) };
+  });
 };
 
 export const getSalesDataForChart = async () => {
@@ -586,8 +595,9 @@ export const getPurchases = async (organizationId: string) => {
 
 export const getGlobalMovements = async (params: { page?: number, limit?: number } = {}) => {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'getGlobalMovements', params, async () => {
   
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -606,8 +616,7 @@ export const getGlobalMovements = async (params: { page?: number, limit?: number
     .range(offset, offset + limit - 1);
 
   if (error) {
-    console.error('Error fetching global movements:', error);
-    return { items: [], totalPages: 0 };
+    throw new Error('No se pudieron cargar los movimientos del taller.');
   }
   
   const saleIds = (data || []).filter(m => m.movement_type === 'sale' && m.reference_id).map(m => m.reference_id);
@@ -650,4 +659,5 @@ export const getGlobalMovements = async (params: { page?: number, limit?: number
   });
 
   return { items, totalPages: Math.ceil((count || 0) / limit) };
+  });
 };

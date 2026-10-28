@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client';
 import { sendTemplateReminderNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
 import { format } from 'date-fns';
 

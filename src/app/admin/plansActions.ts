@@ -1,7 +1,7 @@
 'use server';
 import { requireSuperAdmin } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client';
 
 const getSupabase = () => {
     return createSupabaseClient(

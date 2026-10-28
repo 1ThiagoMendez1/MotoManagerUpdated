@@ -41,8 +41,7 @@ import {
   Cell
 } from 'recharts';
 import { useState, useEffect } from 'react';
-import { getPendingReminders } from '@/lib/actions/reminders';
-import { getDashboardData } from '@/lib/actions/dashboard';
+import type { getDashboardData } from '@/lib/actions/dashboard';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -64,23 +63,11 @@ const itemVariants: any = {
   }
 };
 
-export default function DashboardPage() {
+export default function DashboardPage({ initialStats, initialReminders }: { initialStats: Awaited<ReturnType<typeof getDashboardData>>['data']; initialReminders: any[] }) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
-  const [reminders, setReminders] = useState<any[]>([]);
-  const [stats, setStats] = useState({
-    ingresosMes: 0,
-    motosEnTallerCount: 0,
-    activeWorkOrdersCount: 0,
-    stockCriticoCount: 0,
-    revenueData: [] as any[],
-    topPartsData: [] as any[],
-    incomeByMethodData: [] as any[],
-    alerts: [] as any[],
-    workshopName: '',
-    subscriptionPlan: 'basic'
-  });
+  const reminders = initialReminders;
+  const stats = initialStats;
 
   useEffect(() => {
     setIsMounted(true);
@@ -308,95 +295,6 @@ export default function DashboardPage() {
     img.onerror = () => renderReport(null);
   };
 
-  useEffect(() => {
-    let isSubscribed = true;
-    const fetchDashboard = async () => {
-      try {
-        const [resStats, resRem] = await Promise.all([getDashboardData(), getPendingReminders()]);
-        if (isSubscribed && resStats?.success && resStats?.data) {
-          const d = resStats.data as any;
-          setStats({
-            ingresosMes: Number(d.ingresosMes) || 0,
-            motosEnTallerCount: Number(d.motosEnTallerCount) || 0,
-            activeWorkOrdersCount: Number(d.activeWorkOrdersCount) || 0,
-            stockCriticoCount: Number(d.stockCriticoCount) || 0,
-            revenueData: Array.isArray(d.revenueData) ? d.revenueData : [],
-            topPartsData: Array.isArray(d.topPartsData) ? d.topPartsData : [],
-            incomeByMethodData: Array.isArray(d.incomeByMethodData) ? d.incomeByMethodData : [],
-            alerts: Array.isArray(d.alerts) ? d.alerts : [],
-            workshopName: d.workshopName || '',
-            subscriptionPlan: d.subscriptionPlan || 'basic'
-          });
-        }
-        
-        if (isSubscribed && resRem?.success && Array.isArray(resRem?.data)) {
-          setReminders(resRem.data);
-        }
-      } catch (e) {
-        console.error("Error fetching dashboard data", e);
-      } finally {
-        if (isSubscribed) {
-          setIsLoading(false);
-        }
-      }
-    };
-    fetchDashboard();
-    return () => {
-      isSubscribed = false;
-    };
-  }, []);
-  
-    if (isLoading) {
-      return (
-        <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden">
-          {/* Glow de fondo */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px]" />
-          
-          <motion.div
-            animate={{ 
-              y: [0, -8, 0],
-              x: [-2, 2, -2],
-              rotate: [-2, 2, -2]
-            }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 0.4,
-              ease: "easeInOut"
-            }}
-            className="relative z-10 flex flex-col items-center"
-          >
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/25 mb-6 relative overflow-hidden">
-              {/* Líneas de velocidad animadas simulando viento */}
-              <motion.div
-                animate={{ x: ['150%', '-150%'], opacity: [0, 1, 0] }}
-                transition={{ repeat: Infinity, duration: 0.6, ease: "linear" }}
-                className="absolute top-4 right-0 w-12 h-[2px] bg-white/40 rounded-full"
-              />
-              <motion.div
-                animate={{ x: ['150%', '-150%'], opacity: [0, 1, 0] }}
-                transition={{ repeat: Infinity, duration: 0.8, ease: "linear", delay: 0.2 }}
-                className="absolute top-10 right-0 w-8 h-[2px] bg-white/60 rounded-full"
-              />
-              <motion.div
-                animate={{ x: ['150%', '-150%'], opacity: [0, 1, 0] }}
-                transition={{ repeat: Infinity, duration: 0.5, ease: "linear", delay: 0.4 }}
-                className="absolute bottom-4 right-0 w-10 h-[2px] bg-white/30 rounded-full"
-              />
-              
-              <Bike className="w-10 h-10 text-white relative z-10" />
-            </div>
-          </motion.div>
-          
-          <motion.p 
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ repeat: Infinity, duration: 1.5 }}
-            className="text-foreground/80 font-medium z-10 text-lg tracking-tight"
-          >
-            Calentando motores...
-          </motion.p>
-        </div>
-      );
-    }
 
   return (
     <div className="w-full space-y-6">

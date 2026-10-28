@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from './types'
 import { cache } from 'react'
+import { managedSupabaseFetch } from './managed-fetch'
 
 export const createClient = cache(async (fetchOverride?: typeof fetch) => {
   const cookieStore = await cookies()
@@ -16,7 +17,7 @@ export const createClient = cache(async (fetchOverride?: typeof fetch) => {
     supabaseUrl,
     supabaseAnonKey,
     {
-      global: fetchOverride ? { fetch: fetchOverride } : undefined,
+      global: { fetch: managedSupabaseFetch(fetchOverride || globalThis.fetch) },
       cookies: {
         getAll() {
           return cookieStore.getAll()

@@ -20,7 +20,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   }
 
   const user = await requireWorkshop();
-  const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+  const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

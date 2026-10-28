@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/managed-client';
 import { sendAccessCodeNotification } from '@/lib/whatsapp';
 import { generateMobileCode, generateTemporaryPassword, hashMobileCode, normalizeMobilePhone } from '@/lib/mobile-otp';
 

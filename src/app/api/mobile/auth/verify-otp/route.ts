@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/managed-client';
 import { generateTemporaryPassword, hashMobileCode, normalizeMobilePhone } from '@/lib/mobile-otp';
 
 export const dynamic = 'force-dynamic';

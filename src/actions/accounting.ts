@@ -310,7 +310,7 @@ export async function getPayrollHistory(organizationId: string): Promise<Payroll
   });
 }
 
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client';
 
 export async function getOrganizationTechnicians(organizationId: string) {
   await assertAccountingScope(organizationId);

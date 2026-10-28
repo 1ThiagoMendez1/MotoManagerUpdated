@@ -1,6 +1,8 @@
 # PostgreSQL y Redis en Dokploy
 
-Este Compose prepara **el destino de un ensayo de migración**. No cambia el backend de la aplicación: `v6.8.0` usa Auth, PostgREST/RPC, Storage y Realtime de Supabase. Añadir `DATABASE_URL` no sustituye esas dependencias. Redis es opcional y todavía no está conectado a la aplicación; no contiene la fuente de verdad.
+`compose.yml` prepara **el destino de un ensayo de migración**. No cambia el backend de la aplicación: `v6.8.0` usa Auth, PostgREST/RPC, Storage y Realtime de Supabase. Añadir `DATABASE_URL` no sustituye esas dependencias.
+
+Para la aplicación existente, la integración de caché de lecturas usa **`redis.compose.yml`**, sin crear otra base. Seguir [la configuración y validación de navegación](../../docs/navigation-performance-20261028.md), incluida la migración de técnicos y la conexión privada opcional a Kong. Redis es opcional y no contiene la fuente de verdad. Los pasos siguientes corresponden únicamente al ensayo separado de migración.
 
 1. Crear un proyecto **separado de producción** en Dokploy con `infra/dokploy/compose.yml`. Comprobar espacio para la base restaurada, índices y respaldo. Mantener PostgreSQL 17 si el origen también usa 17; comprobar `SHOW server_version` antes de exportar.
 2. Configurar `POSTGRES_PASSWORD` mediante secretos de Dokploy. Generarla fuera del repositorio; no pegar valores en tickets ni chat. Para Redis, activar el perfil `cache` y configurar `REDIS_PASSWORD` hexadecimal aleatoria de al menos 32 bytes.

@@ -72,7 +72,7 @@ export async function createMotorcycle(prevState: any, formData: FormData) {
     const createWorkOrderFlag = formData.get('createWorkOrder') === 'true';
     const technicianId = formData.get('technicianId') as string;
 
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { useState } from 'react';
+import { IntentLink as Link } from '@/components/navigation/IntentLink';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bike,
@@ -42,9 +42,9 @@ interface DashboardMenuProps {
   userName: string;
   workshopName: string;
   subscriptionPlan?: string;
-  motorcycles: Motorcycle[];
-  technicians: Technician[];
-  unavailableMotorcycleIds: string[];
+  motorcycles?: Motorcycle[];
+  technicians?: Technician[];
+  unavailableMotorcycleIds?: string[];
 }
 
 export function DashboardMenu({ 
@@ -76,14 +76,13 @@ export function DashboardMenu({
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
   };
 
-  // Obtener saludo dinámico
-  const hour = new Date().getHours();
-  let greeting = 'Buenos días';
-  if (hour >= 12 && hour < 19) {
-    greeting = 'Buenas tardes';
-  } else if (hour >= 19 || hour < 5) {
-    greeting = 'Buenas noches';
-  }
+  // Server runs in Bogotá; the browser may use another timezone. Keep the
+  // initial markup stable so React does not discard and rebuild the menu.
+  const [greeting, setGreeting] = useState('Hola');
+  useEffect(() => {
+    const hour = new Date().getHours();
+    setGreeting(hour >= 5 && hour < 12 ? 'Buenos días' : hour < 19 && hour >= 12 ? 'Buenas tardes' : 'Buenas noches');
+  }, []);
 
   // Módulos (se mantienen los permisos)
   const canAccessWorkOrders = hasPermission(role, '/work-orders', customPermissions);
@@ -160,7 +159,7 @@ export function DashboardMenu({
                   
                   <div className="flex flex-col sm:flex-row gap-4 mt-auto">
                     <div className="flex-1">
-                      <AddWorkOrder 
+                      <AddWorkOrder lazy
                         motorcycles={motorcycles} 
                         technicians={technicians}
                         unavailableMotorcycleIds={unavailableMotorcycleIds}

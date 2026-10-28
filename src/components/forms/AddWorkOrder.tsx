@@ -27,10 +27,11 @@ import { createWorkOrder } from '@/lib/actions/work-orders';
 import type { Motorcycle, Technician } from '@/lib/types';
 
 type AddWorkOrderProps = {
-  motorcycles: Motorcycle[];
-  technicians: Technician[];
+  motorcycles?: Motorcycle[];
+  technicians?: Technician[];
   unavailableMotorcycleIds?: string[];
   customTrigger?: React.ReactNode;
+  lazy?: boolean;
 };
 
 function SubmitButton({ disabled }: { disabled: boolean }) {
@@ -42,7 +43,11 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
   );
 }
 
-export function AddWorkOrder({ motorcycles, technicians, unavailableMotorcycleIds = [], customTrigger }: AddWorkOrderProps) {
+export function AddWorkOrder({ motorcycles: initialMotorcycles = [], technicians: initialTechnicians = [], unavailableMotorcycleIds: initialBlocked = [], customTrigger, lazy = false }: AddWorkOrderProps) {
+  const [options, setOptions] = useState({ motorcycles: initialMotorcycles, technicians: initialTechnicians, unavailableMotorcycleIds: initialBlocked });
+  const { motorcycles, technicians, unavailableMotorcycleIds } = lazy ? options : { motorcycles: initialMotorcycles, technicians: initialTechnicians, unavailableMotorcycleIds: initialBlocked };
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [optionsError, setOptionsError] = useState('');
   const blockedIds = new Set(unavailableMotorcycleIds);
   const canCreateOrder = motorcycles.some(moto => !blockedIds.has(moto.id));
   const [isOpen, setIsOpen] = useState(false);
@@ -50,6 +55,18 @@ export function AddWorkOrder({ motorcycles, technicians, unavailableMotorcycleId
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  useEffect(() => {
+    if (!lazy || !isOpen) return;
+    const controller = new AbortController();
+    setLoadingOptions(true); setOptionsError('');
+    fetch('/api/workshop/options', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => { if (!response.ok || response.redirected) throw new Error(); return response.json(); })
+      .then(data => { if (!controller.signal.aborted) setOptions(data); })
+      .catch(() => { if (!controller.signal.aborted) setOptionsError('No se pudieron cargar las opciones. Cierra y vuelve a abrir para reintentar.'); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingOptions(false); });
+    return () => controller.abort();
+  }, [lazy, isOpen]);
+
 
   useEffect(() => {
     if (searchParams.get('new') === 'true') {
@@ -83,6 +100,8 @@ export function AddWorkOrder({ motorcycles, technicians, unavailableMotorcycleId
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-card text-card-foreground">
+        {loadingOptions && <p role="status" className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" />Cargando opciones…</p>}
+        {optionsError && <p role="alert" className="text-sm text-destructive">{optionsError}</p>}
         <DialogHeader>
           <DialogTitle className="text-foreground">Crear Nueva Orden de Trabajo</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -134,7 +153,7 @@ export function AddWorkOrder({ motorcycles, technicians, unavailableMotorcycleId
             </Select>
           </div>
           <DialogFooter>
-            <SubmitButton disabled={!canCreateOrder || technicians.length === 0} />
+            <SubmitButton disabled={loadingOptions || Boolean(optionsError) || !canCreateOrder || technicians.length === 0} />
           </DialogFooter>
         </form>
       </DialogContent>

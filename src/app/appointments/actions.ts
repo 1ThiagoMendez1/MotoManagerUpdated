@@ -1,10 +1,12 @@
 'use server';
 
+import { workshopCache } from '@/lib/cache/redis';
 import { createAdminClient, requireWorkshop } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 
 export async function getAppointments() {
   const user = await requireWorkshop();
+  return workshopCache.remember(user, 'appointments', {}, async () => {
   const supabase = await createAdminClient();
 
   const { data, error } = await supabase
@@ -38,7 +40,7 @@ export async function getAppointments() {
 
   if (error) {
     console.error('Error fetching appointments:', error);
-    return [];
+    throw new Error('No se pudo cargar la agenda.');
   }
 
   return (data || []).map((apt: any) => ({
@@ -67,6 +69,7 @@ export async function getAppointments() {
       licensePlate: apt.motorcycles.license_plate,
     } : null,
   }));
+  });
 }
 
 export async function updateAppointmentStatus(id: string, status: string) {

@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client';
 import { requireWorkshop } from '@/lib/auth-server';
 
 const getSupabaseAdmin = () => createSupabaseClient(

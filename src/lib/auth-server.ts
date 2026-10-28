@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client';
 import { hasPermission } from '@/lib/permissions';
 import { cache } from 'react';
 import { isSuperAdmin } from '@/lib/super-admin';
@@ -21,7 +21,7 @@ export const getCurrentUserServer = cache(async () => {
   );
       const { data: _orgMembers, error: orgError } = await supabaseAdmin
         .from('organization_members')
-        .select('organization_id, role, custom_permissions')
+        .select('organization_id, role, custom_permissions, organization:organizations(id, name, slug, status, settings, created_at)')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
@@ -40,7 +40,8 @@ export const getCurrentUserServer = cache(async () => {
         role: orgMember?.role || 'viewer',
         custom_permissions: orgMember?.custom_permissions || null,
         workshopId: orgMember?.organization_id || null,
-        availableWorkshops: orgMember ? [orgMember.organization_id] : []
+        availableWorkshops: orgMember ? [orgMember.organization_id] : [],
+        organization: Array.isArray(orgMember?.organization) ? orgMember.organization[0] : orgMember?.organization
       };
     }
   } catch (e) {
@@ -103,13 +104,14 @@ export const getWorkshopDetails = cache(async (knownUser?: any) => {
     
     // If we only have knownUser from auth but not the workshopId, fetch it
     let workshopId = user.workshopId;
+    let organization = user.organization;
     let userRole = user.role;
     let customPermissions = user.custom_permissions;
     const actualUserId = user.userId || user.id;
     if (!workshopId && actualUserId) {
        const { data: _orgMembers } = await supabaseAdmin
         .from('organization_members')
-        .select('organization_id, role, custom_permissions')
+        .select('organization_id, role, custom_permissions, organization:organizations(id, name, slug, status, settings, created_at)')
         .eq('user_id', actualUserId)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
@@ -118,6 +120,7 @@ export const getWorkshopDetails = cache(async (knownUser?: any) => {
            workshopId = _orgMembers[0].organization_id;
            userRole = _orgMembers[0].role;
            customPermissions = _orgMembers[0].custom_permissions;
+           organization = Array.isArray(_orgMembers[0].organization) ? _orgMembers[0].organization[0] : _orgMembers[0].organization;
        }
     }
 
@@ -126,18 +129,17 @@ export const getWorkshopDetails = cache(async (knownUser?: any) => {
         return null;
     }
 
-    const { data: _org, error } = await supabaseAdmin
-      .from('organizations')
-      .select('*')
-      .eq('id', workshopId)
-      .single();
-      
-    if (error) {
-      console.error(`[auth-server] getWorkshopDetails - Error fetching org ${workshopId}:`, error);
+    if (!organization) {
+      const { data, error } = await supabaseAdmin
+        .from('organizations')
+        .select('id, name, slug, status, settings, created_at')
+        .eq('id', workshopId)
+        .single();
+      if (error) throw new Error('Could not resolve workshop');
+      organization = data;
     }
-    
-    const org = _org as any;
-    
+    const org = organization;
+
     if (org) {
       const settings = org.settings || {};
       return {
@@ -175,7 +177,7 @@ export async function requireSuperAdmin() {
 }
 
 export async function createAdminClient() {
-  const { createClient } = await import('@supabase/supabase-js');
+  const { createClient } = await import('@/lib/supabase/managed-client');
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,8 +20,23 @@ type MotorcycleDetailsProps = {
   workOrders?: WorkOrder[];
 };
 
-export function MotorcycleDetails({ motorcycle, workOrders = [] }: MotorcycleDetailsProps) {
+export function MotorcycleDetails({ motorcycle, workOrders }: MotorcycleDetailsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [history, setHistory] = useState(workOrders || []);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (workOrders) { setHistory(workOrders); return; }
+    if (!isOpen) return;
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    fetch(`/api/workshop/motorcycles/${encodeURIComponent(motorcycle.id)}/history`, { signal: controller.signal, cache: 'no-store' })
+      .then(async response => { if (!response.ok || response.redirected) throw new Error(); return response.json(); })
+      .then(data => { if (!controller.signal.aborted) setHistory(data.items); })
+      .catch(() => { if (!controller.signal.aborted) setError('No se pudo cargar el historial. Cierra y vuelve a abrir para reintentar.'); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [isOpen, motorcycle.id, workOrders]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -63,11 +78,13 @@ export function MotorcycleDetails({ motorcycle, workOrders = [] }: MotorcycleDet
                          </div>
                      </div>
                  )}
-                 {workOrders.length > 0 && (
+                 {loading && <p role="status" className="text-sm text-muted-foreground">Cargando historial…</p>}
+                 {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+                 {history.length > 0 && (
                      <div>
                          <h4 className="font-semibold mb-2 flex items-center text-foreground"><Wrench className="mr-2 h-4 w-4" /> Órdenes de Trabajo</h4>
                          <div className="space-y-3 pl-6">
-                             {workOrders.map((workOrder) => (
+                             {history.map((workOrder) => (
                                  <div key={workOrder.id} className="border-l-2 border-gray-300 pl-4">
                                      <div className="flex items-center gap-2 mb-2">
                                          <Badge

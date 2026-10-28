@@ -561,7 +561,7 @@ export async function getKardexMovements(itemId: string) {
     // We use the service role client here to bypass any complex RLS recursion 
     // that might be caused by joins on profiles/organization_members.
     // We enforce security manually by filtering strictly by the user's workshopId.
-    const { createClient } = require('@supabase/supabase-js');
+    const { createClient } = require('@/lib/supabase/managed-client');
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!

@@ -8,11 +8,17 @@ test('las dos rutas usan las mismas opciones de selección de motos', () => {
   const orders = source('src/app/work-orders/page.tsx');
   const dashboard = source('src/app/[tenant]/page.tsx');
   assert.match(orders, /getOrderCreationOptions\(\)/);
-  assert.match(dashboard, /getOrderCreationOptions\(\)/);
+  // The home menu no longer blocks navigation on modal-only selectors.
+  assert.doesNotMatch(dashboard, /getOrderCreationOptions\(\)/);
+  const endpoint = source('src/app/api/workshop/options/route.ts');
+  assert.match(endpoint, /authorize\('\/work-orders'\)/);
+  assert.match(endpoint, /getOrderCreationOptions\(\)/);
+  assert.match(source('src/components/dashboard/DashboardMenu.tsx'), /<AddWorkOrder lazy/);
+  assert.match(source('src/components/forms/AddWorkOrder.tsx'), /fetch\('\/api\/workshop\/options'/);
   assert.doesNotMatch(orders, /motorcyclesWithoutAnyWorkOrder/);
   assert.doesNotMatch(dashboard, /motorcyclesWithoutAnyWorkOrder/);
   assert.match(orders, /unavailableMotorcycleIds=\{unavailableMotorcycleIds\}/);
-  assert.match(dashboard, /unavailableMotorcycleIds=\{unavailableMotorcycleIds\}/);
+  assert.match(source('src/components/dashboard/DashboardMenu.tsx'), /unavailableMotorcycleIds=\{unavailableMotorcycleIds\}/);
 });
 
 test('la consulta excluye estados terminados, no todo el historial', () => {

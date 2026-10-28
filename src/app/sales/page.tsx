@@ -94,12 +94,11 @@ export default async function SalesPage({
   const { getServices } = await import('@/actions/services');
 
   try {
-    const [sls, wos, inv, custs, allSales, servicesResult] = await Promise.all([
+    const [sls, wos, inv, custs, servicesResult] = await Promise.all([
       getSales({ dateFrom, dateTo, type, page: currentPage, limit: 10 } as any),
       getWorkOrders({ limit: 200 }),
       getInventory({ limit: 200 } as any),
       getCustomers(),
-      getSales({ dateFrom, dateTo, type, limit: 1000 } as any),
       getServices(user.workshopId),
     ]);
 
@@ -108,7 +107,6 @@ export default async function SalesPage({
     const workOrders = wos.items || wos;
     const inventoryItems = inv.items as InventoryItem[];
     const customers = (custs as any).items || custs;
-    const allFilteredSales = allSales.items;
     const services = servicesResult || [];
 
     const getSaleDetails = (sale: Sale) => {
@@ -154,9 +152,9 @@ export default async function SalesPage({
             </div>
           }
           secondaryActions={[
-            { label: 'Exportar Ventas Directas', component: <ExportDirectSalesButton sales={allFilteredSales.filter(s => !s.workOrderId)} /> },
-            { label: 'Exportar Ventas por Servicio', component: <ExportServiceSalesButton sales={allFilteredSales.filter(s => s.workOrderId)} /> },
-            { label: 'Exportar Todo el Historial', component: <ExportSalesButton sales={allFilteredSales} /> }
+            { label: 'Exportar Ventas Directas', component: <ExportDirectSalesButton filters={{ dateFrom, dateTo, type: 'direct' }} /> },
+            { label: 'Exportar Ventas por Servicio', component: <ExportServiceSalesButton filters={{ dateFrom, dateTo, type: 'service' }} /> },
+            { label: 'Exportar Todo el Historial', component: <ExportSalesButton filters={{ dateFrom, dateTo, type }} /> }
           ]}
         />
 

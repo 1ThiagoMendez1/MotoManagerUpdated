@@ -1,5 +1,7 @@
 'use server';
 
+import { requireWorkshop } from '@/lib/auth-server';
+import { workshopCache } from '@/lib/cache/redis';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
@@ -17,6 +19,9 @@ export interface ServiceItem {
 }
 
 export async function getServices(organizationId: string): Promise<ServiceItem[]> {
+  const user = await requireWorkshop();
+  if (organizationId !== user.workshopId) throw new Error('Workshop access denied');
+  return workshopCache.remember(user, 'services', {}, async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('service_catalog')
@@ -27,10 +32,11 @@ export async function getServices(organizationId: string): Promise<ServiceItem[]
 
   if (error) {
     console.error('Error fetching services:', error);
-    return [];
+    throw new Error('No se pudieron cargar los servicios.');
   }
 
   return data as ServiceItem[];
+  });
 }
 
 export async function createService(organizationId: string, payload: Partial<ServiceItem>): Promise<{ success: boolean; error?: string }> {

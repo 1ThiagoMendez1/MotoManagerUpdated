@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from 'react';
+import { loadSalesExport, type SaleExportFilters } from '@/lib/sales-export';
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 import { exportSpreadsheet } from '@/lib/spreadsheet-export';
@@ -7,12 +9,19 @@ import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale } from "@/lib/types";
 
 type ExportSalesButtonProps = {
-  sales: Sale[];
+  sales?: Sale[];
+  filters?: SaleExportFilters;
 };
 
-export function ExportSalesButton({ sales }: ExportSalesButtonProps) {
-  const handleExport = () => exportSpreadsheet((XLSX) => {
-    const dataToExport = sales.map((sale) => {
+export function ExportSalesButton({ sales, filters }: ExportSalesButtonProps) {
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+    await exportSpreadsheet(async (XLSX) => {
+    const rows = sales || await loadSalesExport(filters);
+    const dataToExport = rows.map((sale) => {
         let details = '';
         if (sale.workOrderId && sale.workOrder) {
             details = sale.workOrder.issueDescription || '';
@@ -50,10 +59,12 @@ export function ExportSalesButton({ sales }: ExportSalesButtonProps) {
     ];
 
     XLSX.writeFile(workbook, "Historial_de_Ventas.xlsx");
-  });
+    });
+    } finally { setExporting(false); }
+  };
 
   return (
-    <Button variant="outline" onClick={handleExport}>
+    <Button variant="outline" onClick={handleExport} disabled={exporting}>
       <FileDown className="mr-2 h-4 w-4" />
       Exportar
     </Button>

@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client'
 
 import { sendOwnerWelcomeNotification } from '@/lib/whatsapp'
 

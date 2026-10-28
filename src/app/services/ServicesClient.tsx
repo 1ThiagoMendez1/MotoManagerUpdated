@@ -18,11 +18,12 @@ import { toast } from 'sonner';
 
 interface ServicesClientProps {
   organizationId: string;
+  initialServices: ServiceItem[];
 }
 
-export default function ServicesClient({ organizationId }: ServicesClientProps) {
-  const [services, setServices] = useState<ServiceItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function ServicesClient({ organizationId, initialServices }: ServicesClientProps) {
+  const [services, setServices] = useState<ServiceItem[]>(initialServices);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
@@ -75,8 +76,8 @@ export default function ServicesClient({ organizationId }: ServicesClientProps) 
   };
 
   useEffect(() => {
-    loadServices();
-  }, [organizationId]);
+    setServices(initialServices);
+  }, [initialServices]);
 
   const filteredServices = services.filter(s => 
     s.name.toLowerCase().includes(search.toLowerCase()) || 

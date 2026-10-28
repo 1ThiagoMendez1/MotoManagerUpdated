@@ -1,19 +1,28 @@
 'use client';
 
 import { Download } from 'lucide-react';
+import { useState } from 'react';
+import { loadSalesExport, type SaleExportFilters } from '@/lib/sales-export';
 import { Button } from '@/components/ui/button';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale } from '@/lib/types';
 import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 
 interface ExportServiceSalesButtonProps {
-  sales: Sale[];
+  sales?: Sale[];
+  filters?: SaleExportFilters;
 }
 
-export function ExportServiceSalesButton({ sales }: ExportServiceSalesButtonProps) {
-  const handleExport = () => exportSpreadsheet((XLSX) => {
+export function ExportServiceSalesButton({ sales, filters }: ExportServiceSalesButtonProps) {
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+    await exportSpreadsheet(async (XLSX) => {
+    const rows = sales || await loadSalesExport(filters);
     // Prepare data for Excel
-    const data = sales.map(sale => ({
+    const data = rows.map(sale => ({
       'Número de Venta': sale.saleNumber,
       'Fecha': formatExactDateTime(sale.date),
       'Cliente': sale.workOrder?.motorcycle.customer.name || 'N/A',
@@ -49,14 +58,16 @@ export function ExportServiceSalesButton({ sales }: ExportServiceSalesButtonProp
     // Generate and download file
     const fileName = `ventas-servicio-${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
-  });
+    });
+    } finally { setExporting(false); }
+  };
 
   return (
     <Button
       onClick={handleExport}
       variant="outline"
       className="bg-card/50 border-border/50 text-foreground hover:bg-card/80"
-      disabled={sales.length === 0}
+      disabled={exporting || (sales !== undefined && sales.length === 0)}
     >
       <Download className="mr-2 h-4 w-4" />
       Exportar Servicio

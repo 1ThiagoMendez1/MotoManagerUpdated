@@ -44,7 +44,7 @@ export async function createNotification({
   metadata?: any;
 }) {
   try {
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -174,7 +174,7 @@ export async function markNotificationAsRead(notificationId: string) {
       return { success: true };
     }
 
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -212,7 +212,7 @@ export async function markAllNotificationsAsRead() {
     const user = await getCurrentUserServer();
     if (!user || !user.workshopId) return { success: false };
 
-    const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');
+    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,

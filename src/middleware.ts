@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { isSuperAdmin } from '@/lib/super-admin'
+import { internalSupabaseFetch } from '@/lib/supabase/transport'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -17,6 +18,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: internalSupabaseFetch() },
       cookies: {
         getAll() {
           return request.cookies.getAll()

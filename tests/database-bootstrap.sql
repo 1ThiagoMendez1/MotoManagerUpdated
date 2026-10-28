@@ -26,8 +26,10 @@ CREATE TABLE public.inventory_item_stock (
 \ir ../supabase/migrations/20261023201000_mobile_otp_challenges.sql
 \ir ../supabase/migrations/20261023202000_atomic_workshop_profile.sql
 \ir ../supabase/migrations/20261023203000_atomic_whatsapp_quota.sql
+\ir ../supabase/migrations/20261028200000_scoped_technician_directory.sql
 GRANT SELECT ON public.organization_members, public.organizations TO authenticated;
 \ir database-regression.sql
+\ir scoped-technicians-regression.sql
 
 -- Minimal Storage metadata fixture for the public-image migration. This is not a Storage server.
 CREATE SCHEMA storage;

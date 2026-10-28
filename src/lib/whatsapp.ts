@@ -4,7 +4,7 @@ import type { ReadyNotice } from './whatsapp-ready';
 import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
 import { buildDiagnosisMetaTemplate } from './whatsapp-diagnosis';
 import { ai } from '@/ai/genkit';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@/lib/supabase/managed-client';
 import { getWorkshopWhatsAppLimit } from '@/lib/workshop-plan';
 
 const evolutionApiUrl = process.env.EVOLUTION_API_URL;
