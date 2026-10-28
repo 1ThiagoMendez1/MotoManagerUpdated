@@ -72,8 +72,8 @@ function RegistrationForm({ plan, billingCycle, name, email, reference, info }: 
       {/* Plan confirmation */}
       <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex justify-between items-center">
         <div>
-          <p className="text-green-400/70 text-xs mb-0.5">Plan activado</p>
-          <p className="font-bold text-foreground">{info.name} · {formatCOPInner(info.price)}</p>
+          <p className="text-green-400/70 text-xs mb-0.5">Plan seleccionado</p>
+          <p className="font-bold text-foreground">{info.name}{info.price > 0 ? ` · ${formatCOPInner(info.price)}` : ''}</p>
           <p className="text-muted-foreground text-xs">{info.period}</p>
         </div>
         <CheckCircle2 className="h-6 w-6 text-green-400" />

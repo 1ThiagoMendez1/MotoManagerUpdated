@@ -1,146 +1,94 @@
 'use client';
-import { ArrowRight, Phone, Shield, Star, Zap, Clock, TrendingUp } from 'lucide-react';
 
-interface Props {
-  onScrollToPlanes: () => void;
-}
+import { ArrowRight, Check, ClipboardCheck, Gauge, MessageSquareText, Wrench } from 'lucide-react';
 
-function StarRating({ count }: { count: number }) {
+export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void }) {
   return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: count }).map((_, i) => (
-        <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
-      ))}
-    </div>
-  );
-}
-
-export function LandingHero({ onScrollToPlanes }: Props) {
-  return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 text-center overflow-hidden pt-20">
-      {/* Animated glow blobs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/20 rounded-full blur-3xl animate-pulse pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="relative z-10 max-w-5xl mx-auto space-y-8">
-        {/* Badge - Urgent */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-bold backdrop-blur-sm shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-bounce">
-          <Clock className="h-4 w-4" />
-          OFERTA POR TIEMPO LIMITADO: 50% OFF EN PLAN ANUAL
-        </div>
-
-        {/* Headline - Agitating the pain */}
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-tight tracking-tight">
-          ¿Pierdes dinero por no tener<br />
-          <span className="bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 bg-clip-text text-transparent">
-            control de tu taller?
-          </span>
-        </h1>
-
-        {/* Subtitle - The solution */}
-        <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
-          Evita el robo hormiga, organiza tus órdenes y <span className="text-foreground font-bold border-b-2 border-red-500">multiplica tus ganancias</span>. 
-          MotoManager es el software #1 diseñado para talleres de motos en Colombia.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-4">
-          <button
-            onClick={onScrollToPlanes}
-            className="group relative flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-extrabold px-10 py-5 rounded-2xl shadow-[0_0_40px_rgba(239,68,68,0.4)] transition-all hover:scale-105 hover:shadow-[0_0_60px_rgba(239,68,68,0.6)] text-lg w-full sm:w-auto overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-white/20 skew-x-12 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-            RECLAMAR MI 50% OFF
-            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-          <a
-            href="https://wa.me/573001234567"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 border-2 border-border/50 hover:border-foreground text-foreground px-8 py-5 rounded-2xl transition-all hover:bg-accent/20 text-lg font-bold w-full sm:w-auto"
-          >
-            <Phone className="h-5 w-5" />
-            Hablar con un asesor
-          </a>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2 font-medium">
-          ⚡ Sin tarjeta de crédito requerida para iniciar · Cancela cuando quieras
-        </p>
-
-        {/* Social proof */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-6 text-muted-foreground text-sm">
-          <div className="flex items-center gap-2 bg-card/40 px-4 py-2 rounded-full border border-border/30">
-            <TrendingUp className="h-4 w-4 text-green-500" />
-            <span className="font-semibold text-foreground">+500 talleres</span> aumentaron sus ventas
+    <section className="relative overflow-hidden bg-[#081121] px-5 pb-24 pt-20 text-white lg:pb-32 lg:pt-28">
+      <div className="pointer-events-none absolute -right-32 top-4 h-[540px] w-[540px] rounded-full bg-cyan-500/10 blur-[100px]" />
+      <div className="pointer-events-none absolute -left-52 bottom-0 h-[440px] w-[440px] rounded-full bg-blue-600/10 blur-[110px]" />
+      <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1fr_0.94fr] lg:gap-16">
+        <div className="max-w-2xl">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-xs font-semibold tracking-wide text-cyan-200">
+            <span className="h-2 w-2 rounded-full bg-cyan-300" />
+            Software de gestión para talleres de motos
           </div>
-          <div className="flex items-center gap-2 bg-card/40 px-4 py-2 rounded-full border border-border/30">
-            <StarRating count={5} />
-            <span className="font-semibold text-foreground">4.9/5</span> de satisfacción
+          <h1 className="max-w-[760px] text-5xl font-semibold leading-[1.09] tracking-[-0.055em] sm:text-6xl lg:text-[4.25rem]">
+            Tu taller, más organizado.
+            <span className="block text-cyan-300">Tu negocio, mejor gestionado.</span>
+          </h1>
+          <p className="mt-7 max-w-xl text-lg leading-8 text-slate-300">
+            Centraliza clientes, motocicletas, órdenes de trabajo, inventario y ventas en un solo lugar.
+            Dedica menos tiempo a buscar información y más a atender bien cada servicio.
+          </p>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <button
+              onClick={onScrollToPlanes}
+              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-7 font-semibold text-slate-950 transition hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+            >
+              Conocer planes y precios <ArrowRight className="h-4 w-4" />
+            </button>
+            <a href="#como-funciona" className="inline-flex min-h-14 items-center justify-center rounded-xl border border-white/20 px-7 font-semibold text-white transition hover:border-white/40 hover:bg-white/5">
+              Descubrir cómo funciona
+            </a>
           </div>
-          <div className="flex items-center gap-2 bg-card/40 px-4 py-2 rounded-full border border-border/30">
-            <Shield className="h-4 w-4 text-blue-500" />
-            <span className="font-semibold text-foreground">100% Seguro</span> con Wompi
+          <div className="mt-9 flex flex-wrap gap-x-7 gap-y-3 text-sm text-slate-300">
+            {['Accede desde el navegador', 'Información por taller', 'Planes para distintos equipos'].map(label => (
+              <span key={label} className="inline-flex items-center gap-2">
+                <Check className="h-4 w-4 text-cyan-300" /> {label}
+              </span>
+            ))}
           </div>
         </div>
 
-        {/* Dashboard mockup (Keep the same cool UI) */}
-        <div className="relative mx-auto max-w-4xl mt-12 z-0">
-          <div className="rounded-2xl border-2 border-primary/20 bg-card/70 backdrop-blur-md overflow-hidden shadow-2xl shadow-black/40 dark:shadow-black/80 ring-1 ring-white/10 transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-500">
-            {/* Fake browser bar */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-black/40 border-b border-white/5">
-              <div className="flex gap-1.5">
-                <span className="h-3 w-3 rounded-full bg-red-500/80" />
-                <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                <span className="h-3 w-3 rounded-full bg-green-500/80" />
+        <div className="relative" aria-label="Representación ilustrativa del flujo de órdenes de MotoManager">
+          <div className="absolute inset-6 -rotate-3 rounded-[32px] bg-gradient-to-br from-cyan-400/20 to-blue-500/10 blur-2xl" />
+          <div className="relative overflow-hidden rounded-[26px] border border-white/15 bg-[#111e32] shadow-[0_36px_95px_rgba(0,0,0,0.35)]">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <div className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-300 text-slate-950"><Wrench className="h-4 w-4" /></span>
+                MotoManager <span className="font-normal text-slate-400">/ Flujo del taller</span>
               </div>
-              <div className="flex-1 mx-4 bg-black/30 rounded-lg px-3 py-1 text-xs text-white/40 text-center font-mono">
-                app.motomanager.com.co/dashboard
-              </div>
+              <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-slate-400">Ejemplo ilustrativo</span>
             </div>
-            {/* Dashboard content simulation */}
-            <div className="p-6 md:p-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Clientes Registrados', value: '1,284', color: 'blue', change: '+12% este mes' },
-                { label: 'Órdenes Activas', value: '47', color: 'amber', change: '5 críticas' },
-                { label: 'Ingresos Mensuales', value: '$14.2M', color: 'green', change: '+23% vs mes anterior' },
-                { label: 'Alertas de Stock', value: '3 repuestos', color: 'red', change: 'Pedir urgente' },
-              ].map(stat => (
-                <div key={stat.label} className="rounded-xl bg-black/20 border border-white/5 p-4 relative overflow-hidden group">
-                  <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-br transition-opacity duration-300 ${
-                    stat.color === 'red' ? 'from-red-500' : 
-                    stat.color === 'green' ? 'from-green-500' : 
-                    stat.color === 'amber' ? 'from-amber-500' : 'from-blue-500'
-                  }`} />
-                  <p className="text-xs text-muted-foreground mb-1 font-medium">{stat.label}</p>
-                  <p className="text-2xl md:text-3xl font-black text-foreground">{stat.value}</p>
-                  <span className={`text-xs font-bold mt-1 inline-block ${stat.color === 'red' ? 'text-red-400' : stat.color === 'green' ? 'text-green-400' : stat.color === 'amber' ? 'text-amber-400' : 'text-blue-400'}`}>
-                    {stat.change}
-                  </span>
+            <div className="grid gap-5 p-5 sm:p-7">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.15em] text-cyan-200">Organiza el servicio</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight">Cada moto, en su etapa.</h2>
                 </div>
-              ))}
-            </div>
-            {/* Fake chart */}
-            <div className="mx-6 mb-6 rounded-xl bg-black/20 border border-white/5 p-5 relative overflow-hidden">
-               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
-              <p className="text-sm font-bold text-muted-foreground mb-4">Crecimiento de Ventas (Últimos 6 meses)</p>
-              <div className="flex items-end gap-3 h-28">
-                {[40, 55, 45, 75, 65, 95].map((h, i) => (
-                  <div key={i} className="flex-1 relative group">
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-xs py-1 px-2 rounded font-bold">
-                      +{h}%
+                <Gauge className="hidden h-10 w-10 text-cyan-200/70 sm:block" />
+              </div>
+              <div className="grid gap-3">
+                {[
+                  {number:'01', title:'Recepción', description:'Cliente y motocicleta identificados', state:'Registrada', highlight:false},
+                  {number:'02', title:'Diagnóstico', description:'Orden y técnico asignado', state:'En proceso', highlight:true},
+                  {number:'03', title:'Reparación', description:'Seguimiento del trabajo', state:'En seguimiento', highlight:false},
+                  {number:'04', title:'Entrega', description:'Historial disponible para la próxima visita', state:'Cerrada', highlight:false},
+                ].map(item => (
+                  <div key={item.number} className={`flex items-center gap-3 rounded-xl border p-3.5 sm:p-4 ${item.highlight ? 'border-cyan-300/40 bg-cyan-300/10' : 'border-white/10 bg-white/[0.035]'}`}>
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${item.highlight ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-cyan-200'}`}>{item.number}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{item.title}</p>
+                      <p className="text-xs leading-5 text-slate-400">{item.description}</p>
                     </div>
-                    <div className="w-full rounded-t-md bg-gradient-to-t from-primary/20 to-primary opacity-90 transition-all duration-500 group-hover:opacity-100 group-hover:to-red-500" style={{ height: `${h}%` }} />
+                    <span className="hidden rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-slate-300 sm:block">{item.state}</span>
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between mt-3 text-xs font-bold text-muted-foreground/60">
-                {['Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr'].map(m => <span key={m}>{m}</span>)}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                  <ClipboardCheck className="h-6 w-6 text-cyan-300" />
+                  <div><p className="text-sm font-semibold">Órdenes</p><p className="text-xs text-slate-400">Seguimiento</p></div>
+                </div>
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                  <MessageSquareText className="h-6 w-6 text-cyan-300" />
+                  <div><p className="text-sm font-semibold">Avisos</p><p className="text-xs text-slate-400">Según tu plan</p></div>
+                </div>
               </div>
             </div>
           </div>
-          {/* Glow under mockup */}
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-4/5 h-20 bg-primary/30 blur-[60px] rounded-full pointer-events-none" />
+          <p className="mt-3 text-center text-xs text-slate-500">Vista conceptual del proceso; no contiene datos de clientes.</p>
         </div>
       </div>
     </section>

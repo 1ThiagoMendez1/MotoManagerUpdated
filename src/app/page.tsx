@@ -4,12 +4,13 @@ import PlanesPage from './planes/PlanesPage';
 
 import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'MotoManager — El CRM #1 para talleres de motocicletas en Colombia',
+  title: 'MotoManager | Software de gestión para talleres de motocicletas',
   description:
-    'Gestiona clientes, motos, inventario, órdenes de trabajo, ventas y pagos digitales desde un solo lugar. Diseñado para talleres de motocicletas en Colombia. Desde $18.900/mes con Wompi.',
+    'Organiza clientes, motocicletas, órdenes de trabajo, inventario y ventas con MotoManager. Conoce las funciones y planes para talleres de motos en Colombia.',
   keywords: [
     'CRM talleres motos Colombia',
     'software taller motos',
@@ -19,8 +20,8 @@ export const metadata: Metadata = {
     'órdenes de trabajo',
   ],
   openGraph: {
-    title: 'MotoManager — El CRM #1 para talleres de motos en Colombia',
-    description: 'Clientes, inventario, órdenes de trabajo y pagos digitales. Desde $18.900/mes.',
+    title: 'MotoManager | Gestiona tu taller de motos',
+    description: 'Gestión conectada de clientes, motocicletas, órdenes de trabajo, inventario y ventas para talleres.',
     url: 'https://www.motomanager.com.co/',
     siteName: 'MotoManager',
     type: 'website',
@@ -42,9 +43,18 @@ export default async function Page() {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     user = currentUser;
 
-    const { data: p } = await supabase.from('subscription_plans').select('*');
+    // El catálogo público se lee en el servidor desde la tabla comercial
+    // vigente. No depende de políticas RLS del visitante anónimo.
+    const catalog = createAdminClient();
+    const { data: p, error: priceError } = await catalog
+      .from('subscription_plans')
+      .select('id, name, price, description, badge, savings, months');
+    if (priceError) console.error('[landing] Error leyendo precios:', priceError.code);
     if (p) plans = p;
-    const { data: f } = await supabase.from('subscription_features').select('*');
+    const { data: f, error: featureError } = await catalog
+      .from('subscription_features')
+      .select('id, feature_name, order_index, included_in_basic, included_in_pro, included_in_full');
+    if (featureError) console.error('[landing] Error leyendo información de planes:', featureError.code);
     if (f) features = f;
   } catch (err) {
     console.error("Error fetching plans data:", err);
