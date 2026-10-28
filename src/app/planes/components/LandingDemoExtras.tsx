@@ -18,7 +18,7 @@ const CATALOG = [
   { id: 'diagnostico', name: 'Diagnóstico general', category: 'Diagnóstico', price: 65000, minutes: 50 },
   { id: 'cadena', name: 'Ajuste y lubricación de cadena', category: 'Mantenimiento', price: 28000, minutes: 25 },
 ];
-const TECHNICIANS = ['Fernando Parra', 'Santiago Narváez', 'María Torres'];
+const TECHNICIANS = ['Técnico de ejemplo A', 'Técnico de ejemplo B', 'Técnico de ejemplo C'];
 const ROLE_MODULES = [
   'Dashboard', 'Órdenes de Trabajo', 'Clientes', 'Motocicletas', 'Inventario',
   'Servicios', 'Ventas', 'Citas', 'Contabilidad', 'Técnicos', 'Usuarios y permisos', 'Soporte',
