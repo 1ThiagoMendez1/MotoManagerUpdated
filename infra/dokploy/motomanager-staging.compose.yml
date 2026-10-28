@@ -1,0 +1,98 @@
+# MotoManager staging only; project name chosen to match user-created Dokploy compose slug.
+# DO NOT expose DB, Redis, Keycloak or REST to the host; private internal network only.
+name: motomanagernew-motomanagernewmigration-ogl915
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    shm_size: 256mb
+    mem_limit: 2g
+    cpus: 2.0
+    environment:
+      POSTGRES_DB: motomanager_stage
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?staging PostgreSQL secret required}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - pg17_stage_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d motomanager_stage']
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks: [staging_private]
+    stop_grace_period: 60s
+    security_opt: [no-new-privileges:true]
+  redis-cache:
+    image: redis:7.4.8-alpine
+    mem_limit: 384m
+    cpus: 0.5
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?staging Redis secret required}
+    tmpfs:
+      - /data
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$$REDIS_PASSWORD" in ''|*[!a-fA-F0-9]*) exit 1;; esac
+        test "$${#REDIS_PASSWORD}" -ge 64 || exit 1
+        umask 077
+        printf '%s\n' 'bind 0.0.0.0' 'protected-mode yes' 'save ""' 'appendonly no' 'maxmemory 256mb' 'maxmemory-policy allkeys-lru' > /tmp/redis-stage.conf
+        printf 'requirepass %s\n' "$$REDIS_PASSWORD" >> /tmp/redis-stage.conf
+        exec redis-server /tmp/redis-stage.conf
+    healthcheck:
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 8
+    networks:
+      staging_private:
+        aliases: [motomanager-read-cache]
+    security_opt: [no-new-privileges:true]
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    mem_limit: 2304m
+    cpus: 1.5
+    profiles: [auth]
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_stage
+      KC_DB_USERNAME: keycloak_stage
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?staging Keycloak DB secret required}
+      KC_BOOTSTRAP_ADMIN_USERNAME: stage-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?staging Keycloak admin secret required}
+      KC_HTTP_ENABLED: 'true'
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'false'
+    command: ['start']
+    networks: [staging_private]
+    security_opt: [no-new-privileges:true]
+  rest:
+    image: postgrest/postgrest:v14.12
+    mem_limit: 512m
+    cpus: 0.75
+    profiles: [api]
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${PGRST_DB_PASSWORD:?staging REST database password required}@postgres:5432/motomanager_stage
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?staging JWT secret required}
+      PGRST_DB_MAX_ROWS: '1000'
+      PGRST_SERVER_HOST: 0.0.0.0
+    networks: [staging_private]
+    security_opt: [no-new-privileges:true]
+volumes:
+  pg17_stage_data:
+networks:
+  staging_private:
+    internal: true
+    driver: bridge
