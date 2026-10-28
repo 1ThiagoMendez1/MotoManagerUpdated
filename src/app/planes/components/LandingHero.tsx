@@ -1,94 +1,105 @@
 'use client';
 
-import { ArrowRight, Check, ClipboardCheck, Gauge, MessageSquareText, Wrench } from 'lucide-react';
+import { ArrowRight, Bike, Boxes, CheckCircle2, ClipboardList, LayoutGrid, PlayCircle, ShieldCheck, ShoppingBag, Wrench } from 'lucide-react';
+
+const SMALL_CARDS = [
+  { name: 'Clientes', subtitle: 'Directorio y contactos', icon: ShieldCheck, bg: 'bg-emerald-500' },
+  { name: 'Motocicletas', subtitle: 'Historial vehicular', icon: Bike, bg: 'bg-[#ff7e13]' },
+  { name: 'Inventario', subtitle: 'Repuestos y stock', icon: Boxes, bg: 'bg-amber-500' },
+  { name: 'Ventas', subtitle: 'Caja y mostrador', icon: ShoppingBag, bg: 'bg-green-500' },
+];
 
 export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void }) {
   return (
-    <section className="relative overflow-hidden bg-[#081121] px-5 pb-24 pt-20 text-white lg:pb-32 lg:pt-28">
-      <div className="pointer-events-none absolute -right-32 top-4 h-[540px] w-[540px] rounded-full bg-cyan-500/10 blur-[100px]" />
-      <div className="pointer-events-none absolute -left-52 bottom-0 h-[440px] w-[440px] rounded-full bg-blue-600/10 blur-[110px]" />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1fr_0.94fr] lg:gap-16">
-        <div className="max-w-2xl">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-xs font-semibold tracking-wide text-cyan-200">
-            <span className="h-2 w-2 rounded-full bg-cyan-300" />
-            Software de gestión para talleres de motos
+    <section className="relative isolate overflow-hidden bg-[#050b18] px-5 pb-20 pt-16 text-white sm:pt-20 lg:pb-28 lg:pt-24">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-44 top-0 h-[650px] w-[650px] rounded-full bg-[#347df1]/15 blur-[110px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-40 bottom-[-200px] h-[600px] w-[600px] rounded-full bg-[#ff7e13]/10 blur-[110px]" />
+      <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12">
+        <div className="max-w-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#ff7e13]/30 bg-[#ff7e13]/10 px-4 py-2 text-xs font-bold tracking-wide text-[#ffad68]">
+            <span className="h-2 w-2 rounded-full bg-[#ff851f]" />
+            EL SOFTWARE QUE ENTIENDE TU TALLER
           </div>
-          <h1 className="max-w-[760px] text-5xl font-semibold leading-[1.09] tracking-[-0.055em] sm:text-6xl lg:text-[4.25rem]">
-            Tu taller, más organizado.
-            <span className="block text-cyan-300">Tu negocio, mejor gestionado.</span>
+          <h1 className="mt-7 text-[clamp(2.8rem,5.2vw,4.95rem)] font-extrabold leading-[1.055] tracking-[-0.06em]">
+            Controla cada moto.
+            <span className="mt-1 block text-[#ff821a]">Haz crecer tu taller.</span>
           </h1>
-          <p className="mt-7 max-w-xl text-lg leading-8 text-slate-300">
-            Centraliza clientes, motocicletas, órdenes de trabajo, inventario y ventas en un solo lugar.
-            Dedica menos tiempo a buscar información y más a atender bien cada servicio.
+          <p className="mt-7 max-w-lg text-base leading-8 text-slate-300 sm:text-lg">
+            Deja de buscar información entre cuadernos y chats. Con MotoManager conectas
+            órdenes de trabajo, clientes, motocicletas, inventario y ventas en un solo lugar.
           </p>
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <button
-              onClick={onScrollToPlanes}
-              className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-7 font-semibold text-slate-950 transition hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
-            >
-              Conocer planes y precios <ArrowRight className="h-4 w-4" />
-            </button>
-            <a href="#como-funciona" className="inline-flex min-h-14 items-center justify-center rounded-xl border border-white/20 px-7 font-semibold text-white transition hover:border-white/40 hover:bg-white/5">
-              Descubrir cómo funciona
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a href="#demo" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-6 text-sm font-extrabold text-[#0a1425] shadow-[0_14px_40px_rgba(255,125,16,.23)] transition hover:-translate-y-0.5 hover:bg-[#ffa149]">
+              <PlayCircle className="h-5 w-5" /> Probar demo interactiva
             </a>
+            <button onClick={onScrollToPlanes} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-6 text-sm font-bold text-white transition hover:bg-white/10">
+              Ver planes y precios <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
-          <div className="mt-9 flex flex-wrap gap-x-7 gap-y-3 text-sm text-slate-300">
-            {['Accede desde el navegador', 'Información por taller', 'Planes para distintos equipos'].map(label => (
-              <span key={label} className="inline-flex items-center gap-2">
-                <Check className="h-4 w-4 text-cyan-300" /> {label}
-              </span>
-            ))}
+          <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-slate-400 sm:text-sm">
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Demo sin registro</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Sin tarjeta para explorar</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Diseñado para talleres de motos</span>
           </div>
+          <a href="#como-funciona" className="mt-9 inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+            Descubre cómo funciona <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
 
-        <div className="relative" aria-label="Representación ilustrativa del flujo de órdenes de MotoManager">
-          <div className="absolute inset-6 -rotate-3 rounded-[32px] bg-gradient-to-br from-cyan-400/20 to-blue-500/10 blur-2xl" />
-          <div className="relative overflow-hidden rounded-[26px] border border-white/15 bg-[#111e32] shadow-[0_36px_95px_rgba(0,0,0,0.35)]">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-              <div className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-300 text-slate-950"><Wrench className="h-4 w-4" /></span>
-                MotoManager <span className="font-normal text-slate-400">/ Flujo del taller</span>
+        <div className="relative">
+          <div aria-hidden="true" className="absolute -inset-5 rounded-[36px] bg-gradient-to-tr from-[#347df1]/20 via-transparent to-[#ff7e13]/10 blur-2xl" />
+          <div className="relative overflow-hidden rounded-[24px] border border-white/15 bg-[#eaf1f8] text-[#142036] shadow-[0_30px_90px_rgba(0,0,0,.48)] sm:rounded-[30px]">
+            <div className="flex items-center justify-between border-b border-[#d8e2ed] bg-[#f7f9fc] px-4 py-3 sm:px-5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[#ff7e13]"><Wrench className="h-5 w-5" /></span>
+                <div><p className="text-sm font-extrabold tracking-tight">MotoManager</p><p className="text-[10px] text-slate-500">Taller Ejemplo · Vista ilustrativa</p></div>
               </div>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-slate-400">Ejemplo ilustrativo</span>
+              <span className="rounded-lg bg-[#347df1] px-3 py-2 text-[11px] font-bold text-white">+ Nueva orden</span>
             </div>
-            <div className="grid gap-5 p-5 sm:p-7">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.15em] text-cyan-200">Organiza el servicio</p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight">Cada moto, en su etapa.</h2>
-                </div>
-                <Gauge className="hidden h-10 w-10 text-cyan-200/70 sm:block" />
+            <div className="p-4 sm:p-5">
+              <div className="mb-5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tu centro de operaciones</span>
+                <h2 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">Tu taller, bajo control.</h2>
+                <p className="mt-1 text-xs text-slate-500">Cada módulo conectado al siguiente.</p>
               </div>
-              <div className="grid gap-3">
-                {[
-                  {number:'01', title:'Recepción', description:'Cliente y motocicleta identificados', state:'Registrada', highlight:false},
-                  {number:'02', title:'Diagnóstico', description:'Orden y técnico asignado', state:'En proceso', highlight:true},
-                  {number:'03', title:'Reparación', description:'Seguimiento del trabajo', state:'En seguimiento', highlight:false},
-                  {number:'04', title:'Entrega', description:'Historial disponible para la próxima visita', state:'Cerrada', highlight:false},
-                ].map(item => (
-                  <div key={item.number} className={`flex items-center gap-3 rounded-xl border p-3.5 sm:p-4 ${item.highlight ? 'border-cyan-300/40 bg-cyan-300/10' : 'border-white/10 bg-white/[0.035]'}`}>
-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${item.highlight ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-cyan-200'}`}>{item.number}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{item.title}</p>
-                      <p className="text-xs leading-5 text-slate-400">{item.description}</p>
-                    </div>
-                    <span className="hidden rounded-full border border-white/10 px-2.5 py-1 text-[10px] text-slate-300 sm:block">{item.state}</span>
+              <div className="grid grid-cols-[1.55fr_1fr] gap-3">
+                <div className="rounded-2xl border border-[#d3dfec] bg-gradient-to-br from-[#edf4fd] to-[#dbe8fb] p-4 sm:p-5">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#347df1] text-white"><ClipboardList className="h-5 w-5" /></span>
+                  <h3 className="mt-3 text-sm font-extrabold sm:text-lg">Órdenes de Trabajo</h3>
+                  <p className="mt-2 text-[11px] text-slate-600">Recepción, reparación y entrega.</p>
+                  <div className="mt-5 flex gap-2">
+                    <span className="rounded-lg bg-[#347df1] px-3 py-2 text-[10px] font-bold text-white sm:px-4">+ Nueva orden</span>
+                    <span className="rounded-lg border border-[#c9d5e2] bg-white/70 px-3 py-2 text-[10px] font-semibold">Ver todas</span>
                   </div>
-                ))}
+                </div>
+                <div className="rounded-2xl border border-[#d3dfec] bg-[#f7f9fc] p-4 sm:p-5">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500 text-white"><LayoutGrid className="h-5 w-5" /></span>
+                  <h3 className="mt-3 text-sm font-extrabold sm:text-base">Dashboard</h3>
+                  <p className="mt-2 text-[11px] leading-5 text-slate-600">Visión del rendimiento y la operación.</p>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-4">
-                  <ClipboardCheck className="h-6 w-6 text-cyan-300" />
-                  <div><p className="text-sm font-semibold">Órdenes</p><p className="text-xs text-slate-400">Seguimiento</p></div>
-                </div>
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.035] p-4">
-                  <MessageSquareText className="h-6 w-6 text-cyan-300" />
-                  <div><p className="text-sm font-semibold">Avisos</p><p className="text-xs text-slate-400">Según tu plan</p></div>
-                </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {SMALL_CARDS.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.name} className="min-h-[112px] rounded-xl border border-[#d8e2ed] bg-[#f7f9fc] p-3">
+                      <span className={'inline-flex h-8 w-8 items-center justify-center rounded-lg text-white ' + item.bg}><Icon className="h-4 w-4" /></span>
+                      <p className="mt-3 text-[11px] font-extrabold">{item.name}</p>
+                      <p className="mt-1 hidden text-[9px] leading-4 text-slate-500 sm:block">{item.subtitle}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-[#d6e0ea] pt-3 text-[10px] text-slate-500">
+                <span>Inspirado en la interfaz real del producto</span>
+                <a href="#demo" className="inline-flex items-center gap-1 font-extrabold text-[#347df1]">Explorar de verdad <ArrowRight className="h-3 w-3" /></a>
               </div>
             </div>
           </div>
-          <p className="mt-3 text-center text-xs text-slate-500">Vista conceptual del proceso; no contiene datos de clientes.</p>
+          <div className="absolute -bottom-5 -left-2 hidden items-center gap-2 rounded-xl border border-white/15 bg-[#12233b] px-4 py-3 text-xs font-semibold text-white shadow-xl sm:flex lg:-left-7">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            No es una imagen: abajo lo puedes usar.
+          </div>
         </div>
       </div>
     </section>

@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'MotoManager — CRM para talleres de motos',
-    description: 'Gestiona tu taller como un profesional. Desde $18.900/mes.',
+    description: 'Explora una demo interactiva del software de gestión para talleres de motocicletas. Sin registro para probar.',
   },
 };
 

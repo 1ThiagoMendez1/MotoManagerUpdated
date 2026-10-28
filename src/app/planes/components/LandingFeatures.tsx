@@ -47,7 +47,7 @@ export function LandingFeatures() {
             </h2>
           </div>
           <p className="max-w-sm text-base leading-7 text-slate-600">
-            Sin promesas abstractas: módulos concretos para gestionar el trabajo diario y la relación con tus clientes.
+            Tu operación deja de estar repartida entre papeles, hojas de cálculo y mensajes. Todo conectado para atender mejor cada moto.
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

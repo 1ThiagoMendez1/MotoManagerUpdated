@@ -5,6 +5,10 @@ import { ChevronDown, MessageCircleQuestion } from 'lucide-react';
 import { getPlanLimits } from '@/lib/constants/plans';
 
 const FAQS = [
+  { question: '¿Puedo probar MotoManager antes de comprar?', answer: 'Sí. En esta misma página puedes abrir la demo interactiva sin crear cuenta ni introducir una tarjeta. Utiliza datos ficticios y no realiza ventas, envíos de WhatsApp ni cambios en talleres reales.' },
+  { question: 'Ya uso Excel y WhatsApp, ¿por qué cambiar?', answer: 'Una hoja de cálculo almacena filas; MotoManager relaciona la moto con su dueño, órdenes, diagnóstico, servicios e historial. Así reduces las búsquedas entre archivos y conversaciones separadas.' },
+  { question: '¿Mi equipo necesita conocimientos técnicos?', answer: 'El sistema se organiza por tareas cotidianas como recibir una motocicleta, registrar una orden y consultar su estado. Puedes explorar primero la demostración y evaluar si encaja con la forma de trabajar de tu equipo.' },
+
   { question: '¿Necesito instalar un programa?', answer: 'No. MotoManager funciona desde el navegador de tu computador, tableta o celular. Solo necesitas acceso a internet y tu cuenta.' },
   { question: '¿Qué incluye cada plan?', answer: 'Básico cubre el registro de clientes, motos, órdenes, inventario y ventas con límites de uso. Pro añade agenda, técnicos y herramientas de contabilidad. Full amplía límites, permisos y paneles. La tabla de planes detalla las capacidades aplicadas por el sistema.' },
   { question: '¿Cuántos usuarios puedo registrar?', answer: `Según los límites de equipos implementados actualmente: Básico permite ${getPlanLimits('basic').users_limit} usuarios, Pro ${getPlanLimits('pro').users_limit} y Full no tiene un límite de usuarios por plan.` },
@@ -23,11 +27,11 @@ export function LandingTestimonialsAndFAQ() {
           <span className="text-xs font-bold uppercase tracking-[0.2em] text-sky-700">Información clara</span>
           <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">Antes de elegir, resuelve tus dudas.</h2>
           <p className="mt-5 max-w-md text-base leading-7 text-slate-600">
-            Sin testimonios inventados ni promesas difíciles de comprobar. Estas respuestas se basan en las funciones y límites actuales del producto.
+            Sabemos que cambiar la forma de llevar un taller es una decisión importante. Explora el sistema por dentro y resuelve tus dudas antes de elegir un plan.
           </p>
           <div className="mt-8 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-medium text-slate-700">
             <MessageCircleQuestion className="h-5 w-5 text-sky-700" />
-            ¿Tienes otra pregunta? Consulta el soporte desde tu cuenta.
+            ¿Quieres verlo primero? Prueba la demo sin crear una cuenta.
           </div>
         </div>
         <div className="space-y-3">

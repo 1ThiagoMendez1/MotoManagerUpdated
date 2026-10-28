@@ -10,7 +10,7 @@ test('la landing no muestra escasez o compras ficticias', () => {
   assert.doesNotMatch(page, /<UrgencyBar\b|<SalesNotification\b|<DashboardPreview\b/);
   assert.match(page, /<LandingFeatures\b/);
   assert.match(page, /<LandingPricing\b/);
-  assert.match(page, /<LandingTopWorkshops\b/);
+  assert.match(page, /<LandingInteractiveDemo\b/);
 });
 
 test('el hero y el footer no anuncian valoraciones, estadísticas o teléfonos inventados', () => {
@@ -18,7 +18,7 @@ test('el hero y el footer no anuncian valoraciones, estadísticas o teléfonos i
     read('src/app/planes/components/LandingFeatures.tsx') +
     read('src/app/planes/components/LandingFooter.tsx');
   assert.doesNotMatch(s, /\+500|\+50K|\+200K|4\.9★|573001234567|CRM #1|50% OFF|OFERTA POR TIEMPO LIMITADO/);
-  assert.match(s, /Ejemplo ilustrativo/);
+  assert.match(s, /Vista ilustrativa/);
 });
 
 test('las preguntas ya no dependen de testimonios inventados', () => {

@@ -5,11 +5,12 @@ import { ArrowRight, BadgeCheck, ClipboardList, Handshake, PackageCheck } from '
 import { useSearchParams } from 'next/navigation';
 import { LandingNavbar } from './components/LandingNavbar';
 import { LandingHero } from './components/LandingHero';
+import { LandingInteractiveDemo } from './components/LandingInteractiveDemo';
+import { LandingWhyChange } from './components/LandingWhyChange';
 import { LandingFeatures } from './components/LandingFeatures';
 import { LandingPricing } from './components/LandingPricing';
 import { LandingTestimonialsAndFAQ } from './components/LandingTestimonialsAndFAQ';
 import { LandingFooter } from './components/LandingFooter';
-import { LandingTopWorkshops } from './components/LandingTopWorkshops';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
 
 interface Plan {
@@ -102,19 +103,18 @@ export default function PlanesPage({ plans = [], features = [], user }: { plans?
       <LandingNavbar user={user} />
       <main>
         <LandingHero onScrollToPlanes={scrollToPlanes} />
+        <LandingInteractiveDemo />
+        <LandingWhyChange />
         <LandingFeatures />
         <ProductFlow />
         <LandingPricing plans={plans} features={features} onSelectPlan={setActivePlan} onScrollToPlanes={scrollToPlanes} />
-        <div className="bg-background text-foreground">
-          <LandingTopWorkshops />
-        </div>
         <LandingTestimonialsAndFAQ />
-        <section className="bg-[#0b2036] px-5 py-16 text-center text-white">
+        <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
           <div className="mx-auto max-w-3xl">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Tu siguiente paso</span>
-            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Dale a tu taller una forma más clara de trabajar.</h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Conoce qué incluye cada plan y elige la capacidad que necesita tu negocio hoy.</p>
-            <button onClick={scrollToPlanes} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-7 py-4 font-semibold text-slate-950 transition hover:bg-cyan-200">
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">¿Listo para dejar el desorden atrás?</h2>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Ya viste cómo se conecta el trabajo del taller. Ahora elige un plan para empezar con tus propios clientes, motos y órdenes.</p>
+            <button onClick={scrollToPlanes} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
               Explorar planes <ArrowRight className="h-4 w-4" />
             </button>
           </div>
