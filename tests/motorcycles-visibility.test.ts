@@ -7,7 +7,10 @@ test('Recepción muestra las motocicletas existentes aunque tengan órdenes', ()
   const source = readFileSync('src/app/motorcycles/page.tsx', 'utf8');
   assert.match(source, /motorcycles\.map\(\(moto\)\s*=>/);
   assert.doesNotMatch(source, /motorcyclesInWorkshop|workOrderMotorcycleIds/);
-  assert.match(source, /getMotorcycles\(\{ query, page \}\)/);
+  assert.match(source, /getMotorcycleOrderList\(query, user\.workshopId!\)/);
+  // La lectura paginada vive ahora en un servicio compartido.
+  const listService = readFileSync('src/lib/motorcycle-order-list.ts', 'utf8');
+  assert.match(listService, /getMotorcycles\(\{ query, page: 1, limit \}\)/);
 });
 test('el lector de motocicletas aplica el taller autenticado y no oculta errores', () => {
   const source = readFileSync('src/lib/data.ts', 'utf8');
