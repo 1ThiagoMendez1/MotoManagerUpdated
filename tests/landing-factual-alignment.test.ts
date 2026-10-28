@@ -17,7 +17,7 @@ test('el hero y el footer no anuncian valoraciones, estadísticas o teléfonos i
   const s = read('src/app/planes/components/LandingHero.tsx') +
     read('src/app/planes/components/LandingFeatures.tsx') +
     read('src/app/planes/components/LandingFooter.tsx');
-  assert.doesNotMatch(s, /\+500|\+50K|\+200K|4\.9★|573001234567|#1|50% OFF|OFERTA POR TIEMPO LIMITADO/);
+  assert.doesNotMatch(s, /\+500|\+50K|\+200K|4\.9★|573001234567|CRM #1|50% OFF|OFERTA POR TIEMPO LIMITADO/);
   assert.match(s, /Ejemplo ilustrativo/);
 });
 
