@@ -5,6 +5,9 @@ services:
   redis:
     image: redis:7.4.8-alpine
     restart: unless-stopped
+    # Redis image declares /data as VOLUME; use ephemeral memory, not an anonymous Docker volume.
+    tmpfs:
+      - /data
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set a random hexadecimal password in Dokploy}
     command:
