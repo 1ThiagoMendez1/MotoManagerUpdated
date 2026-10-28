@@ -7,6 +7,8 @@ import { LandingNavbar } from './components/LandingNavbar';
 import { LandingHero } from './components/LandingHero';
 import { LandingInteractiveDemo } from './components/LandingInteractiveDemo';
 import { LandingWhyChange } from './components/LandingWhyChange';
+import { LandingTopWorkshops } from './components/LandingTopWorkshops';
+import type { PublicWorkshop } from '@/actions/public-workshops';
 import { LandingFeatures } from './components/LandingFeatures';
 import { LandingPricing } from './components/LandingPricing';
 import { LandingTestimonialsAndFAQ } from './components/LandingTestimonialsAndFAQ';
@@ -63,7 +65,7 @@ function ProductFlow() {
   );
 }
 
-export default function PlanesPage({ plans = [], features = [], user }: { plans?: any[]; features?: any[]; user?: any }) {
+export default function PlanesPage({ plans = [], features = [], user, workshops = [] }: { plans?: any[]; features?: any[]; user?: any; workshops?: PublicWorkshop[] }) {
   const searchParams = useSearchParams();
   const paymentStatus = searchParams.get('payment');
   const urlPlan = searchParams.get('plan');
@@ -108,6 +110,7 @@ export default function PlanesPage({ plans = [], features = [], user }: { plans?
         <LandingFeatures />
         <ProductFlow />
         <LandingPricing plans={plans} features={features} onSelectPlan={setActivePlan} onScrollToPlanes={scrollToPlanes} />
+        <LandingTopWorkshops initialWorkshops={workshops} />
         <LandingTestimonialsAndFAQ />
         <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
           <div className="mx-auto max-w-3xl">

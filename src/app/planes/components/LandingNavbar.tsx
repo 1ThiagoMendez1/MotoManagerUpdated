@@ -10,6 +10,7 @@ const NAV = [
   { label: 'Funcionalidades', href: '#funciones' },
   { label: 'Cómo funciona', href: '#como-funciona' },
   { label: 'Precios', href: '#planes' },
+  { label: 'Talleres', href: '#workshops' },
   { label: 'Preguntas', href: '#faq' },
 ];
 

@@ -24,6 +24,7 @@ export function LandingFooter() {
             <a href="#funciones" className="hover:text-white">Funcionalidades</a>
             <a href="#como-funciona" className="hover:text-white">Cómo funciona</a>
             <a href="#planes" className="hover:text-white">Planes y precios</a>
+            <a href="#workshops" className="hover:text-white">Talleres de la comunidad</a>
             <a href="#faq" className="hover:text-white">Preguntas frecuentes</a>
           </div>
         </div>

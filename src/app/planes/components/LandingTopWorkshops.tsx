@@ -1,214 +1,118 @@
 'use client';
-
-import { useState, useEffect } from 'react';
-import { Star, MapPin, Wrench, Trophy, CheckCircle2, Phone, Navigation, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { getWhatsAppLink } from '@/lib/utils';
-import { getPublicWorkshops, PublicWorkshop } from '@/actions/public-workshops';
-import { WorkshopSearchModal } from './WorkshopSearchModal';
+import { ArrowRight, CheckCircle2, MapPin, Phone, Search, Star, Store, Wrench, X } from 'lucide-react';
+import { PublicWorkshop } from '@/actions/public-workshops';
 import { WorkshopImage } from '@/components/workshops/WorkshopImage';
+import { getWhatsAppLink } from '@/lib/utils';
 
-function getWorkshopVisuals(id: string) {
-  const visuals = [
-    {
-      gradient: 'from-blue-600/40 via-blue-900/40 to-black',
-      accent: 'text-blue-400',
-      bgHover: 'group-hover:bg-blue-500/5',
-      border: 'group-hover:border-blue-500/50',
-      glow: 'group-hover:shadow-[0_0_30px_rgba(59,130,246,0.3)]',
-    },
-    {
-      gradient: 'from-orange-600/40 via-red-900/40 to-black',
-      accent: 'text-orange-400',
-      bgHover: 'group-hover:bg-orange-500/5',
-      border: 'group-hover:border-orange-500/50',
-      glow: 'group-hover:shadow-[0_0_30px_rgba(249,115,22,0.3)]',
-    },
-    {
-      gradient: 'from-emerald-600/40 via-green-900/40 to-black',
-      accent: 'text-emerald-400',
-      bgHover: 'group-hover:bg-emerald-500/5',
-      border: 'group-hover:border-emerald-500/50',
-      glow: 'group-hover:shadow-[0_0_30px_rgba(16,185,129,0.3)]',
-    },
-    {
-      gradient: 'from-purple-600/40 via-purple-900/40 to-black',
-      accent: 'text-purple-400',
-      bgHover: 'group-hover:bg-purple-500/5',
-      border: 'group-hover:border-purple-500/50',
-      glow: 'group-hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]',
-    },
-  ];
-  const sum = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return visuals[sum % visuals.length];
-}
-
-export function LandingTopWorkshops() {
-  const [workshops, setWorkshops] = useState<PublicWorkshop[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  useEffect(() => {
-    async function loadWorkshops() {
-      const realWorkshops = await getPublicWorkshops('');
-      const ranked = [...realWorkshops].sort((a,b) =>
-        (Number(b.review_count || 0) > 0 ? 1 : 0) - (Number(a.review_count || 0) > 0 ? 1 : 0) ||
-        Number(b.average_rating || 0) - Number(a.average_rating || 0) ||
-        Number(b.review_count || 0) - Number(a.review_count || 0)
-      );
-      setWorkshops(ranked.slice(0,3));
-    }
-    loadWorkshops();
-  }, []);
-
+export function LandingTopWorkshops({ initialWorkshops }: { initialWorkshops: PublicWorkshop[] }) {
+  const [term, setTerm] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const list = useMemo(() => {
+    const q = term.trim().toLocaleLowerCase('es-CO');
+    const rows = (initialWorkshops || []).filter(w => !q || [w.name, w.city, w.address]
+      .some(v => (v || '').toLocaleLowerCase('es-CO').includes(q)));
+    return rows.sort((a, b) => Number(b.review_count || 0) - Number(a.review_count || 0)
+      || Number(b.average_rating || 0) - Number(a.average_rating || 0) || a.name.localeCompare(b.name));
+  }, [initialWorkshops, term]);
+  const visible = showAll || term.trim() ? list : list.slice(0, 3);
+  const mapsUrl = (w: PublicWorkshop) => {
+    if (w.maps_link?.startsWith('https://')) return w.maps_link;
+    const q = [w.address, w.city].filter(Boolean).join(', ');
+    return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : null;
+  };
   return (
-    <section id="workshops" className="py-24 px-4 scroll-mt-20 relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[1px] bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-      <div className="absolute -left-40 top-40 w-96 h-96 bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -right-40 bottom-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
-      
-      <div className="max-w-7xl mx-auto space-y-16 relative z-10">
-        <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/40 border border-border/50 text-sm font-medium backdrop-blur-md shadow-lg">
-            <Trophy className="w-5 h-5 text-yellow-500" />
-            <span className="text-foreground">Talleres de nuestra comunidad</span>
+    <section id="workshops" className="scroll-mt-20 bg-[#f2f6fa] px-5 py-24 text-[#101c2f] lg:py-28">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.14em] text-[#2670db]">
+              <Store className="h-4 w-4" /> Comunidad MotoManager
+            </span>
+            <h2 className="mt-5 text-4xl font-extrabold leading-tight tracking-[-0.05em] sm:text-5xl">
+              Talleres reales. <span className="text-[#ec7711]">Historias reales.</span>
+            </h2>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
+              Conoce talleres registrados en MotoManager. Consulta su ubicación y canales de atención cuando estén publicados.
+              Las reseñas solo aparecen cuando existen opiniones verificadas.
+            </p>
           </div>
-          <h2 className="text-4xl md:text-6xl font-extrabold text-foreground tracking-tight">
-            Descubre <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-cyan-400 to-blue-500">talleres reales</span>
-          </h2>
-          <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto">
-            Conoce talleres que usan MotoManager. Las estrellas y opiniones proceden exclusivamente de clientes con servicios entregados; nunca inventamos valoraciones.
+          <div className="w-full max-w-md">
+            <label htmlFor="directory-search" className="mb-2 block text-sm font-semibold text-slate-700">Buscar un taller</label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <input id="directory-search" value={term} onChange={e => { setTerm(e.target.value); setShowAll(true); }}
+                placeholder="Nombre, ciudad o dirección" className="w-full rounded-xl border border-[#ccd8e5] bg-white py-3.5 pl-12 pr-11 text-sm text-[#101c2f] shadow-sm outline-none focus:border-[#347df1] focus:ring-2 focus:ring-[#347df1]/20" />
+              {!!term && <button aria-label="Limpiar búsqueda" type="button" onClick={() => setTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 hover:bg-slate-100"><X className="h-4 w-4" /></button>}
+            </div>
+          </div>
+        </div>
+        {visible.length ? (
+          <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {visible.map(w => {
+              const maps = mapsUrl(w);
+              return <article key={w.id} className="group flex flex-col overflow-hidden rounded-[22px] border border-[#d6e1eb] bg-white shadow-[0_10px_35px_rgba(18,43,76,0.06)] transition hover:-translate-y-1 hover:shadow-[0_20px_48px_rgba(18,43,76,0.12)]">
+                <div className="relative h-40 overflow-hidden bg-gradient-to-br from-[#102747] via-[#1b416c] to-[#ec7814]">
+                  <WorkshopImage src={w.image_url} name={w.name} className="absolute inset-0 h-full w-full" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#05162b]/65 via-transparent to-transparent" />
+                  <span className="absolute bottom-4 left-5 rounded-lg border border-white/20 bg-[#091b34]/75 px-3 py-1.5 text-[11px] font-bold tracking-wide text-white backdrop-blur">
+                    <Wrench className="mr-1.5 inline h-3.5 w-3.5" /> Taller registrado
+                  </span>
+                </div>
+                <div className="flex flex-1 flex-col p-6">
+                  <h3 className="text-xl font-extrabold tracking-tight">{w.name}</h3>
+                  {Number(w.review_count || 0) > 0
+                    ? <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-amber-600">
+                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {Number(w.average_rating || 0).toFixed(1)}
+                        <span className="font-medium text-slate-500">({w.review_count} reseñas verificadas)</span>
+                      </p>
+                    : <p className="mt-2 text-xs font-medium text-slate-500">Sin reseñas verificadas todavía</p>}
+                  <div className="mt-5 space-y-2.5 text-sm text-slate-600">
+                    <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#347df1]" />
+                      <span>{[w.city, w.address].filter(Boolean).join(' · ') || 'Ubicación aún no publicada'}</span></p>
+                    {w.phone && <p className="flex items-center gap-2"><Phone className="h-4 w-4 shrink-0 text-[#347df1]" /> {w.phone}</p>}
+                  </div>
+                  {Number(w.review_count || 0) > 0 && w.recent_public_comment && (
+                    <p className="mt-4 rounded-xl bg-[#f6f8fc] p-3 text-xs italic leading-6 text-slate-600">“{w.recent_public_comment}”</p>
+                  )}
+                  <div className="mt-auto grid grid-cols-2 gap-2 pt-6">
+                    <Link href={'/talleres/' + encodeURIComponent(w.slug)} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#347df1] px-3 py-3 text-center text-xs font-extrabold text-white hover:bg-[#2166d7]">
+                      Ver taller <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                    {w.phone
+                      ? <a href={getWhatsAppLink(w.phone, 'Hola ' + w.name + ', los encontré en MotoManager. Quisiera consultar sobre sus servicios.')}
+                          target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#c6d5e6] px-3 py-3 text-center text-xs font-bold text-[#23446d] hover:bg-[#f4f8fc]">
+                          Contactar <Phone className="h-3.5 w-3.5" />
+                        </a>
+                      : maps
+                        ? <a href={maps} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#c6d5e6] px-3 py-3 text-center text-xs font-bold text-[#23446d] hover:bg-[#f4f8fc]">
+                            Ubicación <MapPin className="h-3.5 w-3.5" />
+                          </a>
+                        : <span className="flex items-center justify-center rounded-xl border border-slate-200 px-3 py-3 text-xs text-slate-400">Sin contacto público</span>}
+                  </div>
+                </div>
+              </article>;
+            })}
+          </div>
+        ) : <div className="mt-10 rounded-2xl border border-dashed border-[#cad8e5] bg-white px-6 py-12 text-center">
+          <Store className="mx-auto h-9 w-9 text-[#347df1]" />
+          <p className="mt-4 font-bold">{term ? 'No encontramos talleres con esa búsqueda.' : 'Directorio de talleres en preparación'}</p>
+          <p className="mt-2 text-sm text-slate-600">{term ? 'Prueba otra ciudad o nombre.' : 'Los talleres registrados aparecerán aquí cuando haya perfiles disponibles.'}</p>
+        </div>}
+        <div className="mt-9 flex flex-col items-center justify-between gap-5 rounded-2xl border border-[#cbddeb] bg-[#e9f3ff] p-5 sm:flex-row sm:p-6">
+          <p className="flex items-start gap-3 text-sm font-semibold leading-6 text-[#25476d]">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#347df1]" />
+            Cada ficha se genera a partir de datos publicados por el taller. No creamos negocios ni valoraciones ficticias.
           </p>
-        </div>
-
-        {workshops.length === 0 && <p className="rounded-2xl border border-border p-8 text-center text-muted-foreground">
-          Estamos incorporando talleres a nuestra red. Explora el directorio para descubrir nuevas opciones.
-        </p>}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {workshops.map((workshop) => {
-            const visuals = getWorkshopVisuals(workshop.id);
-            const location = workshop.city || 'Ubicación no especificada';
-            const address = workshop.address || '';
-            const phone = workshop.phone || '';
-            const specialty = 'Taller en MotoManager';
-            const features = ['Consulta sus servicios', 'Solicita información', 'Conecta con el taller'];
-            return (
-              <div 
-                key={workshop.id}
-                className={`group relative rounded-3xl border border-border/40 bg-card/60 backdrop-blur-xl overflow-hidden transition-all duration-500 hover:-translate-y-3 ${visuals.bgHover} ${visuals.border} ${visuals.glow}`}
-              >
-                {/* Header/Banner area */}
-                <div className="h-48 relative overflow-hidden bg-muted dark:bg-[#090b11]">
-                  <WorkshopImage src={workshop.image_url} name={workshop.name} className="absolute inset-0 h-full w-full" />
-                  <div className={`absolute inset-0 bg-gradient-to-br ${visuals.gradient} opacity-60 mix-blend-color`}></div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-background dark:from-[#090b11] via-transparent to-transparent opacity-80"></div>
-                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30 mix-blend-overlay"></div>
-                  
-                  <div className="absolute top-4 right-4 bg-background/80 dark:bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-border/30 flex items-center gap-1.5 shadow-xl">
-                    {workshop.review_count ? <>
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                      <span className="font-bold text-sm text-foreground">{Number(workshop.average_rating).toFixed(1)}</span>
-                      <span className="text-muted-foreground text-xs">({workshop.review_count} opiniones verificadas)</span>
-                    </> : <span className="text-xs text-muted-foreground">Aún sin reseñas verificadas</span>}
-                  </div>
-
-                  <div className="absolute -bottom-8 left-8 p-4 bg-background dark:bg-[#090b11] rounded-2xl border border-border/60 shadow-2xl group-hover:scale-110 transition-transform duration-500">
-                    {workshop.image_url
-                      ? <WorkshopImage src={workshop.image_url} name={workshop.name} className="h-10 w-10 rounded-lg" imageClassName="object-cover" />
-                      : <Wrench className={`w-8 h-8 ${visuals.accent}`} />}
-                  </div>
-                </div>
-
-                {/* Content area */}
-                <div className="pt-12 pb-8 px-8 space-y-6">
-                  <div>
-                    <h3 className={`text-2xl font-bold tracking-tight mb-3 ${visuals.accent} transition-colors`}>{workshop.name}</h3>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2 text-muted-foreground text-sm">
-                        <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-foreground/50" />
-                        <div>
-                          <span className="block font-medium text-foreground/80">{location}</span>
-                          <span className="block text-foreground/60">{address}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <Phone className="w-4 h-4 shrink-0 text-foreground/50" />
-                        <span className="font-medium text-foreground/80">{workshop.phone || 'Sin número'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-2 border-t border-border/30">
-                    <div className={`inline-block px-3 py-1 rounded-lg bg-background/50 border border-border/50 text-sm font-semibold shadow-inner ${visuals.accent}`}>
-                      {specialty}
-                    </div>
-                    
-                    <ul className="space-y-2.5">
-                      {features.map((feature: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-3 text-sm text-muted-foreground">
-                          <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${visuals.accent}`} />
-                          <span className="font-medium">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {workshop.review_count ? <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-3 text-xs text-muted-foreground">
-                    {Math.round((Number(workshop.recommendation_count || 0) / workshop.review_count) * 100)}% de clientes lo recomiendan
-                    {workshop.recent_public_comment &&
-                      <blockquote className="mt-2 line-clamp-3 italic text-foreground/85">
-                        “{workshop.recent_public_comment}” <span className="not-italic text-muted-foreground">— Cliente verificado</span>
-                      </blockquote>}
-                  </div> : null}
-
-                  <div className="pt-4 flex gap-3">
-                    {workshop.phone ? (
-                      <Link href={getWhatsAppLink(workshop.phone, `Hola ${workshop.name}, los encontré en MotoManager. Quisiera consultar sobre sus servicios.`)} target="_blank" className="flex-1">
-                        <button className="w-full py-2.5 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors flex items-center justify-center gap-2 font-semibold text-sm">
-                          <Phone className="w-4 h-4" />
-                          Contactar
-                        </button>
-                      </Link>
-                    ) : (
-                      <button disabled className="flex-1 py-2.5 px-4 rounded-xl bg-muted text-muted-foreground border border-border flex items-center justify-center gap-2 font-semibold text-sm opacity-50 cursor-not-allowed">
-                        <Phone className="w-4 h-4" />
-                        Sin número
-                      </button>
-                    )}
-                    
-                    {(workshop.maps_link || address) ? <Link href={workshop.maps_link || `https://maps.google.com/?q=${encodeURIComponent(address + ", " + location)}`} target="_blank" className="flex-1">
-                      <button className="w-full py-2.5 px-4 rounded-xl bg-card hover:bg-muted text-foreground border border-border transition-colors flex items-center justify-center gap-2 font-semibold text-sm shadow-sm hover:shadow-md">
-                        <Navigation className="w-4 h-4" />
-                        Ubicación
-                      </button>
-                    </Link> : <button disabled className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm text-muted-foreground opacity-60">
-                      Ubicación pendiente
-                    </button>}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Search Call to Action */}
-        <div className="pt-8 flex justify-center">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="group relative inline-flex items-center justify-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-full font-bold text-lg shadow-xl shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-1 transition-all overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-            <Search className="w-6 h-6 relative z-10" />
-            <span className="relative z-10">Explorar taller más cercano</span>
-          </button>
+          {!term && list.length > 3 &&
+            <button type="button" onClick={() => setShowAll(v => !v)}
+              className="w-full shrink-0 rounded-xl bg-[#0e2746] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#1a3e6a] sm:w-auto">
+              {showAll ? 'Ver destacados' : 'Ver todos (' + list.length + ')'} <ArrowRight className="ml-1 inline h-4 w-4" />
+            </button>}
         </div>
       </div>
-
-      <WorkshopSearchModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </section>
   );
 }

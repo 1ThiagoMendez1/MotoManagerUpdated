@@ -1,19 +1,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { LandingDemoExtras } from './LandingDemoExtras';
 import {
   ArrowRight, BarChart3, Bike, Boxes, CalendarDays, Check, CheckCircle2,
   ClipboardList, CreditCard, LayoutGrid, Moon, Plus, RotateCcw, ShoppingBag,
-  Sparkles, Sun, Users, Wrench, X,
+  Sparkles, Sun, Users, Wrench, X, FileText, Headphones, MessageCircle, ShieldCheck, UserRound, Wallet,
 } from 'lucide-react';
 
-type Screen = 'inicio' | 'dashboard' | 'ordenes' | 'motos' | 'inventario' | 'ventas';
-type WorkStatus = 'received' | 'diagnosis' | 'repair' | 'ready' | 'delivered';
-type WorkOrder = { id: number; plate: string; customer: string; bike: string; service: string; status: WorkStatus; total: number };
+type Screen = 'inicio' | 'dashboard' | 'ordenes' | 'motos' | 'inventario' | 'ventas' | 'clientes' | 'servicios' | 'citas' | 'contabilidad' | 'tecnicos' | 'permisos' | 'soporte' | 'portal' | 'whatsapp';
+type WorkStatus = 'received' | 'diagnosis' | 'in_progress' | 'completed' | 'delivered';
+type WorkOrder = { id: number; plate: string; customer: string; bike: string; service: string; status: WorkStatus; total: number; technician?: string };
 type StockItem = { id: number; name: string; sku: string; units: number; price: number };
 const START_ORDERS: WorkOrder[] = [
   { id: 1042, plate: 'DEMO-01', customer: 'Laura Gómez', bike: 'Yamaha FZ 2.0', service: 'Diagnóstico general', status: 'diagnosis', total: 125000 },
-  { id: 1041, plate: 'DEMO-02', customer: 'Andrés Rojas', bike: 'Honda CB 125F', service: 'Cambio de pastillas', status: 'repair', total: 178000 },
+  { id: 1041, plate: 'DEMO-02', customer: 'Andrés Rojas', bike: 'Honda CB 125F', service: 'Cambio de pastillas', status: 'in_progress', total: 178000 },
   { id: 1040, plate: 'DEMO-03', customer: 'Natalia Ruiz', bike: 'AKT NKD 125', service: 'Mantenimiento preventivo', status: 'delivered', total: 95000 },
 ];
 const START_STOCK: StockItem[] = [
@@ -28,19 +29,28 @@ const BIKES = [
   { plate: 'DEMO-04', name: 'Bajaj Pulsar NS 200', owner: 'Carlos Medina', year: 2021 },
 ];
 const NEXT: Record<WorkStatus, WorkStatus> = {
-  received: 'diagnosis', diagnosis: 'repair', repair: 'ready', ready: 'delivered', delivered: 'delivered',
+  received: 'diagnosis', diagnosis: 'in_progress', in_progress: 'completed', completed: 'delivered', delivered: 'delivered',
 };
 const STATUS: Record<WorkStatus, string> = {
-  received: 'Recibida', diagnosis: 'Diagnosticando', repair: 'Reparando',
-  ready: 'Lista para entrega', delivered: 'Entregada',
+  received: 'Nueva orden', diagnosis: 'Diagnosticando', in_progress: 'En proceso',
+  completed: 'Reparada · pendiente de entrega', delivered: 'Entregada',
 };
 const NAV: { id: Screen; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'inicio', label: 'Inicio', icon: LayoutGrid },
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
   { id: 'ordenes', label: 'Órdenes', icon: ClipboardList },
+  { id: 'clientes', label: 'Clientes', icon: Users },
   { id: 'motos', label: 'Motocicletas', icon: Bike },
   { id: 'inventario', label: 'Inventario', icon: Boxes },
+  { id: 'servicios', label: 'Servicios', icon: Wrench },
   { id: 'ventas', label: 'Ventas', icon: ShoppingBag },
+  { id: 'citas', label: 'Citas', icon: CalendarDays },
+  { id: 'contabilidad', label: 'Contabilidad', icon: Wallet },
+  { id: 'tecnicos', label: 'Técnicos', icon: UserRound },
+  { id: 'permisos', label: 'Permisos', icon: ShieldCheck },
+  { id: 'soporte', label: 'Soporte', icon: Headphones },
+  { id: 'portal', label: 'Portal cliente', icon: FileText },
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
 const money = (value: number) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', maximumFractionDigits: 0,
@@ -55,6 +65,10 @@ export function LandingInteractiveDemo() {
   const [orderModal, setOrderModal] = useState(false);
   const [plate, setPlate] = useState('DEMO-04');
   const [message, setMessage] = useState('');
+  const [bikeFilter, setBikeFilter] = useState<'all' | 'without' | 'active' | 'finished'>('all');
+  const [orderFilter, setOrderFilter] = useState<'active' | 'without' | 'completed'>('active');
+  const [resetVersion, setResetVersion] = useState(0);
+  const [quoteStatuses, setQuoteStatuses] = useState<Record<number, string>>({});
   const activeOrders = orders.filter(order => order.status !== 'delivered');
   const busyPlates = new Set(activeOrders.map(order => order.plate));
   const availableBikes = BIKES.filter(bike => !busyPlates.has(bike.plate));
@@ -109,6 +123,8 @@ export function LandingInteractiveDemo() {
     setMessage('Demo restablecida. Tus cambios nunca se guardan.');
     setOrderModal(false);
     setPlate('DEMO-04');
+    setBikeFilter('all'); setOrderFilter('active'); setQuoteStatuses({});
+    setResetVersion(v => v + 1);
   };
   const card = 'rounded-2xl border p-5 shadow-sm ' + (dark ? 'border-white/10 bg-[#141d2d]' : 'border-[#d8e1ea] bg-white');
   const muted = dark ? 'text-slate-400' : 'text-slate-500';
@@ -116,7 +132,7 @@ export function LandingInteractiveDemo() {
   const secondary = dark ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-slate-100 text-slate-900 hover:bg-slate-200';
   const pill = (status: WorkStatus) => status === 'delivered'
     ? (dark ? 'bg-emerald-400/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700')
-    : status === 'ready'
+    : status === 'completed'
       ? (dark ? 'bg-orange-400/15 text-orange-200' : 'bg-orange-50 text-orange-700')
       : (dark ? 'bg-blue-400/15 text-blue-200' : 'bg-blue-50 text-blue-700');
 
@@ -131,8 +147,8 @@ export function LandingInteractiveDemo() {
             Entra al taller. <span className="text-[#ff8a28]">Sin registrarte.</span>
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
-            Esta es una demostración interactiva inspirada en la interfaz de MotoManager.
-            Cambia de módulo, crea una orden ficticia, actualiza su estado y simula una venta.
+            Recorre los módulos de MotoManager con un taller ficticio: clientes, motos, órdenes, inventario,
+            ventas, técnicos, citas y mucho más. Experimenta sin abrir una cuenta.
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-400">
             <span><Check className="mr-1 inline h-4 w-4 text-emerald-400" /> Sin correo</span>
@@ -161,13 +177,13 @@ export function LandingInteractiveDemo() {
           </div>
 
           <div className={'transition-colors duration-300 ' + (dark ? 'bg-[#060c18] text-white' : 'bg-[#edf3f8] text-[#122036]')}>
-            <div className={'flex gap-1 overflow-x-auto border-b px-3 py-3 sm:justify-center sm:px-6 ' + (dark ? 'border-white/10' : 'border-slate-200')}>
+            <div className={'flex gap-1 overflow-x-auto border-b px-3 py-3 lg:flex-wrap lg:justify-center sm:px-6 ' + (dark ? 'border-white/10' : 'border-slate-200')}>
               {NAV.map(item => {
                 const Icon = item.icon;
                 return <button
                   key={item.id} type="button" onClick={() => active(item.id)}
                   aria-pressed={screen === item.id}
-                  className={'inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition sm:px-4 sm:text-sm ' +
+                  className={'inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-bold transition sm:px-3 sm:text-sm ' +
                     (screen === item.id ? accent : (dark ? 'text-slate-300 hover:bg-white/10' : 'text-slate-600 hover:bg-white'))}>
                   <Icon className="h-4 w-4" /> {item.label}
                 </button>;
@@ -201,12 +217,18 @@ export function LandingInteractiveDemo() {
                     <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-[#347df1]">Explorar <ArrowRight className="h-4 w-4" /></span>
                   </button>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                   {([
+                    ['clientes', 'Clientes', Users, 'text-emerald-500 bg-emerald-500/10'],
                     ['motos', 'Motocicletas', Bike, 'text-[#ff7c0d] bg-[#ff7c0d]/10'],
                     ['inventario', 'Inventario', Boxes, 'text-amber-500 bg-amber-500/10'],
-                    ['ventas', 'Ventas', ShoppingBag, 'text-emerald-500 bg-emerald-500/10'],
-                    ['ordenes', 'Servicios', Wrench, 'text-fuchsia-500 bg-fuchsia-500/10'],
+                    ['servicios', 'Servicios', Wrench, 'text-fuchsia-500 bg-fuchsia-500/10'],
+                    ['ventas', 'Ventas', ShoppingBag, 'text-green-500 bg-green-500/10'],
+                    ['citas', 'Citas', CalendarDays, 'text-blue-500 bg-blue-500/10'],
+                    ['contabilidad', 'Contabilidad', Wallet, 'text-violet-500 bg-violet-500/10'],
+                    ['tecnicos', 'Técnicos', UserRound, 'text-cyan-500 bg-cyan-500/10'],
+                    ['permisos', 'Permisos', ShieldCheck, 'text-purple-500 bg-purple-500/10'],
+                    ['soporte', 'Soporte', Headphones, 'text-rose-500 bg-rose-500/10'],
                   ] as const).map(([target, name, Icon, tint]) => (
                     <button type="button" key={name} onClick={() => active(target)} className={card + ' text-left transition hover:-translate-y-0.5'}>
                       <span className={'inline-flex h-9 w-9 items-center justify-center rounded-xl ' + tint}><Icon className="h-5 w-5" /></span>
@@ -214,6 +236,10 @@ export function LandingInteractiveDemo() {
                       <span className={'mt-1 block text-xs ' + muted}>Abrir módulo</span>
                     </button>
                   ))}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => active('portal')} className="rounded-xl border border-[#347df1]/30 px-4 py-3 text-xs font-bold text-[#347df1] hover:bg-[#347df1]/10">Explorar portal del cliente <ArrowRight className="ml-1 inline h-3 w-3" /></button>
+                  <button type="button" onClick={() => active('whatsapp')} className="rounded-xl border border-[#347df1]/30 px-4 py-3 text-xs font-bold text-[#347df1] hover:bg-[#347df1]/10">Vista previa de WhatsApp <ArrowRight className="ml-1 inline h-3 w-3" /></button>
                 </div>
               </>}
 
@@ -235,7 +261,7 @@ export function LandingInteractiveDemo() {
                   <div className={card}>
                     <h4 className="font-bold">Estado de órdenes</h4>
                     <div className="mt-5 space-y-4">
-                      {(['received', 'diagnosis', 'repair', 'ready', 'delivered'] as WorkStatus[]).map(status => {
+                      {(['received', 'diagnosis', 'in_progress', 'completed', 'delivered'] as WorkStatus[]).map(status => {
                         const count = orders.filter(o => o.status === status).length;
                         return <div key={status} className="flex items-center gap-3 text-sm">
                           <span className="w-36 shrink-0">{STATUS[status]}</span>
@@ -259,30 +285,55 @@ export function LandingInteractiveDemo() {
 
               {screen === 'ordenes' && <>
                 <Header title="Órdenes de Trabajo" subtitle="Avanza una orden para ver cómo cambia el seguimiento. No se envía nada a WhatsApp." />
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {([['without', 'Motos sin orden'], ['active', 'Con orden activa'], ['completed', 'Finalizadas']] as const).map(([value, label]) => (
+                    <button key={value} type="button" onClick={() => setOrderFilter(value)} aria-pressed={orderFilter === value}
+                      className={'rounded-xl px-3 py-2 text-xs font-bold ' + (orderFilter === value ? accent : secondary)}>{label}</button>
+                  ))}
+                </div>
                 <button type="button" onClick={openNewOrder} className={'mb-5 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ' + accent}><Plus className="h-4 w-4" /> Nueva orden ficticia</button>
                 <div className={card + ' overflow-x-auto'}>
-                  <table className="w-full min-w-[640px] text-left text-sm">
+                  <table className="w-full min-w-[820px] text-left text-sm">
                     <thead className={'border-b text-xs uppercase tracking-wide ' + (dark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}>
-                      <tr><th className="pb-4">Orden</th><th className="pb-4">Motocicleta / cliente</th><th className="pb-4">Estado</th><th className="pb-4 text-right">Acción</th></tr>
+                      <tr><th className="pb-4">Orden</th><th className="pb-4">Motocicleta / cliente</th><th className="pb-4">Estado</th><th className="pb-4">Cotización</th><th className="pb-4 text-right">Acción</th></tr>
                     </thead>
                     <tbody>
-                      {orders.map(order => <tr key={order.id} className={'border-b last:border-0 ' + (dark ? 'border-white/10' : 'border-slate-100')}>
+                      {(orderFilter === 'without' ? [] : orders.filter(o => orderFilter === 'completed' ? o.status === 'delivered' : o.status !== 'delivered')).map(order => <tr key={order.id} className={'border-b last:border-0 ' + (dark ? 'border-white/10' : 'border-slate-100')}>
                         <td className="py-4 font-bold">#{order.id}<span className={'mt-1 block text-xs font-normal ' + muted}>{order.service}</span></td>
                         <td className="py-4"><strong className="block">{order.plate} · {order.bike}</strong><span className={'text-xs ' + muted}>{order.customer}</span></td>
                         <td className="py-4"><span className={'inline-flex rounded-full px-3 py-1 text-xs font-bold ' + pill(order.status)}>{STATUS[order.status]}</span></td>
+                        <td className="py-4"><select aria-label={'Cotización de orden ' + order.id}
+                          value={quoteStatuses[order.id] || (order.id === 1041 ? 'Aprobada' : 'Pendiente')}
+                          onChange={e => { setQuoteStatuses(v => ({ ...v, [order.id]: e.target.value })); setMessage('Cotización modificada solo en el ejemplo.'); }}
+                          disabled={order.status === 'delivered'}
+                          className={'rounded-lg border px-2 py-2 text-xs font-semibold ' + (dark ? 'border-white/20 bg-[#152237] text-white' : 'border-slate-200 bg-white text-slate-800')}>
+                          <option value="Pendiente">Pendiente</option><option value="Aprobada">Aprobada</option><option value="Rechazada">Rechazada</option>
+                        </select></td>
                         <td className="py-4 text-right">{order.status !== 'delivered'
                           ? <button type="button" onClick={() => progress(order.id)} className="rounded-lg border border-[#347df1]/40 px-3 py-2 text-xs font-bold text-[#347df1] hover:bg-[#347df1]/10">Siguiente etapa <ArrowRight className="inline h-3 w-3" /></button>
                           : <span className="inline-flex items-center gap-1 text-xs text-emerald-500"><CheckCircle2 className="h-4 w-4" /> Cerrada</span>}</td>
                       </tr>)}
                     </tbody>
                   </table>
+                  {orderFilter === 'without' && <div className="py-8 text-center text-sm">
+                    <p className={'mb-3 ' + muted}>Motocicletas disponibles sin historial de órdenes</p>
+                    {BIKES.filter(b => !orders.some(o => o.plate === b.plate)).map(b => <p className="py-1 font-bold" key={b.plate}>{b.plate} · {b.name}</p>)}
+                    <button type="button" onClick={openNewOrder} className={accent + ' mt-4 rounded-lg px-4 py-2 text-xs font-bold'}>Crear orden ficticia</button>
+                  </div>}
                 </div>
               </>}
 
               {screen === 'motos' && <>
                 <Header title="Motocicletas registradas" subtitle="Cada motocicleta conserva su historial, incluso después de entregar una orden." />
+                <div className="mb-5 flex flex-wrap gap-2">
+                  {([['all','Todas'], ['without','Sin orden'], ['active','Con orden activa'], ['finished','Finalizadas']] as const).map(([value,label]) =>
+                    <button type="button" key={value} aria-pressed={bikeFilter === value} onClick={() => setBikeFilter(value)}
+                      className={'rounded-xl px-3 py-2 text-xs font-bold ' + (bikeFilter === value ? accent : secondary)}>
+                      {label} ({BIKES.filter(b => { const related = orders.filter(o => o.plate === b.plate); const classification = related.some(o => o.status !== 'delivered') ? 'active' : related.length ? 'finished' : 'without'; return value === 'all' || classification === value; }).length})
+                    </button>)}
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {BIKES.map(bike => {
+                  {BIKES.filter(b => { const related = orders.filter(o => o.plate === b.plate); const classification = related.some(o => o.status !== 'delivered') ? 'active' : related.length ? 'finished' : 'without'; return bikeFilter === 'all' || classification === bikeFilter; }).map(bike => {
                     const current = orders.find(o => o.plate === bike.plate && o.status !== 'delivered') || orders.find(o => o.plate === bike.plate);
                     return <div key={bike.plate} className={card + ' flex items-start gap-3'}>
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ff7c0d]/10 text-[#ff7c0d]"><Bike className="h-6 w-6" /></span>
@@ -327,6 +378,10 @@ export function LandingInteractiveDemo() {
                   </div>
                 </div>
               </>}
+              <LandingDemoExtras screen={screen} dark={dark} orders={orders} bikes={BIKES}
+                revenue={revenue} resetVersion={resetVersion}
+                onNavigate={value => active(value as Screen)}
+                onAssignTechnician={(id,name) => setOrders(current => current.map(o => o.id === id ? { ...o, technician: name } : o))} />
             </div>
             <div className={'flex flex-wrap items-center justify-between gap-3 border-t px-4 py-4 text-xs sm:px-8 ' + (dark ? 'border-white/10 bg-[#0b1424] text-slate-400' : 'border-slate-200 bg-white text-slate-500')}>
               <span>● Taller Ejemplo · Información ficticia · Cambios solo en tu navegador</span>

@@ -5,6 +5,8 @@ import PlanesPage from './planes/PlanesPage';
 import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getPublicWorkshops } from '@/actions/public-workshops';
+import type { PublicWorkshop } from '@/actions/public-workshops';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
@@ -38,6 +40,7 @@ export default async function Page() {
   let plans: any[] = [];
   let features: any[] = [];
   let user: any = null;
+  let workshops: PublicWorkshop[] = [];
   
   try {
     const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -59,6 +62,9 @@ export default async function Page() {
   } catch (err) {
     console.error("Error fetching plans data:", err);
   }
+
+  // Directorio visible para Google y para visitantes sin iniciar sesión.
+  workshops = await getPublicWorkshops('');
 
   // Merge with styling properties
   plans = mergePlansWithDefaults(plans);
@@ -91,7 +97,7 @@ export default async function Page() {
             <div className="h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         }>
-          <PlanesPage plans={plans} features={features} user={user} />
+          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} />
         </Suspense>
       </div>
     </>

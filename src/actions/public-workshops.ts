@@ -30,11 +30,7 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
         name, 
         slug, 
         phone, 
-        settings,
-        organization_members (
-          role,
-          profiles ( phone )
-        )
+        settings
       `)
       .neq('status', 'suspended')
       .order('created_at', { ascending: false });
@@ -42,7 +38,7 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
     // If there is a search query, filter by name
     if (searchQuery.trim() !== '') {
       const searchTerm = `%${searchQuery.trim()}%`;
-      query = query.or(`name.ilike.${searchTerm}`);
+      query = query.ilike('name', searchTerm);
     }
 
     const { data, error } = await query.limit(50);
@@ -62,9 +58,8 @@ export async function getPublicWorkshops(searchQuery: string = ''): Promise<Publ
     ));
 
     return (data || []).map((org: any) => {
-      const ownerMember = org.organization_members?.find((m: any) => m.role === 'owner' || m.role === 'admin');
-      const ownerPhone = ownerMember?.profiles?.phone || null;
-      const resolvedPhone = org.phone || org.settings?.phone || org.settings?.whatsapp || ownerPhone || null;
+      // El directorio solo publica teléfonos del taller, nunca el perfil privado del dueño.
+      const resolvedPhone = org.phone || org.settings?.phone || org.settings?.whatsapp || null;
       const rating = reputationById.get(org.id);
 
       return {
