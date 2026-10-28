@@ -1,6 +1,8 @@
 import { authorize } from '@/lib/auth-server';
 import { getWorkOrders } from '@/lib/data';
 import { getOrderCreationOptions } from '@/lib/work-orders/order-creation-options';
+import { getMotorcycleOrderList } from '@/lib/motorcycle-order-list';
+import { motorcycleMatchesTab } from '@/lib/motorcycle-order-groups';
 import type { WorkOrder } from '@/lib/types';
 import {
   Card,
@@ -26,7 +28,7 @@ import { SearchWorkOrders } from '@/components/forms/SearchWorkOrders';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Eye, BellRing, CheckCircle2, Clock } from 'lucide-react';
+import { ClipboardList, Eye, BellRing, CheckCircle2, Clock, Bike } from 'lucide-react';
 import WorkOrdersRealtime from './WorkOrdersRealtime';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ModuleToolbar } from '@/components/common/ModuleToolbar';
@@ -46,10 +48,11 @@ export default async function WorkOrdersPage({
   const activePage = Number(resolvedSearchParams.activePage) || 1;
   const completedPage = Number(resolvedSearchParams.completedPage) || 1;
 
-  const [activeWOData, completedWOData, orderOptions] = await Promise.all([
+  const [activeWOData, completedWOData, orderOptions, motorcycleOrderData] = await Promise.all([
     getWorkOrders({ query, page: activePage, statusFilter: 'active' }),
     getWorkOrders({ query, page: completedPage, statusFilter: 'completed' }),
     getOrderCreationOptions(),
+    getMotorcycleOrderList('', user.workshopId!),
   ]);
 
   const activeWorkOrders = activeWOData.items;
@@ -59,6 +62,9 @@ export default async function WorkOrdersPage({
   const totalCompletedPages = completedWOData.totalPages;
   
   const { motorcycles, technicians, unavailableMotorcycleIds } = orderOptions;
+  const motorcyclesWithoutOrder = motorcycleOrderData.motorcycles.filter(
+    moto => motorcycleMatchesTab(moto.id, 'without', motorcycleOrderData.orderIndex),
+  );
 
   return (
     <div className="w-full space-y-4">
@@ -88,16 +94,23 @@ export default async function WorkOrdersPage({
         }
       />
 
-      {/* Navegación Segmentada (Activas / Finalizadas) */}
+      {/* Registro de motos sin historial y órdenes abiertas/cerradas */}
       <Tabs defaultValue="active" className="w-full">
         <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
-          <TabsList className="bg-muted/50 border border-border/60 p-1 rounded-xl h-10">
+          <TabsList className="bg-muted/50 border border-border/60 p-1 rounded-xl h-auto min-h-10 flex-wrap gap-1">
+            <TabsTrigger
+              value="without"
+              className="rounded-lg text-xs sm:text-sm font-semibold px-3.5"
+            >
+              <Bike className="w-3.5 h-3.5 mr-1.5" />
+              Motos sin orden ({motorcyclesWithoutOrder.length})
+            </TabsTrigger>
             <TabsTrigger 
               value="active" 
               className="rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm px-3.5"
             >
               <Clock className="w-3.5 h-3.5 text-primary" />
-              <span>Trabajos Activos</span>
+              <span>Con orden activa</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-primary/15 text-primary font-bold">
                 {activeWorkOrders.length}
               </span>
@@ -114,6 +127,46 @@ export default async function WorkOrdersPage({
             </TabsTrigger>
           </TabsList>
         </div>
+
+        {/* Motocicletas que nunca han tenido orden de trabajo. */}
+        <TabsContent value="without" className="m-0 focus-visible:outline-none">
+          <Card className="border-border/60 bg-card/60 overflow-hidden rounded-2xl">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/20">
+                      <TableHead>Placa</TableHead>
+                      <TableHead>Motocicleta</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="text-right">Acción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {motorcyclesWithoutOrder.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                          No hay motos sin historial de órdenes. Las que ya fueron entregadas están en Finalizadas.
+                        </TableCell>
+                      </TableRow>
+                    ) : motorcyclesWithoutOrder.map(moto => (
+                      <TableRow key={moto.id}>
+                        <TableCell className="font-mono font-semibold">{moto.plate || 'S/P'}</TableCell>
+                        <TableCell>{moto.make} {moto.model}</TableCell>
+                        <TableCell>{moto.customer.name}</TableCell>
+                        <TableCell className="text-right">
+                          <Link href="/work-orders?new=true" className="text-primary text-sm font-medium hover:underline">
+                            Crear orden
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Tab Activas */}
         <TabsContent value="active" className="m-0 focus-visible:outline-none">
