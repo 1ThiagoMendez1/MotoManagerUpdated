@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { hasPermission } from '@/lib/permissions';
 import { cache } from 'react';
 import { isSuperAdmin } from '@/lib/super-admin';
+import { resolveWorkshopPlan } from '@/lib/workshop-plan';
 
 export const getCurrentUserServer = cache(async () => {
   try {
@@ -144,7 +145,7 @@ export const getWorkshopDetails = cache(async (knownUser?: any) => {
         name: org.name,
         slug: org.slug,
         subscription_status: settings.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
-        subscription_plan: settings.plan || 'monthly', 
+        subscription_plan: resolveWorkshopPlan(settings), 
         subscription_end_date: settings.demoEndDate || null,
         created_at: org.created_at,
         has_seen_welcome: true,

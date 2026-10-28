@@ -8,8 +8,32 @@ export async function updateWorkshopStatus(workshopId: string, status: any) {
     await requireSuperAdmin(); return { success: true }; }
 export async function updateCancellationStatus(cancellationId: string, status: any, adminNotes?: string) {
     await requireSuperAdmin(); return { success: true }; }
-export async function updateWorkshopPlan(workshopId: string, plan: any) {
-    await requireSuperAdmin(); return { success: true }; }
+export async function updateWorkshopPlan(workshopId: string, plan: string) {
+    await requireSuperAdmin();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workshopId) ||
+        !['basic', 'pro', 'full'].includes(plan)) {
+        return { success: false, error: 'Taller o plan inválido.' };
+    }
+
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false } }
+    );
+    // El RPC actualiza exclusivamente dos claves JSON, sin borrar horarios,
+    // preferencias, contador WhatsApp ni cambios simultáneos del taller.
+    const { data: updated, error } = await supabaseAdmin.rpc(
+        'set_organization_subscription_plan',
+        { p_organization_id: workshopId, p_plan: plan }
+    );
+    if (error || updated !== true) {
+        console.error('[admin] No se pudo actualizar el plan del taller:', error?.code || 'not_found');
+        return { success: false, error: 'No se pudo guardar el plan. Verifica la migración SQL y que exista el taller.' };
+    }
+    revalidatePath('/admin');
+    revalidatePath('/dashboard/subscription');
+    return { success: true };
+}
 export async function updateUserEmail(userId: string, newEmail: string) {
     await requireSuperAdmin(); return { success: true }; }
 export async function updateUserPassword(userId: string, newPassword: string) {

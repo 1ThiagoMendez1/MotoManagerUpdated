@@ -48,6 +48,7 @@ export async function updateSubscriptionPlan(formData: FormData) {
     const updatedSettings = {
         ...currentSettings,
         plan: normalizedPlan,
+        sub_plan: normalizedPlan, // mantener compatibilidad con talleres antiguos
         billingCycle,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),

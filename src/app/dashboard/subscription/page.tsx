@@ -5,6 +5,7 @@ import { ManageSubscriptionClient } from './ManageSubscriptionClient'
 import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
 import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans'
+import { resolveWorkshopPlan } from '@/lib/workshop-plan'
 
 export default async function SubscriptionPage() {
     const user = await requireWorkshop()
@@ -42,13 +43,9 @@ export default async function SubscriptionPage() {
     const features = dbFeatures.length > 0 ? dbFeatures : DEFAULT_FEATURES;
 
     const settings = workshop?.settings || {};
-    const rawPlan = settings.plan || workshop?.subscription_plan || 'basic';
-    let currentPlan = rawPlan;
-    let currentBillingCycle = (settings.billingCycle || settings.billing_cycle || 'monthly') as 'monthly' | 'biannual' | 'yearly';
-    if (rawPlan === 'biannual' || rawPlan === 'yearly') {
-        currentPlan = 'basic';
-        currentBillingCycle = rawPlan;
-    }
+    const currentPlan = resolveWorkshopPlan(settings);
+    const legacyCycle = settings.plan === 'biannual' || settings.plan === 'yearly' ? settings.plan : 'monthly';
+    const currentBillingCycle = (settings.billingCycle || settings.billing_cycle || legacyCycle) as 'monthly' | 'biannual' | 'yearly';
 
     const startDate = settings.startDate || settings.demoStartDate || settings.subscription_start_date || workshop?.subscription_start_date || workshop?.created_at || new Date().toISOString();
     let endDate = settings.endDate || settings.demoEndDate || settings.subscription_end_date || workshop?.subscription_end_date || null;

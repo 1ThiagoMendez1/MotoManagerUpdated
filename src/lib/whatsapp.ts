@@ -5,7 +5,7 @@ import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-statu
 import { buildDiagnosisMetaTemplate } from './whatsapp-diagnosis';
 import { ai } from '@/ai/genkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { getPlanLimits } from '@/lib/constants/plans';
+import { getWorkshopWhatsAppLimit } from '@/lib/workshop-plan';
 
 const evolutionApiUrl = process.env.EVOLUTION_API_URL;
 const evolutionApiKey = process.env.EVOLUTION_API_KEY;
@@ -2284,10 +2284,10 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
       return false;
     }
 
-    const settings = typeof org.settings === 'string' ? JSON.parse(org.settings) : (org.settings || {});
-    const subPlan = settings.sub_plan || 'basic';
-    const planLimits = getPlanLimits(subPlan);
-    if (planLimits.whatsapp_limit === -1) return true;
+    // settings.plan es la fuente de verdad; sub_plan queda como legado.
+    // Full nunca debe reservar ni bloquearse por el contador histórico de Basic.
+    const whatsappLimit = getWorkshopWhatsAppLimit(org.settings);
+    if (whatsappLimit === -1) return true;
 
     // The RPC serializes per-workshop reservations using a row lock and updates
     // ONLY the month's JSON key. A read/modify/write of all settings could erase
@@ -2298,7 +2298,7 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
       {
         p_organization_id: workshopId,
         p_month: currentMonth,
-        p_limit: planLimits.whatsapp_limit,
+        p_limit: whatsappLimit,
       }
     );
     if (reservationError) {

@@ -13,6 +13,7 @@ import PlanesTab from './PlanesTab';
 import { getAllTicketsForAdmin } from '@/lib/data/tickets';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { resolveWorkshopPlan } from '@/lib/workshop-plan';
 
 export default async function AdminPage({
   searchParams,
@@ -59,7 +60,7 @@ export default async function AdminPage({
     name: org.name,
     slug: org.slug,
     subscription_status: org.settings?.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
-    subscription_plan: org.settings?.plan || 'monthly',
+    subscription_plan: resolveWorkshopPlan(org.settings),
     subscription_end_date: org.settings?.demoEndDate || null,
     created_at: org.created_at,
     members: org.members?.map((m: any) => ({

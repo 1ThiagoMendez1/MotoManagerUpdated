@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -55,6 +56,7 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
     const [credentials, setCredentials] = useState<{ email?: string, password?: string, phone?: string } | null>(null);
     const [copied, setCopied] = useState(false);
     const { toast } = useToast();
+    const router = useRouter();
 
     const plan = workshop.subscription_plan || 'basic';
     const planInfo = PLAN_PRICES[plan] ?? { label: plan, price: 50000 };
@@ -81,10 +83,12 @@ export default function WorkshopActions({ workshop }: { workshop: any }) {
     const handlePlanChange = async (plan: 'basic' | 'pro' | 'full') => {
         try {
             setIsLoading(true);
-            await updateWorkshopPlan(workshop.id, plan);
+            const result = await updateWorkshopPlan(workshop.id, plan);
+            if (!result.success) throw new Error(result.error || 'Error al actualizar el plan.');
             toast({ title: 'Plan actualizado', description: `El plan ahora es ${plan}` });
+            router.refresh();
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar el plan' });
+            toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'No se pudo actualizar el plan' });
         } finally {
             setIsLoading(false);
         }
