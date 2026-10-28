@@ -234,7 +234,7 @@ export function LandingDemoExtras({
             <label className={'mt-4 block text-xs ' + muted} htmlFor="demo-expense-name">Concepto</label>
             <input className={fieldClass + ' mt-2'} id="demo-expense-name" value={expenseName} maxLength={70} onChange={e => setExpenseName(e.target.value)} />
             <label className={'mt-4 block text-xs ' + muted} htmlFor="demo-expense-amount">Valor (COP)</label>
-            <input id="demo-expense-amount" type="number" min="1" max="100000000" step="1000" value={expense || ''} onChange={e => setExpense(Number(e.target.value))} className={fieldClass + ' mt-2'} required />
+            <input id="demo-expense-amount" type="number" min="1" max="100000000" step="1" value={expense || ''} onChange={e => setExpense(Number(e.target.value))} className={fieldClass + ' mt-2'} required />
             <button className={buttonClass + ' mt-4 w-full'} type="submit">Registrar egreso ficticio</button>
           </form>
           <div className={card}>

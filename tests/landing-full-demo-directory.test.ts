@@ -38,6 +38,7 @@ test('las áreas adicionales contienen interacción real de navegador y datos fi
   assert.match(extras, /setTickets/);
   assert.doesNotMatch(extras, /\bfetch\s*\(|\bsupabase\b|localStorage|sessionStorage|\baxios\b|window\.open/);
   assert.match(extras, /Ningún mensaje se envió/);
+  assert.match(extras, /type="number" min="1" max="100000000" step="1"/);
 });
 
 test('el directorio se incluye y se entrega desde el servidor con talleres existentes', () => {
