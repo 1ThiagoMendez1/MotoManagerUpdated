@@ -1,5 +1,6 @@
 import { authorize } from '@/lib/auth-server';
-import { getWorkOrders, getMotorcycles, getTechnicians } from '@/lib/data';
+import { getWorkOrders } from '@/lib/data';
+import { getOrderCreationOptions } from '@/lib/work-orders/order-creation-options';
 import type { WorkOrder } from '@/lib/types';
 import {
   Card,
@@ -45,11 +46,10 @@ export default async function WorkOrdersPage({
   const activePage = Number(resolvedSearchParams.activePage) || 1;
   const completedPage = Number(resolvedSearchParams.completedPage) || 1;
 
-  const [activeWOData, completedWOData, motorcyclesData, techniciansData] = await Promise.all([
+  const [activeWOData, completedWOData, orderOptions] = await Promise.all([
     getWorkOrders({ query, page: activePage, statusFilter: 'active' }),
     getWorkOrders({ query, page: completedPage, statusFilter: 'completed' }),
-    getMotorcycles({ limit: 1000 } as any),
-    getTechnicians({ limit: 1000 } as any),
+    getOrderCreationOptions(),
   ]);
 
   const activeWorkOrders = activeWOData.items;
@@ -58,14 +58,7 @@ export default async function WorkOrdersPage({
   const completedWorkOrders = completedWOData.items;
   const totalCompletedPages = completedWOData.totalPages;
   
-  const motorcycles = motorcyclesData.items;
-  const technicians = techniciansData.items;
-  const [allWO] = await Promise.all([getWorkOrders({ limit: 1000 } as any)]);
-  const workOrders = allWO.items;
-
-  const motorcyclesWithoutAnyWorkOrder = motorcycles.filter(
-    (moto) => !workOrders.some((wo) => wo.motorcycle?.id === moto.id)
-  );
+  const { motorcycles, technicians, unavailableMotorcycleIds } = orderOptions;
 
   return (
     <div className="w-full space-y-4">
@@ -88,8 +81,9 @@ export default async function WorkOrdersPage({
         searchComponent={<SearchWorkOrders />}
         primaryAction={
           <AddWorkOrder 
-            motorcycles={motorcyclesWithoutAnyWorkOrder} 
-            technicians={technicians} 
+            motorcycles={motorcycles}
+            technicians={technicians}
+            unavailableMotorcycleIds={unavailableMotorcycleIds} 
           />
         }
       />

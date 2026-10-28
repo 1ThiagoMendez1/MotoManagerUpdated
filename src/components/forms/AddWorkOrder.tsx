@@ -29,19 +29,22 @@ import type { Motorcycle, Technician } from '@/lib/types';
 type AddWorkOrderProps = {
   motorcycles: Motorcycle[];
   technicians: Technician[];
+  unavailableMotorcycleIds?: string[];
   customTrigger?: React.ReactNode;
 };
 
-function SubmitButton() {
+function SubmitButton({ disabled }: { disabled: boolean }) {
   return (
-    <Button type="submit">
+    <Button type="submit" disabled={disabled}>
       <PlusCircle className="mr-2 h-4 w-4" />
       Crear Orden
     </Button>
   );
 }
 
-export function AddWorkOrder({ motorcycles, technicians, customTrigger }: AddWorkOrderProps) {
+export function AddWorkOrder({ motorcycles, technicians, unavailableMotorcycleIds = [], customTrigger }: AddWorkOrderProps) {
+  const blockedIds = new Set(unavailableMotorcycleIds);
+  const canCreateOrder = motorcycles.some(moto => !blockedIds.has(moto.id));
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -100,12 +103,20 @@ export function AddWorkOrder({ motorcycles, technicians, customTrigger }: AddWor
               </SelectTrigger>
               <SelectContent>
                 {motorcycles.map(moto => (
-                  <SelectItem key={moto.id} value={moto.id}>
-                    {moto.make} {moto.model} ({moto.customer.name})
+                  <SelectItem key={moto.id} value={moto.id} disabled={blockedIds.has(moto.id)}>
+                    {moto.plate || 'S/P'} · {moto.make} {moto.model} ({moto.customer.name})
+                    {blockedIds.has(moto.id) ? ' — orden abierta' : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {!canCreateOrder && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {motorcycles.length === 0
+                  ? 'No hay motocicletas registradas para crear una orden.'
+                  : 'Todas las motocicletas tienen órdenes abiertas. Entrega o cancela la orden actual antes de crear otra.'}
+              </p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium text-foreground">Técnico Asignado</label>
@@ -123,7 +134,7 @@ export function AddWorkOrder({ motorcycles, technicians, customTrigger }: AddWor
             </Select>
           </div>
           <DialogFooter>
-            <SubmitButton />
+            <SubmitButton disabled={!canCreateOrder || technicians.length === 0} />
           </DialogFooter>
         </form>
       </DialogContent>

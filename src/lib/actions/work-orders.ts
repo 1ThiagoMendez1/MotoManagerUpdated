@@ -69,7 +69,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
     { auth: { persistSession: false } }
   );
 
-    const { data: activeOrders } = await supabaseAdmin
+    const { data: activeOrders, error: activeOrdersError } = await supabaseAdmin
         .from('work_orders')
         .select(`
             id,
@@ -81,6 +81,11 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         .neq('status', 'delivered')
         .neq('status', 'delivered_quote_rejected')
         .neq('status', 'cancelled');
+
+    if (activeOrdersError) {
+        console.error('[work-orders] No se pudo verificar las órdenes activas:', activeOrdersError.code);
+        return { message: 'No se pudo verificar si esta moto tiene otra orden activa. Intenta nuevamente.' };
+    }
 
     const activeOrder = activeOrders?.find(wo => wo.status !== 'delivered' && wo.status !== 'delivered_quote_rejected' && wo.status !== 'cancelled');
         
