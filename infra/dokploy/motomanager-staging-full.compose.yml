@@ -123,12 +123,12 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: '9999'
-      API_EXTERNAL_URL: http://gotrue:9999
+      API_EXTERNAL_URL: https://api-staging.motomanager.com.co
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://gotrue_stage:${GOTRUE_STAGE_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage?sslmode=disable
-      GOTRUE_SITE_URL: http://staging-web:3000
-      GOTRUE_URI_ALLOW_LIST: http://staging-web:3000/**,http://localhost:3007/**
-      GOTRUE_DISABLE_SIGNUP: 'false'
+      GOTRUE_SITE_URL: https://staging.motomanager.com.co
+      GOTRUE_URI_ALLOW_LIST: https://staging.motomanager.com.co/**
+      GOTRUE_DISABLE_SIGNUP: 'true'
       GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
       GOTRUE_MAILER_AUTOCONFIRM: 'true'
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: 'false'
@@ -217,6 +217,9 @@ services:
       staging_private:
         aliases:
         - stage-gateway
+      dokploy-network:
+        aliases:
+        - motomanager-staging-gateway
     security_opt:
     - no-new-privileges:true
   staging-web:
@@ -249,7 +252,7 @@ services:
       NEXT_TELEMETRY_DISABLED: '1'
       HOSTNAME: 0.0.0.0
       PORT: '3000'
-      NEXT_PUBLIC_SUPABASE_URL: http://stage-gateway:8000
+      NEXT_PUBLIC_SUPABASE_URL: https://api-staging.motomanager.com.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${STAGING_ANON_KEY:?required}
       SUPABASE_SERVICE_ROLE_KEY: ${STAGING_SERVICE_KEY:?required}
       SUPABASE_INTERNAL_URL: http://stage-gateway:8000
@@ -258,7 +261,7 @@ services:
       CACHE_TTL_SECONDS: '15'
       CACHE_NAMESPACE: motomanager:staging:reads:v1
     volumes:
-    - /opt/motomanagernewmigration-staging/web/standalone:/app:ro
+    - /opt/motomanagernewmigration-staging/web/releases/3aKtlJnZtU_4c_ZbKBz8m:/app:ro
     tmpfs:
     - /app/.next/cache:uid=1000,gid=1000,mode=0700
     networks:

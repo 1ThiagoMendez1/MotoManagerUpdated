@@ -59,3 +59,13 @@ La base PG17.6 de Supabase en producción NO se ha modificado.
 ## Public preview routing
 
 The owner-configured `staging.motomanager.com.co` is served through Traefik using a temporary file-provider router at `/etc/dokploy/traefik/dynamic/motomanager-staging-web.yml`. Only `staging-web` joins the external `dokploy-network` overlay (alias `motomanager-staging-web`). The eight other staging services remain on `staging_private`. Remove the temporary router if Dokploy deploys an equivalent domain rule, to prevent duplicate routing. The web HTML responds publicly over HTTPS; browser authentication still needs a separate HTTPS Supabase gateway URL and a web rebuild with the correct public URL.
+
+## HTTPS staging domain verification (October 29, 2026)
+
+- `staging.motomanager.com.co` HTTPS routes to **only** `staging-web` using the staging-only Traefik file `/etc/dokploy/traefik/dynamic/motomanager-staging-web.yml`.
+- `api-staging.motomanager.com.co` HTTPS routes to **only** `stage-gateway` using `/etc/dokploy/traefik/dynamic/motomanager-staging-api.yml`.
+- Only those two services join the `dokploy-network` overlay; PG17, Redis, Keycloak, GoTrue, PostgREST and Storage remain on the internal staging bridge.
+- Kong enforces API-key authentication for Auth, REST and Storage and restricts CORS to the staging web origin. The private Kong YAML contains credential values and must remain on VPS, **never commit it**.
+- Staging GoTrue external URLs use HTTPS; self-registration and anonymous users are disabled. Existing synthetic accounts remain usable.
+- The Next.js staging standalone release is under `/opt/motomanagernewmigration-staging/web/releases/3aKtlJnZtU_4c_ZbKBz8m`, built with the public HTTPS Supabase URL; the server uses private `SUPABASE_INTERNAL_URL` for backend reads. No production site or databases were updated.
+- The temporary Traefik file-provider routers must be retired before enabling equivalent routers via Dokploy's Domains/deploy action to avoid collisions.
