@@ -1,0 +1,276 @@
+# STAGING ONLY. Import into Dokploy with the existing Compose project name.
+# Secrets must be configured in Dokploy, not committed.
+name: motomanagernew-motomanagernewmigration-ogl915
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    shm_size: 256mb
+    mem_limit: 2g
+    cpus: 2.0
+    environment:
+      POSTGRES_DB: motomanager_stage
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?staging PostgreSQL secret required}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+    - pg17_stage_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d motomanager_stage
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+    - staging_private
+    stop_grace_period: 60s
+    security_opt:
+    - no-new-privileges:true
+  redis-cache:
+    image: redis:7.4.8-alpine
+    mem_limit: 384m
+    cpus: 0.5
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?staging Redis secret required}
+    tmpfs:
+    - /data
+    command:
+    - /bin/sh
+    - -ec
+    - 'case "$$REDIS_PASSWORD" in ''''|*[!a-fA-F0-9]*) exit 1;; esac
+
+      test "$${#REDIS_PASSWORD}" -ge 64 || exit 1
+
+      umask 077
+
+      printf ''%s\n'' ''bind 0.0.0.0'' ''protected-mode yes'' ''save ""'' ''appendonly
+      no'' ''maxmemory 256mb'' ''maxmemory-policy allkeys-lru'' > /tmp/redis-stage.conf
+
+      printf ''requirepass %s\n'' "$$REDIS_PASSWORD" >> /tmp/redis-stage.conf
+
+      exec redis-server /tmp/redis-stage.conf
+
+      '
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 3s
+      retries: 8
+    networks:
+      staging_private:
+        aliases:
+        - motomanager-read-cache
+    security_opt:
+    - no-new-privileges:true
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    mem_limit: 2304m
+    cpus: 1.5
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_stage
+      KC_DB_USERNAME: keycloak_stage
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?staging Keycloak DB secret required}
+      KC_BOOTSTRAP_ADMIN_USERNAME: stage-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?staging Keycloak admin
+        secret required}
+      KC_HTTP_ENABLED: 'true'
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'false'
+    command:
+    - start
+    networks:
+    - staging_private
+    security_opt:
+    - no-new-privileges:true
+  rest:
+    image: postgrest/postgrest:v14.12
+    mem_limit: 512m
+    cpus: 0.75
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${PGRST_DB_PASSWORD:?staging REST database
+        password required}@postgres:5432/motomanager_stage
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?staging JWT secret required}
+      PGRST_DB_MAX_ROWS: '1000'
+      PGRST_SERVER_HOST: 0.0.0.0
+    networks:
+    - staging_private
+    security_opt:
+    - no-new-privileges:true
+  gotrue:
+    image: supabase/gotrue:v2.189.0
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.75
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: '9999'
+      API_EXTERNAL_URL: http://gotrue:9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://gotrue_stage:${GOTRUE_STAGE_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage?sslmode=disable
+      GOTRUE_SITE_URL: http://staging-web:3000
+      GOTRUE_URI_ALLOW_LIST: http://staging-web:3000/**,http://localhost:3007/**
+      GOTRUE_DISABLE_SIGNUP: 'false'
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      GOTRUE_MAILER_AUTOCONFIRM: 'true'
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: 'false'
+      GOTRUE_EXTERNAL_PHONE_ENABLED: 'false'
+      GOTRUE_JWT_SECRET: ${PGRST_JWT_SECRET:?required}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_EXP: '3600'
+    networks:
+    - staging_private
+    security_opt:
+    - no-new-privileges:true
+  rest-runtime:
+    image: postgrest/postgrest:v14.12
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.75
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${PGRST_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_EXTRA_SEARCH_PATH: public,auth
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?required}
+      PGRST_DB_MAX_ROWS: '1000'
+      PGRST_SERVER_HOST: 0.0.0.0
+    networks:
+    - staging_private
+    security_opt:
+    - no-new-privileges:true
+  storage-runtime:
+    image: supabase/storage-api:v1.60.4
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rest-runtime:
+        condition: service_started
+    environment:
+      ANON_KEY: ${STAGING_ANON_KEY:?required}
+      SERVICE_KEY: ${STAGING_SERVICE_KEY:?required}
+      POSTGREST_URL: http://rest-runtime:3000
+      AUTH_JWT_SECRET: ${PGRST_JWT_SECRET:?required}
+      DATABASE_URL: postgres://storage_stage:${STAGING_STORAGE_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage
+      STORAGE_PUBLIC_URL: http://stage-gateway:8000
+      REQUEST_ALLOW_X_FORWARDED_PATH: 'true'
+      FILE_SIZE_LIMIT: '52428800'
+      STORAGE_BACKEND: file
+      GLOBAL_S3_BUCKET: staging-assets
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stage
+      REGION: us-east-1
+      ENABLE_IMAGE_TRANSFORMATION: 'false'
+    volumes:
+    - storage_stage_data:/var/lib/storage
+    networks:
+    - staging_private
+    security_opt:
+    - no-new-privileges:true
+  stage-gateway:
+    image: kong/kong:3.9.1
+    restart: unless-stopped
+    mem_limit: 640m
+    cpus: 0.75
+    depends_on:
+      gotrue:
+        condition: service_started
+      rest-runtime:
+        condition: service_started
+      storage-runtime:
+        condition: service_started
+    environment:
+      KONG_DATABASE: 'off'
+      KONG_DECLARATIVE_CONFIG: /etc/kong/stage.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: 'off'
+      KONG_PLUGINS: bundled
+    volumes:
+    - /opt/motomanagernewmigration-staging/gateway-kong.yml:/etc/kong/stage.yml:ro
+    networks:
+      staging_private:
+        aliases:
+        - stage-gateway
+    security_opt:
+    - no-new-privileges:true
+  staging-web:
+    image: node:24-bookworm-slim
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      interval: 20s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    mem_limit: 1536m
+    cpus: 1.5
+    working_dir: /app
+    user: node
+    command:
+    - node
+    - server.js
+    depends_on:
+      stage-gateway:
+        condition: service_started
+      redis-cache:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: '1'
+      HOSTNAME: 0.0.0.0
+      PORT: '3000'
+      NEXT_PUBLIC_SUPABASE_URL: http://stage-gateway:8000
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${STAGING_ANON_KEY:?required}
+      SUPABASE_SERVICE_ROLE_KEY: ${STAGING_SERVICE_KEY:?required}
+      SUPABASE_INTERNAL_URL: http://stage-gateway:8000
+      REDIS_URL: redis://:${REDIS_PASSWORD:?required}@motomanager-read-cache:6379/0
+      CACHE_ENABLED: 'true'
+      CACHE_TTL_SECONDS: '15'
+      CACHE_NAMESPACE: motomanager:staging:reads:v1
+    volumes:
+    - /opt/motomanagernewmigration-staging/web/standalone:/app:ro
+    tmpfs:
+    - /app/.next/cache:uid=1000,gid=1000,mode=0700
+    networks:
+      staging_private:
+        aliases:
+        - staging-web
+    security_opt:
+    - no-new-privileges:true
+volumes:
+  pg17_stage_data: null
+  storage_stage_data: null
+networks:
+  staging_private:
+    internal: true
+    driver: bridge
