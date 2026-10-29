@@ -55,3 +55,7 @@ La base PG17.6 de Supabase en producción NO se ha modificado.
 - Falta conexión Keycloak -> Supabase Auth; NO cambiar contraseñas ni identidades reales.
 - En producción primero se debe aplicar la RPC SQL con propietario autorizado,
   validar los permisos y solo entonces considerar el deploy de la nueva app.
+
+## Public preview routing
+
+The owner-configured `staging.motomanager.com.co` is served through Traefik using a temporary file-provider router at `/etc/dokploy/traefik/dynamic/motomanager-staging-web.yml`. Only `staging-web` joins the external `dokploy-network` overlay (alias `motomanager-staging-web`). The eight other staging services remain on `staging_private`. Remove the temporary router if Dokploy deploys an equivalent domain rule, to prevent duplicate routing. The web HTML responds publicly over HTTPS; browser authentication still needs a separate HTTPS Supabase gateway URL and a web rebuild with the correct public URL.

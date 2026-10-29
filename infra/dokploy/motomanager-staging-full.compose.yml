@@ -265,6 +265,9 @@ services:
       staging_private:
         aliases:
         - staging-web
+      dokploy-network:
+        aliases:
+        - motomanager-staging-web
     security_opt:
     - no-new-privileges:true
 volumes:
@@ -274,3 +277,5 @@ networks:
   staging_private:
     internal: true
     driver: bridge
+  dokploy-network:
+    external: true
