@@ -5,6 +5,7 @@ import { hasPermission } from '@/lib/permissions';
 import { cache } from 'react';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { resolveWorkshopPlan } from '@/lib/workshop-plan';
+import { getTrialState } from '@/lib/subscription-trial';
 
 export const getCurrentUserServer = cache(async () => {
   try {
@@ -50,7 +51,7 @@ export const getCurrentUserServer = cache(async () => {
   return null;
 });
 
-export async function requireWorkshop() {
+export async function requireWorkshop(options: { allowExpired?: boolean } = {}) {
   const user = await getCurrentUserServer();
   if (!user) {
     redirect('/login');
@@ -60,6 +61,10 @@ export async function requireWorkshop() {
         redirect('/admin');
     }
     redirect('/no-workshop');
+  }
+  if (!options.allowExpired && !isSuperAdmin(user)) {
+    const workshop = await getWorkshopDetails(user);
+    if (workshop?.trial_expired) redirect('/dashboard/subscription');
   }
   return user;
 }
@@ -74,6 +79,10 @@ export async function authorize(path: string) {
         redirect('/admin');
     }
     redirect('/no-workshop');
+  }
+  if (!isSuperAdmin(user)) {
+    const workshop = await getWorkshopDetails(user);
+    if (workshop?.trial_expired) redirect('/dashboard/subscription');
   }
   
   if (!hasPermission(user.role, path, user.custom_permissions)) {
@@ -140,13 +149,18 @@ export const getWorkshopDetails = cache(async (knownUser?: any) => {
     
     if (org) {
       const settings = org.settings || {};
+      const trial = getTrialState(settings);
       return {
         id: org.id,
         name: org.name,
         slug: org.slug,
-        subscription_status: settings.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
+        subscription_status: org.status !== 'active' ? 'past_due' : trial.expired ? 'past_due' : (trial.isTrial || settings.plan === 'demo') ? 'trialing' : 'active',
         subscription_plan: resolveWorkshopPlan(settings), 
-        subscription_end_date: settings.demoEndDate || null,
+        subscription_start_date: trial.isTrial ? settings.trialStartDate : settings.startDate || settings.demoStartDate || null,
+        subscription_end_date: trial.isTrial ? trial.endsAt : settings.endDate || settings.demoEndDate || null,
+        is_trial: trial.isTrial,
+        trial_expired: trial.expired,
+        trial_days_remaining: trial.daysRemaining,
         created_at: org.created_at,
         has_seen_welcome: true,
         user_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Usuario',
@@ -181,8 +195,8 @@ export async function createAdminClient() {
   return createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 }
 
-export async function getScopedClient() {
-  const user = await requireWorkshop();
+export async function getScopedClient(options: { allowExpired?: boolean } = {}) {
+  const user = await requireWorkshop(options);
   return {
     supabase: await createClient(),
     supabaseAdmin: await createClient(),

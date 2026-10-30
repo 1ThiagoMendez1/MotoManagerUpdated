@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'MotoManager | Software de gestión para talleres de motocicletas',
   description:
-    'Organiza clientes, motocicletas, órdenes de trabajo, inventario y ventas con MotoManager. Conoce las funciones y planes para talleres de motos en Colombia.',
+    'Prueba MotoManager Full gratis por 15 días, sin tarjeta. Organiza clientes, motos, órdenes, inventario, ventas y finanzas de tu taller.',
   keywords: [
     'CRM talleres motos Colombia',
     'software taller motos',
@@ -97,7 +97,7 @@ export default async function Page() {
             <div className="h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         }>
-          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} />
+          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} checkoutReady={Boolean(process.env.WOMPI_PRIVATE_KEY && process.env.WOMPI_INTEGRITY_SECRET && process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY)} />
         </Suspense>
       </div>
     </>

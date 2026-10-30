@@ -6,11 +6,14 @@ import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
 import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans'
 import { resolveWorkshopPlan } from '@/lib/workshop-plan'
+import { getTrialState } from '@/lib/subscription-trial'
+import { catalogSubscriptionPrice, paidSubscriptionCredit } from '@/lib/payments/subscription-payment'
 
 export default async function SubscriptionPage() {
-    const user = await requireWorkshop()
+    const user = await requireWorkshop({ allowExpired: true })
+    if (!['owner','admin'].includes(user.role)) return <div className="mx-auto max-w-lg p-8 text-center"><h1 className="text-2xl font-bold">Elige el siguiente paso con el dueño de tu taller</h1><p className="mt-4 text-muted-foreground">El dueño o administrador puede contratar un plan para continuar usando MotoManager con la información del taller.</p></div>;
     const currentUser = await getCurrentUserServer()
-    const { supabase } = await getScopedClient();
+    const supabase = await createAdminClient();
 
     const { data: workshop } = await supabase
         .from('organizations')
@@ -43,6 +46,7 @@ export default async function SubscriptionPage() {
     const features = dbFeatures.length > 0 ? dbFeatures : DEFAULT_FEATURES;
 
     const settings = workshop?.settings || {};
+    const trial = getTrialState(settings);
     const currentPlan = resolveWorkshopPlan(settings);
     const legacyCycle = settings.plan === 'biannual' || settings.plan === 'yearly' ? settings.plan : 'monthly';
     const currentBillingCycle = (settings.billingCycle || settings.billing_cycle || legacyCycle) as 'monthly' | 'biannual' | 'yearly';
@@ -56,11 +60,15 @@ export default async function SubscriptionPage() {
         endDate = d.toISOString();
     }
     const paidAmount = typeof settings.paidAmount === 'number' ? settings.paidAmount : (typeof settings.amount === 'number' ? settings.amount : null);
+    const credit = paidSubscriptionCredit(settings, await catalogSubscriptionPrice(currentPlan, currentBillingCycle));
 
     return (
         <div className="container mx-auto py-10 px-4 md:px-0">
             <Suspense fallback={<div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                 <ManageSubscriptionClient 
+                    isTrial={trial.isTrial}
+                    serverCredit={credit}
+                    paymentReady={Boolean(process.env.WOMPI_PRIVATE_KEY && process.env.WOMPI_INTEGRITY_SECRET && process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY)}
                     currentPlan={currentPlan}
                     currentBillingCycle={currentBillingCycle}
                     startDate={startDate}

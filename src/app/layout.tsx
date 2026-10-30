@@ -33,6 +33,7 @@ export const viewport = {
 };
 
 import { SubscriptionStatusAlert } from '@/components/subscription/SubscriptionStatusAlert';
+import { TrialBanner } from '@/components/subscription/TrialBanner';
 
 import { WelcomeModal } from '@/components/dashboard/WelcomeModal';
 import ShaderBackground from '@/components/ui/shader-background';
@@ -88,6 +89,7 @@ export default async function RootLayout({
           <LayoutWrapper
             workshopSlug={workshop?.slug}
             header={
+              <>
               <Header 
                 workshopName={workshop?.name}
                 workshopSlug={workshop?.slug}
@@ -99,6 +101,8 @@ export default async function RootLayout({
                 userRole={workshop?.user_role || user?.role}
                 customPermissions={workshop?.custom_permissions || user?.custom_permissions}
               />
+              {workshop?.is_trial && workshop.subscription_end_date && <TrialBanner endDate={workshop.subscription_end_date} canManage={['owner', 'admin'].includes(workshop.user_role || '')} />}
+              </>
             }
             sidebar={
               <AppSidebar

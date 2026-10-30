@@ -14,6 +14,7 @@ import { getAllTicketsForAdmin } from '@/lib/data/tickets';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { resolveWorkshopPlan } from '@/lib/workshop-plan';
+import { getTrialState } from '@/lib/subscription-trial';
 
 export default async function AdminPage({
   searchParams,
@@ -59,7 +60,7 @@ export default async function AdminPage({
     id: org.id,
     name: org.name,
     slug: org.slug,
-    subscription_status: org.settings?.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
+    subscription_status: getTrialState(org.settings).expired ? 'past_due' : (getTrialState(org.settings).isTrial || org.settings?.plan === 'demo') ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
     subscription_plan: resolveWorkshopPlan(org.settings),
     // El ciclo de facturación es independiente del nivel basic/pro/full.
     billing_cycle: ((): 'monthly' | 'biannual' | 'yearly' => {

@@ -43,3 +43,11 @@ CREATE POLICY "Test legacy broad policy" ON storage.objects FOR ALL TO authentic
   USING (true) WITH CHECK (true);
 \ir ../supabase/migrations/20261025155215_public_workshop_images.sql
 \ir workshop-image-regression.sql
+
+-- Trial fixtures mirror the service role's existing Supabase grants.
+ALTER TABLE auth.users ADD COLUMN raw_app_meta_data jsonb DEFAULT '{}'::jsonb;
+ALTER ROLE service_role BYPASSRLS;
+GRANT USAGE ON SCHEMA public TO service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+\ir ../supabase/migrations/20261030014156_workshop_full_trial.sql
+\ir subscription-trial-regression.sql
