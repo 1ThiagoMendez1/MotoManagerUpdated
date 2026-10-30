@@ -3,10 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { HalloweenDecor } from './HalloweenDecor';
+import styles from './halloween.module.css';
 
-export function LandingFooter() {
+export function LandingFooter({ halloween = false }: { halloween?: boolean }) {
   return (
-    <footer className="border-t border-white/10 bg-[#07111f] px-5 py-12 text-slate-300">
+    <footer className={`border-t border-white/10 bg-[#07111f] px-5 py-12 text-slate-300 ${halloween ? styles.editionFooter : ''}`}>
       <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-12 md:grid-cols-[1.5fr_1fr_1fr]">
         <div>
           <Link href="/" className="inline-flex items-center gap-2 text-lg font-semibold text-white">
@@ -17,6 +19,7 @@ export function LandingFooter() {
             Software de gestión para talleres de motocicletas. Clientes, motos, órdenes de trabajo y operación comercial conectadas.
           </p>
           <p className="mt-5 text-xs text-slate-500">Hecho para la operación de talleres en Colombia.</p>
+          {halloween && <p className={styles.editionFooterBadge}><HalloweenDecor kind="pumpkin" /> EDICIÓN HALLOWEEN · 2026</p>}
         </div>
         <div>
           <h3 className="text-sm font-semibold text-white">Explorar</h3>

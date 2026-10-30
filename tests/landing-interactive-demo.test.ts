@@ -10,7 +10,7 @@ test('La landing ofrece la demo en primer plano y navegación directa', () => {
   const hero = source('src/app/planes/components/LandingHero.tsx');
   const nav = source('src/app/planes/components/LandingNavbar.tsx');
   assert.match(page, /<LandingInteractiveDemo\s*\/>/);
-  assert.match(page, /<LandingWhyChange\s*\/>/);
+  assert.match(page, /<LandingWhyChange\b/);
   assert.ok(page.indexOf('<LandingInteractiveDemo />') < page.indexOf('<LandingFeatures />'));
   assert.match(hero, /href="#demo"/);
   assert.match(nav, /href: '#demo'/);
