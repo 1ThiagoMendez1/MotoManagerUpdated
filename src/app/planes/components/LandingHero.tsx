@@ -1,146 +1,108 @@
 'use client';
-import { ArrowRight, Phone, Shield, Star, Zap, Clock, TrendingUp } from 'lucide-react';
 
-interface Props {
-  onScrollToPlanes: () => void;
-}
+import { ArrowRight, Bike, Boxes, CheckCircle2, ClipboardList, LayoutGrid, PlayCircle, ShieldCheck, ShoppingBag, Wrench } from 'lucide-react';
+import Link from 'next/link';
+import { HalloweenHero } from './HalloweenCampaign';
 
-function StarRating({ count }: { count: number }) {
+const SMALL_CARDS = [
+  { name: 'Clientes', subtitle: 'Directorio y contactos', icon: ShieldCheck, bg: 'bg-emerald-500' },
+  { name: 'Motocicletas', subtitle: 'Historial vehicular', icon: Bike, bg: 'bg-[#ff7e13]' },
+  { name: 'Inventario', subtitle: 'Repuestos y stock', icon: Boxes, bg: 'bg-amber-500' },
+  { name: 'Ventas', subtitle: 'Caja y mostrador', icon: ShoppingBag, bg: 'bg-green-500' },
+];
+
+export function LandingHero({ onScrollToPlanes, halloween = false }: { onScrollToPlanes: () => void; halloween?: boolean }) {
+  if (halloween) return <HalloweenHero onScrollToPlanes={onScrollToPlanes} />;
   return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: count }).map((_, i) => (
-        <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
-      ))}
-    </div>
-  );
-}
-
-export function LandingHero({ onScrollToPlanes }: Props) {
-  return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 text-center overflow-hidden pt-20">
-      {/* Animated glow blobs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/20 rounded-full blur-3xl animate-pulse pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl animate-pulse pointer-events-none" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="relative z-10 max-w-5xl mx-auto space-y-8">
-        {/* Badge - Urgent */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-bold backdrop-blur-sm shadow-[0_0_15px_rgba(239,68,68,0.2)] animate-bounce">
-          <Clock className="h-4 w-4" />
-          OFERTA POR TIEMPO LIMITADO: 50% OFF EN PLAN ANUAL
-        </div>
-
-        {/* Headline - Agitating the pain */}
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-foreground leading-tight tracking-tight">
-          ¿Pierdes dinero por no tener<br />
-          <span className="bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 bg-clip-text text-transparent">
-            control de tu taller?
-          </span>
-        </h1>
-
-        {/* Subtitle - The solution */}
-        <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
-          Evita el robo hormiga, organiza tus órdenes y <span className="text-foreground font-bold border-b-2 border-red-500">multiplica tus ganancias</span>. 
-          MotoManager es el software #1 diseñado para talleres de motos en Colombia.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-4">
-          <button
-            onClick={onScrollToPlanes}
-            className="group relative flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-extrabold px-10 py-5 rounded-2xl shadow-[0_0_40px_rgba(239,68,68,0.4)] transition-all hover:scale-105 hover:shadow-[0_0_60px_rgba(239,68,68,0.6)] text-lg w-full sm:w-auto overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-white/20 skew-x-12 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-            RECLAMAR MI 50% OFF
-            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-          <a
-            href="https://wa.me/573001234567"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 border-2 border-border/50 hover:border-foreground text-foreground px-8 py-5 rounded-2xl transition-all hover:bg-accent/20 text-lg font-bold w-full sm:w-auto"
-          >
-            <Phone className="h-5 w-5" />
-            Hablar con un asesor
+    <section className="relative isolate overflow-hidden bg-[#050b18] px-5 pb-20 pt-16 text-white sm:pt-20 lg:pb-28 lg:pt-24">
+      <div aria-hidden="true" className="pointer-events-none absolute -right-44 top-0 h-[650px] w-[650px] rounded-full bg-[#347df1]/15 blur-[110px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -left-40 bottom-[-200px] h-[600px] w-[600px] rounded-full bg-[#ff7e13]/10 blur-[110px]" />
+      <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12">
+        <div className="max-w-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#ff7e13]/30 bg-[#ff7e13]/10 px-4 py-2 text-xs font-bold tracking-wide text-[#ffad68]">
+            <span className="h-2 w-2 rounded-full bg-[#ff851f]" />
+            15 DÍAS GRATIS · PLAN FULL TALLER
+          </div>
+          <h1 className="mt-7 text-[clamp(2.8rem,5.2vw,4.95rem)] font-extrabold leading-[1.055] tracking-[-0.06em]">
+            Controla cada moto.
+            <span className="mt-1 block text-[#ff821a]">Haz crecer tu taller.</span>
+          </h1>
+          <p className="mt-7 max-w-lg text-base leading-8 text-slate-300 sm:text-lg">
+            Deja de buscar información entre cuadernos y chats. Con MotoManager conectas
+            órdenes de trabajo, clientes, motocicletas, inventario y ventas en un solo lugar. Pruébalo con tu taller durante 15 días: plan Full, por $0.
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/prueba-gratis" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-6 text-sm font-extrabold text-[#0a1425] shadow-[0_14px_40px_rgba(255,125,16,.23)] transition hover:-translate-y-0.5 hover:bg-[#ffa149]">
+              Activar mis 15 días gratis <ArrowRight className="h-5 w-5" />
+            </Link>
+            <button onClick={onScrollToPlanes} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-6 text-sm font-bold text-white transition hover:bg-white/10">
+              Ver planes y precios <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-slate-400 sm:text-sm">
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Full por 15 días</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Sin tarjeta ni cobros automáticos</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Diseñado para talleres de motos</span>
+          </div>
+          <a href="#demo" className="mt-9 inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+            <PlayCircle className="h-4 w-4" /> Ver demo interactiva sin registro
           </a>
         </div>
-        <p className="text-xs text-muted-foreground mt-2 font-medium">
-          ⚡ Sin tarjeta de crédito requerida para iniciar · Cancela cuando quieras
-        </p>
 
-        {/* Social proof */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 pt-6 text-muted-foreground text-sm">
-          <div className="flex items-center gap-2 bg-card/40 px-4 py-2 rounded-full border border-border/30">
-            <TrendingUp className="h-4 w-4 text-green-500" />
-            <span className="font-semibold text-foreground">+500 talleres</span> aumentaron sus ventas
-          </div>
-          <div className="flex items-center gap-2 bg-card/40 px-4 py-2 rounded-full border border-border/30">
-            <StarRating count={5} />
-            <span className="font-semibold text-foreground">4.9/5</span> de satisfacción
-          </div>
-          <div className="flex items-center gap-2 bg-card/40 px-4 py-2 rounded-full border border-border/30">
-            <Shield className="h-4 w-4 text-blue-500" />
-            <span className="font-semibold text-foreground">100% Seguro</span> con Wompi
-          </div>
-        </div>
-
-        {/* Dashboard mockup (Keep the same cool UI) */}
-        <div className="relative mx-auto max-w-4xl mt-12 z-0">
-          <div className="rounded-2xl border-2 border-primary/20 bg-card/70 backdrop-blur-md overflow-hidden shadow-2xl shadow-black/40 dark:shadow-black/80 ring-1 ring-white/10 transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-500">
-            {/* Fake browser bar */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-black/40 border-b border-white/5">
-              <div className="flex gap-1.5">
-                <span className="h-3 w-3 rounded-full bg-red-500/80" />
-                <span className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                <span className="h-3 w-3 rounded-full bg-green-500/80" />
+        <div className="relative">
+          <div aria-hidden="true" className="absolute -inset-5 rounded-[36px] bg-gradient-to-tr from-[#347df1]/20 via-transparent to-[#ff7e13]/10 blur-2xl" />
+          <div className="relative overflow-hidden rounded-[24px] border border-white/15 bg-[#eaf1f8] text-[#142036] shadow-[0_30px_90px_rgba(0,0,0,.48)] sm:rounded-[30px]">
+            <div className="flex items-center justify-between border-b border-[#d8e2ed] bg-[#f7f9fc] px-4 py-3 sm:px-5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-[#ff7e13]"><Wrench className="h-5 w-5" /></span>
+                <div><p className="text-sm font-extrabold tracking-tight">MotoManager</p><p className="text-[10px] text-slate-500">Taller Ejemplo · Vista ilustrativa</p></div>
               </div>
-              <div className="flex-1 mx-4 bg-black/30 rounded-lg px-3 py-1 text-xs text-white/40 text-center font-mono">
-                app.motomanager.com.co/dashboard
+              <span className="rounded-lg bg-[#347df1] px-3 py-2 text-[11px] font-bold text-white">+ Nueva orden</span>
+            </div>
+            <div className="p-4 sm:p-5">
+              <div className="mb-5">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tu centro de operaciones</span>
+                <h2 className="mt-1 text-xl font-extrabold tracking-tight sm:text-2xl">Tu taller, bajo control.</h2>
+                <p className="mt-1 text-xs text-slate-500">Cada módulo conectado al siguiente.</p>
               </div>
-            </div>
-            {/* Dashboard content simulation */}
-            <div className="p-6 md:p-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Clientes Registrados', value: '1,284', color: 'blue', change: '+12% este mes' },
-                { label: 'Órdenes Activas', value: '47', color: 'amber', change: '5 críticas' },
-                { label: 'Ingresos Mensuales', value: '$14.2M', color: 'green', change: '+23% vs mes anterior' },
-                { label: 'Alertas de Stock', value: '3 repuestos', color: 'red', change: 'Pedir urgente' },
-              ].map(stat => (
-                <div key={stat.label} className="rounded-xl bg-black/20 border border-white/5 p-4 relative overflow-hidden group">
-                  <div className={`absolute inset-0 opacity-0 group-hover:opacity-10 bg-gradient-to-br transition-opacity duration-300 ${
-                    stat.color === 'red' ? 'from-red-500' : 
-                    stat.color === 'green' ? 'from-green-500' : 
-                    stat.color === 'amber' ? 'from-amber-500' : 'from-blue-500'
-                  }`} />
-                  <p className="text-xs text-muted-foreground mb-1 font-medium">{stat.label}</p>
-                  <p className="text-2xl md:text-3xl font-black text-foreground">{stat.value}</p>
-                  <span className={`text-xs font-bold mt-1 inline-block ${stat.color === 'red' ? 'text-red-400' : stat.color === 'green' ? 'text-green-400' : stat.color === 'amber' ? 'text-amber-400' : 'text-blue-400'}`}>
-                    {stat.change}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {/* Fake chart */}
-            <div className="mx-6 mb-6 rounded-xl bg-black/20 border border-white/5 p-5 relative overflow-hidden">
-               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
-              <p className="text-sm font-bold text-muted-foreground mb-4">Crecimiento de Ventas (Últimos 6 meses)</p>
-              <div className="flex items-end gap-3 h-28">
-                {[40, 55, 45, 75, 65, 95].map((h, i) => (
-                  <div key={i} className="flex-1 relative group">
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-xs py-1 px-2 rounded font-bold">
-                      +{h}%
-                    </div>
-                    <div className="w-full rounded-t-md bg-gradient-to-t from-primary/20 to-primary opacity-90 transition-all duration-500 group-hover:opacity-100 group-hover:to-red-500" style={{ height: `${h}%` }} />
+              <div className="grid grid-cols-[1.55fr_1fr] gap-3">
+                <div className="rounded-2xl border border-[#d3dfec] bg-gradient-to-br from-[#edf4fd] to-[#dbe8fb] p-4 sm:p-5">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#347df1] text-white"><ClipboardList className="h-5 w-5" /></span>
+                  <h3 className="mt-3 text-sm font-extrabold sm:text-lg">Órdenes de Trabajo</h3>
+                  <p className="mt-2 text-[11px] text-slate-600">Recepción, reparación y entrega.</p>
+                  <div className="mt-5 flex gap-2">
+                    <span className="rounded-lg bg-[#347df1] px-3 py-2 text-[10px] font-bold text-white sm:px-4">+ Nueva orden</span>
+                    <span className="rounded-lg border border-[#c9d5e2] bg-white/70 px-3 py-2 text-[10px] font-semibold">Ver todas</span>
                   </div>
-                ))}
+                </div>
+                <div className="rounded-2xl border border-[#d3dfec] bg-[#f7f9fc] p-4 sm:p-5">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500 text-white"><LayoutGrid className="h-5 w-5" /></span>
+                  <h3 className="mt-3 text-sm font-extrabold sm:text-base">Dashboard</h3>
+                  <p className="mt-2 text-[11px] leading-5 text-slate-600">Visión del rendimiento y la operación.</p>
+                </div>
               </div>
-              <div className="flex justify-between mt-3 text-xs font-bold text-muted-foreground/60">
-                {['Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr'].map(m => <span key={m}>{m}</span>)}
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {SMALL_CARDS.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.name} className="min-h-[112px] rounded-xl border border-[#d8e2ed] bg-[#f7f9fc] p-3">
+                      <span className={'inline-flex h-8 w-8 items-center justify-center rounded-lg text-white ' + item.bg}><Icon className="h-4 w-4" /></span>
+                      <p className="mt-3 text-[11px] font-extrabold">{item.name}</p>
+                      <p className="mt-1 hidden text-[9px] leading-4 text-slate-500 sm:block">{item.subtitle}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-[#d6e0ea] pt-3 text-[10px] text-slate-500">
+                <span>Inspirado en la interfaz real del producto</span>
+                <a href="#demo" className="inline-flex items-center gap-1 font-extrabold text-[#347df1]">Explorar de verdad <ArrowRight className="h-3 w-3" /></a>
               </div>
             </div>
           </div>
-          {/* Glow under mockup */}
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-4/5 h-20 bg-primary/30 blur-[60px] rounded-full pointer-events-none" />
+          <div className="absolute -bottom-5 -left-2 hidden items-center gap-2 rounded-xl border border-white/15 bg-[#12233b] px-4 py-3 text-xs font-semibold text-white shadow-xl sm:flex lg:-left-7">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            No es una imagen: abajo lo puedes usar.
+          </div>
         </div>
       </div>
     </section>

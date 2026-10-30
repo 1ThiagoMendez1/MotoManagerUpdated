@@ -1,109 +1,50 @@
 'use client';
-import Link from 'next/link';
+
 import Image from 'next/image';
-import { Wrench } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowUpRight } from 'lucide-react';
+import { HalloweenDecor } from './HalloweenDecor';
+import styles from './halloween.module.css';
 
-export function LandingFooter() {
-  const year = new Date().getFullYear();
+export function LandingFooter({ halloween = false }: { halloween?: boolean }) {
   return (
-    <footer className="border-t border-border/30 bg-background/30 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-14 grid grid-cols-1 md:grid-cols-4 gap-10">
-        {/* Brand */}
-        <div className="md:col-span-1 space-y-4">
-          <Link href="/planes" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 drop-shadow-md">
-              <Image 
-                src="/logo.png" 
-                alt="MotoManager Logo" 
-                fill
-                sizes="(max-width: 640px) 48px, 64px"
-                className="object-contain"
-                priority
-              />
-            </div>
+    <footer className={`border-t border-white/10 bg-[#07111f] px-5 py-12 text-slate-300 ${halloween ? styles.editionFooter : ''}`}>
+      <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-12 md:grid-cols-[1.5fr_1fr_1fr]">
+        <div>
+          <Link href="/" className="inline-flex items-center gap-2 text-lg font-semibold text-white">
+            <span className="relative h-11 w-11 overflow-hidden rounded-xl bg-white/10"><Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" /></span>
+            MotoManager
           </Link>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            El CRM #1 para talleres de motocicletas en Colombia. Gestión profesional desde $18.900/mes.
+          <p className="mt-4 max-w-sm text-sm leading-7 text-slate-400">
+            Software de gestión para talleres de motocicletas. Clientes, motos, órdenes de trabajo y operación comercial conectadas.
           </p>
+          <p className="mt-5 text-xs text-slate-500">Hecho para la operación de talleres en Colombia.</p>
+          {halloween && <p className={styles.editionFooterBadge}><HalloweenDecor kind="pumpkin" /> EDICIÓN HALLOWEEN · 2026</p>}
         </div>
-
-        {/* Product */}
-        <div className="space-y-3">
-          <h4 className="text-muted-foreground font-semibold text-sm uppercase tracking-wide">Producto</h4>
-          <ul className="space-y-2 text-sm">
-            {[
-              { label: 'Funcionalidades', href: '#funciones' },
-              { label: 'Demo del dashboard', href: '#demo' },
-              { label: 'Planes y precios', href: '#planes' },
-              { label: 'Preguntas frecuentes', href: '#faq' },
-            ].map(l => (
-              <li key={l.label}>
-                <a href={l.href} className="text-muted-foreground hover:text-foreground transition-colors">
-                  {l.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+        <div>
+          <h3 className="text-sm font-semibold text-white">Explorar</h3>
+          <div className="mt-4 flex flex-col items-start gap-3 text-sm">
+            <a href="#funciones" className="hover:text-white">Funcionalidades</a>
+            <a href="#como-funciona" className="hover:text-white">Cómo funciona</a>
+            <a href="#planes" className="hover:text-white">Planes y precios</a>
+            <a href="#workshops" className="hover:text-white">Talleres de la comunidad</a>
+            <a href="#faq" className="hover:text-white">Preguntas frecuentes</a>
+          </div>
         </div>
-
-        {/* Legal */}
-        <div className="space-y-3">
-          <h4 className="text-muted-foreground font-semibold text-sm uppercase tracking-wide">Legal</h4>
-          <ul className="space-y-2 text-sm">
-            {[
-              { label: 'Términos de servicio', href: '#' },
-              { label: 'Política de privacidad', href: '#' },
-              { label: 'Política de cookies', href: '#' },
-            ].map(l => (
-              <li key={l.label}>
-                <a href={l.href} className="text-muted-foreground hover:text-foreground transition-colors">
-                  {l.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Contact */}
-        <div className="space-y-3">
-          <h4 className="text-muted-foreground font-semibold text-sm uppercase tracking-wide">Contacto</h4>
-          <ul className="space-y-2 text-sm">
-            <li>
-              <a
-                href="https://wa.me/573001234567"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-muted-foreground hover:text-green-400 transition-colors"
-              >
-                <span className="text-base">💬</span> WhatsApp soporte
-              </a>
-            </li>
-            <li>
-              <a
-                href="mailto:soporte@motomanager.com.co"
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <span className="text-base">📧</span> soporte@motomanager.com.co
-              </a>
-            </li>
-            <li className="flex items-center gap-2 text-muted-foreground">
-              <span className="text-base">📍</span> Colombia
-            </li>
-          </ul>
-          <Link
-            href="/login"
-            className="inline-block mt-3 text-sm text-blue-400 hover:text-blue-300 transition-colors"
-          >
-            → Iniciar sesión en el sistema
+        <div>
+          <h3 className="text-sm font-semibold text-white">Acceso</h3>
+          <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">Si ya utilizas MotoManager, entra a tu taller con tu cuenta.</p>
+          <Link href="/login" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/5">
+            Iniciar sesión <ArrowUpRight className="h-4 w-4" />
           </Link>
         </div>
       </div>
-
-      {/* Bottom bar */}
-      <div className="border-t border-border/30 px-4 py-5">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground/60">
-          <p>© {year} MotoManager. Todos los derechos reservados.</p>
-          <p>Sistema de gestión para talleres de motocicletas · Colombia</p>
+      <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-3 pt-6 text-xs text-slate-500">
+        <p>© {new Date().getFullYear()} MotoManager.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p>Información de funcionalidades y planes sujeta a la configuración vigente del servicio.</p>
+          <button type="button" onClick={() => window.dispatchEvent(new Event('mm:marketing-consent-settings'))}
+            className="underline underline-offset-2 hover:text-white">Configurar cookies</button>
         </div>
       </div>
     </footer>

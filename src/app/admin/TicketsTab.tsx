@@ -461,7 +461,7 @@ export default function TicketsTab({ initialTickets }: { initialTickets: Ticket[
             ) : (
               <div className="p-4 bg-card border-t border-border text-center">
                 <p className="text-sm text-emerald-500 font-medium">
-                  Este ticket ha sido finalizado. Si necesitas añadir otra solución, cambia el estado a "En Revisión".
+                  Este ticket ha sido finalizado. Si necesitas añadir otra solución, cambia el estado a &quot;En Revisión&quot;.
                 </p>
               </div>
             )}

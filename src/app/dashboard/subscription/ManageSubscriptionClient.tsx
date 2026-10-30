@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { CheckCircle2, CreditCard, Shield, Lock, Loader2, ArrowRight, HeartCrack, Gift, TrendingUp, Users, Wrench, Star, AlertTriangle, X, ChevronRight, Zap, Trophy, Sparkles, Clock } from 'lucide-react';
 import { WompiSubscriptionForm } from '@/components/payments/WompiSubscriptionForm';
 import { WompiButton } from '@/components/payments/WompiButton';
-import { updateSubscriptionPlan } from '@/lib/actions/subscription';
+import { updateSubscriptionPlan, requestSubscriptionActivation } from '@/lib/actions/subscription';
 import { saveCancellationFeedback } from '@/lib/actions/cancellation';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,9 @@ function formatCOP(n: number) {
 }
 
 interface ManageSubscriptionProps {
+  isTrial?: boolean;
+  serverCredit?: number;
+  paymentReady?: boolean;
   currentPlan: string;
   currentBillingCycle?: 'monthly' | 'biannual' | 'yearly';
   startDate?: string | null;
@@ -42,7 +45,10 @@ interface ManageSubscriptionProps {
   features: any[];
 }
 
-export function ManageSubscriptionClient({ 
+export function ManageSubscriptionClient({
+  isTrial = false,
+  serverCredit = 0,
+  paymentReady = false,
   currentPlan,
   currentBillingCycle = 'monthly',
   startDate = null,
@@ -63,6 +69,7 @@ export function ManageSubscriptionClient({
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
   const [paymentMode, setPaymentMode] = useState<'automatic' | 'manual'>('manual');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [activationRequested, setActivationRequested] = useState(false);
   const [cancelStep, setCancelStep] = useState<0 | 1 | 2 | 3>(0);
   const [cancelReason, setCancelReason] = useState<string>('');
   const router = useRouter();
@@ -81,26 +88,27 @@ export function ManageSubscriptionClient({
     const planToUpdate = searchParams.get('plan');
     const cycleToUpdate = searchParams.get('cycle') || 'monthly';
     const amountToUpdate = searchParams.get('amount') || '0';
-    
+
     if (paymentStatus === 'success' && planToUpdate && !isUpdating) {
-      handlePaymentSuccess(planToUpdate, cycleToUpdate, amountToUpdate);
+      handlePaymentSuccess(planToUpdate, cycleToUpdate, amountToUpdate, searchParams.get('id') || '');
     }
   }, [searchParams]);
 
-  const handlePaymentSuccess = async (plan: string, cycle?: string, amount?: string) => {
+  const handlePaymentSuccess = async (plan: string, cycle?: string, amount?: string, transactionId?: string) => {
     setIsUpdating(true);
     const formData = new FormData();
     formData.append('plan', plan);
     if (cycle) formData.append('billingCycle', cycle);
     if (amount) formData.append('paidAmount', amount);
-    
+    if (transactionId) formData.append('transactionId', transactionId);
+
     try {
       const res = await updateSubscriptionPlan(formData);
       if (res.error) throw new Error(res.error);
-      
+
       setActivePlan(plan);
       if (cycle) setBillingCycle(cycle as any);
-      
+
       toast({
         title: '¡Suscripción actualizada!',
         description: 'Tu pago fue recibido y tu plan ha sido mejorado con éxito.',
@@ -141,7 +149,7 @@ export function ManageSubscriptionClient({
 
   // Resolve effective start & end dates (matching Header logic)
   const effectiveStartDate = startDate || new Date().toISOString();
-  
+
   // Detect active cycle: from prop or duration between dates
   let detectedCycle = currentBillingCycle || 'monthly';
   if (endDate && startDate) {
@@ -175,7 +183,7 @@ export function ManageSubscriptionClient({
   if (end.getTime() > now.getTime()) {
     totalDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
     remainingDays = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-    
+
     if (totalDays > 0 && remainingDays > 0 && currentCost > 0) {
       // Si el usuario acaba de adquirir el plan o le queda la mayor parte del ciclo (ej. primeros 5 días),
       // abonamos el 100% del valor pagado del plan. Si ha pasado más tiempo, se prorratea.
@@ -195,25 +203,27 @@ export function ManageSubscriptionClient({
   }
 
   // Sort plans by price ascending (Básico -> Pro -> Full)
+  // Free access never represents money paid or a credit towards another plan.
+  creditRemaining = isTrial ? 0 : serverCredit;
   const sortedPlans = [...plans].sort((a, b) => a.price - b.price);
-  
+
   // Calculate orders so the active plan is always in the middle (index 1)
   const getPlanOrder = (planId: string, index: number) => {
     if (planId === normalizedActivePlan) return 'order-first md:order-2';
-    
+
     if (normalizedActivePlan === sortedPlans[0]?.id) {
       if (index === 1) return 'order-2 md:order-1';
       if (index === 2) return 'order-last md:order-3';
     }
-    
+
     if (normalizedActivePlan === sortedPlans[2]?.id) {
       if (index === 0) return 'order-2 md:order-1';
       if (index === 1) return 'order-last md:order-3';
     }
-    
+
     if (index === 0) return 'order-1';
     if (index === 2) return 'order-3';
-    
+
     return 'order-none';
   };
 
@@ -238,7 +248,7 @@ export function ManageSubscriptionClient({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedPlan(null)} />
       <div className="relative w-full max-w-lg bg-background dark:bg-[#0d1117] border border-border/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        
+
         {/* Modal Header */}
         <div className="flex items-center gap-3 p-5 border-b border-border/40 bg-muted/30">
           <div className="p-2.5 bg-primary/15 rounded-xl border border-primary/20 text-primary">
@@ -250,8 +260,8 @@ export function ManageSubscriptionClient({
               Mejora a Plan {selectedPlan.name} • Facturación {selectedCycleInfo.name}
             </p>
           </div>
-          <button 
-            onClick={() => setSelectedPlan(null)} 
+          <button
+            onClick={() => setSelectedPlan(null)}
             className="text-muted-foreground hover:text-foreground text-2xl leading-none px-2 rounded-lg hover:bg-muted transition-colors"
           >
             ×
@@ -316,7 +326,21 @@ export function ManageSubscriptionClient({
           </div>
 
           {/* Payment execution */}
-          {netAmountToPay === 0 ? (
+          {!paymentReady ? (
+            <div className="space-y-4 rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm leading-7">
+              <p>Solicita tu activación y el equipo de MotoManager te indicará cómo contratar. Conservas la información de tu taller. Esta solicitud no genera cobros.</p>
+              <button disabled={isUpdating || activationRequested} onClick={async () => {
+                setIsUpdating(true);
+                try {
+                  const result = await requestSubscriptionActivation(selectedPlan.id, billingCycle);
+                  if (result.error) throw new Error(result.error);
+                  setActivationRequested(true);
+                  toast({ title: 'Solicitud recibida', description: 'Tu solicitud de contratación quedó registrada. El equipo de MotoManager podrá verla en administración.' });
+                } catch (error) { toast({ title: 'No pudimos guardar la solicitud', description: error instanceof Error ? error.message : 'Intenta nuevamente.', variant: 'destructive' }); }
+                finally { setIsUpdating(false); }
+              }} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground disabled:opacity-60">{activationRequested ? 'Solicitud registrada' : isUpdating ? 'Registrando…' : `Quiero contratar ${selectedPlan.name}`}</button>
+            </div>
+          ) : netAmountToPay === 0 ? (
             <div className="space-y-4 text-center">
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
                 ¡Tu saldo a favor cubre el costo total de esta actualización! No se requiere ningún cobro adicional.
@@ -333,18 +357,18 @@ export function ManageSubscriptionClient({
           ) : (
             <div className="space-y-4">
               <div className="flex bg-muted/60 p-1 rounded-xl">
-                <button 
+                <button
                   onClick={() => setPaymentMode('manual')}
                   className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'manual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   Pago Único (PSE, Nequi, Tarjetas)
                 </button>
-                <button 
+                {!isTrial && <button
                   onClick={() => setPaymentMode('automatic')}
                   className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'automatic' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 >
                   Débito Automático (Tarjeta)
-                </button>
+                </button>}
               </div>
 
               {paymentMode === 'automatic' ? (
@@ -374,14 +398,14 @@ export function ManageSubscriptionClient({
                   <div className="flex justify-center">
                     <WompiButton
                       amountInCents={amountInCents}
-                      reference={`sub_${workshopId}_${Date.now()}`}
+                      reference={`sub_${workshopId}_${selectedPlan.id}_${billingCycle}_${Date.now()}`}
                       customerEmail={userEmail}
                       customerName={userName}
                       redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/subscription?payment=success&plan=${selectedPlan.id}&cycle=${billingCycle}&amount=${netAmountToPay}`}
                       buttonLabel={`Pagar ${formatCOP(netAmountToPay)} con Wompi`}
                     />
                   </div>
-                  
+
                   <div className="flex items-center justify-center gap-4 text-muted-foreground/60 text-xs pt-1">
                     <span className="flex items-center gap-1"><Lock className="h-3.5 w-3.5" />Pago cifrado SSL</span>
                     <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" />Pasarela oficial Wompi</span>
@@ -399,7 +423,8 @@ export function ManageSubscriptionClient({
     <div className="space-y-10 pb-12 overflow-hidden">
       {/* Header section */}
       <div className="text-center max-w-2xl mx-auto space-y-4">
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">Gestionar Suscripción</h1>
+        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">{isTrial ? 'Tu taller ya dio el primer paso. Sigue creciendo.' : 'Gestionar Suscripción'}</h1>
+        {isTrial && <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 p-5 text-sm leading-7"><p className="font-bold text-orange-600 dark:text-orange-300">{endDate && Date.parse(endDate) <= Date.now() ? 'Tus 15 días de prueba terminaron.' : 'Estás disfrutando Full gratis.'}</p><p>Elige tu plan y conserva clientes, motos, órdenes e inventario. Si contratas antes de terminar la prueba, conservas los días gratuitos que te quedan. Sin cobros automáticos por la prueba.</p></div>}
         <p className="text-muted-foreground text-lg">
           Tu plan actual es <span className={`font-semibold capitalize ${plans.find(p => p.id === normalizedActivePlan)?.accentText || 'text-primary'}`}>{getPlanLabel(activePlan)}</span>
         </p>
@@ -460,7 +485,7 @@ export function ManageSubscriptionClient({
           const grossCyclePrice = Math.round(basePrice * currentCycle.months * currentCycle.discount);
           const monthlyEquivalent = Math.round(grossCyclePrice / currentCycle.months);
           const hasDiscount = currentCycle.months > 1;
-          
+
           return (
             <div
               key={plan.id}
@@ -512,10 +537,10 @@ export function ManageSubscriptionClient({
 
                   // Determine colors based on the plan ID
                   const checkColor = plan.id === 'pro' ? 'text-amber-500' : plan.id === 'full' ? 'text-purple-500' : 'text-primary';
-                  const badgeColor = plan.id === 'pro' 
-                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' 
-                    : plan.id === 'full' 
-                      ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' 
+                  const badgeColor = plan.id === 'pro'
+                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                    : plan.id === 'full'
+                      ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                       : 'bg-primary/10 text-primary border border-primary/20';
 
                   return (
@@ -547,7 +572,7 @@ export function ManageSubscriptionClient({
                 </div>
               )}
 
-              {isCurrent ? (
+              {isCurrent && !isTrial ? (
                 <button
                   disabled
                   className="w-full flex items-center justify-center gap-2 bg-muted text-muted-foreground font-semibold h-12 rounded-xl border border-border/50 text-sm cursor-not-allowed"
@@ -556,11 +581,11 @@ export function ManageSubscriptionClient({
                 </button>
               ) : (
                 <button
-                  onClick={() => setSelectedPlan(plan)}
+                  onClick={() => { setActivationRequested(false); setSelectedPlan(plan); }}
                   className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r ${plan.btn} text-foreground font-semibold h-12 rounded-xl shadow-lg transition-all hover:scale-105 text-sm`}
                 >
                   <CreditCard className="h-4 w-4" />
-                  Cambiar a {plan.name}
+                  {isTrial ? `Continuar con ${plan.name}` : `Cambiar a ${plan.name}`}
                 </button>
               )}
             </div>

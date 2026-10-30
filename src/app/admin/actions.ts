@@ -1,15 +1,46 @@
 'use server';
+import { requireSuperAdmin } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { sendAccessCodeNotification } from '@/lib/whatsapp';
 
-export async function updateWorkshopStatus(workshopId: string, status: any) { return { success: true }; }
-export async function updateCancellationStatus(cancellationId: string, status: any, adminNotes?: string) { return { success: true }; }
-export async function updateWorkshopPlan(workshopId: string, plan: any) { return { success: true }; }
-export async function updateUserEmail(userId: string, newEmail: string) { return { success: true }; }
-export async function updateUserPassword(userId: string, newPassword: string) { return { success: true }; }
+export async function updateWorkshopStatus(workshopId: string, status: any) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateCancellationStatus(cancellationId: string, status: any, adminNotes?: string) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateWorkshopPlan(workshopId: string, plan: string) {
+    await requireSuperAdmin();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workshopId) ||
+        !['basic', 'pro', 'full'].includes(plan)) {
+        return { success: false, error: 'Taller o plan inválido.' };
+    }
+
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false } }
+    );
+    // El RPC actualiza exclusivamente dos claves JSON, sin borrar horarios,
+    // preferencias, contador WhatsApp ni cambios simultáneos del taller.
+    const { data: updated, error } = await supabaseAdmin.rpc(
+        'set_organization_subscription_plan',
+        { p_organization_id: workshopId, p_plan: plan }
+    );
+    if (error || updated !== true) {
+        console.error('[admin] No se pudo actualizar el plan del taller:', error?.code || 'not_found');
+        return { success: false, error: 'No se pudo guardar el plan. Verifica la migración SQL y que exista el taller.' };
+    }
+    revalidatePath('/admin');
+    revalidatePath('/dashboard/subscription');
+    return { success: true };
+}
+export async function updateUserEmail(userId: string, newEmail: string) {
+    await requireSuperAdmin(); return { success: true }; }
+export async function updateUserPassword(userId: string, newPassword: string) {
+    await requireSuperAdmin(); return { success: true }; }
 
 export async function createUser(data: any) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -21,6 +52,7 @@ export async function createUser(data: any) {
     const lastName = nameParts.slice(1).join(' ') || '';
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        app_metadata: { is_super_admin: data.isSuperAdmin === true },
         email: data.email,
         password: data.password,
         email_confirm: true,
@@ -28,7 +60,7 @@ export async function createUser(data: any) {
             first_name: firstName,
             last_name: lastName,
             full_name: data.name,
-            is_super_admin: data.isSuperAdmin,
+
         }
     });
 
@@ -50,6 +82,7 @@ export async function createUser(data: any) {
 }
 
 export async function deleteUser(userId: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -64,6 +97,7 @@ export async function deleteUser(userId: string) {
 }
 
 export async function updateUser(userId: string, data: any) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -75,12 +109,13 @@ export async function updateUser(userId: string, data: any) {
     const lastName = nameParts.slice(1).join(' ') || '';
     
     const updatePayload: any = {
+        app_metadata: { is_super_admin: data.isSuperAdmin === true },
         email: data.email,
         user_metadata: {
             first_name: firstName,
             last_name: lastName,
             full_name: data.name,
-            is_super_admin: data.isSuperAdmin,
+
         }
     };
     
@@ -108,6 +143,7 @@ export async function updateUser(userId: string, data: any) {
 }
 
 export async function getWorkshopCredentials(userId: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -135,6 +171,7 @@ export async function getWorkshopCredentials(userId: string) {
 }
 
 export async function sendCredentialsViaWhatsApp(userId: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -190,6 +227,7 @@ export async function sendCredentialsViaWhatsApp(userId: string) {
 }
 
 export async function resetUserPasswordAndNotify(userId: string, email: string, phone: string | undefined, name: string) {
+    await requireSuperAdmin();
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,

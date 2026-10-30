@@ -1,175 +1,23 @@
 'use server';
-import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
+
+import { authorize, getWorkshopDetails } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
+import { dashboardSummarySchema, formatDashboardSummary } from '@/lib/workshops/dashboard';
 
 export async function getDashboardData() {
-  const user = await requireWorkshop()
-  const supabase = await createAdminClient()
-  const workshop = await getWorkshopDetails(user)
-
-  // 1. Ingresos del Mes (Revenue this month)
-  const now = new Date()
-  const year = now.getFullYear();
-  const monthStr = String(now.getMonth() + 1).padStart(2, '0');
-  const startOfMonthStr = `${year}-${monthStr}-01`;
-  
-  const { data: salesThisMonth, error: e1 } = await supabase
-    .from('sales')
-    .select('total, status, payment_method')
-    .eq('organization_id', user.workshopId)
-    .gte('created_at', startOfMonthStr)
-
-  if (e1) console.error('Dashboard Error (sales):', e1)
-
-  let ingresosMes = 0;
-  const incomeByMethodMap: Record<string, number> = {};
-
-  (salesThisMonth || []).forEach(sale => {
-    if (sale.status === 'paid' || sale.status === 'completed') {
-      const amount = Number(sale.total) || 0;
-      ingresosMes += amount;
-      
-      const method = sale.payment_method || 'Otros';
-      if (!incomeByMethodMap[method]) {
-        incomeByMethodMap[method] = 0;
-      }
-      incomeByMethodMap[method] += amount;
-    }
-  });
-
-  const uiMethods: Record<string, string> = {
-    'cash': 'Efectivo',
-    'credit_card': 'Tarjeta de Crédito',
-    'debit_card': 'Tarjeta de Débito',
-    'transfer': 'Transferencia Bancaria',
-    'nequi': 'Nequi',
-    'daviplata': 'DaviPlata',
-    'wompi': 'Wompi',
-    'other': 'Otro'
-  };
-
-  const incomeByMethodData = Object.entries(incomeByMethodMap)
-    .map(([method, amount]) => ({ name: uiMethods[method] || method, amount }))
-    .sort((a, b) => b.amount - a.amount);
-
-  // 2. Motos en Taller & 3. Órdenes Activas
-  const { data: wosData, error: e2 } = await supabase
-    .from('work_orders')
-    .select('id, status, motorcycle_id, sales(id, status)')
-    .eq('organization_id', user.workshopId);
-    
-  if (e2) console.error('Dashboard Error (WOs for stats):', e2)
-
-  const activeWorkOrders = (wosData || []).filter(wo => {
-    return wo.status !== 'delivered';
-  });
-
-  const activeWorkOrdersCount = activeWorkOrders.length;
-  const motosEnTallerSet = new Set(activeWorkOrders.map(wo => wo.motorcycle_id).filter(Boolean));
-  const motosEnTallerCount = motosEnTallerSet.size;
-
-  // 4. Stock Crítico
-  const { data: inventory, error: e4 } = await supabase
-    .from('inventory_items')
-    .select('id, quantity, min_quantity')
-    .eq('organization_id', user.workshopId)
-
-  if (e4) console.error('Dashboard Error (inventory):', e4)
-
-  const stockCriticoCount = (inventory || []).filter(item => item.quantity <= (item.min_quantity || 5)).length
-
-  // 5. Flujo de Caja (Semanal)
-  // Last 7 days revenue
-  const revenueData = []
-  const today = new Date()
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    
-    const dYear = d.getFullYear();
-    const dMonth = String(d.getMonth() + 1).padStart(2, '0');
-    const dDay = String(d.getDate()).padStart(2, '0');
-    const dateStr = `${dYear}-${dMonth}-${dDay}`;
-    
-    // Para el .lt (less than) usamos el día siguiente
-    const nextD = new Date(d);
-    nextD.setDate(nextD.getDate() + 1);
-    const nextDateStr = `${nextD.getFullYear()}-${String(nextD.getMonth() + 1).padStart(2, '0')}-${String(nextD.getDate()).padStart(2, '0')}`;
-    
-    // sum sales for this date
-    const { data: dailySales } = await supabase
-      .from('sales')
-      .select('total, status')
-      .eq('organization_id', user.workshopId)
-      .gte('created_at', dateStr)
-      .lt('created_at', nextDateStr)
-      
-    const dayTotal = (dailySales || [])
-      .filter(sale => sale.status === 'paid' || sale.status === 'completed')
-      .reduce((sum, sale) => sum + Number(sale.total), 0)
-    
-    revenueData.push({
-      name: d.toLocaleDateString('es-CO', { weekday: 'short' }),
-      ingresos: dayTotal,
-      gastos: 0 // We don't have expenses tracking yet
-    })
+  const user = await authorize('/dashboard');
+  const supabase = await createClient();
+  const [summary, workshop] = await Promise.all([
+    supabase.rpc('workshop_dashboard_summary', { p_organization_id: user.workshopId }),
+    getWorkshopDetails(user),
+  ]);
+  if (summary.error) {
+    console.error('Dashboard summary failed:', summary.error.code);
+    throw new Error('No se pudieron cargar las métricas del taller.');
   }
-
-  // 6. Top Selling Parts
-  const { data: salesWithItems, error: e5 } = await supabase
-    .from('sales')
-    .select('id, sale_items(inventory_item_id, quantity, inventory_items(name))')
-    .eq('organization_id', user.workshopId)
-    
-  if (e5) console.error('Dashboard Error (sale items):', e5)
-    
-  const partsMap: Record<string, { name: string, ventas: number }> = {}
-  if (salesWithItems) {
-    salesWithItems.forEach((sale: any) => {
-      if (!sale.sale_items) return;
-      // Depending on Supabase relations, sale_items might be an array
-      const items = Array.isArray(sale.sale_items) ? sale.sale_items : [sale.sale_items];
-      items.forEach((item: any) => {
-        if (!item.inventory_item_id) return;
-        const name = item.inventory_items?.name || 'Desconocido'
-        if (!partsMap[item.inventory_item_id]) {
-          partsMap[item.inventory_item_id] = { name, ventas: 0 }
-        }
-        partsMap[item.inventory_item_id].ventas += Number(item.quantity)
-      });
-    })
-  }
-  
-  const topPartsData = Object.values(partsMap)
-    .sort((a, b) => b.ventas - a.ventas)
-    .slice(0, 5)
-
-  // Alertas del taller
-  const alerts = []
-  if (stockCriticoCount > 0) {
-    alerts.push({ text: `Hay ${stockCriticoCount} repuesto(s) con stock crítico.`, time: "Reciente", urgent: true, link: "/inventory" })
-  }
-  if (activeWorkOrdersCount && activeWorkOrdersCount > 0) {
-    alerts.push({ text: `Tienes ${activeWorkOrdersCount} orden(es) activa(s) en proceso.`, time: "Reciente", urgent: false, link: "/work-orders" })
-  }
-  if (alerts.length === 0) {
-    alerts.push({ text: "Todo está al día en tu taller.", time: "Ahora", urgent: false })
-  }
-
-  console.log('DEBUG DASHBOARD:', { ingresosMes, motosEnTallerCount, activeWorkOrdersCount, stockCriticoCount, workshopId: user.workshopId, workshopName: workshop?.name });
-
-  return {
-    success: true,
-    data: {
-      ingresosMes,
-      motosEnTallerCount: motosEnTallerCount || 0,
-      activeWorkOrdersCount: activeWorkOrdersCount || 0,
-      stockCriticoCount,
-      revenueData,
-      topPartsData,
-      incomeByMethodData,
-      alerts,
-      workshopName: workshop?.name || 'Mi Taller',
-      subscriptionPlan: workshop?.subscription_plan || 'basic'
-    }
-  }
+  const data = formatDashboardSummary(dashboardSummarySchema.parse(summary.data));
+  return { success: true, data: {
+    ...data, workshopName: workshop?.name || 'Mi Taller',
+    subscriptionPlan: workshop?.subscription_plan || 'basic',
+  } };
 }

@@ -3,7 +3,7 @@ import { DashboardMenu } from '@/components/dashboard/DashboardMenu';
 import { Suspense } from 'react';
 import { FirstLoginPasswordChangeModal } from '@/components/auth/FirstLoginPasswordChangeModal';
 import { TourHandler } from '@/components/dashboard/TourHandler';
-import { getMotorcycles, getTechnicians, getWorkOrders } from '@/lib/data';
+import { getOrderCreationOptions } from '@/lib/work-orders/order-creation-options';
 import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
 import { redirect } from 'next/navigation';
 
@@ -25,15 +25,7 @@ export default async function TenantPage({ params }: TenantPageProps) {
   const workshopDetails = await getWorkshopDetails();
   
   // Fetch data for the "Nueva Orden" modal
-  const [{ items: motorcycles }, { items: technicians }, workOrdersData] = await Promise.all([
-    getMotorcycles(),
-    getTechnicians(),
-    getWorkOrders()
-  ]);
-
-  const motorcyclesWithoutAnyWorkOrder = motorcycles.filter(
-    (moto) => !workOrdersData.items.some((wo) => wo.motorcycle?.id === moto.id)
-  );
+  const { motorcycles, technicians, unavailableMotorcycleIds } = await getOrderCreationOptions();
 
   return (
     <>
@@ -43,8 +35,9 @@ export default async function TenantPage({ params }: TenantPageProps) {
         userName={workshopDetails?.user_name || 'Usuario'}
         workshopName={workshopDetails?.slug || 'tu-taller'}
         subscriptionPlan={workshopDetails?.subscription_plan}
-        motorcycles={motorcyclesWithoutAnyWorkOrder}
+        motorcycles={motorcycles}
         technicians={technicians}
+        unavailableMotorcycleIds={unavailableMotorcycleIds}
       />
       <Suspense fallback={null}>
         <FirstLoginPasswordChangeModal />

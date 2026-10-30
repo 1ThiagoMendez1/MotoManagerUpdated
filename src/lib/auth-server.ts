@@ -2,8 +2,12 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { hasPermission } from '@/lib/permissions';
+import { cache } from 'react';
+import { isSuperAdmin } from '@/lib/super-admin';
+import { resolveWorkshopPlan } from '@/lib/workshop-plan';
+import { getTrialState } from '@/lib/subscription-trial';
 
-export async function getCurrentUserServer() {
+export const getCurrentUserServer = cache(async () => {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,6 +24,8 @@ export async function getCurrentUserServer() {
         .from('organization_members')
         .select('organization_id, role, custom_permissions')
         .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
         .limit(1);
       
       if (orgError) {
@@ -27,14 +33,11 @@ export async function getCurrentUserServer() {
       }
       const orgMember = _orgMembers?.[0] as any;
 
-      if (!orgMember) {
-        console.warn(`[auth-server] User ${user.email} has no assigned organization_members.`);
-      }
-
       return {
         userId: user.id,
         email: user.email,
         user_metadata: user.user_metadata,
+        app_metadata: user.app_metadata,
         role: orgMember?.role || 'viewer',
         custom_permissions: orgMember?.custom_permissions || null,
         workshopId: orgMember?.organization_id || null,
@@ -46,20 +49,22 @@ export async function getCurrentUserServer() {
   }
 
   return null;
-}
+});
 
-export async function requireWorkshop() {
+export async function requireWorkshop(options: { allowExpired?: boolean } = {}) {
   const user = await getCurrentUserServer();
   if (!user) {
     redirect('/login');
   }
   if (!user.workshopId) {
-    const { data: authData } = await (await createClient()).auth.getUser();
-    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.toLowerCase().startsWith('admin@') || authData?.user?.email?.toLowerCase() === 'juanurian31@gmail.com';
-    if (isSuperAdmin) {
+    if (isSuperAdmin(user)) {
         redirect('/admin');
     }
     redirect('/no-workshop');
+  }
+  if (!options.allowExpired && !isSuperAdmin(user)) {
+    const workshop = await getWorkshopDetails(user);
+    if (workshop?.trial_expired) redirect('/dashboard/subscription');
   }
   return user;
 }
@@ -70,12 +75,14 @@ export async function authorize(path: string) {
     redirect('/login');
   }
   if (!user.workshopId) {
-    const { data: authData } = await (await createClient()).auth.getUser();
-    const isSuperAdmin = authData?.user?.user_metadata?.is_super_admin === true || authData?.user?.email?.toLowerCase().startsWith('admin@') || authData?.user?.email?.toLowerCase() === 'juanurian31@gmail.com';
-    if (isSuperAdmin) {
+    if (isSuperAdmin(user)) {
         redirect('/admin');
     }
     redirect('/no-workshop');
+  }
+  if (!isSuperAdmin(user)) {
+    const workshop = await getWorkshopDetails(user);
+    if (workshop?.trial_expired) redirect('/dashboard/subscription');
   }
   
   if (!hasPermission(user.role, path, user.custom_permissions)) {
@@ -90,10 +97,9 @@ export async function authorize(path: string) {
   return user;
 }
 
-export async function getWorkshopDetails(knownUser?: any) {
+export const getWorkshopDetails = cache(async (knownUser?: any) => {
   const user = knownUser || await getCurrentUserServer();
   if (!user || (!user.workshopId && !user.id)) {
-    console.warn(`[auth-server] getWorkshopDetails - User or user.workshopId is missing. user:`, user);
     return null;
   }
 
@@ -114,6 +120,8 @@ export async function getWorkshopDetails(knownUser?: any) {
         .from('organization_members')
         .select('organization_id, role, custom_permissions')
         .eq('user_id', actualUserId)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
         .limit(1);
        if (_orgMembers && _orgMembers.length > 0) {
            workshopId = _orgMembers[0].organization_id;
@@ -141,13 +149,18 @@ export async function getWorkshopDetails(knownUser?: any) {
     
     if (org) {
       const settings = org.settings || {};
+      const trial = getTrialState(settings);
       return {
         id: org.id,
         name: org.name,
         slug: org.slug,
-        subscription_status: settings.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
-        subscription_plan: settings.plan || 'monthly', 
-        subscription_end_date: settings.demoEndDate || null,
+        subscription_status: org.status !== 'active' ? 'past_due' : trial.expired ? 'past_due' : (trial.isTrial || settings.plan === 'demo') ? 'trialing' : 'active',
+        subscription_plan: resolveWorkshopPlan(settings), 
+        subscription_start_date: trial.isTrial ? settings.trialStartDate : settings.startDate || settings.demoStartDate || null,
+        subscription_end_date: trial.isTrial ? trial.endsAt : settings.endDate || settings.demoEndDate || null,
+        is_trial: trial.isTrial,
+        trial_expired: trial.expired,
+        trial_days_remaining: trial.daysRemaining,
         created_at: org.created_at,
         has_seen_welcome: true,
         user_name: user.user_metadata?.first_name || user.email?.split('@')[0] || 'Usuario',
@@ -162,7 +175,7 @@ export async function getWorkshopDetails(knownUser?: any) {
   }
 
   return null;
-}
+});
 
 export async function requireSuperAdmin() {
   const user = await getCurrentUserServer();
@@ -171,6 +184,7 @@ export async function requireSuperAdmin() {
   if (!user) {
     redirect('/login');
   }
+  if (!isSuperAdmin(user)) redirect('/dashboard');
   return { ...user, isSuperAdmin: true };
 }
 
@@ -181,8 +195,8 @@ export async function createAdminClient() {
   return createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 }
 
-export async function getScopedClient() {
-  const user = await requireWorkshop();
+export async function getScopedClient(options: { allowExpired?: boolean } = {}) {
+  const user = await requireWorkshop(options);
   return {
     supabase: await createClient(),
     supabaseAdmin: await createClient(),

@@ -1,7 +1,30 @@
 'use server';
 
-import { createAdminClient, getCurrentUserServer } from '@/lib/auth-server';
+import { createAdminClient } from '@/lib/auth-server';
+import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { getOwnAvatarUrl } from './reputation-actions';
+
+/** Solo clientes con acceso verificado (correo o WhatsApp); la placa no prueba titularidad. */
+async function getVerifiedCustomerLinks() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user?.email_confirmed_at) return null;
+  const admin = await createAdminClient();
+  const { data: links, error: linkError } = await admin
+    .from('workshop_customer_accounts')
+    .select('customer_id, organization_id')
+    .eq('user_id', user.id);
+  if (linkError || !links?.length) return null;
+  return { userId: user.id, links, admin };
+}
+
+
+async function adminReviewLookup(admin: any, userId: string, orderIds: string[]) {
+  return admin.from('customer_service_reviews')
+    .select('work_order_id,rating,recommended,comment,publish_comment')
+    .eq('reviewer_user_id', userId).in('work_order_id', orderIds).limit(100);
+}
 
 /**
  * Fetches all customer data by license plate: motorcycle, customer info,
@@ -12,8 +35,14 @@ export async function getCustomerPortalData(licensePlate: string) {
     return { success: false, message: 'Placa inválida.' };
   }
 
-  const supabase = await createAdminClient();
+  const verified = await getVerifiedCustomerLinks();
+  if (!verified) return { success: false, message: 'Para consultar datos privados, inicia sesión con WhatsApp o con tu contraseña desde el QR del taller.' };
+  const supabase = verified.admin;
   const normalizedPlate = licensePlate.replace(/[\s-]/g, '').toUpperCase();
+  if (!/^[A-Z0-9]{5,8}$/.test(normalizedPlate)) {
+    return { success: false, message: 'Placa inválida.' };
+  }
+  const customerIds = Array.from(new Set(verified.links.map(link => link.customer_id)));
 
   // Find motorcycle by normalized plate
   const { data: motorcycles, error: motoError } = await supabase
@@ -23,6 +52,7 @@ export async function getCustomerPortalData(licensePlate: string) {
       brand,
       model,
       license_plate,
+      organization_id,
       customer_id,
       customers (
         id,
@@ -32,10 +62,12 @@ export async function getCustomerPortalData(licensePlate: string) {
         phone
       ),
       organizations (
-        name
+        name,
+        slug
       )
     `)
-    .ilike('license_plate', `%${normalizedPlate}%`);
+    .in('customer_id', customerIds)
+    .limit(100);
 
   if (motoError || !motorcycles || motorcycles.length === 0) {
     return { success: false, message: 'No se encontró ninguna motocicleta con esa placa.' };
@@ -44,8 +76,13 @@ export async function getCustomerPortalData(licensePlate: string) {
   // Find exact match by normalizing
   const motorcycle = motorcycles.find((m: any) => {
     const dbPlate = (m.license_plate || '').replace(/[\s-]/g, '').toUpperCase();
-    return dbPlate === normalizedPlate;
-  }) || motorcycles[0];
+    return dbPlate === normalizedPlate && verified.links.some(
+      link => link.customer_id === m.customer_id && link.organization_id === m.organization_id
+    );
+  });
+  if (!motorcycle) {
+    return { success: false, message: 'No hay motocicletas vinculadas a tu cuenta con esa placa.' };
+  }
 
   const customer = (motorcycle as any).customers;
   if (!customer) {
@@ -73,7 +110,14 @@ export async function getCustomerPortalData(licensePlate: string) {
       )
     `)
     .eq('motorcycle_id', motorcycle.id)
+    .eq('organization_id', (motorcycle as any).organization_id)
     .order('created_at', { ascending: false });
+
+  const ids = (workOrders || []).map(item => item.id);
+  const { data: reviews } = ids.length
+    ? await adminReviewLookup(supabase, verified.userId, ids)
+    : { data: [] as any[] };
+  const reviewed = new Map<string, any>((reviews || []).map((review: any) => [review.work_order_id, review]));
 
   // Fetch appointments for this motorcycle
   const { data: appointments } = await supabase
@@ -87,12 +131,16 @@ export async function getCustomerPortalData(licensePlate: string) {
       created_at
     `)
     .eq('motorcycle_id', motorcycle.id)
+    .eq('customer_id', customer.id)
+    .eq('organization_id', (motorcycle as any).organization_id)
     .order('scheduled_start', { ascending: false });
 
   return {
     success: true,
     data: {
       workshopName: (motorcycle as any).organizations?.name || 'Portal del Cliente',
+      workshopSlug: (motorcycle as any).organizations?.slug || '',
+      avatarUrl: await getOwnAvatarUrl(),
       customer: {
         id: customer.id,
         name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
@@ -119,6 +167,12 @@ export async function getCustomerPortalData(licensePlate: string) {
         mechanicName: wo.mechanic
           ? `${(wo.mechanic as any).first_name || ''} ${(wo.mechanic as any).last_name || ''}`.trim()
           : null,
+        review: reviewed.has(wo.id) ? {
+          rating: reviewed.get(wo.id).rating,
+          recommended: reviewed.get(wo.id).recommended,
+          comment: reviewed.get(wo.id).comment || '',
+          publishComment: reviewed.get(wo.id).publish_comment === true,
+        } : null,
       })),
       appointments: (appointments || []).map((apt: any) => ({
         id: apt.id,
@@ -147,14 +201,21 @@ export async function createCustomerAppointment(formData: FormData) {
     return { success: false, message: 'Todos los campos son obligatorios.' };
   }
 
-  const supabase = await createAdminClient();
+  const verified = await getVerifiedCustomerLinks();
+  if (!verified) return { success: false, message: 'Debes verificar tu acceso y vincular tu cuenta al taller.' };
+  const supabase = verified.admin;
 
-  // Get the organization_id from the motorcycle
   const { data: moto } = await supabase
     .from('motorcycles')
-    .select('organization_id')
+    .select('organization_id, customer_id')
     .eq('id', motorcycleId)
+    .eq('customer_id', customerId)
     .single();
+
+  if (!moto || !verified.links.some(link =>
+      link.organization_id === moto.organization_id && link.customer_id === customerId)) {
+    return { success: false, message: 'No tienes permiso para agendar esta motocicleta.' };
+  }
 
   if (!moto) {
     return { success: false, message: 'Motocicleta no encontrada.' };
@@ -165,15 +226,7 @@ export async function createCustomerAppointment(formData: FormData) {
   // Default appointment duration: 1 hour
   const scheduledEnd = new Date(scheduledStart.getTime() + 60 * 60 * 1000);
 
-  let creatorId: string | null = null;
-  try {
-    const currentUser = await getCurrentUserServer();
-    if (currentUser) {
-      creatorId = currentUser.userId;
-    }
-  } catch (e) {
-    // Si no hay sesión (flujo de portal público), queda null
-  }
+  const creatorId = verified.userId;
 
   const { error: insertError } = await supabase
     .from('appointments')
@@ -198,18 +251,90 @@ export async function createCustomerAppointment(formData: FormData) {
 }
 
 export async function cancelCustomerAppointment(appointmentId: string) {
-  const supabase = await createAdminClient();
+  const verified = await getVerifiedCustomerLinks();
+  if (!verified) return { success: false, message: 'Debes verificar tu cuenta.' };
+  const supabase = verified.admin;
 
-  const { error } = await supabase
-    .from('appointments')
-    .update({ status: 'cancelled' })
-    .eq('id', appointmentId);
-
-  if (error) {
-    console.error('Error cancelling appointment:', error);
-    return { success: false, message: 'Error al cancelar la cita.' };
+  // No se cancela una cita solo conociendo su UUID.
+  const { data: appointment } = await supabase.from('appointments')
+    .select('id, customer_id, organization_id, status')
+    .eq('id', appointmentId)
+    .single();
+  if (!appointment || !verified.links.some(link =>
+      link.customer_id === appointment.customer_id &&
+      link.organization_id === appointment.organization_id)) {
+    return { success: false, message: 'No tienes permiso para cancelar esta cita.' };
+  }
+  if (appointment.status !== 'pending' && appointment.status !== 'confirmed') {
+    return { success: false, message: 'Esta cita ya no se puede cancelar.' };
   }
 
+  const { error } = await supabase.from('appointments')
+    .update({ status: 'cancelled' })
+    .eq('id', appointmentId)
+    .eq('customer_id', appointment.customer_id)
+    .eq('organization_id', appointment.organization_id)
+    .in('status', ['pending', 'confirmed']);
+  if (error) return { success: false, message: 'Error al cancelar la cita.' };
   revalidatePath('/clientes');
   return { success: true, message: 'Cita cancelada correctamente.' };
+}
+
+
+export type CustomerPortalOverview = {
+  verified: boolean;
+  avatarUrl?: string | null;
+  workshops: Array<{ id: string; name: string }>;
+  motorcycles: Array<{ id: string; brand: string; model: string; licensePlate: string; workshopName: string }>;
+};
+
+/** A verified customer's linked motorcycles, without asking them to retype plates.
+ * Every returned pair must match a row in workshop_customer_accounts for auth.uid().
+ */
+export async function getCustomerPortalOverview(): Promise<CustomerPortalOverview> {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const empty: CustomerPortalOverview = { verified: false, workshops: [], motorcycles: [] };
+  if (authError || !user?.email_confirmed_at) return empty;
+
+  const admin = await createAdminClient();
+  const { data: links, error: linkError } = await admin
+    .from('workshop_customer_accounts')
+    .select('organization_id, customer_id')
+    .eq('user_id', user.id)
+    .limit(100);
+  if (linkError) {
+    console.error('[customer-overview] Failed to load account associations');
+    return { ...empty, verified: true };
+  }
+  if (!links?.length) return { ...empty, verified: true, avatarUrl: await getOwnAvatarUrl() };
+
+  const organizationIds = [...new Set(links.map(link => link.organization_id))];
+  const customerIds = [...new Set(links.map(link => link.customer_id))];
+  const [{ data: organizations, error: orgError }, { data: motorcycles, error: motoError }] = await Promise.all([
+    admin.from('organizations').select('id, name').in('id', organizationIds).limit(100),
+    admin.from('motorcycles').select('id, brand, model, license_plate, organization_id, customer_id')
+      .in('customer_id', customerIds).limit(100),
+  ]);
+  if (orgError || motoError) {
+    console.error('[customer-overview] Failed to load connected vehicles');
+    return { ...empty, verified: true };
+  }
+
+  const workshopNames = new Map((organizations || []).map(org => [org.id, org.name]));
+  // Restrict by BOTH IDs, not just the customer_id (which alone is insufficient in a multi-tenant app).
+  const permittedPairs = new Set(links.map(link => link.organization_id + ':' + link.customer_id));
+  const accessible = (motorcycles || []).filter(moto =>
+    permittedPairs.has(moto.organization_id + ':' + moto.customer_id) &&
+    workshopNames.has(moto.organization_id));
+  return {
+    verified: true,
+    avatarUrl: await getOwnAvatarUrl(),
+    workshops: (organizations || []).map(org => ({ id: org.id, name: org.name })),
+    motorcycles: accessible.map(moto => ({
+      id: moto.id, brand: moto.brand || '', model: moto.model || '',
+      licensePlate: moto.license_plate || '',
+      workshopName: workshopNames.get(moto.organization_id) || 'Mi taller',
+    })),
+  };
 }

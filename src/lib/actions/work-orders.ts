@@ -4,7 +4,10 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { sendOrderStatusUpdate, sendQuoteNotification, sendMotoIngresoNotification, sendDiagnosticadoReparadoNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
+import { shouldSendReadyNotice } from '@/lib/whatsapp-ready';
+import { isChangeableOrderStatus } from '@/lib/work-order-status';
 import { createNotification } from '@/lib/actions/notifications';
+import { formatBusinessHours } from '@/lib/business-hours';
 
 const workOrderSchema = z.object({
     motorcycleId: z.string().min(1, 'Se requiere la motocicleta.'),
@@ -28,7 +31,7 @@ function mapStatusToUi(dbStatus: string) {
     if (dbStatus === 'completed') return 'Reparado';
     if (dbStatus === 'delivered') return 'Entregado';
     if (dbStatus === 'delivered_quote_rejected') return 'Moto entregada por cotización rechazada';
-    if (dbStatus === 'received') return 'Ingreso a revisión';
+    if (dbStatus === 'received') return 'Nueva orden';
     return dbStatus;
 }
 
@@ -66,7 +69,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
     { auth: { persistSession: false } }
   );
 
-    const { data: activeOrders } = await supabaseAdmin
+    const { data: activeOrders, error: activeOrdersError } = await supabaseAdmin
         .from('work_orders')
         .select(`
             id,
@@ -78,6 +81,11 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         .neq('status', 'delivered')
         .neq('status', 'delivered_quote_rejected')
         .neq('status', 'cancelled');
+
+    if (activeOrdersError) {
+        console.error('[work-orders] No se pudo verificar las órdenes activas:', activeOrdersError.code);
+        return { message: 'No se pudo verificar si esta moto tiene otra orden activa. Intenta nuevamente.' };
+    }
 
     const activeOrder = activeOrders?.find(wo => wo.status !== 'delivered' && wo.status !== 'delivered_quote_rejected' && wo.status !== 'cancelled');
         
@@ -225,7 +233,10 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
   );
 
     const id = formData.get('id') as string;
-    const uiStatus = formData.get('status') as string;
+    const uiStatus = formData.get('status');
+    if (!id || !isChangeableOrderStatus(uiStatus)) {
+        return { message: 'Selecciona un estado válido. Los estados antiguos ya no están disponibles.' };
+    }
     const status = mapStatusToDb(uiStatus);
 
     const updateData: any = { status };
@@ -245,6 +256,10 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         .eq('organization_id', user.workshopId)
         .single();
     const oldStatus = oldWo?.status;
+    if (!oldStatus) return { message: 'La orden no existe en este taller.' };
+    if (oldStatus === status) {
+        return { message: 'La orden ya tiene ese estado. No se enviará un mensaje repetido.' };
+    }
 
     const { error, data: _updatedWo } = await supabase
         .from('work_orders')
@@ -280,6 +295,8 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
         return { message: `Error al actualizar el estado: ${error.message}` };
     }
 
+    let whatsappWarning: string | undefined;
+    let whatsappManualUrl: string | undefined;
     if (updatedWo) {
         const mc = Array.isArray(updatedWo.motorcycles) ? updatedWo.motorcycles[0] : updatedWo.motorcycles;
         const customer = mc?.customers;
@@ -314,71 +331,111 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
             }
         }
 
-        // Recuperar nombre y dirección del taller de workshops
-        let { data: workshop } = await supabase
-            .from('workshops')
-            .select('name, address')
+        // Los datos de la notificación provienen de la organización de esta orden.
+        // Nunca consultar la tabla heredada workshops ni tomar horarios del cliente.
+        const { data: organization, error: organizationError } = await supabase
+            .from('organizations')
+            .select('name, settings')
             .eq('id', user.workshopId)
             .single();
-
-        // Fallback a organizations si falla o no tiene nombre
-        if (!workshop || !workshop.name) {
-            const { data: orgData } = await supabase
-                .from('organizations')
-                .select('name, settings')
-                .eq('id', user.workshopId)
-                .single();
-            if (orgData) {
-                workshop = {
-                    name: orgData.name,
-                    address: workshop?.address || (orgData.settings as any)?.address || ''
-                };
-            }
+        if (organizationError) {
+            console.error('No se pudo consultar el perfil del taller para WhatsApp.');
         }
+        const workshop = organization ? {
+            name: organization.name,
+            address: (organization.settings as any)?.address || '',
+            businessHours: (organization.settings as any)?.business_hours ?? null,
+        } : null;
 
         if (customer?.phone) {
-            const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
-            if (canSend) {
-                const isDiagnosticadoToReparado = oldStatus === 'diagnosis' && status === 'completed';
-
-                if (isDiagnosticadoToReparado) {
+            const isReadyTransition = shouldSendReadyNotice(oldStatus, status);
+            const evolutionAvailable = Boolean(
+                process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE_NAME
+            );
+            const metaAvailable = Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+            if (!isReadyTransition && !evolutionAvailable && !metaAvailable) {
+                whatsappWarning = 'No hay un proveedor WhatsApp configurado para cambios de estado.';
+            } else if (isReadyTransition && !metaAvailable && !evolutionAvailable) {
+                whatsappWarning = 'No hay un proveedor de WhatsApp configurado para avisar que la moto está lista.';
+            } else {
+              const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
+              if (canSend) {
+                if (isReadyTransition) {
                     const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Cliente';
                     const motorcycleInfo = `${mc?.brand || ''} ${mc?.model || ''}`.trim() || 'Motocicleta';
                     const plate = mc?.license_plate || '';
                     const orderNum = updatedWo.order_number?.toString() || id.substring(0, 8);
                     const address = workshop?.address || '';
 
-                    sendDiagnosticadoReparadoNotification(
-                        customer.phone,
-                        customerName,
-                        workshop?.name || 'Taller',
-                        motorcycleInfo,
-                        plate,
-                        orderNum,
-                        address
-                    ).catch(err => console.error('Error sending WhatsApp diagnosticado_reparado template:', err));
-                } else {
-                    sendOrderStatusUpdate(
-                        customer.phone,
-                        {
-                            orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
-                            status: uiStatus as any,
-                            customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
-                            motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
-                            technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
-                            items: usedPartsItems,
-                            workshopName: workshop?.name
+                    try {
+                        const delivery = await sendDiagnosticadoReparadoNotification(
+                            customer.phone,
+                            customerName,
+                            workshop?.name || 'Taller',
+                            motorcycleInfo,
+                            plate,
+                            orderNum,
+                            address,
+                            workshop?.businessHours ?? null
+                        );
+                        if (!delivery.success) {
+                            whatsappWarning = delivery.error || 'Meta no aceptó el aviso de moto lista.';
+                            console.warn('[work-orders] WhatsApp ready notice rejected:', whatsappWarning);
                         }
-                    ).catch(err => console.error('Error sending WhatsApp order status update:', err));
+                    } catch {
+                        whatsappWarning = 'No se pudo confirmar el aviso de moto lista.';
+                        console.error('[work-orders] WhatsApp ready notice could not be confirmed.');
+                    }
+                } else {
+                    try {
+                        const delivery = await sendOrderStatusUpdate(
+                            customer.phone,
+                            {
+                                orderNumber: updatedWo.order_number?.toString() || id.substring(0, 8),
+                                status: uiStatus as any,
+                                customerName: `${customer.first_name} ${customer.last_name}`.trim() || 'Cliente',
+                                motorcycleInfo: `${mc?.brand} ${mc?.model} (${mc?.license_plate})`,
+                                plate: mc?.license_plate || '',
+                                technicianName: tech ? `${tech.first_name} ${tech.last_name}` : 'Técnico asignado',
+                                items: usedPartsItems,
+                                workshopName: workshop?.name,
+                                workshopAddress: workshop?.address,
+                                businessHours: formatBusinessHours(workshop?.businessHours)
+                            }
+                        );
+                        if (!delivery.success) {
+                            whatsappWarning = delivery.error || 'El proveedor no aceptó el aviso de cambio de estado.';
+                            console.warn('[work-orders] WhatsApp status notice rejected:', delivery.error === 'Evolution API not configured' ? 'Evolution not configured' : 'provider failure');
+                        }
+                    } catch {
+                        whatsappWarning = 'No se pudo confirmar el aviso de cambio de estado.';
+                        console.error('[work-orders] WhatsApp status notice could not be confirmed.');
+                    }
                 }
-            } else {
-                console.warn(`WhatsApp notification skipped for order update (Limit reached)`);
+              } else {
+                  whatsappWarning = 'Se alcanzó el límite de WhatsApp del taller o falló la comprobación de cuota.';
+                  console.warn('[work-orders] WhatsApp notification skipped: quota unavailable.');
+              }
+            }
+        } else {
+            whatsappWarning = 'El cliente no tiene un teléfono registrado para WhatsApp.';
+        }
+        // Manual fallback is deliberately click-to-send; never claim automatic delivery.
+        if (whatsappWarning && customer?.phone) {
+            const digits = customer.phone.replace(/[^0-9]/g, '');
+            const recipient = digits.length === 10 ? '57' + digits : digits;
+            if (/^\d{11,15}$/.test(recipient)) {
+                const message = 'Hola ' + (customer.first_name || 'cliente') + ', tu orden ' +
+                    (updatedWo.order_number || id.substring(0, 8)) + ' en ' +
+                    (workshop?.name || 'el taller') + ' tiene el estado: ' + uiStatus +
+                    '. Comunícate con el taller si necesitas información.';
+                whatsappManualUrl = 'https://wa.me/' + recipient + '?text=' + encodeURIComponent(message);
             }
         }
     }
 
     revalidatePath('/work-orders');
-    return { success: true };
+    return { success: true, whatsappWarning, whatsappManualUrl };
 }
 
 export async function reassignWorkOrderTechnician(prevState: any, formData: FormData) {

@@ -49,7 +49,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('🔐 AuthProvider signIn called with:', { email, password });
 
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -60,30 +59,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         credentials: 'include', // Include cookies
       });
 
-      console.log('📡 AuthProvider response status:', response.status);
-      console.log('✅ AuthProvider response ok:', response.ok);
 
       let data;
       const responseText = await response.text();
-      console.log('📄 AuthProvider raw response text:', responseText);
 
       try {
         data = JSON.parse(responseText);
-        console.log('📦 AuthProvider parsed data:', data);
       } catch (jsonError) {
         console.error('❌ AuthProvider JSON parse error:', jsonError);
         return { success: false, error: 'Invalid response format' };
       }
 
-      console.log('👤 AuthProvider data.user exists:', !!data.user);
-      console.log('🔑 AuthProvider data.token exists:', !!data.token);
 
       if (response.ok && data.user && data.token) {
-        console.log('🎉 AuthProvider setting user:', data.user);
         setUser(data.user);
         return { success: true };
       } else {
-        console.log('❌ AuthProvider returning error:', data.error);
         return { success: false, error: data.error || 'Login failed' };
       }
     } catch (error) {

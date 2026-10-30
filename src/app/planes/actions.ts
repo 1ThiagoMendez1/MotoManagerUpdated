@@ -5,6 +5,8 @@ import { z } from 'zod'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 import { sendOwnerWelcomeNotification } from '@/lib/whatsapp'
+import { catalogSubscriptionPrice, verifySubscriptionPayment } from '@/lib/payments/subscription-payment'
+import { randomInt } from 'node:crypto'
 
 const registrationSchema = z.object({
     workshopName: z.string().min(3, 'El nombre del taller debe tener al menos 3 caracteres'),
@@ -27,7 +29,7 @@ const registrationSchema = z.object({
 export async function registerWorkshopPublic(prevState: any, formData: FormData) {
     const data = Object.fromEntries(formData)
     console.log('\n🚀 ===== INICIO REGISTRO TALLER =====')
-    console.log('📋 Datos recibidos del formulario:', JSON.stringify(data, null, 2))
+
 
     // Auto-sanitize slug
     if (typeof data.slug === 'string') {
@@ -48,9 +50,20 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
 
     const { workshopName, slug, email, fullName, phone, workshopPhone, address, mapsLink, city, nit, subscriptionPlan, billingCycle } = validation.data
     
+    let verifiedPayment;
+    try {
+        verifiedPayment = await verifySubscriptionPayment({
+            transactionId: String(data.paymentRef || ''), email,
+            referencePrefix: `MM-NEW-${subscriptionPlan.toUpperCase()}-`,
+            amount: await catalogSubscriptionPrice(subscriptionPlan, billingCycle),
+        });
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : 'No se pudo verificar el pago.', fields: data };
+    }
+
     // Generate automatic password
-    const generatedPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-    console.log('🔑 Contraseña generada (guardar!):', generatedPassword)
+    const generatedPassword = randomInt(100000, 1000000).toString(); // 6-digit OTP
+
 
     const supabaseAdmin = createSupabaseClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,40 +114,12 @@ export async function registerWorkshopPublic(prevState: any, formData: FormData)
     }
     console.log('📅 Plan:', subscriptionPlan, '| Ciclo:', billingCycle, '| Inicio:', startDate.toISOString(), '| Fin:', endDate.toISOString())
 
-    // Create organization using RPC via temp client
-    console.log('🏭 Creando taller via RPC:', workshopName, '| Slug:', slug)
-    const tempClient = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-            }
-        }
-    );
-
-    const { error: signInError } = await tempClient.auth.signInWithPassword({
-        email,
-        password: generatedPassword
-    });
-
-    if (signInError) {
-        console.error('Sign In Error:', signInError);
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        return { error: 'Error de autenticación temporal: ' + signInError.message, fields: data };
-    }
-
-    const { data: orgId, error: rpcError } = await tempClient.rpc('create_organization_with_owner', {
-        org_name: workshopName,
-        org_slug: slug,
-        org_email: email,
-        org_phone: phone,
-        org_legal_name: null,
-        org_tax_identifier: nit || null,
-        sub_plan: subscriptionPlan,
-        demo_start: startDate.toISOString(),
-        demo_end: endDate.toISOString()
+    const { data: orgId, error: rpcError } = await supabaseAdmin.rpc('provision_workshop_account', {
+        p_owner_id: authData.user.id, p_name: workshopName, p_slug: slug,
+        p_phone: workshopPhone || phone, p_city: city, p_is_trial: false,
+        p_plan: subscriptionPlan, p_start: startDate.toISOString(), p_end: endDate.toISOString(),
+        p_tax_identifier: nit || null, p_cycle: billingCycle,
+        p_transaction_id: verifiedPayment.id, p_amount: verifiedPayment.amount_in_cents / 100,
     });
 
     if (rpcError) {
