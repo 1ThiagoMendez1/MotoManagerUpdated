@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { ArrowRight, CheckCircle2, Gift } from 'lucide-react';
+import { HalloweenTrialOffer } from './HalloweenCampaign';
 
-export function LandingTrial({ fullPrice }: { fullPrice: number }) {
+export function LandingTrial({ fullPrice, halloween = false }: { fullPrice: number; halloween?: boolean }) {
+  if (halloween) return <HalloweenTrialOffer fullPrice={fullPrice} />;
   return <section id="prueba-gratis" className="scroll-mt-20 border-y border-[#ff831b]/20 bg-[#0b2036] px-5 py-16 text-white">
     <div className="mx-auto grid max-w-7xl items-center gap-9 lg:grid-cols-[1.2fr_0.8fr]">
       <div><span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[#ffad68]"><Gift className="h-4 w-4" />Tu taller merece probarlo completo</span>

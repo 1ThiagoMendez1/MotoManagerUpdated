@@ -2,6 +2,7 @@
 
 import { ArrowRight, Bike, Boxes, CheckCircle2, ClipboardList, LayoutGrid, PlayCircle, ShieldCheck, ShoppingBag, Wrench } from 'lucide-react';
 import Link from 'next/link';
+import { HalloweenHero } from './HalloweenCampaign';
 
 const SMALL_CARDS = [
   { name: 'Clientes', subtitle: 'Directorio y contactos', icon: ShieldCheck, bg: 'bg-emerald-500' },
@@ -10,7 +11,8 @@ const SMALL_CARDS = [
   { name: 'Ventas', subtitle: 'Caja y mostrador', icon: ShoppingBag, bg: 'bg-green-500' },
 ];
 
-export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void }) {
+export function LandingHero({ onScrollToPlanes, halloween = false }: { onScrollToPlanes: () => void; halloween?: boolean }) {
+  if (halloween) return <HalloweenHero onScrollToPlanes={onScrollToPlanes} />;
   return (
     <section className="relative isolate overflow-hidden bg-[#050b18] px-5 pb-20 pt-16 text-white sm:pt-20 lg:pb-28 lg:pt-24">
       <div aria-hidden="true" className="pointer-events-none absolute -right-44 top-0 h-[650px] w-[650px] rounded-full bg-[#347df1]/15 blur-[110px]" />

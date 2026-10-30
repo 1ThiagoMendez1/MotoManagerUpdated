@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPublicWorkshops } from '@/actions/public-workshops';
 import type { PublicWorkshop } from '@/actions/public-workshops';
+import { isHalloweenEditionActive } from '@/lib/seasonal-campaign';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
@@ -97,7 +98,7 @@ export default async function Page() {
             <div className="h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         }>
-          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} checkoutReady={Boolean(process.env.WOMPI_PRIVATE_KEY && process.env.WOMPI_INTEGRITY_SECRET && process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY)} />
+          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} halloween={isHalloweenEditionActive()} checkoutReady={Boolean(process.env.WOMPI_PRIVATE_KEY && process.env.WOMPI_INTEGRITY_SECRET && process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY)} />
         </Suspense>
       </div>
     </>
