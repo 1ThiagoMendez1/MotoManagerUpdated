@@ -10,9 +10,11 @@ export function TrialBanner({ endDate, canManage }: { endDate: string; canManage
   const router = useRouter();
   const [remaining, setRemaining] = useState(() => Math.max(0, Date.parse(endDate) - Date.now()));
   useEffect(() => {
+    let refreshed = false;
     const tick = () => {
       const next = Math.max(0, Date.parse(endDate) - Date.now());
-      setRemaining(previous => { if (previous > 0 && next === 0) router.refresh(); return next; });
+      setRemaining(next);
+      if (next === 0 && !refreshed) { refreshed = true; router.refresh(); }
     };
     tick();
     const timer = setInterval(tick, 30_000);

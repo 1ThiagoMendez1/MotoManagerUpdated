@@ -1,4 +1,5 @@
 import { getPlanLimits } from './constants/plans';
+import { getTrialState } from './subscription-trial';
 
 /** Plan de producto vigente. El ciclo de cobro no es un plan. */
 export type WorkshopPlan = 'basic' | 'pro' | 'full';
@@ -33,5 +34,9 @@ export function resolveWorkshopPlan(settings: unknown): WorkshopPlan {
 }
 
 export function getWorkshopWhatsAppLimit(settings: unknown): number {
+  // Cron jobs also use this resolver with a service client. An expired free
+  // account must not keep sending reminders outside the interactive UI.
+  if (settings && typeof settings === 'object' && !Array.isArray(settings) &&
+      getTrialState(settings as Record<string, unknown>).expired) return 0;
   return getPlanLimits(resolveWorkshopPlan(settings)).whatsapp_limit;
 }
