@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { ArrowRight, Loader2, LockKeyhole } from 'lucide-react';
 import Link from 'next/link';
 import { startFullTrial } from './actions';
+import { TRIAL_WHATSAPP_CONSENT_TEXT } from '@/lib/subscription-trial';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -32,6 +33,10 @@ export function TrialForm() {
     <label className="flex items-start gap-3 text-xs leading-5 text-slate-300">
       <input type="checkbox" name="terms" required className="mt-1 h-4 w-4 shrink-0 accent-[#ff831b]" />
       <span>Acepto las condiciones: una prueba de 15 días por taller, correo y celular. Al finalizar elegiré un plan para continuar. No hay cobros automáticos durante la prueba. Mis datos de contacto se usarán para crear y gestionar mi cuenta.</span>
+    </label>
+    <label className="flex items-start gap-3 text-xs leading-5 text-slate-300">
+      <input type="checkbox" name="whatsappConsent" className="mt-1 h-4 w-4 shrink-0 accent-[#ff831b]" />
+      <span>{TRIAL_WHATSAPP_CONSENT_TEXT} <span className="text-slate-400">(Opcional)</span></span>
     </label>
     {state.error && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">{state.error}</p>}
     <Submit />
