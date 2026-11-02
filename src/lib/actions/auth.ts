@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { getWorkshopDetails } from '@/lib/auth-server';
+import { scheduleAccountAccess } from '@/lib/analytics/web-server';
 
 export async function loginAction(formData: FormData) {
   const email = formData.get('email') as string;
@@ -27,6 +28,7 @@ export async function loginAction(formData: FormData) {
   }
 
   const user = data?.user;
+  if (user) await scheduleAccountAccess(user, 'login');
 
   revalidatePath('/', 'layout');
   

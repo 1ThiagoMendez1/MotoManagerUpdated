@@ -20,6 +20,7 @@ import { LandingFooter } from './components/LandingFooter';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
 import { HalloweenClosing, HalloweenRibbon } from './components/HalloweenCampaign';
 import halloweenStyles from './components/halloween.module.css';
+import { isSuperAdmin } from '@/lib/super-admin';
 
 interface Plan {
   id: 'basic' | 'pro' | 'full';
@@ -122,7 +123,7 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
 
   return (
     <div className={`min-h-screen bg-[#081121] text-white ${halloween ? halloweenStyles.edition : ''}`} data-campaign={halloween ? 'halloween-2026' : undefined}>
-      <MetaPixelMarketing />
+      <MetaPixelMarketing excluded={isSuperAdmin(user)} />
       <LandingNavbar user={user} halloween={halloween} />
       <main>
         {halloween ? <HalloweenRibbon /> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-orange-400/20 bg-[#ff831b]/10 px-5 py-3 text-center text-sm"><span><strong className="text-[#ffad68]">15 días de Full gratis.</strong> Sin tarjeta. Tu taller, con todo activado.</span><Link href="/prueba-gratis" className="inline-flex items-center gap-1 font-bold text-[#ffad68] underline underline-offset-4">Activar prueba <ArrowRight className="h-3.5 w-3.5" /></Link></div>}
@@ -140,7 +141,7 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Tu siguiente paso</span>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">¿Listo para dejar el desorden atrás?</h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Dale 15 días a una nueva forma de trabajar. Prueba Full con tus clientes, tus motos y tu equipo. Después decides cómo seguir.</p>
-            <Link href="/prueba-gratis" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
+            <Link href="/prueba-gratis" data-analytics-id="closing_trial" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
               Empezar mis 15 días gratis <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

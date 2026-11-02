@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/auth-server';
 import { getTrialState, trialRegistrationSchema, TRIAL_WHATSAPP_CONSENT_TEXT } from '@/lib/subscription-trial';
 import { sendTrialWelcomeViaMeta } from '@/lib/whatsapp-trial';
+import { scheduleAccountAccess } from '@/lib/analytics/web-server';
 
 export async function startFullTrial(_previous: { error: string }, form: FormData): Promise<{ error: string }> {
   const input = trialRegistrationSchema.safeParse(Object.fromEntries(form));
@@ -52,6 +53,7 @@ export async function startFullTrial(_previous: { error: string }, form: FormDat
       ? 'Este correo o celular ya utilizó una prueba. Ingresa a tu cuenta para continuar con un plan.'
       : 'No pudimos activar tu taller. Intenta de nuevo en unos minutos.' };
   }
+  if (organizationId) await scheduleAccountAccess(account.user, 'trial_activated', organizationId);
   if (optedIn && organizationId) {
     // Run only after a successful account + workshop activation. Delivery must
     // not delay or undo registration, even if Meta is reviewing the template.

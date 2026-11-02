@@ -31,7 +31,7 @@ export function LandingPricing({ plans, onSelectPlan, previewMode = false }: Pro
   const sortedPlans = [...plans].filter(p => ['basic', 'pro', 'full'].includes(p.id)).sort((a,b) => a.price - b.price);
 
   return (
-    <section id="planes" className={`scroll-mt-20 bg-[#091426] px-5 text-white ${previewMode ? 'py-12' : 'py-24 lg:py-28'}`}>
+    <section id="planes" data-analytics-state={cycle} className={`scroll-mt-20 bg-[#091426] px-5 text-white ${previewMode ? 'py-12' : 'py-24 lg:py-28'}`}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
           <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff9e4c]">Elige el siguiente paso de tu taller</span>
@@ -106,6 +106,7 @@ export function LandingPricing({ plans, onSelectPlan, previewMode = false }: Pro
                 </ul>
                 <button
                   type="button"
+                  data-analytics-id={`plan_${plan.id}`}
                   onClick={() => onSelectPlan({ ...plan, price: total, amountInCents: total * 100, billingCycle: cycle, period: config.period })}
                   className={`mt-9 inline-flex min-h-13 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold transition ${isPro ? 'bg-[#ff831b] text-[#081426] hover:bg-[#ffa149]' : 'bg-white text-slate-900 hover:bg-slate-200'}`}
                 >
