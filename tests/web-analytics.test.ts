@@ -53,6 +53,11 @@ test('signed sessions reject tampering, expiry and cross-visitor reuse',()=>{
 test('geolocation reads only the configured proxy header and rejects private addresses',()=>{
   assert.equal(analyticsClientIp(new Headers({'x-forwarded-for':'8.8.8.8','cf-ipcountry':'CO'})),null);
   assert.equal(analyticsClientIp(new Headers({'x-real-ip':'8.8.8.8'})),'8.8.8.8');
+  assert.equal(analyticsClientIp(new Headers({'x-real-ip':'162.158.1.2','cf-connecting-ip':'8.8.8.8'})),'8.8.8.8');
+  assert.equal(analyticsClientIp(new Headers({'x-real-ip':'8.8.4.4','cf-connecting-ip':'1.1.1.1'})),'8.8.4.4','a direct visitor cannot impersonate Cloudflare');
+  assert.equal(analyticsClientIp(new Headers({'x-real-ip':'162.158.1.2'})),null,'an edge server is not a visitor location');
+  assert.equal(analyticsClientIp(new Headers({'x-real-ip':'2606:4700::1','cf-connecting-ip':'240.1.1.1','cf-connecting-ipv6':'2001:4860:4860::8888'})),'2001:4860:4860::8888');
+  assert.equal(analyticsClientIp(new Headers({'x-real-ip':'8.8.4.4','cf-connecting-ip':'1.1.1.1'}),'cf-connecting-ip'),null);
   for(const ip of ['127.0.0.1','192.168.1.1','::1','::ffff:10.0.0.1','not-an-ip'])assert.equal(analyticsClientIp(new Headers({'x-real-ip':ip})),null);
 });
 test('click coordinates do not double-count window offsets and fixed-container scroll remains aligned',()=>{

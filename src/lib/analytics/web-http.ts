@@ -42,16 +42,32 @@ function addCookie(response:Response,name:string,value:string,age:number,secure:
   response.headers.append('Set-Cookie',`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${age}; HttpOnly; SameSite=Lax${secure?'; Secure':''}`);
 }
 const blocked=new BlockList();
-for(const [address,prefix]of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127.0.0.0',8],['169.254.0.0',16],['172.16.0.0',12],['192.168.0.0',16],['198.18.0.0',15],['224.0.0.0',4]]as const)blocked.addSubnet(address,prefix,'ipv4');
+for(const [address,prefix]of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127.0.0.0',8],['169.254.0.0',16],['172.16.0.0',12],['192.168.0.0',16],['198.18.0.0',15],['224.0.0.0',4],['240.0.0.0',4]]as const)blocked.addSubnet(address,prefix,'ipv4');
 for(const [address,prefix]of [['::',128],['::1',128],['fc00::',7],['fe80::',10],['ff00::',8]]as const)blocked.addSubnet(address,prefix,'ipv6');
+// Published Cloudflare ingress ranges, checked 2026-11-02:
+// https://www.cloudflare.com/ips-v4/ and https://www.cloudflare.com/ips-v6/
+const cloudflare=new BlockList();
+for(const cidr of ['173.245.48.0/20','103.21.244.0/22','103.22.200.0/22','103.31.4.0/22','141.101.64.0/18','108.162.192.0/18','190.93.240.0/20','188.114.96.0/20','197.234.240.0/22','198.41.128.0/17','162.158.0.0/15','104.16.0.0/13','104.24.0.0/14','172.64.0.0/13','131.0.72.0/22','2400:cb00::/32','2606:4700::/32','2803:f800::/32','2405:b500::/32','2405:8100::/32','2a06:98c0::/29','2c0f:f248::/32']){
+  const [address,prefix]=cidr.split('/');cloudflare.addSubnet(address,Number(prefix),isIP(address)===4?'ipv4':'ipv6');
+}
+function publicIp(value:string){
+  const ip=value.trim().replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i,'$1');
+  const family=isIP(ip);return family&&!blocked.check(ip,family===4?'ipv4':'ipv6')?ip:null;
+}
 /** The ingress must overwrite this header. Never infer location from submitted
  * browser data, timezone, language, or untrusted country headers. */
 export function analyticsClientIp(headers:Headers,header='x-real-ip') {
+  const peer=publicIp(headers.get('x-real-ip')||'');
+  const fromCloudflare=!!peer&&cloudflare.check(peer,isIP(peer)===4?'ipv4':'ipv6');
+  if((header.toLowerCase()==='x-real-ip'&&fromCloudflare)||header.toLowerCase()==='cf-connecting-ip'){
+    if(!fromCloudflare)return null;
+    const client=publicIp(headers.get('cf-connecting-ip')||'')||publicIp(headers.get('cf-connecting-ipv6')||'');
+    // Cross-zone Workers use this shared address, which is not a visitor.
+    return client==='2a06:98c0:3600::103'?null:client;
+  }
   let ip=(headers.get(header)||'').trim();
   if(header.toLowerCase()==='x-forwarded-for')ip=ip.split(',')[0].trim();
-  ip=ip.replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i,'$1');
-  const family=isIP(ip);if(!family || blocked.check(ip,family===4?'ipv4':'ipv6'))return null;
-  return ip;
+  return publicIp(ip);
 }
 export const privateHeaders={ 'Cache-Control':'private, no-store, max-age=0','Vary':'Cookie','X-Content-Type-Options':'nosniff' };
 export const analyticsJson=(data:unknown,status=200)=>Response.json(data,{status,headers:privateHeaders});
