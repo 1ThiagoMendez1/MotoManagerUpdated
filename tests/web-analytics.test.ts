@@ -96,6 +96,10 @@ test('collector uses server-verified identity, salted IP key and HttpOnly signed
   assert.equal(records[0].userId,user);assert.equal(records[0].rateKey.length,64);
   assert.ok(!JSON.stringify(records[0]).includes('8.8.8.8'));assert.equal(records[0].layouts[0].id.length,32);
   assert.match(response.headers.get('set-cookie')||'',/HttpOnly; SameSite=Lax; Secure/);
+  const sameViewport=batch();
+  await handler(request(sameViewport));
+  await handler(request(sameViewport,{'user-agent':'Mozilla/5.0 (iPhone; Mobile) Safari/605'}));
+  assert.notEqual(records[1].layouts[0].id,records[2].layouts[0].id,'equal-sized desktop and mobile views stay in separate device cohorts');
   const internal=createAnalyticsCollector({key,origins:[origin],actor:async()=>({id:user,app_metadata:{is_super_admin:true}}),geo:async()=>null,record:async()=>{throw Error('must not run');}});
   assert.equal((await internal(request(batch()))).status,204);
 });

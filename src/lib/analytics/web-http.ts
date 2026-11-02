@@ -104,7 +104,7 @@ export function createAnalyticsCollector(deps:CollectorDependencies) {
         meta:{channel:batch.attribution.channel,source:cleanCampaignValue(batch.attribution.source),medium:cleanCampaignValue(batch.attribution.medium),
           campaign:cleanCampaignValue(batch.attribution.campaign),referrer,device:deviceFromAgent(agent),browser:browserFromAgent(agent),
           country:geo?.country||null,city:geo?.city||null,latitude:geo?.latitude??null,longitude:geo?.longitude??null},
-        layouts:batch.layouts.map(layout=>({...layout,id:createHash('sha256').update(JSON.stringify(layout)).digest('hex').slice(0,32)})),events:batch.events});
+        layouts:batch.layouts.map(layout=>({...layout,id:createHash('sha256').update(JSON.stringify({...layout,device:deviceFromAgent(agent)})).digest('hex').slice(0,32)})),events:batch.events});
       if(result.limited)return analyticsJson({error:'Demasiados eventos'},429);
       if(result.unavailable || !result.sessionId)return analyticsJson({error:'Medición no disponible'},503);
       const response=new Response(null,{status:204,headers:privateHeaders});
