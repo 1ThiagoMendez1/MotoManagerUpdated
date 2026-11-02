@@ -37,7 +37,7 @@ export function LandingNavbar({ user, halloween = false }: { user?: unknown; hal
           <Link href={destination} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
             {user ? 'Ir al sistema' : 'Iniciar sesión'}
           </Link>
-          <Link href={user ? '/dashboard/subscription' : '/prueba-gratis'} className="inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-5 py-3 text-sm font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
+          <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} className="inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-5 py-3 text-sm font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
             {user ? 'Ver mi plan' : '15 días gratis'} <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -54,7 +54,7 @@ export function LandingNavbar({ user, halloween = false }: { user?: unknown; hal
           <div className="mx-auto flex max-w-7xl flex-col gap-1">
             {NAV.map(item => <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{item.label}</a>)}
             <Link href={destination} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{user ? 'Ir al sistema' : 'Iniciar sesión'}</Link>
-            <Link href={user ? '/dashboard/subscription' : '/prueba-gratis'} onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 py-3 text-sm font-extrabold text-[#081121]">
+            <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 py-3 text-sm font-extrabold text-[#081121]">
               {user ? 'Ver mi plan' : 'Activar 15 días gratis'} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

@@ -45,6 +45,9 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { getWorkshopDetails, getCurrentUserServer } from '@/lib/auth-server';
 import { LayoutWrapper } from '@/components/LayoutWrapper';
 import { PartRequestsNotifier } from '@/components/work-orders/PartRequestsNotifier';
+import { WebAnalyticsTracker } from '@/components/analytics/WebAnalyticsTracker';
+import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences';
+import { isSuperAdmin } from '@/lib/super-admin';
 
 export default async function RootLayout({
   children,
@@ -106,6 +109,7 @@ export default async function RootLayout({
             }
             sidebar={
               <AppSidebar
+                isPlatformAdmin={isSuperAdmin(user)}
                 workshopName={workshop?.name}
                 workshopSlug={workshop?.slug}
                 userRole={workshop?.user_role || user?.role}
@@ -125,6 +129,8 @@ export default async function RootLayout({
             {children}
           </LayoutWrapper>
           <Toaster />
+          <WebAnalyticsTracker isInternal={isSuperAdmin(user)} />
+          {!isSuperAdmin(user) && <MeasurementPreferences />}
         </TenantProvider>
         </ThemeProvider>
       </body>

@@ -137,7 +137,7 @@ export function LandingInteractiveDemo() {
       : (dark ? 'bg-blue-400/15 text-blue-200' : 'bg-blue-50 text-blue-700');
 
   return (
-    <section id="demo" className="scroll-mt-20 bg-[#071224] px-4 py-20 text-white sm:px-6 lg:py-28">
+    <section id="demo" data-analytics-state={`${screen}-${dark ? 'dark' : 'light'}`} className="scroll-mt-20 bg-[#071224] px-4 py-20 text-white sm:px-6 lg:py-28">
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#fd821b]/40 bg-[#fd821b]/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#ffad69]">

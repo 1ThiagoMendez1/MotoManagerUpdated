@@ -1,0 +1,138 @@
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { isIP, BlockList } from 'node:net';
+import { isSuperAdmin } from '../super-admin';
+import { browserFromAgent, cleanCampaignValue, deviceFromAgent, isKnownBot, type AnalyticsBatch } from './web-shared';
+import { batchSchema } from './web-validation';
+
+export const ANALYTICS_COOKIES = { visitor:'mm_wa_v1', session:'mm_wa_s1', consent:'mm_wa_c1' };
+export type AnalyticsActor = {id:string;email?:string|null;app_metadata?:Record<string,unknown>};
+export type AnalyticsGeo = {country:string|null;city:string|null;latitude:number|null;longitude:number|null};
+export type AnalyticsRecord = { visitorId:string;sessionId:string;batchId:string;rateKey:string;userId:string|null;
+  meta:Record<string,unknown>;layouts:(AnalyticsBatch['layouts'][number]&{id:string})[];events:AnalyticsBatch['events'] };
+
+export function signAnalyticsId(key:string,purpose:string,id:string,ttl:number,now=Date.now()) {
+  const payload=id+'.'+Math.floor(now/1000+ttl);
+  return payload+'.'+createHmac('sha256',key).update(purpose+':'+payload).digest('base64url');
+}
+export function verifyAnalyticsId(key:string,purpose:string,token:string|undefined,maxTtl:number,now=Date.now()):string|null {
+  if (!token) return null;
+  const parts=token.split('.');
+  if(parts.length!==3 || !/^[a-f0-9-]{36}$/.test(parts[0]) || !/^\d{10,12}$/.test(parts[1])) return null;
+  const expires=Number(parts[1]),seconds=now/1000;
+  if(expires<=seconds || expires>seconds+maxTtl+10) return null;
+  const expected=createHmac('sha256',key).update(purpose+':'+parts[0]+'.'+parts[1]).digest();
+  let received:Buffer;
+  try {received=Buffer.from(parts[2],'base64url');} catch{return null;}
+  return expected.length===received.length && timingSafeEqual(expected,received)?parts[0]:null;
+}
+export function analyticsVisitorId(key:string,seed:string) {
+  const bytes=createHmac('sha256',key).update('web-analytics-visitor:'+seed).digest().subarray(0,16);
+  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+  const h=bytes.toString('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+export function cookieValues(request:Request) {
+  const cookies:Record<string,string>={};
+  for(const item of (request.headers.get('cookie')||'').split(';')) {
+    const at=item.indexOf('=');if(at<0)continue;
+    try{cookies[item.slice(0,at).trim()]=decodeURIComponent(item.slice(at+1));}catch{/* Malformed cookies have no authority. */}
+  }
+  return cookies;
+}
+function addCookie(response:Response,name:string,value:string,age:number,secure:boolean) {
+  response.headers.append('Set-Cookie',`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${age}; HttpOnly; SameSite=Lax${secure?'; Secure':''}`);
+}
+const blocked=new BlockList();
+for(const [address,prefix]of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127.0.0.0',8],['169.254.0.0',16],['172.16.0.0',12],['192.168.0.0',16],['198.18.0.0',15],['224.0.0.0',4]]as const)blocked.addSubnet(address,prefix,'ipv4');
+for(const [address,prefix]of [['::',128],['::1',128],['fc00::',7],['fe80::',10],['ff00::',8]]as const)blocked.addSubnet(address,prefix,'ipv6');
+/** The ingress must overwrite this header. Never infer location from submitted
+ * browser data, timezone, language, or untrusted country headers. */
+export function analyticsClientIp(headers:Headers,header='x-real-ip') {
+  let ip=(headers.get(header)||'').trim();
+  if(header.toLowerCase()==='x-forwarded-for')ip=ip.split(',')[0].trim();
+  ip=ip.replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i,'$1');
+  const family=isIP(ip);if(!family || blocked.check(ip,family===4?'ipv4':'ipv6'))return null;
+  return ip;
+}
+export const privateHeaders={ 'Cache-Control':'private, no-store, max-age=0','Vary':'Cookie','X-Content-Type-Options':'nosniff' };
+export const analyticsJson=(data:unknown,status=200)=>Response.json(data,{status,headers:privateHeaders});
+
+async function readSmallJson(request:Request) {
+  if(Number(request.headers.get('content-length')||0)>32768)throw new Error('too_large');
+  if(!request.body)throw new Error('empty');
+  const reader=request.body.getReader();let size=0;const chunks:Uint8Array[]=[];
+  try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;
+    if(size>32768){await reader.cancel();throw new Error('too_large');}chunks.push(value);}}
+  finally{reader.releaseLock();}
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+export type CollectorDependencies={
+  key?:string;origins:string[];secure?:boolean;ipHeader?:string;now?:()=>number;
+  actor:(request:Request)=>Promise<AnalyticsActor|null>;
+  geo:(ip:string|null)=>Promise<AnalyticsGeo|null>;
+  record:(record:AnalyticsRecord)=>Promise<{sessionId?:string;limited?:boolean;inserted?:number;unavailable?:boolean}>;
+};
+export function createAnalyticsCollector(deps:CollectorDependencies) {
+  return async(request:Request):Promise<Response>=>{
+    const origin=request.headers.get('origin');
+    if(!origin || !deps.origins.includes(origin) || request.headers.get('sec-fetch-site')==='cross-site')return analyticsJson({error:'Origen no permitido'},403);
+    if(request.method==='DELETE'){
+      const response=new Response(null,{status:204,headers:privateHeaders});
+      Object.values(ANALYTICS_COOKIES).forEach(name=>addCookie(response,name,'',0,!!deps.secure));return response;
+    }
+    if(request.method!=='POST')return analyticsJson({error:'Método no permitido'},405);
+    if(!request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))return analyticsJson({error:'Contenido no permitido'},415);
+    if(!deps.key || deps.key.length<32)return analyticsJson({error:'Medición no disponible'},503);
+    if(request.headers.get('sec-gpc')==='1' || request.headers.get('dnt')==='1' || isKnownBot(request.headers.get('user-agent')||''))return new Response(null,{status:204,headers:privateHeaders});
+    let batch:AnalyticsBatch;
+    try{const parsed=batchSchema.safeParse(await readSmallJson(request));if(!parsed.success)return analyticsJson({error:'Eventos no válidos'},400);batch=parsed.data;}
+    catch(error){return analyticsJson({error:'Solicitud no válida'},error instanceof Error&&error.message==='too_large'?413:400);}
+    try{
+      const actor=await deps.actor(request);
+      if(isSuperAdmin(actor))return new Response(null,{status:204,headers:privateHeaders});
+      const now=deps.now?.()??Date.now(),key=deps.key;
+      const visitorId=analyticsVisitorId(key,batch.visitorSeed);
+      const cookies=cookieValues(request);
+      const sessionId=verifyAnalyticsId(key,'session:'+visitorId,cookies[ANALYTICS_COOKIES.session],1800,now)||randomUUID();
+      const ip=analyticsClientIp(request.headers,deps.ipHeader);
+      const geo=await deps.geo(ip).catch(()=>null);
+      const agent=request.headers.get('user-agent')||'';
+      const rateKey=createHmac('sha256',key).update('analytics-rate:'+new Date(now).toISOString().slice(0,10)+':'+(ip||visitorId)).digest('hex');
+      let referrer:string|null=null;
+      try{if(batch.attribution.referrer){const u=new URL('https://'+batch.attribution.referrer);if(u.hostname===batch.attribution.referrer)referrer=u.hostname;}}catch{/* Ignore invalid hosts. */}
+      const result=await deps.record({visitorId,sessionId,batchId:batch.batchId,rateKey,userId:actor?.id||null,
+        meta:{channel:batch.attribution.channel,source:cleanCampaignValue(batch.attribution.source),medium:cleanCampaignValue(batch.attribution.medium),
+          campaign:cleanCampaignValue(batch.attribution.campaign),referrer,device:deviceFromAgent(agent),browser:browserFromAgent(agent),
+          country:geo?.country||null,city:geo?.city||null,latitude:geo?.latitude??null,longitude:geo?.longitude??null},
+        layouts:batch.layouts.map(layout=>({...layout,id:createHash('sha256').update(JSON.stringify(layout)).digest('hex').slice(0,32)})),events:batch.events});
+      if(result.limited)return analyticsJson({error:'Demasiados eventos'},429);
+      if(result.unavailable || !result.sessionId)return analyticsJson({error:'Medición no disponible'},503);
+      const response=new Response(null,{status:204,headers:privateHeaders});
+      addCookie(response,ANALYTICS_COOKIES.visitor,signAnalyticsId(key,'visitor',visitorId,15552000,now),15552000,!!deps.secure);
+      addCookie(response,ANALYTICS_COOKIES.session,signAnalyticsId(key,'session:'+visitorId,result.sessionId,1800,now),1800,!!deps.secure);
+      addCookie(response,ANALYTICS_COOKIES.consent,'1',15552000,!!deps.secure);
+      return response;
+    }catch{return analyticsJson({error:'Medición no disponible'},503);}
+  };
+}
+
+/** The tested gate runs before creating a privileged data client or reading any
+ * report. Ordinary workshop owners are not platform administrators. */
+export function createOwnerAnalyticsHandler<T>(deps:{actor:(request:Request)=>Promise<AnalyticsActor|null>;load:(request:Request,actor:AnalyticsActor)=>Promise<T>}) {
+  return async(request:Request):Promise<Response>=>{
+    try{
+      const actor=await deps.actor(request);
+      if(!actor)return analyticsJson({error:'Inicia sesión para continuar.'},401);
+      if(!isSuperAdmin(actor))return analyticsJson({error:'Acceso exclusivo del administrador de MotoManager.'},403);
+      if(request.headers.get('sec-fetch-site')==='cross-site')return analyticsJson({error:'Origen no permitido.'},403);
+      const result=await deps.load(request,actor);
+      return result instanceof Response?result:analyticsJson(result);
+    }catch(error){
+      if(error instanceof AnalyticsInputError)return analyticsJson({error:error.message},400);
+      if(error instanceof AnalyticsNotReadyError)return analyticsJson({error:'La analítica todavía no está activada en la base de datos.',code:'analytics_not_ready'},503);
+      return analyticsJson({error:'No pudimos cargar la analítica. Intenta de nuevo.'},503);
+    }
+  };
+}
+export class AnalyticsInputError extends Error {}
+export class AnalyticsNotReadyError extends Error {}
