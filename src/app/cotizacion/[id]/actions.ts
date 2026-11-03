@@ -4,9 +4,12 @@ import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminC
 
 
 import { revalidatePath } from 'next/cache'
+import { canAccessOwnCustomerQuote } from './access';
 
 export async function submitQuoteResponse(workOrderId: string, response: 'approved' | 'rejected', formData?: FormData) {
   if (!workOrderId) return { success: false, message: 'ID de orden inválido.' }
+  if (!await canAccessOwnCustomerQuote(workOrderId)) return { success:false, message:'No tienes permiso para responder a esta cotización.' };
+  if (response !== 'approved' && response !== 'rejected') return {success:false,message:'Respuesta inválida.'};
 
   let rejectionReason = '';
   if (formData && response === 'rejected') {
