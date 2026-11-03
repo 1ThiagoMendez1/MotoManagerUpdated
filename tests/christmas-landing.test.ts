@@ -30,3 +30,24 @@ test('Christmas landing keeps verified trial and plan routes, real demo and camp
   assert.doesNotMatch(feature,/fake countdown|últimas unidades|hoy vence|porcentaje de descuento/i);
   assert.match(seasonal,/visual merchandising only/);
 });
+
+
+test('Christmas artwork, Santa hat and mobile performance constraints are integrated',async()=>{
+  const [campaign,navbar,footer,css,root]=await Promise.all([
+    '../src/app/planes/components/ChristmasCampaign.tsx',
+    '../src/app/planes/components/LandingNavbar.tsx',
+    '../src/app/planes/components/LandingFooter.tsx',
+    '../src/app/planes/components/christmas.module.css',
+    '../src/app/planes/PlanesPage.tsx',
+  ].map(file=>readFile(new URL(file,import.meta.url),'utf8')));
+  assert.match(campaign,/navidad-santa-motero-2026\.svg/);
+  assert.match(navbar,/navidad-gorro-logo\.svg/);
+  assert.match(footer,/navidad-gorro-logo\.svg/);
+  assert.match(root,/christmas=\{christmasEdition\}/);
+  assert.match(css,/@media \(max-width: 639px\)/);
+  assert.match(css,/\.edition \.productCard, \.edition \.starlight, \.edition \.giftAccent \{ display: none; \}/);
+  assert.match(css,/@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(css,/animation: none !important/);
+  assert.match(campaign,/data-analytics-id="hero_trial"/);
+  assert.match(campaign,/href="#demo"/);
+});

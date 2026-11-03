@@ -24,8 +24,9 @@ export function LandingNavbar({ user, halloween = false, christmas = false }: { 
     <header className={`sticky top-0 z-[80] border-b border-white/10 bg-[#060d1b]/95 text-white shadow-lg shadow-black/10 backdrop-blur-xl ${halloween ? styles.editionNav : ''}`}>
       <nav className={`mx-auto flex max-w-7xl items-center justify-between gap-2.5 px-3 sm:px-5 ${christmas ? 'h-[66px] sm:h-[74px]' : 'h-[74px]'}`} aria-label="Navegación principal">
         <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="MotoManager - inicio">
-          <span className="relative h-11 w-11 overflow-hidden rounded-xl bg-white/10">
+          <span className={`relative h-11 w-11 rounded-xl bg-white/10 ${christmas ? 'overflow-visible' : 'overflow-hidden'}`}>
             <Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" />
+            {christmas && <Image src="/campaigns/navidad-gorro-logo.svg" alt="" width={34} height={31} unoptimized className="pointer-events-none absolute -right-2 -top-3 z-10 rotate-[12deg] drop-shadow-md" />}
           </span>
           <span className="text-base font-extrabold tracking-[-0.045em] sm:text-lg">MotoManager{halloween && <span className={styles.navEdition}>HALLOWEEN EDITION</span>}</span>
           {christmas && <span className="hidden items-center gap-1 rounded-full border border-emerald-300/25 bg-emerald-900/45 px-2 py-1 text-[10px] font-extrabold text-emerald-100 sm:inline-flex"><Gift className="h-3 w-3 text-[#ffd08b]"/>Navidad</span>}

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowRight, Bike, Boxes, Check, CheckCircle2, ClipboardList,
   CreditCard, Gift, HeartHandshake, Play, ShieldCheck, ShoppingBag,
@@ -34,9 +35,9 @@ export function ChristmasHero() {
     <div className={styles.heroContainer}>
       <div className={styles.heroCopy}>
         <span className={styles.eyebrow}><Star size={14} fill="currentColor" /> NAVIDAD 2026 · PARA TALLERES DE COLOMBIA</span>
-        <span className={styles.holidayLabel}><Gift size={15} /> Diciembre se mueve en moto</span>
+        <span className={styles.holidayLabel}><Gift size={15} /> Que diciembre no te coja en desorden</span>
         <h1 id="christmas-hero-title" className={styles.title}>Esta Navidad, pon tu taller en <span>modo Full.</span></h1>
-        <p className={styles.description}>Que el desorden no te quite clientes ni tiempo. Reúne <strong>órdenes, motos, repuestos y ventas</strong> en un solo lugar para trabajar con más tranquilidad.</p>
+        <p className={styles.description}>En Colombia, diciembre pone a prueba la organización del taller. Lleva <strong>órdenes, clientes, motos, repuestos y ventas</strong> en un solo lugar y atiende con más tranquilidad.</p>
         <div className={styles.actions}>
           <Link href="/prueba-gratis" data-analytics-id="hero_trial" className={styles.primaryCta}>Activar mis 15 días gratis <ArrowRight size={20} /></Link>
           <a href="#demo" data-analytics-id="hero_demo" className={styles.secondaryCta}><Play size={17} fill="currentColor" /> Probar la demo</a>
@@ -48,6 +49,18 @@ export function ChristmasHero() {
         </div>
       </div>
       <div className={styles.productStage}>
+        <div className={styles.santaScene}>
+          <Image
+            src="/campaigns/navidad-santa-motero-2026.svg"
+            alt="Papá Noel viaja en motocicleta con regalos por un pueblo colombiano iluminado para Navidad"
+            fill
+            priority
+            unoptimized
+            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 650px, 770px"
+            className={styles.santaArt}
+          />
+          <span className={styles.santaSpark} aria-hidden="true">✦</span>
+        </div>
         <div className={styles.starlight} aria-hidden="true">✦</div>
         <div className={styles.productCard}>
           <div className={styles.productBar}>
@@ -79,7 +92,7 @@ export function ChristmasHero() {
       </div>
     </div>
     <div className={styles.trustRail}>
-      <span><Bike size={18} /> Para talleres de motos</span>
+      <span><Bike size={18} /> Para talleres de Colombia</span>
       <span><CreditCard size={18} /> Prueba sin tarjeta</span>
       <span><HeartHandshake size={18} /> Tú decides después</span>
       <a href="#demo">Conoce el sistema <ArrowRight size={16}/></a>

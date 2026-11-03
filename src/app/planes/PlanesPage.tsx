@@ -153,7 +153,7 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
           </div>
         </section>}
       </main>
-      <LandingFooter halloween={halloween} />
+      <LandingFooter halloween={halloween} christmas={christmasEdition} />
       {christmasEdition && <ChristmasMobileDock user={Boolean(user)} />}
 
       {activePlan && <PaymentModal plan={activePlan} onClose={() => setActivePlan(null)} appUrl={appUrl} />}

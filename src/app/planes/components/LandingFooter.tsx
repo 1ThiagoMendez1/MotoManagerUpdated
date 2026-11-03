@@ -6,13 +6,13 @@ import { ArrowUpRight } from 'lucide-react';
 import { HalloweenDecor } from './HalloweenDecor';
 import styles from './halloween.module.css';
 
-export function LandingFooter({ halloween = false }: { halloween?: boolean }) {
+export function LandingFooter({ halloween = false, christmas = false }: { halloween?: boolean; christmas?: boolean }) {
   return (
     <footer className={`border-t border-white/10 bg-[#07111f] px-5 py-12 text-slate-300 ${halloween ? styles.editionFooter : ''}`}>
       <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-12 md:grid-cols-[1.5fr_1fr_1fr]">
         <div>
           <Link href="/" className="inline-flex items-center gap-2 text-lg font-semibold text-white">
-            <span className="relative h-11 w-11 overflow-hidden rounded-xl bg-white/10"><Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" /></span>
+            <span className={`relative h-11 w-11 rounded-xl bg-white/10 ${christmas ? 'overflow-visible' : 'overflow-hidden'}`}><Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" />{christmas && <Image src="/campaigns/navidad-gorro-logo.svg" alt="" width={34} height={31} unoptimized className="pointer-events-none absolute -right-2 -top-3 z-10 rotate-[12deg]" />}</span>
             MotoManager
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-7 text-slate-400">

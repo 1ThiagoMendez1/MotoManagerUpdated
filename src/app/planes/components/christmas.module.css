@@ -254,3 +254,117 @@
 @media(prefers-reduced-motion:reduce){
   .primaryCta,.secondaryCta {transition:none;}
 }
+
+
+/* Edición Navidad Colombia: Santa motero como arte principal, demo real visible en escritorio. */
+.edition .productStage {
+  min-height: 570px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: visible;
+}
+.edition .santaScene {
+  position: relative;
+  z-index: 1;
+  width: 116%;
+  height: clamp(465px, 47vw, 650px);
+  max-width: none;
+  margin-left: -8%;
+  transform-origin: 50% 75%;
+  animation: santaRideFloat 6s ease-in-out infinite;
+  will-change: transform;
+}
+.edition .santaArt {
+  object-fit: contain;
+  object-position: center bottom;
+  filter: drop-shadow(0 26px 28px rgba(0,0,0,.42));
+}
+.edition .santaSpark {
+  position: absolute;
+  top: 6%;
+  right: 8%;
+  font-size: 32px;
+  color: #ffe3a2;
+  text-shadow: 0 0 22px #f4aa50;
+  animation: santaSparkle 3.8s ease-in-out infinite;
+}
+.edition .productCard {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  bottom: 0;
+  width: min(64%, 440px);
+  transform: rotate(-4deg) scale(.87);
+  transform-origin: bottom left;
+  box-shadow: 0 18px 65px rgba(0,0,0,.62),0 0 0 7px rgba(255,198,107,.12);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+.edition .productCard:hover {
+  transform: rotate(-1deg) scale(.9);
+  box-shadow: 0 25px 72px rgba(0,0,0,.62),0 0 0 7px rgba(255,198,107,.18);
+}
+.edition .starlight { z-index: 4; left: 2%; top: 28%; }
+.edition .giftAccent { z-index: 4; right: 1%; bottom: 10%; color: #ffcf72; }
+.edition .lightWire .bulb:nth-child(3n) { animation: navidadLightTwinkle 3.4s ease-in-out infinite; }
+.edition .lightWire .bulb:nth-child(4n) { animation: navidadLightTwinkle 4.2s ease-in-out 1.3s infinite; }
+.edition .lightWire .bulb:nth-child(5n) { animation: navidadLightTwinkle 5s ease-in-out .65s infinite; }
+.edition .offerEyebrow svg, .edition .giftAccent svg { animation: navidadSoftGlow 4.8s ease-in-out infinite; }
+
+@keyframes santaRideFloat {
+  0%,100% { transform: translate3d(0,0,0) rotate(-.3deg); }
+  50% { transform: translate3d(0,-8px,0) rotate(.25deg); }
+}
+@keyframes navidadLightTwinkle {
+  0%,100% { opacity: 1; transform: scale(1); }
+  45% { opacity: .52; transform: scale(.75); }
+  65% { opacity: .92; transform: scale(1.12); }
+}
+@keyframes navidadSoftGlow {
+  0%,100% { filter: drop-shadow(0 0 0 rgba(255,194,102,0)); }
+  50% { filter: drop-shadow(0 0 9px rgba(255,194,102,.8)); }
+}
+@keyframes santaSparkle {
+  0%,100% { opacity: .65; transform: scale(.85) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.17) rotate(15deg); }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .edition .productStage { min-height: 540px; }
+  .edition .santaScene { width: 100%; height: 550px; margin: 0; }
+  .edition .productCard { width: 57%; left: 4%; }
+}
+
+@media (max-width: 639px) {
+  /* Keep the 15-day free trial CTA above Santa on every mobile viewport. */
+  .edition .heroContainer { gap: 4px; }
+  .edition .productStage {
+    min-height: 0;
+    display: block;
+    padding: 0 0 5px;
+    margin: 0 -4px;
+  }
+  .edition .santaScene {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 900 / 760;
+    min-height: 250px;
+    margin: 0;
+    animation-duration: 8s;
+  }
+  .edition .productCard, .edition .starlight, .edition .giftAccent { display: none; }
+  .edition .santaSpark { top: 13%; right: 7%; font-size: 22px; }
+  .edition .trustRail { position: relative; z-index: 3; }
+  .edition .heroContainer { padding-bottom: 6px; }
+  .edition .demoGuide { scroll-margin-top: 90px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edition .santaScene,
+  .edition .santaSpark,
+  .edition .lightWire .bulb,
+  .edition .offerEyebrow svg,
+  .edition .giftAccent svg { animation: none !important; will-change: auto; }
+  .edition .productCard { transition: none; }
+}
