@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { analyticsVisitorSeed, webMeasurementAllowed } from '@/lib/analytics/web-consent';
-import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_SESSION_MS, MEASUREMENT_CHANGED, publicAnalyticsPath, SECTION_LABELS, TARGET_LABELS,
+import { webMeasurementAllowed } from '@/lib/analytics/web-consent';
+import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE, ANALYTICS_SESSION_MS, LEGACY_WEB_ANALYTICS_STORAGE_KEYS, publicAnalyticsPath, SECTION_LABELS, TARGET_LABELS,
   trafficAttribution, type AnalyticsBatch, type AnalyticsEvent, type AnalyticsLayout } from '@/lib/analytics/web-shared';
 import { measuredDepth, normalizeClick, type ScrollGeometry } from '@/lib/analytics/web-geometry';
 
@@ -38,7 +38,8 @@ function measureLayout(path:string):{layout:AnalyticsLayout;info:ScrollGeometry}
 }
 
 function createTracker(getPath:()=>string){
-  const visitorSeed=analyticsVisitorSeed();
+  // Volatile per-script navigation seed; never saved or shared across reloads.
+  const visitorSeed=crypto.randomUUID();
   const attribution=trafficAttribution(window.location.href,document.referrer);
   let path='',pageId=crypto.randomUUID(),queue:Captured[]=[],active=true,inFlight=false;
   let lastLayout:AnalyticsLayout|null=null,lastTick=performance.now(),lastConfirmed=performance.now(),visible=!document.hidden;
@@ -73,7 +74,7 @@ function createTracker(getPath:()=>string){
     }
     if(!selected.length)return;
     queue.splice(0,selected.length);
-    const batch:AnalyticsBatch={consent:true,batchId:crypto.randomUUID(),visitorSeed,attribution,layouts,
+    const batch:AnalyticsBatch={mode:ANALYTICS_MODE,batchId:crypto.randomUUID(),visitorSeed,attribution,layouts,
       events:selected.map(item=>({...item.event,layout:keys.indexOf(JSON.stringify(item.layout)),ageMs:Math.min(60000,Math.round(performance.now()-item.at))}))};
     const body=JSON.stringify(batch);
     if(beacon&&navigator.sendBeacon){
@@ -153,19 +154,19 @@ function createTracker(getPath:()=>string){
 
 export function WebAnalyticsTracker({isInternal=false}:{isInternal?:boolean}){
   const pathname=usePathname();const path=useRef(pathname);path.current=pathname;
-  const [enabled,setEnabled]=useState(false);
   const tracker=useRef<ReturnType<typeof createTracker>|null>(null);
   const isPublic=publicAnalyticsPath(pathname)===pathname;
   useEffect(()=>{
-    const update=()=>setEnabled(webMeasurementAllowed());update();
-    window.addEventListener(MEASUREMENT_CHANGED,update);window.addEventListener('storage',update);
-    return()=>{window.removeEventListener(MEASUREMENT_CHANGED,update);window.removeEventListener('storage',update);};
+    // Remove identifiers from prior versions; never create replacements.
+    for(const key of LEGACY_WEB_ANALYTICS_STORAGE_KEYS){
+      try{localStorage.removeItem(key);}catch{/* Storage might be blocked. */}
+    }
   },[]);
   useEffect(()=>{
-    if(!enabled||!isPublic||isInternal)return;
+    if(!isPublic||isInternal||!webMeasurementAllowed())return;
     const instance=createTracker(()=>path.current);tracker.current=instance;instance.navigate(path.current);
     return()=>{instance.stop();tracker.current=null;};
-  },[enabled,isPublic,isInternal]);
+  },[isPublic,isInternal]);
   useEffect(()=>{tracker.current?.navigate(pathname);},[pathname]);
   return null;
 }

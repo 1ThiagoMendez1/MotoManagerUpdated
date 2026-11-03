@@ -1,8 +1,8 @@
-export const WEB_ANALYTICS_CONSENT_KEY = 'mm_web_analytics_consent_v1';
-export const WEB_ANALYTICS_VISITOR_KEY = 'mm_web_analytics_visitor_v1';
+export const LEGACY_WEB_ANALYTICS_STORAGE_KEYS = ['mm_web_analytics_consent_v1','mm_web_analytics_visitor_v1'] as const;
 export const MEASUREMENT_CHANGED = 'mm:measurement-consent-change';
 export const ANALYTICS_LAYOUT_VERSION = '2026-10-30-v1';
 export const ANALYTICS_SESSION_MS = 30 * 60_000;
+export const ANALYTICS_MODE = 'anonymous' as const;
 export const CHANNELS = ['direct', 'search_ai', 'social', 'referral', 'ads'] as const;
 export type Channel = typeof CHANNELS[number];
 export const CHANNEL_LABELS: Record<Channel | 'all', string> = {
@@ -64,7 +64,7 @@ export function trafficAttribution(url: string, referrer: string): Attribution {
 
 export type AnalyticsLayout = {path:string;version:typeof ANALYTICS_LAYOUT_VERSION;variant:string;viewportWidth:number;viewportHeight:number;width:number;height:number;sections:{key:string;start:number;end:number}[]};
 export type AnalyticsEvent = {id:string;pageId:string;layout:number;kind:'pageview'|'click'|'scroll'|'engagement'|'form_start';ageMs:number;x?:number;y?:number;target?:string;depth?:number;seconds?:number};
-export type AnalyticsBatch = {consent:true;batchId:string;visitorSeed:string;attribution:Attribution;layouts:AnalyticsLayout[];events:AnalyticsEvent[]};
+export type AnalyticsBatch = {mode:typeof ANALYTICS_MODE;batchId:string;visitorSeed:string;attribution:Attribution;layouts:AnalyticsLayout[];events:AnalyticsEvent[]};
 
 export function deviceFromAgent(agent: string) {
   return /ipad|tablet|android(?!.*mobile)/i.test(agent) ? 'tablet' : /mobile|iphone|ipod/i.test(agent) ? 'mobile' : 'desktop';

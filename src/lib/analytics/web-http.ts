@@ -100,7 +100,7 @@ export function createAnalyticsCollector(deps:CollectorDependencies) {
       const rateKey=createHmac('sha256',key).update('analytics-rate:'+new Date(now).toISOString().slice(0,10)+':'+(ip||visitorId)).digest('hex');
       let referrer:string|null=null;
       try{if(batch.attribution.referrer){const u=new URL('https://'+batch.attribution.referrer);if(u.hostname===batch.attribution.referrer)referrer=u.hostname;}}catch{/* Ignore invalid hosts. */}
-      const result=await deps.record({visitorId,sessionId,batchId:batch.batchId,rateKey,userId:actor?.id||null,
+      const result=await deps.record({visitorId,sessionId,batchId:batch.batchId,rateKey,userId:null,
         meta:{channel:batch.attribution.channel,source:cleanCampaignValue(batch.attribution.source),medium:cleanCampaignValue(batch.attribution.medium),
           campaign:cleanCampaignValue(batch.attribution.campaign),referrer,device:deviceFromAgent(agent),browser:browserFromAgent(agent),
           country:geo?.country||null,city:geo?.city||null,latitude:geo?.latitude??null,longitude:geo?.longitude??null},

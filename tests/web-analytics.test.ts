@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { ANALYTICS_LAYOUT_VERSION, analyticsRange, cleanCampaignValue, csvCell, publicAnalyticsPath, trafficAttribution, type AnalyticsBatch } from '../src/lib/analytics/web-shared';
+import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE, analyticsRange, cleanCampaignValue, csvCell, publicAnalyticsPath, trafficAttribution, type AnalyticsBatch } from '../src/lib/analytics/web-shared';
 import { batchSchema } from '../src/lib/analytics/web-validation';
 import { analyticsClientIp, analyticsVisitorId, createAnalyticsCollector, createOwnerAnalyticsHandler, type AnalyticsRecord } from '../src/lib/analytics/web-http';
 import { measuredDepth, normalizeClick } from '../src/lib/analytics/web-geometry';
 
 const key='test-only-key-for-web-analytics-at-least-32-characters';
 const origin='https://www.motomanager.com.co';
-function batch():AnalyticsBatch{return {consent:true,batchId:randomUUID(),visitorSeed:randomUUID(),
+function batch():AnalyticsBatch{return {mode:ANALYTICS_MODE,batchId:randomUUID(),visitorSeed:randomUUID(),
   attribution:{channel:'direct',source:null,medium:null,campaign:null,referrer:null},
   layouts:[{path:'/',version:ANALYTICS_LAYOUT_VERSION,variant:'default',viewportWidth:390,viewportHeight:844,width:390,height:4000,sections:[{key:'hero',start:0,end:.2}]}],
   events:[{id:randomUUID(),pageId:randomUUID(),layout:0,kind:'pageview',ageMs:0}]};}
@@ -64,7 +64,7 @@ test('click coordinates do not double-count window offsets and fixed-container s
 test('strict collector schema rejects identity injection, private clicks and client-forged activations',()=>{
   const value=batch();assert.ok(batchSchema.safeParse(value).success);
   assert.equal(batchSchema.safeParse({...value,userId:randomUUID()}).success,false);
-  assert.equal(batchSchema.safeParse({...value,consent:false}).success,false);
+  assert.equal(batchSchema.safeParse({...value,mode:'persisted'}).success,false);
   assert.equal(batchSchema.safeParse({...value,events:[{...value.events[0],kind:'trial_activated'}]}).success,false);
   const login=batch();login.layouts[0].path='/login';login.events[0]={...login.events[0],kind:'click',x:.5,y:.2,target:'button'};
   assert.equal(batchSchema.safeParse(login).success,false);
@@ -81,10 +81,10 @@ test('HTTP owner gate never creates/loads privileged reports for anonymous or wo
   const owner=createOwnerAnalyticsHandler({actor:async()=>({id:'root',app_metadata:{is_super_admin:true}}),load:async()=>{reads++;return {visits:3};}});
   assert.equal((await owner(new Request(origin+'/api/admin/web-analytics'))).status,200);assert.equal(reads,1);
 });
-test('collector rejects malformed/oversized/unconsented events before touching storage',async()=>{
+test('collector rejects malformed, oversized or non-anonymous events before touching storage',async()=>{
   let writes=0;const handler=createAnalyticsCollector({key,origins:[origin],actor:async()=>null,geo:async()=>null,record:async()=>{writes++;return {sessionId:randomUUID()};}});
   assert.equal((await handler(request(batch(),{origin:'https://evil.test'}))).status,403);
-  assert.equal((await handler(request({...batch(),consent:false}))).status,400);
+  assert.equal((await handler(request({...batch(),mode:'persisted'}))).status,400);
   assert.equal((await handler(request({padding:'x'.repeat(33000)}))).status,413);
   assert.equal((await handler(request(batch(),{dnt:'1'}))).status,204);
   assert.equal((await handler(request(batch(),{'sec-gpc':'1'}))).status,204);
@@ -94,7 +94,7 @@ test('collector verifies identity and rate keys without issuing analytics cookie
   const records:AnalyticsRecord[]=[];const user=randomUUID();
   const handler=createAnalyticsCollector({key,origins:[origin],secure:true,actor:async()=>({id:user}),geo:async()=>({country:'CO',city:'Bogotá',latitude:4.61,longitude:-74.08}),record:async row=>{records.push(row);return {sessionId:row.sessionId,inserted:1};}});
   const response=await handler(request(batch(),{'x-real-ip':'8.8.8.8'}));assert.equal(response.status,204);
-  assert.equal(records[0].userId,user);assert.equal(records[0].rateKey.length,64);
+  assert.equal(records[0].userId,null,'public analytics never joins an Auth identity');assert.equal(records[0].rateKey.length,64);
   assert.ok(!JSON.stringify(records[0]).includes('8.8.8.8'));assert.equal(records[0].layouts[0].id.length,32);
   assert.equal(response.headers.get('set-cookie'),null,'new visits never set analytics cookies');
   const old=await handler(request(batch(),{cookie:'mm_wa_v1=old; mm_wa_s1=old; mm_wa_c1=1'}));

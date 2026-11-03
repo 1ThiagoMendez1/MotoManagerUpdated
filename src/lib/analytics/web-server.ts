@@ -7,10 +7,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { analyticsGeo, analyticsGeoStatus } from './geo';
 import {
-  analyticsClientIp, analyticsVisitorId, AnalyticsInputError, AnalyticsNotReadyError,
+  analyticsClientIp, AnalyticsInputError, AnalyticsNotReadyError,
   createAnalyticsCollector, type AnalyticsActor, type AnalyticsRecord,
 } from './web-http';
-import { ANALYTICS_SESSION_MS, analyticsRange, browserFromAgent, CHANNELS, csvCell, deviceFromAgent, publicAnalyticsPath,
+import { analyticsRange, browserFromAgent, CHANNELS, csvCell, deviceFromAgent, publicAnalyticsPath,
   type AnalyticsPayload, type AnalyticsReport, type HeatmapData } from './web-shared';
 
 // The generated legacy Database type predates these migrations. Only this
@@ -50,31 +50,19 @@ export function analyticsCollector(){
 /** Only call immediately after successful Auth / atomic workshop provisioning.
  * Read request context before after(); chosen passwords and form values never
  * enter the analytics callback, storage, or logs. */
-export async function scheduleAccountAccess(user:User,kind:'login'|'trial_activated',organizationId?:string,visitorSeed?:string|null){
+export async function scheduleAccountAccess(user:User,kind:'login'|'trial_activated',organizationId?:string){
   try{
-    const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if(!key)return;
+    if(!process.env.SUPABASE_SERVICE_ROLE_KEY)return;
     const requestHeaders=new Headers(await headers());
-    const isAdmin=isSuperAdmin(user);
-    // The seed is a consented random correlation token, not a user identity.
-    const visitorId=!isAdmin&&typeof visitorSeed==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(visitorSeed)
-      ?analyticsVisitorId(key,visitorSeed):null;
     const agent=requestHeaders.get('user-agent')||'';
     const ip=analyticsClientIp(requestHeaders,process.env.ANALYTICS_CLIENT_IP_HEADER||'x-real-ip');
     after(async()=>{
       try{
-        const db=database();
-        let sessionId:string|null=null;
-        if(visitorId){
-          const {data,error}=await db.from('web_analytics_sessions').select('id')
-            .eq('visitor_id',visitorId).gte('last_seen',new Date(Date.now()-ANALYTICS_SESSION_MS).toISOString())
-            .order('last_seen',{ascending:false}).limit(1).maybeSingle();
-          if(!error)sessionId=data?.id||null;
-        }
         const geo=await analyticsGeo(ip);
-        const {error}=await db.rpc('record_web_analytics_access',{
-          p_user_id:user.id,p_kind:kind,p_organization_id:organizationId||null,p_session_id:sessionId,p_visitor_id:visitorId,
-          p_is_admin:isAdmin,p_meta:{device:deviceFromAgent(agent),browser:browserFromAgent(agent),country:geo?.country||null,city:geo?.city||null},
+        const {error}=await database().rpc('record_web_analytics_access',{
+          p_user_id:user.id,p_kind:kind,p_organization_id:organizationId||null,
+          p_session_id:null,p_visitor_id:null,p_is_admin:isSuperAdmin(user),
+          p_meta:{device:deviceFromAgent(agent),browser:browserFromAgent(agent),country:geo?.country||null,city:geo?.city||null},
         });
         if(error && !missing(error.code))console.warn('[web-analytics] Access unavailable:',error.code);
         if(!error)await pruneIfDue();
@@ -127,6 +115,11 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
   }
   const report=reportResult!.data as AnalyticsReport,heatmap=heatResult!.data as HeatmapData;
   if(!report?.totals || !heatmap?.layouts)throw new Error('Analytics unavailable');
+  // Do not expose legacy identity links in the anonymous navigation report.
+  // Verified account access events remain a separate administrator-only log.
+  for(const row of report.sessions){
+    row.userId=null;row.name=null;row.email=null;row.workshop=null;
+  }
   await enrichIdentities(report,db);
   after(pruneIfDue);
   return {report,heatmap,range,fetchedAt:new Date().toISOString(),geo:results[2].status==='fulfilled'?results[2].value as AnalyticsPayload['geo']:{available:false,downloading:false,updatedAt:null}};

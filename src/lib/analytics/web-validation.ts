@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ANALYTICS_LAYOUT_VERSION, CHANNELS, publicAnalyticsPath } from './web-shared';
+import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE, CHANNELS, publicAnalyticsPath } from './web-shared';
 
 export const layoutSchema = z.object({
   path: z.string().max(120).refine(path => publicAnalyticsPath(path) === path, 'Página no medible'),
@@ -28,7 +28,7 @@ export const eventSchema = z.object({
   if (event.kind === 'engagement' && event.seconds === undefined) ctx.addIssue({ code: 'custom', message: 'Duración incompleta' });
 });
 export const batchSchema = z.object({
-  consent: z.literal(true), batchId: z.string().uuid(), visitorSeed: z.string().uuid(),
+  mode: z.literal(ANALYTICS_MODE), batchId: z.string().uuid(), visitorSeed: z.string().uuid(),
   attribution: z.object({
     source: z.string().max(100).nullable(), medium: z.string().max(100).nullable(),
     campaign: z.string().max(100).nullable(), referrer: z.string().max(160).nullable(),

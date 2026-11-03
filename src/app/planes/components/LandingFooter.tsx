@@ -44,7 +44,7 @@ export function LandingFooter({ halloween = false }: { halloween?: boolean }) {
         <div className="flex flex-wrap items-center gap-3">
           <p>Información de funcionalidades y planes sujeta a la configuración vigente del servicio.</p>
           <button type="button" onClick={() => window.dispatchEvent(new Event('mm:marketing-consent-settings'))}
-            className="underline underline-offset-2 hover:text-white">Configurar cookies</button>
+            className="underline underline-offset-2 hover:text-white">Privacidad publicitaria</button>
         </div>
       </div>
     </footer>
