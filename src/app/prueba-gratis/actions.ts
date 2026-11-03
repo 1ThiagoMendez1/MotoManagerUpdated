@@ -53,7 +53,7 @@ export async function startFullTrial(_previous: { error: string }, form: FormDat
       ? 'Este correo o celular ya utilizó una prueba. Ingresa a tu cuenta para continuar con un plan.'
       : 'No pudimos activar tu taller. Intenta de nuevo en unos minutos.' };
   }
-  if (organizationId) await scheduleAccountAccess(account.user, 'trial_activated', organizationId);
+  if (organizationId) await scheduleAccountAccess(account.user, 'trial_activated', organizationId, String(form.get('analyticsVisitorSeed') || ''));
   if (optedIn && organizationId) {
     // Run only after a successful account + workshop activation. Delivery must
     // not delay or undo registration, even if Meta is reviewing the template.

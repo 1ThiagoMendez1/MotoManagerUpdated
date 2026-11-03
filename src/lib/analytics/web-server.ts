@@ -1,5 +1,5 @@
 import 'server-only';
-import { headers, cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import { after } from 'next/server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
@@ -7,10 +7,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { analyticsGeo, analyticsGeoStatus } from './geo';
 import {
-  ANALYTICS_COOKIES, analyticsClientIp, AnalyticsInputError, AnalyticsNotReadyError,
-  createAnalyticsCollector, verifyAnalyticsId, type AnalyticsActor, type AnalyticsRecord,
+  analyticsClientIp, analyticsVisitorId, AnalyticsInputError, AnalyticsNotReadyError,
+  createAnalyticsCollector, type AnalyticsActor, type AnalyticsRecord,
 } from './web-http';
-import { analyticsRange, browserFromAgent, CHANNELS, csvCell, deviceFromAgent, publicAnalyticsPath,
+import { ANALYTICS_SESSION_MS, analyticsRange, browserFromAgent, CHANNELS, csvCell, deviceFromAgent, publicAnalyticsPath,
   type AnalyticsPayload, type AnalyticsReport, type HeatmapData } from './web-shared';
 
 // The generated legacy Database type predates these migrations. Only this
@@ -50,23 +50,31 @@ export function analyticsCollector(){
 /** Only call immediately after successful Auth / atomic workshop provisioning.
  * Read request context before after(); chosen passwords and form values never
  * enter the analytics callback, storage, or logs. */
-export async function scheduleAccountAccess(user:User,kind:'login'|'trial_activated',organizationId?:string){
+export async function scheduleAccountAccess(user:User,kind:'login'|'trial_activated',organizationId?:string,visitorSeed?:string|null){
   try{
     const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
     if(!key)return;
     const requestHeaders=new Headers(await headers());
-    const store=await cookies();
-    const allowed=store.get(ANALYTICS_COOKIES.consent)?.value==='1';
-    const visitorId=allowed?verifyAnalyticsId(key,'visitor',store.get(ANALYTICS_COOKIES.visitor)?.value,15552000):null;
-    const sessionId=visitorId?verifyAnalyticsId(key,'session:'+visitorId,store.get(ANALYTICS_COOKIES.session)?.value,1800):null;
+    const isAdmin=isSuperAdmin(user);
+    // The seed is a consented random correlation token, not a user identity.
+    const visitorId=!isAdmin&&typeof visitorSeed==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(visitorSeed)
+      ?analyticsVisitorId(key,visitorSeed):null;
     const agent=requestHeaders.get('user-agent')||'';
     const ip=analyticsClientIp(requestHeaders,process.env.ANALYTICS_CLIENT_IP_HEADER||'x-real-ip');
     after(async()=>{
       try{
+        const db=database();
+        let sessionId:string|null=null;
+        if(visitorId){
+          const {data,error}=await db.from('web_analytics_sessions').select('id')
+            .eq('visitor_id',visitorId).gte('last_seen',new Date(Date.now()-ANALYTICS_SESSION_MS).toISOString())
+            .order('last_seen',{ascending:false}).limit(1).maybeSingle();
+          if(!error)sessionId=data?.id||null;
+        }
         const geo=await analyticsGeo(ip);
-        const {error}=await database().rpc('record_web_analytics_access',{
+        const {error}=await db.rpc('record_web_analytics_access',{
           p_user_id:user.id,p_kind:kind,p_organization_id:organizationId||null,p_session_id:sessionId,p_visitor_id:visitorId,
-          p_is_admin:isSuperAdmin(user),p_meta:{device:deviceFromAgent(agent),browser:browserFromAgent(agent),country:geo?.country||null,city:geo?.city||null},
+          p_is_admin:isAdmin,p_meta:{device:deviceFromAgent(agent),browser:browserFromAgent(agent),country:geo?.country||null,city:geo?.city||null},
         });
         if(error && !missing(error.code))console.warn('[web-analytics] Access unavailable:',error.code);
         if(!error)await pruneIfDue();

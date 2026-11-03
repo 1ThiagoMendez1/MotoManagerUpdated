@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { ANALYTICS_LAYOUT_VERSION, analyticsRange, cleanCampaignValue, csvCell, publicAnalyticsPath, trafficAttribution, type AnalyticsBatch } from '../src/lib/analytics/web-shared';
 import { batchSchema } from '../src/lib/analytics/web-validation';
-import { analyticsClientIp, analyticsVisitorId, createAnalyticsCollector, createOwnerAnalyticsHandler, signAnalyticsId, verifyAnalyticsId, type AnalyticsRecord } from '../src/lib/analytics/web-http';
+import { analyticsClientIp, analyticsVisitorId, createAnalyticsCollector, createOwnerAnalyticsHandler, type AnalyticsRecord } from '../src/lib/analytics/web-http';
 import { measuredDepth, normalizeClick } from '../src/lib/analytics/web-geometry';
 
 const key='test-only-key-for-web-analytics-at-least-32-characters';
@@ -39,16 +39,12 @@ test('Bogota dates use local midnight, inclusive custom end and a maximum 90-day
   assert.throws(()=>analyticsRange('custom','2026-01-01','2026-10-30',now));
   assert.throws(()=>analyticsRange('custom','2026-11-03','2026-11-03',now));
 });
-test('signed sessions reject tampering, expiry and cross-visitor reuse',()=>{
-  const now=Date.parse('2026-11-01T12:00:00Z'),id=randomUUID();
-  const token=signAnalyticsId(key,'session:visitor-a',id,1800,now);
-  assert.equal(verifyAnalyticsId(key,'session:visitor-a',token,1800,now),id);
-  assert.equal(verifyAnalyticsId(key,'session:visitor-b',token,1800,now),null);
-  assert.equal(verifyAnalyticsId(key,'session:visitor-a',token+'x',1800,now),null);
-  assert.equal(verifyAnalyticsId(key,'session:visitor-a',token,1800,now+1800001),null);
+test('consented visitor identifiers stay keyed without browser cookies',()=>{
+  const id=randomUUID();
   assert.equal(analyticsVisitorId(key,id),analyticsVisitorId(key,id));
   assert.notEqual(analyticsVisitorId(key,id),id);
   assert.notEqual(analyticsVisitorId(key+'other',id),analyticsVisitorId(key,id));
+  assert.notEqual(analyticsVisitorId(key,randomUUID()),analyticsVisitorId(key,id));
 });
 test('geolocation reads only the configured proxy header and rejects private addresses',()=>{
   assert.equal(analyticsClientIp(new Headers({'x-forwarded-for':'8.8.8.8','cf-ipcountry':'CO'})),null);
@@ -94,17 +90,29 @@ test('collector rejects malformed/oversized/unconsented events before touching s
   assert.equal((await handler(request(batch(),{'sec-gpc':'1'}))).status,204);
   assert.equal((await handler(request(batch(),{'user-agent':'Googlebot'}))).status,204);assert.equal(writes,0);
 });
-test('collector uses server-verified identity, salted IP key and HttpOnly signed cookies',async()=>{
+test('collector verifies identity and rate keys without issuing analytics cookies',async()=>{
   const records:AnalyticsRecord[]=[];const user=randomUUID();
   const handler=createAnalyticsCollector({key,origins:[origin],secure:true,actor:async()=>({id:user}),geo:async()=>({country:'CO',city:'Bogotá',latitude:4.61,longitude:-74.08}),record:async row=>{records.push(row);return {sessionId:row.sessionId,inserted:1};}});
   const response=await handler(request(batch(),{'x-real-ip':'8.8.8.8'}));assert.equal(response.status,204);
   assert.equal(records[0].userId,user);assert.equal(records[0].rateKey.length,64);
   assert.ok(!JSON.stringify(records[0]).includes('8.8.8.8'));assert.equal(records[0].layouts[0].id.length,32);
-  assert.match(response.headers.get('set-cookie')||'',/HttpOnly; SameSite=Lax; Secure/);
+  assert.equal(response.headers.get('set-cookie'),null,'new visits never set analytics cookies');
+  const old=await handler(request(batch(),{cookie:'mm_wa_v1=old; mm_wa_s1=old; mm_wa_c1=1'}));
+  assert.equal(old.status,204);
+  const expired=old.headers.getSetCookie();
+  assert.equal(expired.length,3,'previous analytic cookies are expired on migration');
+  for(const value of expired)assert.match(value,/Max-Age=0; HttpOnly; SameSite=Lax; Secure/);
+  const deletion=await handler(new Request(origin+'/api/analytics/collect',{
+    method:'DELETE',headers:{origin,cookie:'mm_wa_v1=old; mm_wa_s1=old; mm_wa_c1=1'},
+  }));
+  assert.equal(deletion.status,204);
+  assert.equal(deletion.headers.getSetCookie().length,3);
+  const clear=await handler(new Request(origin+'/api/analytics/collect',{method:'DELETE',headers:{origin}}));
+  assert.equal(clear.headers.get('set-cookie'),null);
   const sameViewport=batch();
   await handler(request(sameViewport));
   await handler(request(sameViewport,{'user-agent':'Mozilla/5.0 (iPhone; Mobile) Safari/605'}));
-  assert.notEqual(records[1].layouts[0].id,records[2].layouts[0].id,'equal-sized desktop and mobile views stay in separate device cohorts');
+  assert.notEqual(records.at(-2)!.layouts[0].id,records.at(-1)!.layouts[0].id,'equal-sized desktop and mobile views stay in separate device cohorts');
   const internal=createAnalyticsCollector({key,origins:[origin],actor:async()=>({id:user,app_metadata:{is_super_admin:true}}),geo:async()=>null,record:async()=>{throw Error('must not run');}});
   assert.equal((await internal(request(batch()))).status,204);
 });

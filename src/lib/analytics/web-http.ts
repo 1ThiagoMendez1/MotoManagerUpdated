@@ -1,45 +1,29 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { isIP, BlockList } from 'node:net';
 import { isSuperAdmin } from '../super-admin';
 import { browserFromAgent, cleanCampaignValue, deviceFromAgent, isKnownBot, type AnalyticsBatch } from './web-shared';
 import { batchSchema } from './web-validation';
 
-export const ANALYTICS_COOKIES = { visitor:'mm_wa_v1', session:'mm_wa_s1', consent:'mm_wa_c1' };
+const LEGACY_ANALYTICS_COOKIES = ['mm_wa_v1', 'mm_wa_s1', 'mm_wa_c1'] as const;
 export type AnalyticsActor = {id:string;email?:string|null;app_metadata?:Record<string,unknown>};
 export type AnalyticsGeo = {country:string|null;city:string|null;latitude:number|null;longitude:number|null};
 export type AnalyticsRecord = { visitorId:string;sessionId:string;batchId:string;rateKey:string;userId:string|null;
   meta:Record<string,unknown>;layouts:(AnalyticsBatch['layouts'][number]&{id:string})[];events:AnalyticsBatch['events'] };
 
-export function signAnalyticsId(key:string,purpose:string,id:string,ttl:number,now=Date.now()) {
-  const payload=id+'.'+Math.floor(now/1000+ttl);
-  return payload+'.'+createHmac('sha256',key).update(purpose+':'+payload).digest('base64url');
-}
-export function verifyAnalyticsId(key:string,purpose:string,token:string|undefined,maxTtl:number,now=Date.now()):string|null {
-  if (!token) return null;
-  const parts=token.split('.');
-  if(parts.length!==3 || !/^[a-f0-9-]{36}$/.test(parts[0]) || !/^\d{10,12}$/.test(parts[1])) return null;
-  const expires=Number(parts[1]),seconds=now/1000;
-  if(expires<=seconds || expires>seconds+maxTtl+10) return null;
-  const expected=createHmac('sha256',key).update(purpose+':'+parts[0]+'.'+parts[1]).digest();
-  let received:Buffer;
-  try {received=Buffer.from(parts[2],'base64url');} catch{return null;}
-  return expected.length===received.length && timingSafeEqual(expected,received)?parts[0]:null;
-}
 export function analyticsVisitorId(key:string,seed:string) {
   const bytes=createHmac('sha256',key).update('web-analytics-visitor:'+seed).digest().subarray(0,16);
   bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
   const h=bytes.toString('hex');return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
 }
-export function cookieValues(request:Request) {
-  const cookies:Record<string,string>={};
-  for(const item of (request.headers.get('cookie')||'').split(';')) {
-    const at=item.indexOf('=');if(at<0)continue;
-    try{cookies[item.slice(0,at).trim()]=decodeURIComponent(item.slice(at+1));}catch{/* Malformed cookies have no authority. */}
+/** Only expire the old analytics cookies when a browser already has them.
+ * This endpoint never issues or renews tracking cookies. */
+function expireLegacyAnalyticsCookies(request:Request,response:Response,secure:boolean){
+  const names=new Set((request.headers.get('cookie')||'').split(';').map(item=>item.split('=')[0]?.trim()));
+  for(const name of LEGACY_ANALYTICS_COOKIES){
+    if(names.has(name))response.headers.append('Set-Cookie',
+      name+'=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax'+(secure?'; Secure':''));
   }
-  return cookies;
-}
-function addCookie(response:Response,name:string,value:string,age:number,secure:boolean) {
-  response.headers.append('Set-Cookie',`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${age}; HttpOnly; SameSite=Lax${secure?'; Secure':''}`);
+  return response;
 }
 const blocked=new BlockList();
 for(const [address,prefix]of [['0.0.0.0',8],['10.0.0.0',8],['100.64.0.0',10],['127.0.0.0',8],['169.254.0.0',16],['172.16.0.0',12],['192.168.0.0',16],['198.18.0.0',15],['224.0.0.0',4],['240.0.0.0',4]]as const)blocked.addSubnet(address,prefix,'ipv4');
@@ -93,8 +77,7 @@ export function createAnalyticsCollector(deps:CollectorDependencies) {
     const origin=request.headers.get('origin');
     if(!origin || !deps.origins.includes(origin) || request.headers.get('sec-fetch-site')==='cross-site')return analyticsJson({error:'Origen no permitido'},403);
     if(request.method==='DELETE'){
-      const response=new Response(null,{status:204,headers:privateHeaders});
-      Object.values(ANALYTICS_COOKIES).forEach(name=>addCookie(response,name,'',0,!!deps.secure));return response;
+      return expireLegacyAnalyticsCookies(request,new Response(null,{status:204,headers:privateHeaders}),!!deps.secure);
     }
     if(request.method!=='POST')return analyticsJson({error:'Método no permitido'},405);
     if(!request.headers.get('content-type')?.toLowerCase().startsWith('application/json'))return analyticsJson({error:'Contenido no permitido'},415);
@@ -108,8 +91,9 @@ export function createAnalyticsCollector(deps:CollectorDependencies) {
       if(isSuperAdmin(actor))return new Response(null,{status:204,headers:privateHeaders});
       const now=deps.now?.()??Date.now(),key=deps.key;
       const visitorId=analyticsVisitorId(key,batch.visitorSeed);
-      const cookies=cookieValues(request);
-      const sessionId=verifyAnalyticsId(key,'session:'+visitorId,cookies[ANALYTICS_COOKIES.session],1800,now)||randomUUID();
+      // The RPC merges tabs into a single active visit and starts a new visit
+      // after 30 minutes of inactivity, without relying on browser cookies.
+      const sessionId=randomUUID();
       const ip=analyticsClientIp(request.headers,deps.ipHeader);
       const geo=await deps.geo(ip).catch(()=>null);
       const agent=request.headers.get('user-agent')||'';
@@ -123,11 +107,7 @@ export function createAnalyticsCollector(deps:CollectorDependencies) {
         layouts:batch.layouts.map(layout=>({...layout,id:createHash('sha256').update(JSON.stringify({...layout,device:deviceFromAgent(agent)})).digest('hex').slice(0,32)})),events:batch.events});
       if(result.limited)return analyticsJson({error:'Demasiados eventos'},429);
       if(result.unavailable || !result.sessionId)return analyticsJson({error:'Medición no disponible'},503);
-      const response=new Response(null,{status:204,headers:privateHeaders});
-      addCookie(response,ANALYTICS_COOKIES.visitor,signAnalyticsId(key,'visitor',visitorId,15552000,now),15552000,!!deps.secure);
-      addCookie(response,ANALYTICS_COOKIES.session,signAnalyticsId(key,'session:'+visitorId,result.sessionId,1800,now),1800,!!deps.secure);
-      addCookie(response,ANALYTICS_COOKIES.consent,'1',15552000,!!deps.secure);
-      return response;
+      return expireLegacyAnalyticsCookies(request,new Response(null,{status:204,headers:privateHeaders}),!!deps.secure);
     }catch{return analyticsJson({error:'Medición no disponible'},503);}
   };
 }

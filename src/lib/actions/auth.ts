@@ -28,7 +28,7 @@ export async function loginAction(formData: FormData) {
   }
 
   const user = data?.user;
-  if (user) await scheduleAccountAccess(user, 'login');
+  if (user) await scheduleAccountAccess(user, 'login', undefined, String(formData.get('analyticsVisitorSeed') || ''));
 
   revalidatePath('/', 'layout');
   

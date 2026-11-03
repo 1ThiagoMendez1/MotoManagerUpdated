@@ -6,6 +6,7 @@ import { ArrowRight, Loader2, LockKeyhole } from 'lucide-react';
 import Link from 'next/link';
 import { startFullTrial } from './actions';
 import { TRIAL_WHATSAPP_CONSENT_TEXT } from '@/lib/subscription-trial';
+import { AnalyticsIdentityField } from '@/components/analytics/AnalyticsIdentityField';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -25,6 +26,7 @@ export function TrialForm() {
     { name: 'password', label: 'Crea tu contraseña', type: 'password', autoComplete: 'new-password', placeholder: 'Mínimo 10 caracteres', maxLength: 128 },
   ];
   return <form action={action} className="space-y-4">
+    <AnalyticsIdentityField />
     {fields.map(field => <div key={field.name}>
       <label htmlFor={`trial-${field.name}`} className="mb-1.5 block text-sm font-semibold text-slate-200">{field.label}</label>
       <input {...field} id={`trial-${field.name}`} required minLength={field.name === 'password' ? 10 : undefined} className="min-h-12 w-full rounded-xl border border-white/20 bg-[#081121] px-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-[#ff831b] focus:ring-2 focus:ring-[#ff831b]/20" />

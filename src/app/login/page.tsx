@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Wrench, Loader2, LogIn } from 'lucide-react';
+import { consentingAnalyticsVisitorSeed } from '@/lib/analytics/web-consent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -94,6 +95,8 @@ function LoginForm() {
       const formData = new FormData();
       formData.append('email', email);
       formData.append('password', password);
+      const visitorSeed=consentingAnalyticsVisitorSeed();
+      if(visitorSeed)formData.append('analyticsVisitorSeed',visitorSeed);
 
       const result = await loginAction(formData);
       

@@ -18,6 +18,9 @@ export function MeasurementPreferences(){
       setBlocked(privacySignal());
     };
     load();
+    // Expire analytics cookies left by earlier deployments even when the
+    // visitor now refuses tracking. This request never records a visit.
+    void fetch('/api/analytics/collect',{method:'DELETE',credentials:'same-origin',keepalive:true}).catch(()=>{});
     try{if(!localStorage.getItem(WEB_ANALYTICS_CONSENT_KEY))setOpen(true);}catch{/* Do not interrupt access when browser storage is unavailable. */}
     const reopen=()=>{load();setOpen(true);};
     window.addEventListener('mm:marketing-consent-settings',reopen);
