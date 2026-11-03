@@ -17,5 +17,5 @@ test('quote page and mutation require the same verified workshop/customer associ
   assert.match(page,/canAccessOwnCustomerQuote\(resolvedParams\.id\)/);
   assert.match(actions,/canAccessOwnCustomerQuote\(workOrderId\)/);
   assert.doesNotMatch(page,/normalizePlate|isAuthValid|realLicensePlate/);
-  assert.doesNotMatch(actions,/if \(!workOrderId\)[\s\S]*?const supabase = await createAdminClient\(\)/);
+  assert.match(actions,/canAccessOwnCustomerQuote\(workOrderId\)[\s\S]*?const supabase = await createAdminClient\(\)/);
 });
