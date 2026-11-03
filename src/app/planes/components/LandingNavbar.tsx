@@ -31,12 +31,13 @@ export function LandingNavbar({ user, halloween = false, christmas = false }: { 
           <span className="text-base font-extrabold tracking-[-0.045em] sm:text-lg">MotoManager{halloween && <span className={styles.navEdition}>HALLOWEEN EDITION</span>}</span>
           {christmas && <span className="hidden items-center gap-1 rounded-full border border-emerald-300/25 bg-emerald-900/45 px-2 py-1 text-[10px] font-extrabold text-emerald-100 sm:inline-flex"><Gift className="h-3 w-3 text-[#ffd08b]"/>Navidad</span>}
         </Link>
-        <div className="hidden items-center gap-6 xl:flex">
+        <div className="hidden items-center gap-4 xl:flex">
           {NAV.map(item => (
             <a key={item.href} href={item.href} className={'text-sm font-semibold transition hover:text-white ' + (item.href === '#demo' ? 'text-[#ff9e4c]' : 'text-slate-300')}>{item.label}</a>
           ))}
         </div>
         <div className="hidden items-center gap-3 xl:flex">
+          <Link href="/clientes" className="rounded-lg px-2 py-2.5 text-sm font-semibold text-orange-200 transition hover:bg-white/10">Mi garaje</Link>
           <Link href={destination} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
             {user ? 'Ir al sistema' : 'Iniciar sesión'}
           </Link>
@@ -57,6 +58,7 @@ export function LandingNavbar({ user, halloween = false, christmas = false }: { 
         <div id="landing-mobile-menu" className="border-t border-white/10 bg-[#0b1829] px-5 py-4 xl:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-1">
             {NAV.map(item => <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{item.label}</a>)}
+            <Link href="/clientes" onClick={() => setOpen(false)} className="rounded-xl border border-orange-400/20 bg-orange-400/10 px-4 py-3 text-sm font-bold text-orange-200">🏍️ Mi garaje · Clientes</Link>
             <Link href={destination} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{user ? 'Ir al sistema' : 'Iniciar sesión'}</Link>
             <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 py-3 text-sm font-extrabold text-[#081121]">
               {user ? 'Ver mi plan' : 'Activar 15 días gratis'} <ArrowRight className="h-4 w-4" />

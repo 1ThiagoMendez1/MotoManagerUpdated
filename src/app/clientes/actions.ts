@@ -38,9 +38,11 @@ export async function getCustomerPortalData(licensePlate: string) {
   const verified = await getVerifiedCustomerLinks();
   if (!verified) return { success: false, message: 'Para consultar datos privados, inicia sesión con WhatsApp o con tu contraseña desde el QR del taller.' };
   const supabase = verified.admin;
+  const motorcycleId = licensePlate.trim();
+  const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(motorcycleId);
   const normalizedPlate = licensePlate.replace(/[\s-]/g, '').toUpperCase();
-  if (!/^[A-Z0-9]{5,8}$/.test(normalizedPlate)) {
-    return { success: false, message: 'Placa inválida.' };
+  if (!isId && !/^[A-Z0-9]{5,8}$/.test(normalizedPlate)) {
+    return { success: false, message: 'Referencia de motocicleta inválida.' };
   }
   const customerIds = Array.from(new Set(verified.links.map(link => link.customer_id)));
 
@@ -76,7 +78,7 @@ export async function getCustomerPortalData(licensePlate: string) {
   // Find exact match by normalizing
   const motorcycle = motorcycles.find((m: any) => {
     const dbPlate = (m.license_plate || '').replace(/[\s-]/g, '').toUpperCase();
-    return dbPlate === normalizedPlate && verified.links.some(
+    return (isId ? m.id === motorcycleId : dbPlate === normalizedPlate) && verified.links.some(
       link => link.customer_id === m.customer_id && link.organization_id === m.organization_id
     );
   });
@@ -284,7 +286,8 @@ export async function cancelCustomerAppointment(appointmentId: string) {
 export type CustomerPortalOverview = {
   verified: boolean;
   avatarUrl?: string | null;
-  workshops: Array<{ id: string; name: string }>;
+  displayName?: string | null;
+  workshops: Array<{ id: string; name: string; slug: string }>;
   motorcycles: Array<{ id: string; brand: string; model: string; licensePlate: string; workshopName: string }>;
 };
 
@@ -312,7 +315,7 @@ export async function getCustomerPortalOverview(): Promise<CustomerPortalOvervie
   const organizationIds = [...new Set(links.map(link => link.organization_id))];
   const customerIds = [...new Set(links.map(link => link.customer_id))];
   const [{ data: organizations, error: orgError }, { data: motorcycles, error: motoError }] = await Promise.all([
-    admin.from('organizations').select('id, name').in('id', organizationIds).limit(100),
+    admin.from('organizations').select('id, name, slug').in('id', organizationIds).limit(100),
     admin.from('motorcycles').select('id, brand, model, license_plate, organization_id, customer_id')
       .in('customer_id', customerIds).limit(100),
   ]);
@@ -321,6 +324,14 @@ export async function getCustomerPortalOverview(): Promise<CustomerPortalOvervie
     return { ...empty, verified: true };
   }
 
+  const { data: linkedCustomer } = await admin.from('customers')
+    .select('first_name, last_name')
+    .eq('id', links[0].customer_id)
+    .eq('organization_id', links[0].organization_id)
+    .maybeSingle();
+  const displayName = linkedCustomer
+    ? [linkedCustomer.first_name, linkedCustomer.last_name].filter(Boolean).join(' ').trim()
+    : null;
   const workshopNames = new Map((organizations || []).map(org => [org.id, org.name]));
   // Restrict by BOTH IDs, not just the customer_id (which alone is insufficient in a multi-tenant app).
   const permittedPairs = new Set(links.map(link => link.organization_id + ':' + link.customer_id));
@@ -330,7 +341,8 @@ export async function getCustomerPortalOverview(): Promise<CustomerPortalOvervie
   return {
     verified: true,
     avatarUrl: await getOwnAvatarUrl(),
-    workshops: (organizations || []).map(org => ({ id: org.id, name: org.name })),
+    displayName,
+    workshops: (organizations || []).map(org => ({ id: org.id, name: org.name, slug: org.slug })),
     motorcycles: accessible.map(moto => ({
       id: moto.id, brand: moto.brand || '', model: moto.model || '',
       licensePlate: moto.license_plate || '',
