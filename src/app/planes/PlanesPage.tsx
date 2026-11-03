@@ -20,6 +20,8 @@ import { LandingFooter } from './components/LandingFooter';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
 import { HalloweenClosing, HalloweenRibbon } from './components/HalloweenCampaign';
 import halloweenStyles from './components/halloween.module.css';
+import christmasStyles from './components/christmas.module.css';
+import { ChristmasRibbon, ChristmasHero, ChristmasDemoGuide, ChristmasTrialOffer, ChristmasMobileDock, ChristmasClosing } from './components/ChristmasCampaign';
 import { isSuperAdmin } from '@/lib/super-admin';
 
 interface Plan {
@@ -72,7 +74,7 @@ function ProductFlow() {
   );
 }
 
-export default function PlanesPage({ plans = [], features = [], user, workshops = [], checkoutReady = false, halloween = false }: { plans?: any[]; features?: any[]; user?: any; workshops?: PublicWorkshop[]; checkoutReady?: boolean; halloween?: boolean }) {
+export default function PlanesPage({ plans = [], features = [], user, workshops = [], checkoutReady = false, halloween = false, christmas = false }: { plans?: any[]; features?: any[]; user?: any; workshops?: PublicWorkshop[]; checkoutReady?: boolean; halloween?: boolean; christmas?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paymentStatus = searchParams.get('payment');
@@ -121,22 +123,26 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
     setActivePlan(plan);
   };
 
+  const christmasEdition = christmas && !halloween;
+  const fullPrice = Number(plans.find(plan => plan.id === 'full')?.price || 119900);
   return (
-    <div className={`min-h-screen bg-[#081121] text-white ${halloween ? halloweenStyles.edition : ''}`} data-campaign={halloween ? 'halloween-2026' : undefined}>
+    <div className={`min-h-screen bg-[#081121] text-white ${halloween ? halloweenStyles.edition : ''} ${christmasEdition ? christmasStyles.edition : ''}`} data-campaign={halloween ? 'halloween-2026' : christmasEdition ? 'navidad-2026' : undefined}>
       <MetaPixelMarketing excluded={isSuperAdmin(user)} />
-      <LandingNavbar user={user} halloween={halloween} />
+      <LandingNavbar user={user} halloween={halloween} christmas={christmasEdition} />
       <main>
-        {halloween ? <HalloweenRibbon /> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-orange-400/20 bg-[#ff831b]/10 px-5 py-3 text-center text-sm"><span><strong className="text-[#ffad68]">15 días de Full gratis.</strong> Sin tarjeta. Tu taller, con todo activado.</span><Link href="/prueba-gratis" className="inline-flex items-center gap-1 font-bold text-[#ffad68] underline underline-offset-4">Activar prueba <ArrowRight className="h-3.5 w-3.5" /></Link></div>}
-        <LandingHero onScrollToPlanes={scrollToPlanes} halloween={halloween} />
+        {halloween ? <HalloweenRibbon /> : christmasEdition ? <ChristmasRibbon /> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-orange-400/20 bg-[#ff831b]/10 px-5 py-3 text-center text-sm"><span><strong className="text-[#ffad68]">15 días de Full gratis.</strong> Sin tarjeta. Tu taller, con todo activado.</span><Link href="/prueba-gratis" className="inline-flex items-center gap-1 font-bold text-[#ffad68] underline underline-offset-4">Activar prueba <ArrowRight className="h-3.5 w-3.5" /></Link></div>}
+        {christmasEdition ? <ChristmasHero /> : <LandingHero onScrollToPlanes={scrollToPlanes} halloween={halloween} />}
+        {christmasEdition && <ChristmasDemoGuide />}
         <LandingInteractiveDemo />
+        {christmasEdition && <ChristmasTrialOffer fullPrice={fullPrice} />}
         <LandingWhyChange halloween={halloween} />
         <LandingFeatures />
         <ProductFlow />
-        <LandingTrial fullPrice={Number(plans.find(plan => plan.id === 'full')?.price || 119900)} halloween={halloween} />
-        <LandingPricing plans={plans} features={features} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes} />
+        {!christmasEdition && <LandingTrial fullPrice={fullPrice} halloween={halloween} />}
+        <LandingPricing plans={plans} features={features} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes} christmas={christmasEdition} />
         <LandingTopWorkshops initialWorkshops={workshops} />
         <LandingTestimonialsAndFAQ />
-        {halloween ? <HalloweenClosing /> : <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
+        {halloween ? <HalloweenClosing /> : christmasEdition ? <ChristmasClosing /> : <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
           <div className="mx-auto max-w-3xl">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Tu siguiente paso</span>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">¿Listo para dejar el desorden atrás?</h2>
@@ -148,6 +154,7 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
         </section>}
       </main>
       <LandingFooter halloween={halloween} />
+      {christmasEdition && <ChristmasMobileDock user={Boolean(user)} />}
 
       {activePlan && <PaymentModal plan={activePlan} onClose={() => setActivePlan(null)} appUrl={appUrl} />}
       <RegistrationModal

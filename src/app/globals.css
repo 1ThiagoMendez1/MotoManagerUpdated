@@ -223,3 +223,12 @@
 .maplibregl-popup-tip {
   display: none !important;
 }
+/* Christmas mobile dock: keep privacy controls accessible, never over the primary CTA. */
+@media (max-width: 639px) {
+  body:has([data-campaign="navidad-2026"]) button[aria-label="Configurar privacidad publicitaria"] {
+    bottom: calc(83px + env(safe-area-inset-bottom));
+  }
+  body:has([data-campaign="navidad-2026"]) section[aria-label="Privacidad publicitaria"] {
+    bottom: calc(126px + env(safe-area-inset-bottom));
+  }
+}
