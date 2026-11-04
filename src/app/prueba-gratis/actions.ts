@@ -25,16 +25,19 @@ export async function startFullTrial(_previous: { error: string }, form: FormDat
   const { data: allowed, error: rateError } = await admin.rpc('claim_trial_signup_attempt', { p_key: key });
   if (rateError || !allowed) return { error: 'Se alcanzó el límite de intentos. Intenta de nuevo en una hora o inicia sesión si ya tienes cuenta.' };
 
-  const { email, password, fullName, workshopName, phone, city, whatsappConsent } = input.data;
-  const optedIn = whatsappConsent === 'on';
+  const { email, password, fullName, workshopName, phone, city, welcomeRequested } = input.data;
+  const optedIn = welcomeRequested === 'yes';
+  const acceptedAt = new Date().toISOString();
   // Same immediate-access model as the existing commercial registration. Never
   // send the chosen password or create a temporary password/payment source.
   const { data: account, error: accountError } = await admin.auth.admin.createUser({
     email, password, email_confirm: true,
     user_metadata: {
       first_name: fullName.split(' ')[0], last_name: fullName.split(' ').slice(1).join(' '), phone,
+      trial_terms_accepted: { at: acceptedAt, source: '/prueba-gratis', version: '2026-11-04',
+        text: 'Prueba Full de 15 días por taller, correo y celular, sin cobros automáticos. Autorizo el tratamiento de datos para gestionar la cuenta.' },
       ...(optedIn ? { trial_whatsapp_opt_in: {
-        at: new Date().toISOString(), source: '/prueba-gratis', text: TRIAL_WHATSAPP_CONSENT_TEXT,
+        at: acceptedAt, source: '/prueba-gratis', text: TRIAL_WHATSAPP_CONSENT_TEXT,
       } } : {}),
     },
   });
@@ -73,6 +76,7 @@ export async function startFullTrial(_previous: { error: string }, form: FormDat
         }, {
           token: process.env.WHATSAPP_API_TOKEN, phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID,
           version: process.env.WHATSAPP_GRAPH_API_VERSION,
+          variableCount: Number(process.env.WHATSAPP_TRIAL_WELCOME_VAR_COUNT || '4'),
         });
         if (result.status !== 'accepted') console.warn('[trial-whatsapp] Welcome not confirmed', result);
       } catch {

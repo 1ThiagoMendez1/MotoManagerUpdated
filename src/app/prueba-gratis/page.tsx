@@ -2,46 +2,71 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { CheckCircle2, ArrowLeft, Gift, Sparkles } from 'lucide-react';
+import { ArrowLeft, Bike, CheckCircle2, ClipboardList, Gift, ShieldCheck, Sparkles, Users, Wrench } from 'lucide-react';
 import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
 import { TrialForm } from './TrialForm';
-import { isHalloweenEditionActive } from '@/lib/seasonal-campaign';
-import { HalloweenDecor } from '../planes/components/HalloweenDecor';
-import halloweenStyles from '../planes/components/halloween.module.css';
 
 export const metadata: Metadata = {
-  title: '15 días gratis con Full Taller | MotoManager',
-  description: 'Prueba MotoManager Full durante 15 días con tus propios clientes, motos y órdenes. Sin tarjeta y sin cobros automáticos. Crea tu taller y empieza hoy.',
+  title: 'Activa 15 días gratis | MotoManager Full Taller',
+  description: 'Activa tu taller en tres pasos y disfruta MotoManager Full por 15 días. Sin tarjeta ni cobros automáticos.',
 };
 
+const benefits = [
+  { title: 'Cada moto bajo control', detail: 'Órdenes e historial en un solo lugar.', Icon: Bike },
+  { title: 'Todo tu taller conectado', detail: 'Clientes, inventario, ventas y agenda.', Icon: ClipboardList },
+  { title: 'Tu equipo organizado', detail: 'Técnicos, accesos y permisos Full.', Icon: Users },
+];
+
 export default async function TrialPage() {
-  const halloween = isHalloweenEditionActive();
   const user = await getCurrentUserServer();
   if (user?.workshopId) {
     const workshop = await getWorkshopDetails(user);
-    redirect(workshop?.trial_expired ? '/dashboard/subscription' : `/${workshop?.slug || 'dashboard'}`);
+    redirect(workshop?.trial_expired ? '/dashboard/subscription' : '/' + (workshop?.slug || 'dashboard'));
   }
-  return <div className={`min-h-screen bg-[#050b18] px-5 py-7 text-white sm:py-10 ${halloween ? halloweenStyles.signup : ''}`}>
-    {halloween && <HalloweenDecor kind="web" className={halloweenStyles.webRight} />}
-    <div className={`mx-auto max-w-6xl ${halloween ? halloweenStyles.signupInner : ''}`}>
-      <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Volver a MotoManager</Link>
-      <div className="mt-9 grid items-start gap-10 lg:grid-cols-[1fr_0.95fr] lg:gap-20">
-        <div className="lg:sticky lg:top-10">
-          <Link href="/" className="flex items-center gap-3"><Image src="/logo.png" alt="MotoManager" width={60} height={60} /><span className="text-2xl font-extrabold tracking-tight">MotoManager</span></Link>
-          {halloween ? <span className={halloweenStyles.signupBadge}><HalloweenDecor kind="pumpkin" />HALLOWEEN EDITION · 15 DÍAS GRATIS</span> : <span className="mt-9 inline-flex items-center gap-2 rounded-full border border-[#ff831b]/35 bg-[#ff831b]/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#ffad68]"><Gift className="h-4 w-4" />Full Taller · 15 días gratis</span>}
-          <h1 className={`mt-6 text-4xl font-extrabold leading-[1.1] tracking-[-0.045em] sm:text-5xl ${halloween ? halloweenStyles.signupTitle : ''}`}>{halloween ? 'Dale vida a tu taller.' : 'Descubre cuánto puede dar tu taller.'}<span className="mt-2 block text-[#ff831b]">{halloween ? 'El trato empieza por $0.' : 'El primer paso cuesta $0.'}</span></h1>
-          <p className="mt-6 max-w-lg text-lg leading-8 text-slate-300">{halloween ? 'Un trato de miedo, sin trucos: estrena Full con tus propios clientes, motos y equipo. Sin tarjeta y sin cobros automáticos.' : 'No te quedes imaginando cómo sería. Trabaja con tus clientes, tus motos y tu equipo en el plan más completo de MotoManager.'}</p>
-          <ul className="mt-7 space-y-4 text-sm text-slate-200">
-            {['Órdenes, clientes e historial de cada moto.', 'Inventario, ventas, caja y contabilidad.', 'Agenda, técnicos, equipo y permisos Full.', 'Portal y QR para tus clientes.', 'WhatsApp según la configuración del proveedor.'].map(text => <li key={text} className="flex items-start gap-3"><CheckCircle2 className="h-5 w-5 shrink-0 text-[#ffad68]" />{text}</li>)}
-          </ul>
-          <div className="mt-9 rounded-2xl border border-white/10 bg-white/5 p-5"><p className="flex items-center gap-2 font-bold"><Sparkles className="h-5 w-5 text-[#ffad68]" />Empieza gratis. Crece a tu ritmo.</p><p className="mt-2 text-sm leading-7 text-slate-300">La prueba comienza al crear tu taller. Al terminar, elige Básico, Pro o sigue con Full. Conservas tu información al contratar; no necesitas registrarlo todo de nuevo.</p></div>
-          {halloween && <div className={halloweenStyles.signupArt}><Image src="/campaigns/halloween-garage-2026.webp" alt="Moto y calabazas de la edición Halloween de MotoManager" fill unoptimized sizes="(min-width: 1024px) 440px, 1px" /></div>}
-        </div>
-        <div className={`rounded-3xl border border-white/15 bg-[#0e1a2e] p-6 shadow-2xl sm:p-8 ${halloween ? halloweenStyles.signupCard : ''}`}>
-          <div className="mb-6 border-b border-white/10 pb-5"><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#ffad68]">{halloween ? 'TRATO HECHO. SIN TRUCOS.' : 'Tu taller empieza aquí'}</p><h2 className="mt-2 text-2xl font-bold">Activa tu cuenta Full</h2><p className="mt-2 text-sm text-slate-300">15 días para vivir el cambio con tu operación real.</p></div>
-          {user ? <p className="text-sm leading-7 text-slate-200">Tu sesión ya está abierta. <Link href="/no-workshop" className="text-[#ffad68] underline">Revisa tu cuenta</Link> o cierra sesión para registrar un taller nuevo.</p> : <TrialForm />}
-        </div>
+  return <main className="relative flex min-h-dvh flex-col overflow-hidden bg-[#050b18] px-5 py-7 text-white sm:py-10">
+    <div aria-hidden="true" className="pointer-events-none absolute -right-32 -top-44 h-[530px] w-[530px] rounded-full bg-orange-500/10 blur-[125px]" />
+    <div aria-hidden="true" className="pointer-events-none absolute -bottom-48 -left-40 h-[500px] w-[500px] rounded-full bg-emerald-500/10 blur-[120px]" />
+    <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col">
+      <header className="flex items-center justify-between gap-3">
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-300 transition hover:text-white"><ArrowLeft size={17}/> Volver a MotoManager</Link>
+        <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200">Activación segura</span>
+      </header>
+      <div className="grid flex-1 items-center gap-8 pb-12 pt-8 lg:grid-cols-[1.1fr_.9fr] lg:gap-16 lg:py-16">
+        <section className="max-w-2xl">
+          <div className="flex items-center gap-2">
+            <Image src="/logo.png" alt="" width={48} height={48}/>
+            <span className="text-xl font-black tracking-tight sm:text-2xl">MotoManager</span>
+          </div>
+          <p className="mt-8 inline-flex items-center gap-2 rounded-full border border-orange-400/25 bg-orange-500/10 px-3 py-2 text-xs font-extrabold text-[#ffb97f]"><Gift size={16}/> PRUEBA FULL TALLER · 15 DÍAS POR $0</p>
+          <h1 className="mt-5 text-4xl font-black leading-[1.07] tracking-[-.05em] sm:text-5xl lg:text-6xl">
+            Tu taller puede crecer. <span className="block text-[#ff831b]">Empieza hoy, gratis.</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
+            Olvídate del desorden entre chats y cuadernos. Organiza tus motos, clientes y órdenes en MotoManager Full desde el primer día.
+          </p>
+          <div className="mt-7">
+            {user ? <p className="rounded-xl border border-white/15 bg-white/5 p-4 text-sm">Ya tienes una sesión iniciada. <Link href="/no-workshop" className="font-bold text-orange-300 underline">Revisa tu cuenta</Link> para continuar.</p> : <TrialForm />}
+          </div>
+          <p className="mt-4 flex items-center gap-2 text-xs text-slate-400"><ShieldCheck size={16} className="text-emerald-300"/> Sin tarjeta, sin permanencia y sin cobros automáticos.</p>
+        </section>
+        <section aria-label="Qué incluye tu prueba" className="relative rounded-[28px] border border-white/15 bg-[#0d1b2e]/90 p-5 shadow-2xl shadow-black/25 sm:p-8">
+          <div className="flex items-center justify-between gap-3">
+            <div><p className="text-xs font-extrabold tracking-[.17em] text-[#ffb47d]">PLAN FULL ACTIVADO</p><h2 className="mt-2 text-2xl font-black tracking-tight">Todo tu taller, conectado.</h2></div>
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-orange-400/10 text-orange-400"><Wrench size={27}/></span>
+          </div>
+          <div className="mt-6 space-y-4">
+            {benefits.map(({title,detail,Icon})=><article key={title} className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-400/10 text-emerald-300"><Icon size={22}/></span>
+              <div><h3 className="font-bold">{title}</h3><p className="mt-1 text-xs leading-5 text-slate-400">{detail}</p></div>
+              <CheckCircle2 size={18} className="ml-auto shrink-0 text-orange-400"/>
+            </article>)}
+          </div>
+          <div className="mt-6 rounded-2xl border border-orange-300/20 bg-orange-400/10 p-4">
+            <p className="flex items-center gap-2 text-sm font-bold text-orange-200"><Sparkles size={18}/> Tu primer paso cuesta $0</p>
+            <p className="mt-2 text-xs leading-6 text-slate-300">Al completar los 15 días puedes elegir el plan que más te convenga. Tu información permanece en tu taller.</p>
+          </div>
+        </section>
       </div>
     </div>
-  </div>;
+  </main>;
 }
