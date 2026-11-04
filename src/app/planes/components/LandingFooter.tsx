@@ -34,6 +34,7 @@ export function LandingFooter({ halloween = false, christmas = false }: { hallow
         <div>
           <h3 className="text-sm font-semibold text-white">Acceso</h3>
           <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">Si ya utilizas MotoManager, entra a tu taller con tu cuenta.</p>
+          <Link href="/clientes" className="mt-4 flex items-center gap-2 text-sm font-bold text-orange-300 hover:underline">Soy cliente de un taller · Mi garaje <ArrowUpRight className="h-4 w-4" /></Link>
           <Link href="/login" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/5">
             Iniciar sesión <ArrowUpRight className="h-4 w-4" />
           </Link>

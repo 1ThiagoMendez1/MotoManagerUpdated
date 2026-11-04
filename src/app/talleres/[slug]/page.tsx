@@ -80,7 +80,7 @@ export default async function WorkshopStorefront({ params, searchParams }: {
         <div className="rounded-xl border bg-card p-4"><strong className="text-primary">03 · Conecta</strong><p className="mt-1 text-xs text-muted-foreground">Tus motos e historial, desde el portal.</p></div>
       </div>
       <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0" />Tu acceso se verifica con un código privado de WhatsApp o con una contraseña existente. El QR no permite consultar historias de servicio ni da acceso a la administración del taller.</p>
-      <Link href="/clientes" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">Ir al portal de clientes <ArrowRight className="h-4 w-4" /></Link>
+      <Link href="/clientes" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline">¿Ya te registraste? Entra a Mi garaje <ArrowRight className="h-4 w-4" /></Link>
     </main>
   );
 }
