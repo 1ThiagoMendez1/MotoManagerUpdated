@@ -76,7 +76,7 @@ export async function startFullTrial(_previous: { error: string }, form: FormDat
         }, {
           token: process.env.WHATSAPP_API_TOKEN, phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID,
           version: process.env.WHATSAPP_GRAPH_API_VERSION,
-          variableCount: Number(process.env.WHATSAPP_TRIAL_WELCOME_VAR_COUNT || '4'),
+          variableCount: Number(process.env.WHATSAPP_TRIAL_WELCOME_VAR_COUNT || '5'),
         });
         if (result.status !== 'accepted') console.warn('[trial-whatsapp] Welcome not confirmed', result);
       } catch {
