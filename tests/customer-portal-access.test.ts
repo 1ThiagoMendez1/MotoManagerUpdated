@@ -49,3 +49,13 @@ test('portal and QR routes expose the reusable entry, never a plate-only login',
   assert.match(nav,/href="\/clientes"/);
   assert.match(qr,/¿Ya te registraste\? Entra a Mi garaje/);
 });
+
+
+test('returning customer code requests have an IP quota separate from trial signup',async()=>{
+  const s=await readFile(new URL('../src/app/clientes/acceso/actions.ts',import.meta.url),'utf8');
+  assert.match(s,/analyticsClientIp\(requestHeaders/);
+  assert.match(s,/customer-portal-otp-ip:/);
+  assert.match(s,/claim_trial_signup_attempt/);
+  assert.match(s,/if \(limitError \|\| !allowed\)/);
+  assert.match(s,/linkedTechnicalAccount\(phone\)/);
+});
