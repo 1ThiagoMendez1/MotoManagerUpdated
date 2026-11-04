@@ -14,14 +14,20 @@ test('la prueba es Full y vence exactamente al alcanzar su fecha, sin afectar pl
   assert.equal(getTrialState({ ...settings, isTrial: false }, now + 20 * 86_400_000).expired, false);
 });
 
-test('el registro exige consentimiento y contraseña segura, y normaliza correo y celular', () => {
-  const input = { fullName: 'Ana Pérez', workshopName: 'Taller Ana', email: ' ANA@EXAMPLE.TEST ', phone: '300 123 4567', city: 'Bogotá', password: 'Segura2026!Trial', terms: 'on', website: '' };
+test('el registro por pasos requiere acción afirmativa, no casillas, y normaliza datos', () => {
+  const input = {
+    fullName: 'Ana Pérez', workshopName: 'Taller Ana', email: ' ANA@EXAMPLE.TEST ',
+    phone: '300 123 4567', city: 'Bogotá', password: 'Segura2026!Trial',
+    termsAcknowledged: 'yes', welcomeRequested: 'yes', website: '',
+  };
   const parsed = trialRegistrationSchema.parse(input);
-  assert.equal(parsed.email, 'ana@example.test');
-  assert.equal(parsed.phone, '573001234567');
-  assert.equal(trialRegistrationSchema.safeParse({ ...input, terms: '' }).success, false);
-  assert.equal(trialRegistrationSchema.safeParse({ ...input, password: '123' }).success, false);
-  assert.equal(trialRegistrationSchema.safeParse({ ...input, website: 'spam' }).success, false);
+  assert.equal(parsed.email,'ana@example.test');
+  assert.equal(parsed.phone,'573001234567');
+  assert.equal(parsed.welcomeRequested,'yes');
+  assert.equal(trialRegistrationSchema.safeParse({...input,welcomeRequested:'no'}).success,true);
+  assert.equal(trialRegistrationSchema.safeParse({...input,termsAcknowledged:''}).success,false);
+  assert.equal(trialRegistrationSchema.safeParse({...input,password:'123'}).success,false);
+  assert.equal(trialRegistrationSchema.safeParse({...input,website:'spam'}).success,false);
 });
 
 test('el precio de conversión respeta mensual, semestral y anual', () => {

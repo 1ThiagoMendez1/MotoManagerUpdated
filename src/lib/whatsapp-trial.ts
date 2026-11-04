@@ -74,37 +74,54 @@ export function buildTrialWelcomeTemplate(metadata: unknown, input: TrialWelcome
   };
 }
 
+/**
+ * Send one onboarding message by template NAME.
+ * A hardcoded Meta template-object ID blocked every send when it was inaccessible
+ * on this WABA. Meta validates name, locale and approval on POST.
+ *
+ * Default is four body variables per the trial template screenshot. A
+ * five-variable version can be selected explicitly via environment config.
+ */
+export function buildTrialWelcomeSendTemplate(input: TrialWelcomeInput, variableCount: 4 | 5 = 4) {
+  const values = [parameter(input.fullName), parameter(input.workshopName)];
+  if (variableCount === 5) values.push(parameter(input.email, 254));
+  values.push(formatTrialWelcomeDate(input.startsAt), formatTrialWelcomeDate(input.endsAt));
+  return {
+    name: TRIAL_WELCOME_TEMPLATE,
+    language: { code: TRIAL_WELCOME_LANGUAGE },
+    components: [{ type: 'body', parameters: values.map(text => ({ type: 'text', text })) }],
+  };
+}
+
 export async function sendTrialWelcomeViaMeta(
   input: TrialWelcomeInput,
-  config: { token?: string; phoneId?: string; version?: string },
+  config: { token?: string; phoneId?: string; version?: string; variableCount?: number },
   fetcher: typeof fetch = fetch,
   now = Date.now(),
 ): Promise<TrialWelcomeResult> {
   if (!input.optedIn) return { status: 'skipped', reason: 'not_opted_in' };
-  const version = config.version || 'v23.0'; // Same version as the existing QR sender.
-  if (!config.token || !config.phoneId || !/^[0-9]+$/.test(config.phoneId) || !/^v[0-9]{1,2}\.[0-9]{1,2}$/.test(version)) return { status: 'skipped', reason: 'not_configured' };
+  const version = config.version || 'v23.0';
+  if (!config.token || !config.phoneId || !/^[0-9]+$/.test(config.phoneId) ||
+    !/^v[0-9]{1,2}\.[0-9]{1,2}$/.test(version) ||
+    (config.variableCount !== undefined && config.variableCount !== 4 && config.variableCount !== 5)) {
+    return { status: 'skipped', reason: 'not_configured' };
+  }
   const start = Date.parse(input.startsAt);
   const end = Date.parse(input.endsAt);
   if (!/^[0-9]{10,15}$/.test(input.phone) || !parameter(input.fullName) || !parameter(input.workshopName) ||
-    !Number.isFinite(start) || !Number.isFinite(end) || start > now || end <= now || end <= start) return { status: 'skipped', reason: 'invalid_input' };
-  const base = `https://graph.facebook.com/${version}/`;
-  const headers = { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' };
-  let submitting = false;
+    !Number.isFinite(start) || !Number.isFinite(end) || start > now || end <= now || end <= start) {
+    return { status: 'skipped', reason: 'invalid_input' };
+  }
+
+  const headers = { Authorization: 'Bearer ' + config.token, 'Content-Type': 'application/json' };
   try {
-    const metadataResponse = await fetcher(base + TRIAL_WELCOME_TEMPLATE_ID + '?fields=id,name,status,language,components', {
-      headers, cache: 'no-store', signal: AbortSignal.timeout(7000),
-    });
-    if (!metadataResponse.ok) return { status: 'skipped', reason: 'provider_rejected', httpStatus: metadataResponse.status };
-    const metadata = await metadataResponse.json();
-    if (metadata?.status !== 'APPROVED') return { status: 'skipped', reason: 'template_not_approved' };
-    let template;
-    try { template = buildTrialWelcomeTemplate(metadata, input); }
-    catch { return { status: 'skipped', reason: 'unsupported_template' }; }
-    submitting = true;
-    const response = await fetcher(base + config.phoneId + '/messages', {
-      method: 'POST', headers,
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: input.phone, type: 'template', template }),
-      cache: 'no-store', signal: AbortSignal.timeout(12000),
+    // Never retry after an ambiguous POST. It may already have been accepted.
+    const response = await fetcher('https://graph.facebook.com/' + version + '/' + config.phoneId + '/messages', {
+      method: 'POST', headers, cache: 'no-store', signal: AbortSignal.timeout(12000),
+      body: JSON.stringify({
+        messaging_product: 'whatsapp', to: input.phone, type: 'template',
+        template: buildTrialWelcomeSendTemplate(input, (config.variableCount || 4) as 4 | 5),
+      }),
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) return {
@@ -116,8 +133,6 @@ export async function sendTrialWelcomeViaMeta(
       ? { status: 'accepted', messageId: id }
       : { status: 'unconfirmed', reason: 'invalid_provider_response' };
   } catch {
-    // A timeout after POST may still mean Meta accepted the message. Never send
-    // another welcome as a fallback: that would risk duplicate marketing messages.
-    return { status: submitting ? 'unconfirmed' : 'skipped', reason: 'transport_error' };
+    return { status: 'unconfirmed', reason: 'transport_error' };
   }
 }
