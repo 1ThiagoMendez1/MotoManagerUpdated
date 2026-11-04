@@ -16,7 +16,15 @@ async function getVerifiedCustomerLinks() {
     .select('customer_id, organization_id')
     .eq('user_id', user.id);
   if (linkError || !links?.length) return null;
-  return { userId: user.id, links, admin };
+  // Never expose data or allow appointments for an inactive workshop.
+  const organizationIds = [...new Set(links.map(link => link.organization_id))];
+  const { data: active, error: orgError } = await admin.from('organizations')
+    .select('id').in('id', organizationIds).eq('status', 'active');
+  if (orgError || !active?.length) return null;
+  const activeIds = new Set(active.map(org => org.id));
+  const authorized = links.filter(link => activeIds.has(link.organization_id));
+  if (!authorized.length) return null;
+  return { userId: user.id, links: authorized, admin };
 }
 
 
@@ -315,7 +323,7 @@ export async function getCustomerPortalOverview(): Promise<CustomerPortalOvervie
   const organizationIds = [...new Set(links.map(link => link.organization_id))];
   const customerIds = [...new Set(links.map(link => link.customer_id))];
   const [{ data: organizations, error: orgError }, { data: motorcycles, error: motoError }] = await Promise.all([
-    admin.from('organizations').select('id, name, slug').in('id', organizationIds).limit(100),
+    admin.from('organizations').select('id, name, slug').in('id', organizationIds).eq('status', 'active').limit(100),
     admin.from('motorcycles').select('id, brand, model, license_plate, organization_id, customer_id')
       .in('customer_id', customerIds).limit(100),
   ]);
