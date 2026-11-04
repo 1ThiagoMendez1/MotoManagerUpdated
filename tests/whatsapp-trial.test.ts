@@ -32,14 +32,14 @@ const response = (data: unknown, status=200) => new Response(JSON.stringify(data
 });
 
 test('Meta trial payload keeps correct name, language and 4 or 5 safe body fields',()=>{
-  const four=buildTrialWelcomeSendTemplate(input);
+  const four=buildTrialWelcomeSendTemplate(input,4);
   assert.equal(four.name,TRIAL_WELCOME_TEMPLATE);
   assert.equal(four.language.code,'es_CO');
   assert.equal(four.components.length,1);
   assert.deepEqual(four.components[0].parameters.map(p=>p.text),[
     'Juan Pérez','Moto Rayo',formatTrialWelcomeDate(input.startsAt),formatTrialWelcomeDate(input.endsAt),
   ]);
-  const five=buildTrialWelcomeSendTemplate(input,5);
+  const five=buildTrialWelcomeSendTemplate(input);
   assert.deepEqual(five.components[0].parameters.map(p=>p.text),[
     'Juan Pérez','Moto Rayo','juan@example.test',formatTrialWelcomeDate(input.startsAt),formatTrialWelcomeDate(input.endsAt),
   ]);
@@ -88,7 +88,7 @@ test('welcome is sent exactly once by template NAME without inaccessible metadat
   assert.equal(calls[0].init?.method,'POST');
   const body=JSON.parse(String(calls[0].init?.body));
   assert.equal(body.template.name,TRIAL_WELCOME_TEMPLATE);
-  assert.equal(body.template.components[0].parameters.length,4);
+  assert.equal(body.template.components[0].parameters.length,5);
   assert.equal(body.to,input.phone);
   assert.doesNotMatch(JSON.stringify(body),/never-send-this-password|fake-test-token/);
 });
@@ -110,7 +110,7 @@ test('invalid Meta response, rejection or timeout never cause a duplicate POST',
   }
 });
 
-test('can select five-variable Meta template explicitly, never by retrying',async()=>{
+test('can select five-variable Meta template explicitly',async()=>{
   const mocked=(async(_url,init)=>{
     const p=JSON.parse(String(init?.body));
     assert.equal(p.template.components[0].parameters.length,5);
@@ -118,4 +118,55 @@ test('can select five-variable Meta template explicitly, never by retrying',asyn
   }) as typeof fetch;
   assert.equal((await sendTrialWelcomeViaMeta(input,{...config,variableCount:5},mocked,now)).status,'accepted');
   assert.equal((await sendTrialWelcomeViaMeta(input,{...config,variableCount:3},mocked,now)).status,'skipped');
+});
+
+
+test('Meta error 132000 on five parameters retries four exactly once, with no recipients added',async()=>{
+  const payloads:number[]=[];
+  const mocked=(async(_url,init)=>{
+    const data=JSON.parse(String(init?.body));
+    const count=data.template.components[0].parameters.length;
+    payloads.push(count);
+    assert.equal(data.to,input.phone);
+    if(count===5) return response({error:{code:132000,message:'Parameter count mismatch'}},400);
+    return response({messages:[{id:'wamid.four-test'}]});
+  }) as typeof fetch;
+  assert.deepEqual(await sendTrialWelcomeViaMeta(input,config,mocked,now),
+    {status:'accepted',messageId:'wamid.four-test'});
+  assert.deepEqual(payloads,[5,4]);
+});
+
+test('Meta error 132000 on four parameters retries five exactly once',async()=>{
+  const attempts:number[]=[];
+  const mocked=(async(_url,init)=>{
+    const count=JSON.parse(String(init?.body)).template.components[0].parameters.length;
+    attempts.push(count);
+    return count===4
+      ? response({error:{code:132000}},400)
+      : response({messages:[{id:'wamid.five-test'}]});
+  }) as typeof fetch;
+  assert.deepEqual(await sendTrialWelcomeViaMeta(input,{...config,variableCount:4},mocked,now),
+    {status:'accepted',messageId:'wamid.five-test'});
+  assert.deepEqual(attempts,[4,5]);
+});
+
+test('two definitive 132000 rejections stop after two attempts without sending a third',async()=>{
+  let calls=0;
+  const mocked=(async()=>{calls++;return response({error:{code:132000}},400);}) as typeof fetch;
+  const result=await sendTrialWelcomeViaMeta(input,config,mocked,now);
+  assert.deepEqual(result,{status:'unconfirmed',reason:'provider_rejected',httpStatus:400,metaCode:132000});
+  assert.equal(calls,2);
+});
+
+test('Meta non-132000 rejection or ambiguous provider response never retried',async()=>{
+  for(const provider of [
+    ()=>response({error:{code:132001}},400),
+    ()=>response({messages:[]},200),
+    ()=>response({messages:[{id:'wamid.accepted'}]},200),
+  ]){
+    let calls=0;
+    const mocked=(async()=>{calls++;return provider();}) as typeof fetch;
+    await sendTrialWelcomeViaMeta(input,config,mocked,now);
+    assert.equal(calls,1);
+  }
 });
