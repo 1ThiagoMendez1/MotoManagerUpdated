@@ -1,6 +1,9 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createHash } from 'node:crypto';
+import { headers } from 'next/headers';
+import { analyticsClientIp } from '@/lib/analytics/web-http';
 import { createClient } from '@/lib/supabase/server';
 import { generateMobileCode, generateTemporaryPassword, hashMobileCode, normalizeMobilePhone } from '@/lib/mobile-otp';
 import { deriveWorkshopQrPepper } from '@/lib/workshops/qr-secret';
@@ -59,6 +62,21 @@ export async function requestCustomerPortalCode(input: string): Promise<AccessRe
   if (!deliveryConfigured()) return { error: 'El acceso por WhatsApp no está disponible en este momento.' };
 
   try {
+    // Defense in depth against code-sending abuse across many phone numbers.
+    // The existing atomic DB quota is keyed by a separate hash of the trusted
+    // ingress IP; it does not consume trial-signup quota or expose raw IPs.
+    const requestHeaders = await headers();
+    const clientIp = analyticsClientIp(requestHeaders, process.env.ANALYTICS_CLIENT_IP_HEADER || 'x-real-ip');
+    if (clientIp) {
+      const key = createHash('sha256').update('customer-portal-otp-ip:' + clientIp).digest('hex');
+      const admin = createAdminClient();
+      const { data: allowed, error: limitError } = await admin.rpc('claim_trial_signup_attempt', { p_key: key });
+      if (limitError || !allowed) {
+        return { error: 'Hay demasiadas solicitudes desde esta conexión. Espera antes de pedir otro código.', retryAfterSeconds: 3600 };
+      }
+    }
+    // If the trusted ingress cannot establish an IP, the per-phone atomic
+    // cooldown and per-phone daily quota remain mandatory in the OTP RPC.
     const account = await linkedTechnicalAccount(phone);
     if (!account) return accessSent;
     const code = generateMobileCode();
