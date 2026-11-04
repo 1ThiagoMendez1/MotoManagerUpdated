@@ -68,16 +68,7 @@ export default async function QuotePage({
     .eq('id', resolvedParams.id)
     .single()
 
-  if (error || !workOrder) {
-    return (
-      <div style={{ padding: 20, color: 'white', backgroundColor: 'black' }}>
-        <h1>Error loading QuotePage</h1>
-        <p><strong>ID Queried:</strong> {resolvedParams.id}</p>
-        <p><strong>Error:</strong> {JSON.stringify(error, null, 2)}</p>
-        <p><strong>workOrder:</strong> {JSON.stringify(workOrder, null, 2)}</p>
-      </div>
-    );
-  }
+  if (error || !workOrder) notFound();
 
   let parsedDeposit = 0;
   if (workOrder.customer_observations) {
