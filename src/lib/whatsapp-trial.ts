@@ -75,14 +75,15 @@ export function buildTrialWelcomeTemplate(metadata: unknown, input: TrialWelcome
 }
 
 /**
- * Send one onboarding message by template NAME.
- * A hardcoded Meta template-object ID blocked every send when it was inaccessible
- * on this WABA. Meta validates name, locale and approval on POST.
+ * Send one activation template with exactly the positional variables that Meta
+ * expects. The approved template has historically existed with 4 and 5 body
+ * variables, and edits of a template can change the actual accepted count.
  *
- * Default is four body variables per the trial template screenshot. A
- * five-variable version can be selected explicitly via environment config.
+ * Only an explicit HTTP error 132000 (Meta unequivocally rejected the request
+ * for parameter count mismatch) may trigger one alternative request. Never
+ * resend after a timeout, HTTP 200 or ambiguous provider response.
  */
-export function buildTrialWelcomeSendTemplate(input: TrialWelcomeInput, variableCount: 4 | 5 = 4) {
+export function buildTrialWelcomeSendTemplate(input: TrialWelcomeInput, variableCount: 4 | 5 = 5) {
   const values = [parameter(input.fullName), parameter(input.workshopName)];
   if (variableCount === 5) values.push(parameter(input.email, 254));
   values.push(formatTrialWelcomeDate(input.startsAt), formatTrialWelcomeDate(input.endsAt));
@@ -108,31 +109,53 @@ export async function sendTrialWelcomeViaMeta(
   }
   const start = Date.parse(input.startsAt);
   const end = Date.parse(input.endsAt);
-  if (!/^[0-9]{10,15}$/.test(input.phone) || !parameter(input.fullName) || !parameter(input.workshopName) ||
-    !Number.isFinite(start) || !Number.isFinite(end) || start > now || end <= now || end <= start) {
+  if (!/^[0-9]{10,15}$/.test(input.phone) || !parameter(input.fullName) ||
+    !parameter(input.workshopName) || !Number.isFinite(start) || !Number.isFinite(end) ||
+    start > now || end <= now || end <= start) {
     return { status: 'skipped', reason: 'invalid_input' };
   }
 
+  const initialCount = config.variableCount || 5;
+  const alternateCount = initialCount === 5 ? 4 : 5;
+  const url = 'https://graph.facebook.com/' + version + '/' + config.phoneId + '/messages';
   const headers = { Authorization: 'Bearer ' + config.token, 'Content-Type': 'application/json' };
-  try {
-    // Never retry after an ambiguous POST. It may already have been accepted.
-    const response = await fetcher('https://graph.facebook.com/' + version + '/' + config.phoneId + '/messages', {
+  const send = async (count: 4 | 5) => {
+    const response = await fetcher(url, {
       method: 'POST', headers, cache: 'no-store', signal: AbortSignal.timeout(12000),
       body: JSON.stringify({
         messaging_product: 'whatsapp', to: input.phone, type: 'template',
-        template: buildTrialWelcomeSendTemplate(input, (config.variableCount || 4) as 4 | 5),
+        template: buildTrialWelcomeSendTemplate(input, count),
       }),
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) return {
-      status: 'unconfirmed', reason: 'provider_rejected', httpStatus: response.status,
-      ...(typeof payload?.error?.code === 'number' ? { metaCode: payload.error.code } : {}),
-    };
-    const id = payload?.messages?.[0]?.id;
-    return typeof id === 'string' && id.length > 0
-      ? { status: 'accepted', messageId: id }
-      : { status: 'unconfirmed', reason: 'invalid_provider_response' };
+    return { response, payload };
+  };
+  try {
+    // The 4-parameter template was rejected with Meta 132000 in production.
+    // Use 5 first; try 4 only if Meta explicitly confirms 5 was rejected.
+    for (const count of [initialCount, alternateCount] as const) {
+      const { response, payload } = await send(count as 4 | 5);
+      if (!response.ok) {
+        const metaCode = typeof payload?.error?.code === 'number' ? payload.error.code : undefined;
+        if (metaCode === 132000 && count === initialCount) {
+          // First POST was definitively rejected and could not have sent a message.
+          // Keep logs free of phone numbers, content and credentials.
+          console.warn('[trial-whatsapp] Meta template count mismatch; testing alternate approved shape', {
+            firstCount: initialCount, secondCount: alternateCount, metaCode,
+          });
+          continue;
+        }
+        return { status: 'unconfirmed', reason: 'provider_rejected',
+          httpStatus: response.status, ...(metaCode !== undefined ? { metaCode } : {}) };
+      }
+      const id = payload?.messages?.[0]?.id;
+      return typeof id === 'string' && id.length > 0
+        ? { status: 'accepted', messageId: id }
+        : { status: 'unconfirmed', reason: 'invalid_provider_response' };
+    }
+    return { status: 'unconfirmed', reason: 'invalid_provider_response' };
   } catch {
+    // A transport error is ambiguous: never retry, to avoid duplicate delivery.
     return { status: 'unconfirmed', reason: 'transport_error' };
   }
 }
