@@ -16,8 +16,10 @@ export function SearchMotorcycles() {
 
     if (searchQuery.trim()) {
       params.set('query', searchQuery.trim());
+      params.delete('page');
     } else {
       params.delete('query');
+      params.delete('page');
     }
 
     router.push(`/motorcycles?${params.toString()}`);
@@ -27,6 +29,7 @@ export function SearchMotorcycles() {
     setQuery('');
     const params = new URLSearchParams(searchParams.toString());
     params.delete('query');
+    params.delete('page');
     router.push(`/motorcycles?${params.toString()}`);
   };
 

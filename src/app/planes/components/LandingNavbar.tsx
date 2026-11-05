@@ -1,143 +1,68 @@
 'use client';
-import Link from 'next/link';
+
+import { useState } from 'react';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
-import { Menu, X, Sun, Moon } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
+import Link from 'next/link';
+import { ArrowRight, Menu, PlayCircle, X } from 'lucide-react';
+import styles from './halloween.module.css';
+import { Gift } from 'lucide-react';
 
-export function LandingNavbar({ user }: { user?: any }) {
-  const [scrolled, setScrolled] = useState(false);
+const NAV = [
+  { label: 'Demo en vivo', href: '#demo' },
+  { label: 'Funcionalidades', href: '#funciones' },
+  { label: 'Cómo funciona', href: '#como-funciona' },
+  { label: 'Precios', href: '#planes' },
+  { label: 'Talleres', href: '#workshops' },
+  { label: 'Preguntas', href: '#faq' },
+];
+
+export function LandingNavbar({ user, halloween = false, christmas = false }: { user?: unknown; halloween?: boolean; christmas?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const { theme, setTheme } = useTheme();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
-
-  useEffect(() => {
-    setMounted(true);
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const links = [
-    { href: '#funciones', label: 'Funciones' },
-    { href: '#demo', label: 'Demo' },
-    { href: '#workshops', label: 'Talleres' },
-    { href: '#planes', label: 'Planes' },
-    { href: '#faq', label: 'FAQ' },
-  ];
-
-  const scrollTo = (id: string) => {
-    setOpen(false);
-    const el = document.querySelector(id);
-    el?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
+  const destination = user ? '/dashboard' : '/login';
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'bg-background/90 backdrop-blur-xl border-b border-border/50 shadow-lg'
-          : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link href={user ? "/" : "/planes"} className="flex items-center gap-2 group hover:opacity-80 transition-opacity">
-          <div className="relative w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 drop-shadow-md">
-            <Image 
-              src="/logo.png" 
-              alt="MotoManager Logo" 
-              fill
-              sizes="(max-width: 640px) 48px, 64px"
-              className="object-contain"
-              priority
-            />
-          </div>
+    <header className={`sticky top-0 z-[80] border-b border-white/10 bg-[#060d1b]/95 text-white shadow-lg shadow-black/10 backdrop-blur-xl ${halloween ? styles.editionNav : ''}`}>
+      <nav className={`mx-auto flex max-w-7xl items-center justify-between gap-2.5 px-3 sm:px-5 ${christmas ? 'h-[66px] sm:h-[74px]' : 'h-[74px]'}`} aria-label="Navegación principal">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="MotoManager - inicio">
+          <span className={`relative h-11 w-11 rounded-xl bg-white/10 ${christmas ? 'overflow-visible' : 'overflow-hidden'}`}>
+            <Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" />
+            {christmas && <Image src="/campaigns/navidad-gorro-logo.svg" alt="" width={34} height={31} unoptimized className="pointer-events-none absolute -right-2 -top-3 z-10 rotate-[12deg] drop-shadow-md" />}
+          </span>
+          <span className="text-base font-extrabold tracking-[-0.045em] sm:text-lg">MotoManager{halloween && <span className={styles.navEdition}>HALLOWEEN EDITION</span>}</span>
+          {christmas && <span className="hidden items-center gap-1 rounded-full border border-emerald-300/25 bg-emerald-900/45 px-2 py-1 text-[10px] font-extrabold text-emerald-100 sm:inline-flex"><Gift className="h-3 w-3 text-[#ffd08b]"/>Navidad</span>}
         </Link>
-
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1">
-          {links.map(l => (
-            <button
-              key={l.href}
-              onClick={() => scrollTo(l.href)}
-              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground rounded-lg hover:bg-accent/30 transition-all"
-            >
-              {l.label}
-            </button>
+        <div className="hidden items-center gap-4 xl:flex">
+          {NAV.map(item => (
+            <a key={item.href} href={item.href} className={'text-sm font-semibold transition hover:text-white ' + (item.href === '#demo' ? 'text-[#ff9e4c]' : 'text-slate-300')}>{item.label}</a>
           ))}
-        </nav>
-
-        {/* Desktop CTA */}
-        <div className="hidden md:flex items-center gap-2">
-          {/* Theme Toggle */}
-          {mounted && (
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-all"
-              aria-label="Cambiar tema"
-            >
-              {theme === 'dark' ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </button>
-          )}
         </div>
-
-        {/* Mobile buttons */}
-        <div className="md:hidden flex items-center gap-1">
-          {/* Theme Toggle Mobile */}
-          {mounted && (
-            <button
-              onClick={toggleTheme}
-              className="p-2 text-muted-foreground hover:text-foreground"
-              aria-label="Cambiar tema"
-            >
-              {theme === 'dark' ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </button>
-          )}
-          <button
-            onClick={() => setOpen(!open)}
-            className="text-muted-foreground hover:text-foreground p-2"
-          >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+        <div className="hidden items-center gap-3 xl:flex">
+          <Link href="/clientes" className="rounded-lg px-2 py-2.5 text-sm font-semibold text-orange-200 transition hover:bg-white/10">Mi garaje</Link>
+          <Link href={destination} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/10">
+            {user ? 'Ir al sistema' : 'Iniciar sesión'}
+          </Link>
+          <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} className="inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-5 py-3 text-sm font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
+            {user ? 'Ver mi plan' : '15 días gratis'} <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
-      </div>
-
-      {/* Mobile menu */}
+        {christmas && <Link href={user ? '/dashboard/subscription' : '/prueba-gratis'} data-analytics-id="nav_trial" className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#ff8a1d] px-3 text-[11px] font-extrabold text-[#0a1425] sm:px-4 sm:text-xs xl:hidden">{user ? 'Mi plan' : '15 días gratis'} <ArrowRight className="h-3.5 w-3.5"/></Link>}
+        <button
+          type="button" onClick={() => setOpen(v => !v)}
+          aria-label={open ? 'Cerrar menú' : 'Abrir menú'} aria-controls="landing-mobile-menu" aria-expanded={open}
+          className="rounded-lg border border-white/15 p-2.5 text-white xl:hidden"
+        >
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </nav>
       {open && (
-        <div className="md:hidden bg-background/95 backdrop-blur-xl border-t border-border/50 px-4 py-4 space-y-1">
-          {links.map(l => (
-            <button
-              key={l.href}
-              onClick={() => scrollTo(l.href)}
-              className="block w-full text-left px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-accent/20 rounded-xl transition-all"
-            >
-              {l.label}
-            </button>
-          ))}
-          <div className="pt-2 border-t border-border/30 space-y-2">
+        <div id="landing-mobile-menu" className="border-t border-white/10 bg-[#0b1829] px-5 py-4 xl:hidden">
+          <div className="mx-auto flex max-w-7xl flex-col gap-1">
+            {NAV.map(item => <a key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{item.label}</a>)}
+            <Link href="/clientes" onClick={() => setOpen(false)} className="rounded-xl border border-orange-400/20 bg-orange-400/10 px-4 py-3 text-sm font-bold text-orange-200">🏍️ Mi garaje · Clientes</Link>
+            <Link href={destination} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{user ? 'Ir al sistema' : 'Iniciar sesión'}</Link>
+            <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 py-3 text-sm font-extrabold text-[#081121]">
+              {user ? 'Ver mi plan' : 'Activar 15 días gratis'} <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       )}

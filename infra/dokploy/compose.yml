@@ -1,0 +1,65 @@
+name: motomanager
+
+# Stage 1: a migration/rehearsal target. The current app still uses Supabase.
+# Do not point production traffic here or assume DATABASE_URL replaces Supabase.
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: motomanager
+      POSTGRES_USER: motomanager
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong PostgreSQL password in Dokploy}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    shm_size: 256mb
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U motomanager -d motomanager']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+    # No host port: connect from trusted services on this private network.
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+
+  redis:
+    image: redis:7.4.8-alpine
+    profiles: [cache]
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        test -n "$$REDIS_PASSWORD" || { echo 'Set REDIS_PASSWORD in Dokploy'; exit 1; }
+        test "$${#REDIS_PASSWORD}" -ge 64 || { echo 'REDIS_PASSWORD must have at least 64 hexadecimal characters'; exit 1; }
+        umask 077
+        printf '%s\n' 'bind 0.0.0.0' 'protected-mode yes' 'appendonly yes' 'maxmemory 256mb' 'maxmemory-policy allkeys-lru' > /tmp/redis.conf
+        # Accept hexadecimal secrets to keep the generated config unambiguous.
+        case "$$REDIS_PASSWORD" in *[!a-fA-F0-9]*) echo 'Use a hexadecimal REDIS_PASSWORD'; exit 1;; esac
+        printf 'requirepass %s\n' "$$REDIS_PASSWORD" >> /tmp/redis.conf
+        chown redis:redis /tmp/redis.conf
+        exec /usr/local/bin/docker-entrypoint.sh redis-server /tmp/redis.conf
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [backend]
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: '3' }
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  backend:
+    internal: true

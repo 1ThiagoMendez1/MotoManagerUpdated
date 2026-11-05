@@ -27,9 +27,13 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { formatExactDateTime } from '@/lib/dateUtils'
 import Link from 'next/link'
+import { DeliveredServiceReview } from '@/components/profile/DeliveredServiceReview'
+import { ProfileAvatarUploader } from '@/components/profile/ProfileAvatarUploader'
 
 type PortalData = {
   workshopName: string
+  workshopSlug?: string
+  avatarUrl?: string | null
   customer: {
     id: string
     name: string
@@ -54,6 +58,7 @@ type PortalData = {
     createdAt: string
     workshopName: string
     mechanicName?: string | null
+    review?: { rating: number; recommended: boolean; comment: string; publishComment: boolean } | null
   }>
   appointments: Array<{
     id: string
@@ -135,7 +140,7 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
   const getWorkOrderStatusInfo = (status: string) => {
     switch (status) {
       case 'intake':
-        return { label: 'Ingreso a revisión', color: 'bg-blue-500/15 text-blue-400' }
+        return { label: 'Nueva orden', color: 'bg-blue-500/15 text-blue-400' }
       case 'diagnosis':
         return { label: 'Diagnosticando', color: 'bg-amber-500/15 text-amber-400' }
       case 'repair':
@@ -197,6 +202,10 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
         </div>
 
         <div className="space-y-5">
+          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+            <h2 className="mb-3 text-base font-semibold text-white">Mi perfil</h2>
+            <ProfileAvatarUploader initialUrl={data.avatarUrl} name={data.customer.name} />
+          </section>
 
           {/* Customer & Motorcycle Info */}
           <Card className="bg-slate-900/50 backdrop-blur-xl border-slate-800/60 shadow-xl overflow-hidden">
@@ -298,6 +307,10 @@ export function ClientPortalContent({ data, auth }: { data: PortalData; auth: st
                           </div>
                         </div>
 
+                        {(wo.status === 'delivered' || wo.status === 'delivered_quote_rejected') &&
+                          <DeliveredServiceReview orderId={wo.id} orderNumber={wo.orderNumber}
+                            workshopName={data.workshopName} workshopSlug={data.workshopSlug}
+                            existing={wo.review || null} />}
                         {wo.reportedSymptoms && (
                           <p className="text-slate-400 text-xs mb-3 line-clamp-2 leading-relaxed">
                             <span className="text-slate-500 font-semibold">Problema: </span>

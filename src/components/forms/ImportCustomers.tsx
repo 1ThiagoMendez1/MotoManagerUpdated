@@ -14,7 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+
 import { importCustomers } from '@/lib/actions/customers';
 
 export function ImportCustomers() {
@@ -35,9 +35,10 @@ export function ImportCustomers() {
 
   const readExcel = (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = e.target?.result as ArrayBuffer;
+        const XLSX = await import('xlsx');
         const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];

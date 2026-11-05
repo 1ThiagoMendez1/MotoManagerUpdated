@@ -1,7 +1,18 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUserServer } from '@/lib/auth-server';
+import { hasPermission } from '@/lib/permissions';
 import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
+
+
+async function assertAccountingScope(organizationId: string) {
+  const user = await getCurrentUserServer();
+  if (!user || user.workshopId !== organizationId ||
+      !hasPermission(user.role, '/accounting', user.custom_permissions)) {
+    throw new Error('Acceso denegado a la contabilidad del taller.');
+  }
+}
 
 // Tipos para las ventas por categoría
 export interface CategorySaleSummary {
@@ -10,6 +21,7 @@ export interface CategorySaleSummary {
 }
 
 export async function getSalesByCategory(organizationId: string, startDate?: string, endDate?: string): Promise<CategorySaleSummary[]> {
+  await assertAccountingScope(organizationId);
   const supabase = await createClient();
 
   // We will build a raw query or use multiple queries and aggregate in JS
@@ -77,6 +89,7 @@ export async function getSalesByCategory(organizationId: string, startDate?: str
 }
 
 export async function getSalesByPaymentMethod(organizationId: string, startDate?: string, endDate?: string): Promise<{ method: string; total: number }[]> {
+  await assertAccountingScope(organizationId);
   const supabase = await createClient();
   let query = supabase
     .from('sales')
@@ -139,6 +152,7 @@ export async function getTechnicianWork(
   startDate?: string, 
   endDate?: string
 ): Promise<TechnicianWorkSummary[]> {
+  await assertAccountingScope(organizationId);
   const supabase = await createClient();
 
   // The technician is assigned to the work_order.
@@ -212,6 +226,7 @@ export async function registerPayrollPayment(
   commissionPercentage: number,
   totalPaid: number
 ) {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -255,6 +270,7 @@ export interface PayrollPaymentSummary {
 }
 
 export async function getPayrollHistory(organizationId: string): Promise<PayrollPaymentSummary[]> {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -297,6 +313,7 @@ export async function getPayrollHistory(organizationId: string): Promise<Payroll
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 export async function getOrganizationTechnicians(organizationId: string) {
+  await assertAccountingScope(organizationId);
   try {
     const supabaseAdmin = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -344,6 +361,7 @@ export async function addExpense(
   date?: string,
   paymentMethod?: string
 ) {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -373,6 +391,7 @@ export async function addExpense(
 }
 
 export async function getExpenses(organizationId: string, startDate?: string, endDate?: string) {
+  await assertAccountingScope(organizationId);
   noStore();
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -422,6 +441,7 @@ export async function getDailyClosingSummary(
   clientStartIso?: string,
   clientEndIso?: string
 ): Promise<DailyClosingSummary> {
+  await assertAccountingScope(organizationId);
   noStore();
   // Query sales
   let startIso, endIso;
@@ -628,6 +648,7 @@ export async function closeDay(
   status: 'closed' | 'no_sales',
   summary: DailyClosingSummary
 ) {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -663,6 +684,7 @@ export async function closeDay(
 }
 
 export async function getDailyClosings(organizationId: string, limit = 30) {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -708,6 +730,7 @@ export async function getRealtimeFinancialDataRaw(
   startIso: string, 
   endIso: string
 ): Promise<RealtimeFinancialData> {
+  await assertAccountingScope(organizationId);
   noStore();
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -779,6 +802,7 @@ export async function getRealtimeFinancialDataRaw(
 }
 
 export async function setInitialCashBase(organizationId: string, date: string, amount: number, description: string = 'Apertura', type: string = 'addition') {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -801,6 +825,7 @@ export async function setInitialCashBase(organizationId: string, date: string, a
 }
 
 export async function getInitialCashBase(organizationId: string, date: string) {
+  await assertAccountingScope(organizationId);
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,

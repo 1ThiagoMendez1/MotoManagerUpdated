@@ -208,11 +208,11 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
                 )}
                 <div><span className="font-medium">Problema Reportado:</span></div>
                 <div className="bg-background p-3 rounded border text-muted-foreground italic">
-                  "{sale.workOrder.issueDescription || 'No registrado por el cliente.'}"
+                  &quot;{sale.workOrder.issueDescription || 'No registrado por el cliente.'}&quot;
                 </div>
                 <div><span className="font-medium">Solución Realizada:</span></div>
                 <div className="bg-background p-3 rounded border text-muted-foreground italic">
-                  "{(sale.workOrder as any).solutionDescription || 'No se registró una solución específica.'}"
+                  &quot;{(sale.workOrder as any).solutionDescription || 'No se registró una solución específica.'}&quot;
                 </div>
                 <div>
                   <span className="font-medium">Estado Final:</span>

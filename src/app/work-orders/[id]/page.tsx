@@ -73,6 +73,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
       technicians={technicians}
       inventory={inventory}
       userRole={user.role}
+      organizationId={user.workshopId!}
       partRequests={partRequests as any || []}
       services={services}
       reminders={reminders}

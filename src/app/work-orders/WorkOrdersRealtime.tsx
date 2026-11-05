@@ -3,80 +3,25 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { createRealtimeRefresh } from '@/lib/realtime-refresh';
 
-export default function WorkOrdersRealtime() {
-    const router = useRouter();
-
-    useEffect(() => {
-        const supabase = createClient();
-        
-        const channel = supabase.channel('work-orders-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'work_orders'
-                },
-                (payload) => {
-                    console.log('Realtime update on work_orders:', payload);
-                    router.refresh();
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'motorcycles'
-                },
-                (payload) => {
-                    console.log('Realtime update on motorcycles:', payload);
-                    router.refresh();
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'part_requests'
-                },
-                (payload) => {
-                    console.log('Realtime update on part_requests:', payload);
-                    router.refresh();
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'work_order_services'
-                },
-                (payload) => {
-                    console.log('Realtime update on work_order_services:', payload);
-                    router.refresh();
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'sale_items'
-                },
-                (payload) => {
-                    console.log('Realtime update on sale_items:', payload);
-                    router.refresh();
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [router]);
-
-    return null; // This component doesn't render anything, it just listens for changes
+export default function WorkOrdersRealtime({ organizationId }: { organizationId: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    const supabase = createClient();
+    const refresh = createRealtimeRefresh(() => router.refresh());
+    let channel = supabase.channel(`work-orders-${organizationId}`);
+    for (const table of ['work_orders', 'motorcycles', 'part_requests']) {
+      channel = channel.on('postgres_changes', {
+        event: '*', schema: 'public', table, filter: `organization_id=eq.${organizationId}`,
+      }, refresh.schedule);
+    }
+    // These child tables have no organization_id. Their RLS policies scope access.
+    for (const table of ['work_order_services', 'sale_items']) {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, refresh.schedule);
+    }
+    channel.subscribe();
+    return () => { refresh.dispose(); void supabase.removeChannel(channel); };
+  }, [router, organizationId]);
+  return null;
 }

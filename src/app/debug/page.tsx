@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 export default async function DebugPage() {
+    const { requireSuperAdmin } = await import('@/lib/auth-server');
+    await requireSuperAdmin();
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 

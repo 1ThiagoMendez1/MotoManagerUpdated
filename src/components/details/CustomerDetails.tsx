@@ -122,7 +122,7 @@ export function CustomerDetails({ customer }: { customer: Customer }) {
                           <Badge className="bg-foreground/10 text-foreground shadow-none">{wo.status}</Badge>
                         </div>
                         <p className="text-sm font-medium">Moto: <span className="text-muted-foreground">{wo.motorcycle}</span></p>
-                        <p className="text-sm text-muted-foreground line-clamp-2">"{wo.issue}"</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">&quot;{wo.issue}&quot;</p>
                         <p className="text-xs text-muted-foreground mt-1">{formatExactDateTime(wo.createdAt)}</p>
                       </div>
                     ))

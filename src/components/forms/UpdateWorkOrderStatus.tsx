@@ -22,8 +22,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { updateWorkOrderStatus } from '@/lib/actions/work-orders';
+import { WORK_ORDER_STATUS_OPTIONS, isChangeableOrderStatus } from '@/lib/work-order-status';
 import type { WorkOrder } from '@/lib/types';
 import { formatExactDateTime } from '@/lib/dateUtils';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -42,15 +45,16 @@ interface UpdateWorkOrderStatusProps {
 
 export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string>(workOrder.status);
+  const [selectedStatus, setSelectedStatus] = useState<string>(isChangeableOrderStatus(workOrder.status) ? workOrder.status : '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { toast } = useToast();
   // @ts-ignore
   const [state, formAction] = useActionState(updateWorkOrderStatus, undefined);
 
   // Reset selected status whenever the dialog opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedStatus(workOrder.status);
+      setSelectedStatus(isChangeableOrderStatus(workOrder.status) ? workOrder.status : '');
       setErrorMsg(null);
     }
   }, [isOpen, workOrder.status]);
@@ -60,21 +64,27 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
     if (state?.success) {
       setIsOpen(false);
       setErrorMsg(null);
+      if ('whatsappWarning' in state && state.whatsappWarning) {
+        toast({
+          title: 'Estado guardado, pero no se envió WhatsApp',
+          description: state.whatsappWarning,
+          variant: 'destructive',
+          action: ('whatsappManualUrl' in state && state.whatsappManualUrl)
+            ? <ToastAction altText="Enviar aviso manual por WhatsApp" onClick={() => {
+                window.open(state.whatsappManualUrl, '_blank', 'noopener,noreferrer');
+              }}>Abrir WhatsApp</ToastAction> : undefined,
+        });
+      }
     } else if (state?.message) {
       setErrorMsg(state.message);
     }
-  }, [state]);
-
-  const statusOptions = [
-    { value: 'Ingreso a revisión', label: 'Ingreso a revisión' },
-    { value: 'Diagnosticando', label: 'Diagnosticando' },
-    { value: 'En proceso', label: 'En proceso' },
-    { value: 'Reparado', label: 'Reparado' },
-    { value: 'Entregado', label: 'Entregado' },
-    { value: 'Moto entregada por cotización rechazada', label: 'Moto entregada por cotización rechazada' },
-  ];
+  }, [state, toast]);
 
   const handleSubmit = (formData: FormData) => {
+    if (!isChangeableOrderStatus(selectedStatus)) {
+      setErrorMsg('Selecciona un estado disponible.');
+      return;
+    }
     if (selectedStatus === workOrder.status) {
       setErrorMsg('Seleccioná un estado diferente al actual.');
       return;
@@ -115,9 +125,9 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
                 <SelectValue placeholder="Selecciona un estado" />
               </SelectTrigger>
               <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                {WORK_ORDER_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -149,4 +159,4 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
       </DialogContent>
     </Dialog>
   );
-}
+}

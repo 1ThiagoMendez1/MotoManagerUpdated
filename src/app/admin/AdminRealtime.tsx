@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { createRealtimeRefresh } from '@/lib/realtime-refresh';
 
 
 export default function AdminRealtime() {
@@ -10,6 +11,7 @@ export default function AdminRealtime() {
 
     useEffect(() => {
         const supabase = createClient();
+        const refresh = createRealtimeRefresh(() => router.refresh());
         
         const channel = supabase.channel('admin-global-changes')
             .on(
@@ -17,11 +19,10 @@ export default function AdminRealtime() {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'workshops'
+                    table: 'organizations'
                 },
                 (payload) => {
-                    console.log('Realtime update on workshops:', payload);
-                    router.refresh();
+                    refresh.schedule();
                 }
             )
             .on(
@@ -29,17 +30,17 @@ export default function AdminRealtime() {
                 {
                     event: '*',
                     schema: 'public',
-                    table: 'user_profiles'
+                    table: 'profiles'
                 },
                 (payload) => {
-                    console.log('Realtime update on users:', payload);
-                    router.refresh();
+                    refresh.schedule();
                 }
             )
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            refresh.dispose();
+            void supabase.removeChannel(channel);
         };
     }, [router]);
 

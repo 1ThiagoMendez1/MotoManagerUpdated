@@ -33,6 +33,7 @@ export const viewport = {
 };
 
 import { SubscriptionStatusAlert } from '@/components/subscription/SubscriptionStatusAlert';
+import { TrialBanner } from '@/components/subscription/TrialBanner';
 
 import { WelcomeModal } from '@/components/dashboard/WelcomeModal';
 import ShaderBackground from '@/components/ui/shader-background';
@@ -44,6 +45,9 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { getWorkshopDetails, getCurrentUserServer } from '@/lib/auth-server';
 import { LayoutWrapper } from '@/components/LayoutWrapper';
 import { PartRequestsNotifier } from '@/components/work-orders/PartRequestsNotifier';
+import { WebAnalyticsTracker } from '@/components/analytics/WebAnalyticsTracker';
+import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences';
+import { isSuperAdmin } from '@/lib/super-admin';
 
 export default async function RootLayout({
   children,
@@ -88,6 +92,7 @@ export default async function RootLayout({
           <LayoutWrapper
             workshopSlug={workshop?.slug}
             header={
+              <>
               <Header 
                 workshopName={workshop?.name}
                 workshopSlug={workshop?.slug}
@@ -99,9 +104,12 @@ export default async function RootLayout({
                 userRole={workshop?.user_role || user?.role}
                 customPermissions={workshop?.custom_permissions || user?.custom_permissions}
               />
+              {workshop?.is_trial && workshop.subscription_end_date && <TrialBanner endDate={workshop.subscription_end_date} canManage={['owner', 'admin'].includes(workshop.user_role || '')} />}
+              </>
             }
             sidebar={
               <AppSidebar
+                isPlatformAdmin={isSuperAdmin(user)}
                 workshopName={workshop?.name}
                 workshopSlug={workshop?.slug}
                 userRole={workshop?.user_role || user?.role}
@@ -121,6 +129,8 @@ export default async function RootLayout({
             {children}
           </LayoutWrapper>
           <Toaster />
+          <WebAnalyticsTracker isInternal={isSuperAdmin(user)} />
+          {!isSuperAdmin(user) && <MeasurementPreferences />}
         </TenantProvider>
         </ThemeProvider>
       </body>

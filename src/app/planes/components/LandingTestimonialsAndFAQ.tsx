@@ -1,149 +1,59 @@
 'use client';
-import { Star } from 'lucide-react';
-import { useState } from 'react';
 
-const TESTIMONIALS = [
-  {
-    name: 'Carlos Rodríguez',
-    role: 'Propietario · Moto Service Express, Medellín',
-    avatar: 'CR',
-    gradient: 'from-blue-500 to-cyan-500',
-    stars: 5,
-    text: 'MotoManager me ahorró horas de trabajo al mes. Antes llevaba todo en cuadernos, ahora en segundos sé cuántos repuestos tengo y cuánto he vendido en el mes.',
-  },
-  {
-    name: 'Luisa Fernanda Torres',
-    role: 'Administradora · Taller El Rápido, Bogotá',
-    avatar: 'LT',
-    gradient: 'from-purple-500 to-pink-500',
-    stars: 5,
-    text: 'El WhatsApp automático redujo las llamadas de seguimiento en un 80%. Los clientes reciben su notificación y eso nos ahorra muchísimo tiempo en el día.',
-  },
-  {
-    name: 'Andrés Morales',
-    role: 'Dueño · Motos y Más, Cali',
-    avatar: 'AM',
-    gradient: 'from-amber-500 to-orange-500',
-    stars: 5,
-    text: 'La integración de pagos con Wompi fue un cambio total. Ahora cobro de forma digital y llevo el control de todo desde mi celular sin complicaciones.',
-  },
-  {
-    name: 'Jorge Patiño',
-    role: 'Técnico · Taller Central, Barranquilla',
-    avatar: 'JP',
-    gradient: 'from-green-500 to-emerald-500',
-    stars: 5,
-    text: 'Como técnico, me encanta que puedo ver mis órdenes asignadas desde el celular. Ya no tengo que ir al escritorio a buscar información del cliente.',
-  },
-  {
-    name: 'María Velásquez',
-    role: 'Contadora · Motos del Norte, Bucaramanga',
-    avatar: 'MV',
-    gradient: 'from-red-500 to-rose-500',
-    stars: 5,
-    text: 'Los reportes exportables me ahorran al menos 4 horas semanales de trabajo contable. Descargo el Excel y ya tengo todo organizado por fechas y categorías.',
-  },
-  {
-    name: 'Felipe Giraldo',
-    role: 'Propietario · Moto Flash, Pereira',
-    avatar: 'FG',
-    gradient: 'from-indigo-500 to-purple-500',
-    stars: 5,
-    text: 'Tengo 3 técnicos y cada uno maneja sus propias órdenes. El sistema de roles es perfecto, no se mezclan los trabajos y yo veo todo desde mi cuenta.',
-  },
-];
+import { useState } from 'react';
+import { ChevronDown, MessageCircleQuestion } from 'lucide-react';
+import { getPlanLimits } from '@/lib/constants/plans';
 
 const FAQS = [
-  { q: '¿Hay período de prueba gratuito?', a: 'Actualmente no ofrecemos período de prueba, pero puedes empezar con el plan mensual desde $18.900 y cancelar cuando quieras. No hay compromisos a largo plazo.' },
-  { q: '¿Puedo cambiar de plan en cualquier momento?', a: 'Sí. Si deseas hacer un upgrade, comunícate con nuestro equipo de soporte por WhatsApp y te ayudamos sin costo adicional.' },
-  { q: '¿Qué métodos de pago aceptan?', a: 'Aceptamos tarjeta crédito/débito, Nequi, Daviplata, PSE y efectivo (corresponsales bancarios) a través de Wompi.' },
-  { q: '¿Mis datos están seguros?', a: 'Sí. Toda la información se almacena de forma cifrada en servidores de alta disponibilidad con TLS en tránsito y cifrado en reposo.' },
-  { q: '¿Cómo funciona el soporte técnico?', a: 'Soporte por WhatsApp de lunes a sábado de 8am a 6pm. Respondemos en promedio en menos de 2 horas durante el horario hábil.' },
-  { q: '¿Puedo usar MotoManager desde el celular?', a: 'Sí, MotoManager es 100% responsive. Funciona perfectamente desde cualquier navegador en celular, tablet o computador.' },
-  { q: '¿Cuántos técnicos puedo agregar?', a: 'Todos los planes incluyen técnicos ilimitados. Puedes agregar todo tu equipo sin costo adicional por usuario.' },
-  { q: '¿Qué pasa si no renuevo mi suscripción?', a: 'Tu cuenta queda pausada pero todos tus datos se conservan por 90 días. Puedes reactivarla en cualquier momento.' },
-  { q: '¿Puedo tener varios talleres en la misma cuenta?', a: 'Cada taller requiere su propia suscripción. Si tienes múltiples talleres, contáctanos para un plan especial con descuento.' },
+  { question: '¿Cómo funcionan los 15 días gratis?', answer: 'Crea tu cuenta y tu taller para activar 15 días de Full con tus propios datos y tu equipo. No necesitas tarjeta. La prueba comienza al crear el taller y está disponible una vez por taller, correo y celular. También puedes explorar la demo interactiva sin registro.' },
+  { question: '¿Qué pasa cuando terminan los 15 días?', answer: 'No hay cobros automáticos por la prueba. El acceso operativo se pausa y puedes contratar Básico, Pro o Full desde tu suscripción. Al contratar conservas tus clientes, motos, órdenes e inventario. Si pagas antes de terminar la prueba, se conservan los días gratuitos que te quedan.' },
+  { question: 'Ya uso Excel y WhatsApp, ¿por qué cambiar?', answer: 'Una hoja de cálculo almacena filas; MotoManager relaciona la moto con su dueño, órdenes, diagnóstico, servicios e historial. Así reduces las búsquedas entre archivos y conversaciones separadas.' },
+  { question: '¿Mi equipo necesita conocimientos técnicos?', answer: 'El sistema se organiza por tareas cotidianas como recibir una motocicleta, registrar una orden y consultar su estado. Puedes explorar primero la demostración y evaluar si encaja con la forma de trabajar de tu equipo.' },
+
+  { question: '¿Necesito instalar un programa?', answer: 'No. MotoManager funciona desde el navegador de tu computador, tableta o celular. Solo necesitas acceso a internet y tu cuenta.' },
+  { question: '¿Qué incluye cada plan?', answer: 'Básico cubre el registro de clientes, motos, órdenes, inventario y ventas con límites de uso. Pro añade agenda, técnicos y herramientas de contabilidad. Full amplía límites, permisos y paneles. La tabla de planes detalla las capacidades aplicadas por el sistema.' },
+  { question: '¿Cuántos usuarios puedo registrar?', answer: `Según los límites de equipos implementados actualmente: Básico permite ${getPlanLimits('basic').users_limit} usuarios, Pro ${getPlanLimits('pro').users_limit} y Full no tiene un límite de usuarios por plan.` },
+  { question: '¿Cómo funcionan los avisos por WhatsApp?', answer: `La cuota mensual que aplica el sistema es de ${getPlanLimits('basic').whatsapp_limit} para Básico y ${getPlanLimits('pro').whatsapp_limit} para Pro. Full no tiene tope mensual de plan. El envío efectivo depende de la configuración del proveedor y de sus políticas.` },
+  { question: '¿Cómo se cobra la suscripción?', answer: 'Puedes elegir pago mensual, semestral o anual. Antes de pagar verás el total correspondiente al periodo seleccionado; el proceso de pago utiliza la integración con Wompi.' },
+  { question: '¿Puedo volver a atender una moto que ya fue entregada?', answer: 'Sí. Su historial permanece asociado a la motocicleta. Una vez cerrada la orden anterior, puedes crear un nuevo ingreso sin volver a registrar la moto.' },
+  { question: '¿Puedo cambiar de plan?', answer: 'El sistema contempla los planes Básico, Pro y Full. Si necesitas cambiarlo, consulta las opciones disponibles en tu suscripción o solicita ayuda desde los canales de soporte del sistema.' },
 ];
 
-function FAQItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className={`border rounded-xl overflow-hidden transition-all ${open ? 'border-primary/40 bg-primary/5' : 'border-border/30 bg-muted/20'}`}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 text-left text-foreground hover:bg-card/30 transition-colors"
-      >
-        <span className="font-medium text-sm md:text-base pr-4">{q}</span>
-        <span className={`text-muted-foreground text-lg transition-transform duration-200 shrink-0 ${open ? 'rotate-180' : ''}`}>▾</span>
-      </button>
-      {open && (
-        <div className="px-5 pb-5 text-muted-foreground text-sm leading-relaxed border-t border-border/30 pt-4">
-          {a}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function LandingTestimonialsAndFAQ() {
+  const [active, setActive] = useState<number | null>(0);
   return (
-    <>
-      {/* Testimonials */}
-      <section className="py-24 px-4">
-        <div className="max-w-7xl mx-auto space-y-14">
-          <div className="text-center space-y-4">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-card/30 border border-border/30 text-muted-foreground text-sm font-medium">
-              Testimonios
-            </span>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-foreground">
-              Lo que dicen nuestros clientes
-            </h2>
-            <p className="text-muted-foreground text-lg">Más de 500 talleres ya confían en MotoManager</p>
+    <section id="faq" className="scroll-mt-20 bg-[#f6f8fc] px-5 py-24 text-slate-900 lg:py-28">
+      <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20">
+        <div>
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-sky-700">Información clara</span>
+          <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">Antes de elegir, resuelve tus dudas.</h2>
+          <p className="mt-5 max-w-md text-base leading-7 text-slate-600">
+            Sabemos que cambiar la forma de llevar un taller es una decisión importante. Explora el sistema por dentro y resuelve tus dudas antes de elegir un plan.
+          </p>
+          <div className="mt-8 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm font-medium text-slate-700">
+            <MessageCircleQuestion className="h-5 w-5 text-sky-700" />
+            ¿Quieres verlo primero? Prueba la demo sin crear una cuenta.
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {TESTIMONIALS.map(t => (
-              <div
-                key={t.name}
-                className="p-6 rounded-2xl bg-card/30 border border-border/30 hover:border-border/50 hover:bg-card/[0.07] transition-all group flex flex-col gap-4"
+        </div>
+        <div className="space-y-3">
+          {FAQS.map((item, index) => (
+            <div key={item.question} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <button
+                type="button"
+                onClick={() => setActive(current => current === index ? null : index)}
+                aria-expanded={active === index}
+                className="flex w-full items-center justify-between gap-5 px-5 py-5 text-left font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
               >
-                <div className="flex gap-0.5">
-                  {Array.from({ length: t.stars }).map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-                <p className="text-muted-foreground text-sm leading-relaxed italic flex-1">"{t.text}"</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-border/30">
-                  <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-foreground font-bold text-sm shrink-0`}>
-                    {t.avatar}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-foreground text-sm">{t.name}</p>
-                    <p className="text-muted-foreground text-xs">{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                {item.question}
+                <ChevronDown className={`h-5 w-5 shrink-0 text-sky-700 transition-transform ${active === index ? 'rotate-180' : ''}`} />
+              </button>
+              {active === index && (
+                <p className="border-t border-slate-100 px-5 pb-5 pt-4 text-sm leading-7 text-slate-600 sm:px-6">{item.answer}</p>
+              )}
+            </div>
+          ))}
         </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="py-24 px-4 scroll-mt-20">
-        <div className="max-w-3xl mx-auto space-y-10">
-          <div className="text-center space-y-4">
-            <span className="inline-block px-4 py-1.5 rounded-full bg-card/30 border border-border/30 text-muted-foreground text-sm font-medium">
-              Preguntas frecuentes
-            </span>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-foreground">
-              Resolvemos tus dudas
-            </h2>
-          </div>
-          <div className="space-y-2">
-            {FAQS.map(faq => <FAQItem key={faq.q} q={faq.q} a={faq.a} />)}
-          </div>
-        </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

@@ -4,14 +4,14 @@ import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Motorcycle } from '@/lib/types';
-import * as XLSX from 'xlsx';
+import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 
 interface ExportMotorcyclesButtonProps {
   motorcycles: Motorcycle[];
 }
 
 export function ExportMotorcyclesButton({ motorcycles }: ExportMotorcyclesButtonProps) {
-  const handleExport = () => {
+  const handleExport = () => exportSpreadsheet((XLSX) => {
     // Prepare data for Excel
     const data = motorcycles.map(moto => ({
       'Marca': moto.make,
@@ -49,7 +49,7 @@ export function ExportMotorcyclesButton({ motorcycles }: ExportMotorcyclesButton
     // Generate and download file
     const fileName = `motocicletas-${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
-  };
+  });
 
   return (
     <Button

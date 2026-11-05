@@ -4,13 +4,17 @@ import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminC
 
 
 import { revalidatePath } from 'next/cache'
+import { canAccessOwnCustomerQuote } from './access';
 
 export async function submitQuoteResponse(workOrderId: string, response: 'approved' | 'rejected', formData?: FormData) {
   if (!workOrderId) return { success: false, message: 'ID de orden inválido.' }
+  if (!await canAccessOwnCustomerQuote(workOrderId)) return { success:false, message:'No tienes permiso para responder a esta cotización.' };
+  if (response !== 'approved' && response !== 'rejected') return {success:false,message:'Respuesta inválida.'};
 
   let rejectionReason = '';
   if (formData && response === 'rejected') {
-      rejectionReason = formData.get('rejectionReason') as string || '';
+      const rawReason = formData.get('rejectionReason');
+      rejectionReason = typeof rawReason === 'string' ? rawReason.trim().slice(0, 500) : '';
   }
 
   const supabase = await createAdminClient()
@@ -33,20 +37,25 @@ export async function submitQuoteResponse(workOrderId: string, response: 'approv
   // Determine new work order status based on response
   const newStatus = response === 'approved' ? 'Reparado' : 'Diagnosticando'; // Let's keep it in Diagnosticando if rejected, or just don't change it. We'll leave it as Diagnosticando so tech can review.
 
-  // Update the quote_status and quote_responded_at
-  const { error: updateError } = await supabase
+  // Atomic compare-and-set: only the FIRST response may alter this quote.
+  // Without a conditional UPDATE two concurrent submissions can both deduct
+  // the same inventory after independently observing a pending quote.
+  const { data: claimed, error: updateError } = await supabase
     .from('work_orders')
-    .update({ 
-        quote_status: response, 
-        quote_responded_at: new Date().toISOString(),
-        // If approved, we could optionally update the status. But we'll let the user update it or update it here.
-        // Let's just update the quote status for now so the tech manually changes state.
-        // The prompt said "en el momento que apruebe el tecnico pueda proceder", implying tech sees it and proceeds.
+    .update({
+      quote_status: response,
+      quote_responded_at: new Date().toISOString(),
     })
     .eq('id', workOrderId)
+    .or('quote_status.is.null,quote_status.eq.pending')
+    .select('id')
+    .maybeSingle();
 
   if (updateError) {
-    return { success: false, message: 'Error al guardar la respuesta.' }
+    return { success: false, message: 'Error al guardar la respuesta.' };
+  }
+  if (!claimed) {
+    return { success: false, message: 'Esta cotización ya fue respondida.' };
   }
 
   // Manage inventory based on response

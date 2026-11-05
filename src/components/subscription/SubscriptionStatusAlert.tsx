@@ -11,7 +11,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, ArrowRight } from "lucide-react";
+import { createClient } from '@/lib/supabase/client';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -26,7 +27,7 @@ export function SubscriptionStatusAlert({ status, startDate, endDate }: Subscrip
     const router = useRouter();
 
     // Allow access to admin panel (for super admins) and login
-    if (pathname?.startsWith('/admin') || pathname?.startsWith('/login')) return null;
+    if (pathname === '/' || pathname === '/planes' || pathname === '/prueba-gratis' || pathname === '/dashboard/subscription' || pathname?.startsWith('/admin') || pathname?.startsWith('/login') || pathname?.startsWith('/talleres') || pathname?.startsWith('/clientes')) return null;
 
     const isExpiredDemo = status === 'trialing' && endDate && new Date(endDate) < new Date();
 
@@ -36,12 +37,7 @@ export function SubscriptionStatusAlert({ status, startDate, endDate }: Subscrip
     const isCanceled = status === 'canceled';
 
     const handleLogout = async () => {
-        const supabase = new Proxy({}, {
-  get: (target, prop) => {
-    if (prop === 'then') return (resolve: any) => resolve({ data: [], count: 0, error: null });
-    return () => supabase;
-  }
-}) as any;
+        const supabase = createClient();
         await supabase.auth.signOut();
         window.location.href = '/planes';
     };
@@ -75,6 +71,7 @@ export function SubscriptionStatusAlert({ status, startDate, endDate }: Subscrip
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="sm:justify-center">
+                    {isPastDue && <Button onClick={() => router.push('/dashboard/subscription')}>Elegir un plan <ArrowRight className="ml-2 h-4 w-4" /></Button>}
                     <Button variant="destructive" className="w-full sm:w-auto mt-4" onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />
                         Cerrar Sesión

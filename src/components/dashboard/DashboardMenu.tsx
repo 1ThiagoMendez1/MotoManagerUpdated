@@ -44,6 +44,7 @@ interface DashboardMenuProps {
   subscriptionPlan?: string;
   motorcycles: Motorcycle[];
   technicians: Technician[];
+  unavailableMotorcycleIds: string[];
 }
 
 export function DashboardMenu({ 
@@ -53,7 +54,8 @@ export function DashboardMenu({
   workshopName, 
   subscriptionPlan = 'monthly',
   motorcycles,
-  technicians
+  technicians,
+  unavailableMotorcycleIds
 }: DashboardMenuProps) {
   const { toast } = useToast();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -161,6 +163,7 @@ export function DashboardMenu({
                       <AddWorkOrder 
                         motorcycles={motorcycles} 
                         technicians={technicians}
+                        unavailableMotorcycleIds={unavailableMotorcycleIds}
                         customTrigger={
                           <button className="w-full py-3.5 px-6 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98]">
                             <PlusCircle className="w-5 h-5" />

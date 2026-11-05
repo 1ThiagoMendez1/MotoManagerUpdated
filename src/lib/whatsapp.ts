@@ -1,7 +1,11 @@
 import axios from 'axios';
+import { composeReadyNotice, buildReadyMetaTemplate } from './whatsapp-ready';
+import type { ReadyNotice } from './whatsapp-ready';
+import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
+import { buildDiagnosisMetaTemplate } from './whatsapp-diagnosis';
 import { ai } from '@/ai/genkit';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { getPlanLimits } from '@/lib/constants/plans';
+import { getWorkshopWhatsAppLimit } from '@/lib/workshop-plan';
 
 const evolutionApiUrl = process.env.EVOLUTION_API_URL;
 const evolutionApiKey = process.env.EVOLUTION_API_KEY;
@@ -113,19 +117,71 @@ export async function sendOrderStatusUpdate(
     status: 'Diagnosticando' | 'Reparado' | 'Entregado';
     customerName: string;
     motorcycleInfo: string;
+    plate: string;
     technicianName: string;
     items?: Array<{ name: string; quantity: number; price: number }>;
     workshopName?: string;
+    businessHours?: string;
+    workshopAddress?: string;
   }
 ) {
+  const wpToken = process.env.WHATSAPP_API_TOKEN;
+  const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const digits = customerPhone.replace(/[^0-9]/g, '');
+  const recipient = digits.length === 10 ? '57' + digits : digits;
+  if (!/^\d{11,15}$/.test(recipient)) return { success: false, error: 'Número WhatsApp inválido.' };
+  if (wpToken && wpPhoneId) {
+    const isDiagnosis = orderData.status === 'Diagnosticando';
+    const templateName = isDiagnosis
+      ? 'actualizacion_estado_diagnosticando'
+      : (process.env.WHATSAPP_STATUS_TEMPLATE || STATUS_TEMPLATE_NAME);
+    const motorcycleOnly = orderData.motorcycleInfo.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const template = isDiagnosis
+      ? buildDiagnosisMetaTemplate({
+        customerName: orderData.customerName,
+        workshopName: orderData.workshopName || 'Mi taller',
+        motorcycleInfo: motorcycleOnly,
+        plate: orderData.plate,
+        orderNumber: orderData.orderNumber,
+        workshopAddress: orderData.workshopAddress || '',
+      })
+      : {
+        name: templateName, language: { code: 'es_CO' as const },
+        components: [{ type: 'body' as const, parameters: statusTemplateParameters({
+          customerName: orderData.customerName,
+          workshopName: orderData.workshopName || 'Mi taller',
+          motorcycleInfo: orderData.motorcycleInfo,
+          orderNumber: orderData.orderNumber,
+          status: orderData.status,
+        }).map(text => ({ type: 'text' as const, text })) }],
+      };
+    try {
+      const response = await axios.post('https://graph.facebook.com/v19.0/' + wpPhoneId + '/messages', {
+        messaging_product: 'whatsapp', to: recipient, type: 'template', template,
+      }, { headers: { Authorization: 'Bearer ' + wpToken, 'Content-Type': 'application/json' }, timeout: 18000 });
+      return { success: true, provider: 'meta', data: response.data };
+    } catch (error: any) {
+      const httpStatus = error?.response?.status;
+      const metaCode = error?.response?.data?.error?.code;
+      console.warn('[whatsapp:status] Meta rejected status template:', {
+        httpStatus: typeof httpStatus === 'number' ? httpStatus : null,
+        metaCode: typeof metaCode === 'number' ? metaCode : null,
+      });
+      // An uncertain HTTP/network failure could already have delivered.
+      if (httpStatus !== 400 && httpStatus !== 404)
+        return { success: false, error: 'Meta no confirmó el envío (HTTP ' + (httpStatus || 'red') + ').' };
+      if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance)
+        return { success: false, error: 'Meta rechazó ' + templateName +
+          ' (HTTP ' + httpStatus + (metaCode ? ', código ' + metaCode : '') +
+          '). Verifica que esté aprobada en español de Colombia para este número.' };
+    }
+  }
   if (!evolutionApiUrl || !evolutionApiKey || !whatsappInstance) {
-    console.log('Evolution API not configured, skipping WhatsApp notification');
-    return { success: false, error: 'Evolution API not configured' };
+    return { success: false, error: 'Para estos estados falta aprobar la plantilla Meta actualizacion_estado_moto o configurar Evolution API.' };
   }
 
   try {
-    // Format phone number for WhatsApp (remove + and add country code if needed)
-    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
+    const formattedPhone = recipient;
 
     const statusEmojis = {
       'Diagnosticando': '🔍',
@@ -158,6 +214,7 @@ Orden: ${orderData.orderNumber}
 Estado: ${orderData.status}
 Técnico: ${orderData.technicianName}${itemsText}
 
+${orderData.status === 'Reparado' || orderData.status === 'Entregado' ? '\n📍 Dirección: ' + (orderData.workshopAddress || 'Consulta con el taller') + '\n⏰ Horario de atención: ' + (orderData.businessHours || 'Consulta con el taller antes de visitarlo') + '\n' : ''}
 Te mantendremos informado sobre cualquier actualización.
 
 🏍️ *${orderData.workshopName || 'MotoManager'}*`;
@@ -1406,189 +1463,80 @@ export async function sendDiagnosticadoReparadoNotification(
   plate: string,
   orderNumber: string,
   workshopAddress: string,
-  weekdaysSchedule: string = '09:00 a.m. a 13:00 p.m. y 15:00 a.m. a 19:00 p.m.',
-  saturdaySchedule: string = '09:00 a.m. a 14:00 p.m.'
+  businessHours: unknown
 ) {
+  const digits = customerPhone.replace(/[^0-9]/g, '');
+  const formattedPhone = digits.length === 10 ? '57' + digits : digits;
+  if (!/^\d{11,15}$/.test(formattedPhone)) {
+    return { success: false, error: 'Teléfono de destino no válido' };
+  }
+
+  const details: ReadyNotice = {
+    customerName, workshopName, motorcycleInfo, plate, orderNumber,
+    workshopAddress, businessHours,
+  };
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  // Una plantilla NUEVA y aprobada: la anterior contiene horarios escritos de forma fija.
+  const template = buildReadyMetaTemplate(details, process.env.WHATSAPP_READY_DYNAMIC_TEMPLATE);
+  let rejection: { httpStatus: number; metaCode: number | null } | null = null;
 
-  if (!wpToken || !wpPhoneId) {
-    console.log('WhatsApp Cloud API no configurada para diagnosticado_reparado.');
-    return { success: false, error: 'WhatsApp API no configurada' };
+  // A stale WHATSAPP_READY_DYNAMIC_TEMPLATE must never select the old fixed-hours template.
+  // Evolution's free-text fallback remains safe because it uses workshop-specific data.
+  if (wpToken && wpPhoneId && template) {
+    try {
+      const response = await axios.post(
+        'https://graph.facebook.com/v19.0/' + wpPhoneId + '/messages',
+        {
+          messaging_product: 'whatsapp',
+          to: formattedPhone,
+          type: 'template',
+          template,
+        },
+        { headers: { Authorization: 'Bearer ' + wpToken, 'Content-Type': 'application/json' } }
+      );
+      return { success: true, provider: 'meta', data: response.data };
+    } catch (error: any) {
+      // Una red interrumpida no significa que Meta no haya entregado el mensaje.
+      // Evitar segundo envío en caso de fallo indeterminado.
+      const status = error?.response?.status;
+      const rawCode = error?.response?.data?.error?.code;
+      const metaCode = typeof rawCode === 'number' ? rawCode : null;
+      console.warn('[whatsapp:ready] Meta request failed', {
+        httpStatus: typeof status === 'number' ? status : null,
+        metaCode,
+        // Never log the phone, customer data, response body or bearer token.
+      });
+      if (typeof status === 'number') rejection = { httpStatus: status, metaCode };
+      if (status !== 400 && status !== 404) {
+        return { success: false, error: status ?
+          'Meta no confirmó el envío (HTTP ' + status + (metaCode ? ', código ' + metaCode : '') + ').' :
+          'No se pudo confirmar el envío mediante Meta.' };
+      }
+      // Solo un rechazo HTTP explícito permite intentar el otro proveedor.
+    }
   }
 
-  try {
-    const formattedPhone = customerPhone.replace('+', '').startsWith('57') ? customerPhone.replace('+', '') : `57${customerPhone.replace('+', '')}`;
-    const addressText = workshopAddress || 'Dirección del taller';
-
-    const payloadsToTry = [
-      // 1. Header (1 param) + Body (7 params with repeating workshopName)
-      {
-        header: [{ type: 'text', text: motorcycleInfo }],
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: addressText },
-          { type: 'text', text: workshopName }
-        ]
-      },
-      // 2. Header (1 param) + Body (7 params with schedule)
-      {
-        header: [{ type: 'text', text: motorcycleInfo }],
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: weekdaysSchedule },
-          { type: 'text', text: saturdaySchedule }
-        ]
-      },
-      // 3. Just Body (7 params with repeating workshopName)
-      {
-        header: null,
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: addressText },
-          { type: 'text', text: workshopName }
-        ]
-      },
-      // 4. Just Body (7 params with schedule)
-      {
-        header: null,
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: weekdaysSchedule },
-          { type: 'text', text: saturdaySchedule }
-        ]
-      },
-      // 5. Header (1 param) + Body (6 params)
-      {
-        header: [{ type: 'text', text: motorcycleInfo }],
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: addressText }
-        ]
-      },
-      // 6. Just Body (6 params)
-      {
-        header: null,
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: addressText }
-        ]
-      },
-      // 7. Header (1 param) + Body (8 params)
-      {
-        header: [{ type: 'text', text: motorcycleInfo }],
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: addressText },
-          { type: 'text', text: weekdaysSchedule },
-          { type: 'text', text: saturdaySchedule }
-        ]
-      },
-      // 8. Header (1 param) + Body (9 params)
-      {
-        header: [{ type: 'text', text: motorcycleInfo }],
-        body: [
-          { type: 'text', text: customerName },
-          { type: 'text', text: workshopName },
-          { type: 'text', text: motorcycleInfo },
-          { type: 'text', text: plate },
-          { type: 'text', text: orderNumber },
-          { type: 'text', text: addressText },
-          { type: 'text', text: weekdaysSchedule },
-          { type: 'text', text: saturdaySchedule },
-          { type: 'text', text: workshopName }
-        ]
-      }
-    ];
-
-    console.log(`Sending template 'diagnosticado_reparado' to ${formattedPhone}...`);
-
-    let lastError = null;
-    let successResponse = null;
-
-    for (let i = 0; i < payloadsToTry.length; i++) {
-      const config = payloadsToTry[i];
-      try {
-        const components: any[] = [];
-        if (config.header) {
-          components.push({
-            type: 'header',
-            parameters: config.header
-          });
-        }
-        components.push({
-          type: 'body',
-          parameters: config.body
-        });
-
-        console.log(`Trying to send diagnosticado_reparado template payload option ${i + 1}...`);
-        const response = await axios.post(
-          `https://graph.facebook.com/v19.0/${wpPhoneId}/messages`,
-          {
-            messaging_product: 'whatsapp',
-            to: formattedPhone,
-            type: 'template',
-            template: {
-              name: 'diagnosticado_reparado',
-              language: { code: 'es_CO' },
-              components
-            }
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${wpToken}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        console.log(`✅ diagnosticado_reparado template sent successfully using payload option ${i + 1}.`);
-        successResponse = response.data;
-        break; // Exit loop on success
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = err.response?.data?.error?.message || err.message;
-        const errDetails = err.response?.data?.error?.error_data?.details || '';
-        console.log(`Payload option ${i + 1} failed: ${errMsg}. Details: ${errDetails}`);
-      }
+  if (evolutionApiUrl && evolutionApiKey && whatsappInstance) {
+    try {
+      const response = await axios.post(
+        evolutionApiUrl + '/message/sendText/' + whatsappInstance,
+        { number: formattedPhone, text: composeReadyNotice(details), delay: 1000 },
+        { headers: { 'Content-Type': 'application/json', apikey: evolutionApiKey } }
+      );
+      return { success: true, provider: 'evolution', data: response.data };
+    } catch {
+      return { success: false, error: 'No se pudo enviar la notificación dinámica.' };
     }
-
-    if (!successResponse) {
-      throw lastError || new Error("Failed to send diagnosticado_reparado template with all payload variations");
-    }
-
-    return { success: true, data: successResponse };
-  } catch (error: any) {
-    console.error('❌ Error sending WhatsApp diagnosticado_reparado notification via Meta API:', error.response?.data || error.message);
-    return { success: false, error: error.response?.data || error.message };
   }
+
+  return {
+    success: false,
+    error: rejection ?
+      'Meta rechazó la plantilla de horarios (HTTP ' + rejection.httpStatus +
+      (rejection.metaCode ? ', código ' + rejection.metaCode : '') + ').' :
+      'No existe un proveedor disponible con una plantilla aprobada de horarios dinámicos.',
+  };
 }
 
 export async function sendVentaPorOrdenNotification(
@@ -2316,7 +2264,7 @@ export default {
 }
 
 export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<boolean> {
-  if (!workshopId) return true;
+  if (!workshopId) return false;
 
   try {
     const supabaseAdmin = createSupabaseClient(
@@ -2330,32 +2278,36 @@ export async function checkAndUpdateWhatsAppLimit(workshopId: string): Promise<b
       .eq('id', workshopId)
       .single();
 
-    if (error || !org) return true;
-
-    const settings = typeof org.settings === 'string' ? JSON.parse(org.settings) : (org.settings || {});
-    const subPlan = settings.sub_plan || 'basic';
-    const planLimits = getPlanLimits(subPlan);
-
-    if (planLimits.whatsapp_limit === -1) return true;
-
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const msgCountKey = `whatsapp_count_${currentMonth}`;
-    const currentCount = settings[msgCountKey] || 0;
-
-    if (currentCount >= planLimits.whatsapp_limit) {
-      console.warn(`WhatsApp limit reached for workshop ${workshopId}. Plan: ${subPlan}, Limit: ${planLimits.whatsapp_limit}`);
+    // Never allow a send on lookup failure: failing open bypasses paid plan limits.
+    if (error || !org) {
+      console.error('Unable to verify workshop WhatsApp quota.');
       return false;
     }
 
-    settings[msgCountKey] = currentCount + 1;
-    await supabaseAdmin
-      .from('organizations')
-      .update({ settings })
-      .eq('id', workshopId);
+    // settings.plan es la fuente de verdad; sub_plan queda como legado.
+    // Full nunca debe reservar ni bloquearse por el contador histórico de Basic.
+    const whatsappLimit = getWorkshopWhatsAppLimit(org.settings);
+    if (whatsappLimit === -1) return true;
 
-    return true;
-  } catch (err) {
-    console.error('Error checking WhatsApp limit:', err);
-    return true; // allow by default if db fails
+    // The RPC serializes per-workshop reservations using a row lock and updates
+    // ONLY the month's JSON key. A read/modify/write of all settings could erase
+    // hours or QR changes saved concurrently by the workshop owner.
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const { data: reserved, error: reservationError } = await supabaseAdmin.rpc(
+      'reserve_workshop_whatsapp_quota',
+      {
+        p_organization_id: workshopId,
+        p_month: currentMonth,
+        p_limit: whatsappLimit,
+      }
+    );
+    if (reservationError) {
+      console.error('Unable to reserve workshop WhatsApp quota.');
+      return false;
+    }
+    return reserved === true;
+  } catch {
+    console.error('WhatsApp quota check failed.');
+    return false;
   }
 };

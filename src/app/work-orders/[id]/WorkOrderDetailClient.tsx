@@ -47,6 +47,7 @@ interface WorkOrderDetailClientProps {
   technicians: any[];
   inventory: any;
   userRole: string;
+  organizationId: string;
   partRequests: any[];
   services: any[];
   reminders: any[];
@@ -61,6 +62,7 @@ export function WorkOrderDetailClient({
   technicians,
   inventory,
   userRole,
+  organizationId,
   partRequests,
   services,
   reminders,
@@ -72,7 +74,7 @@ export function WorkOrderDetailClient({
 
   return (
     <div className="w-full space-y-4 text-foreground pb-12">
-      <WorkOrdersRealtime />
+      <WorkOrdersRealtime organizationId={organizationId} />
 
       {/* Sticky Top Header Bar */}
       <div className="sticky top-14 z-20 bg-background/90 backdrop-blur-md -mx-3 sm:-mx-5 md:-mx-6 px-3 sm:px-5 md:px-6 py-3 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">

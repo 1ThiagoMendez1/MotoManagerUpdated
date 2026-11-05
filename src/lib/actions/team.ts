@@ -4,6 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 import { sendCredentialsNotification } from '@/lib/whatsapp';
 import { getPlanLimits } from '@/lib/constants/plans';
+import { randomBytes } from 'node:crypto';
 
 
 
@@ -16,9 +17,11 @@ export async function inviteUser(data: {
 }) {
   try {
     const currentUser = await getCurrentUserServer();
-    if (!currentUser || !currentUser.workshopId) {
-      throw new Error('No estás autenticado o no estás asociado a ningún taller');
+    if (!currentUser || !currentUser.workshopId || currentUser.role !== 'owner') {
+      throw new Error('Solo el propietario del taller puede invitar usuarios.');
     }
+    const allowedRoles = ['admin','mechanic','receptionist','service_advisor'];
+    if (!allowedRoles.includes(data.role)) throw new Error('Rol de invitación inválido.');
 
     const workshopDetails = await getWorkshopDetails();
     if (!workshopDetails) {
@@ -64,11 +67,8 @@ export async function inviteUser(data: {
     { auth: { persistSession: false } }
   );
 
-    // Generar contraseña temporal
-    const tempPassword = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-    console.log(`\n=============================================`);
-    console.log(`🔑 OTP Generado para nuevo usuario: ${tempPassword}`);
-    console.log(`=============================================\n`);
+    // Credencial temporal criptográficamente aleatoria, sin logs ni metadata.
+    const tempPassword = randomBytes(24).toString('base64url') + 'A1!';
 
     const nameParts = data.name.trim().split(' ');
     const firstName = nameParts[0] || '';
@@ -83,7 +83,6 @@ export async function inviteUser(data: {
         first_name: firstName,
         last_name: lastName,
         full_name: data.name,
-        temp_password: tempPassword,
         needs_password_change: true
       }
     });
@@ -173,11 +172,11 @@ export async function getTeamMembers() {
       return [];
     }
 
-    const { data: authData } = await supabaseAdmin.auth.admin.listUsers();
-    const usersMap = new Map();
-    if (authData && authData.users) {
-       authData.users.forEach(u => usersMap.set(u.id, u.email));
-    }
+    const usersMap = new Map<string, string>();
+    await Promise.all((members || []).map(async (member: any) => {
+      const { data } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
+      if (data?.user?.email) usersMap.set(member.user_id, data.user.email);
+    }));
 
     const result = (members || []).map((member: any) => {
       const profile = member.profiles || {};
@@ -208,7 +207,7 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
       throw new Error('No estás autenticado o no estás asociado a ningún taller');
     }
 
-    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+    if (currentUser.role !== 'owner') {
       throw new Error('No tienes permisos para cambiar roles');
     }
 
@@ -224,6 +223,16 @@ export async function updateUserRole(userIdToUpdate: string, newRole: string) {
   );
 
     const dbRole = newRole === 'receptionist' ? 'service_advisor' : newRole;
+    if (!['admin','mechanic','service_advisor'].includes(dbRole)) {
+      throw new Error('Rol no permitido desde este módulo.');
+    }
+    const { data: existingMembership } = await supabaseAdmin
+      .from('organization_members')
+      .select('role').eq('user_id', userIdToUpdate)
+      .eq('organization_id', currentUser.workshopId).single();
+    if (!existingMembership || existingMembership.role === 'owner') {
+      throw new Error('No se puede modificar al propietario ni a usuarios de otros talleres.');
+    }
 
     const planLimits = getPlanLimits(workshopDetails.subscription_plan || 'basic');
     if (planLimits.id === 'basic') {
@@ -262,7 +271,7 @@ export async function updateUserPermissions(userIdToUpdate: string, permissions:
       throw new Error('No estás autenticado o no estás asociado a ningún taller');
     }
 
-    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+    if (currentUser.role !== 'owner') {
       throw new Error('No tienes permisos para cambiar permisos de usuario');
     }
 
@@ -272,6 +281,19 @@ export async function updateUserPermissions(userIdToUpdate: string, permissions:
       { auth: { persistSession: false } }
     );
 
+    if (permissions && (!Array.isArray(permissions) || permissions.length > 20 ||
+        permissions.some(p => typeof p !== 'string' || ![
+          '/dashboard','/motorcycles','/customers','/work-orders','/inventory',
+          '/technicians','/sales','/appointments','/accounting','/services'
+        ].includes(p)))) {
+      throw new Error('La lista de permisos no es válida.');
+    }
+    const { data: memberForPermissions } = await supabaseAdmin.from('organization_members')
+      .select('role').eq('user_id', userIdToUpdate)
+      .eq('organization_id', currentUser.workshopId).single();
+    if (!memberForPermissions || memberForPermissions.role === 'owner') {
+      throw new Error('No se pueden modificar permisos del propietario ni de otro taller.');
+    }
     const { error } = await supabaseAdmin
       .from('organization_members')
       .update({ custom_permissions: permissions })
@@ -296,7 +318,7 @@ export async function updateTeamMemberInfo(userIdToUpdate: string, data: { name:
       throw new Error('No estás autenticado o no estás asociado a ningún taller');
     }
 
-    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+    if (currentUser.role !== 'owner') {
       throw new Error('No tienes permisos para editar la información de los usuarios');
     }
 
@@ -306,6 +328,12 @@ export async function updateTeamMemberInfo(userIdToUpdate: string, data: { name:
       { auth: { persistSession: false } }
     );
 
+    const { data: memberForEdit } = await supabaseAdmin.from('organization_members')
+      .select('role').eq('user_id', userIdToUpdate)
+      .eq('organization_id', currentUser.workshopId).single();
+    if (!memberForEdit || memberForEdit.role === 'owner') {
+      throw new Error('No se puede editar a un propietario ni a usuarios ajenos.');
+    }
     const nameParts = data.name.trim().split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -356,7 +384,7 @@ export async function removeUserFromTeam(userIdToRemove: string) {
       throw new Error('No estás autenticado o no estás asociado a ningún taller');
     }
 
-    if (currentUser.role !== 'owner' && currentUser.role !== 'admin') {
+    if (currentUser.role !== 'owner') {
       throw new Error('No tienes permisos para revocar acceso a miembros');
     }
 
@@ -370,7 +398,13 @@ export async function removeUserFromTeam(userIdToRemove: string) {
       { auth: { persistSession: false } }
     );
 
-    // Eliminar de organization_members
+    const { data: memberForRemoval } = await supabaseAdmin.from('organization_members')
+      .select('role').eq('user_id', userIdToRemove)
+      .eq('organization_id', currentUser.workshopId).single();
+    if (!memberForRemoval || memberForRemoval.role === 'owner') {
+      throw new Error('No se puede retirar a un propietario ni a usuarios ajenos.');
+    }
+    // Revocar únicamente esta membresía. Conservar la cuenta Auth y otras organizaciones.
     const { error: deleteMemberError } = await supabaseAdmin
       .from('organization_members')
       .delete()
@@ -379,13 +413,6 @@ export async function removeUserFromTeam(userIdToRemove: string) {
 
     if (deleteMemberError) {
       throw new Error('Error al revocar acceso del taller: ' + deleteMemberError.message);
-    }
-
-    // Intentar eliminar del sistema Auth
-    try {
-      await supabaseAdmin.auth.admin.deleteUser(userIdToRemove);
-    } catch (e) {
-      console.warn('Eliminado de la organización, pero aviso al borrar de auth:', e);
     }
 
     return { success: true };

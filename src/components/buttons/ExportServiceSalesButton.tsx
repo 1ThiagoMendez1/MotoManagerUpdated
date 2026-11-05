@@ -4,14 +4,14 @@ import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import type { Sale } from '@/lib/types';
-import * as XLSX from 'xlsx';
+import { exportSpreadsheet } from '@/lib/spreadsheet-export';
 
 interface ExportServiceSalesButtonProps {
   sales: Sale[];
 }
 
 export function ExportServiceSalesButton({ sales }: ExportServiceSalesButtonProps) {
-  const handleExport = () => {
+  const handleExport = () => exportSpreadsheet((XLSX) => {
     // Prepare data for Excel
     const data = sales.map(sale => ({
       'Número de Venta': sale.saleNumber,
@@ -49,7 +49,7 @@ export function ExportServiceSalesButton({ sales }: ExportServiceSalesButtonProp
     // Generate and download file
     const fileName = `ventas-servicio-${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, fileName);
-  };
+  });
 
   return (
     <Button

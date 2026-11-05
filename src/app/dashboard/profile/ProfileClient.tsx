@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -9,9 +9,14 @@ import {
   Wrench, Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getProfileData, updateProfileData } from '@/lib/actions/profile';
+import { updateProfileData } from '@/lib/actions/profile';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import WorkshopQR from '@/components/workshops/WorkshopQR';
+import { BusinessHoursEditor } from './BusinessHoursEditor';
+import { ProfileAvatarUploader } from '@/components/profile/ProfileAvatarUploader';
+import { WorkshopImageUploader } from '@/components/workshops/WorkshopImageUploader';
+import type { BusinessHours } from '@/lib/business-hours';
 
 interface ProfileData {
   workshopName: string;
@@ -22,30 +27,25 @@ interface ProfileData {
   ownerName: string;
   ownerPhone: string;
   email: string;
+  avatarUrl?: string | null;
+  workshopImageUrl?: string | null;
   userRole?: string;
   workshopMapsLink?: string;
+  workshopSlug: string;
+  enrollmentEnabled: boolean;
+  businessHours: BusinessHours | null;
 }
 
-export default function ProfileClient() {
+export default function ProfileClient({ initialData }: { initialData: ProfileData }) {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-  const [mapsLinkText, setMapsLinkText] = useState('');
+  const [mapsLinkText, setMapsLinkText] = useState(initialData.workshopMapsLink || '');
   const [editingSections, setEditingSections] = useState({ workshop: false, owner: false });
   const [manualAddressEdited, setManualAddressEdited] = useState(false);
-  const [data, setData] = useState<ProfileData>({
-    workshopName: '',
-    workshopPhone: '',
-    workshopAddress: '',
-    workshopCity: '',
-    workshopNit: '',
-    ownerName: '',
-    ownerPhone: '',
-    email: '',
-  });
+  const [data, setData] = useState<ProfileData>(initialData);
 
   const toggleSectionEdit = (section: 'workshop' | 'owner') => {
     setEditingSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -60,7 +60,7 @@ export default function ProfileClient() {
     isEditing: boolean,
     required: boolean = false
   ) => {
-    const val = data[id] || '';
+    const val = typeof data[id] === 'string' ? data[id] as string : '';
     return (
       <div className="flex flex-col gap-1.5">
         <label htmlFor={id as string} className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -88,13 +88,6 @@ export default function ProfileClient() {
     );
   };
 
-  useEffect(() => {
-    getProfileData().then((d) => {
-      setData(d as any);
-      setMapsLinkText(d.workshopMapsLink || '');
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -185,14 +178,6 @@ export default function ProfileClient() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
       <div className="max-w-2xl mx-auto">
@@ -214,6 +199,19 @@ export default function ProfileClient() {
           </div>
         </motion.div>
 
+        {data.userRole === 'owner' && <Link href="/dashboard/reviews"
+          className="mb-6 flex items-center justify-between rounded-2xl border border-amber-500/20 bg-amber-500/5 px-5 py-4 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10">
+          <span>⭐ Opiniones de clientes y reputación del taller</span>
+          <span>Ver resultados →</span>
+        </Link>}
+        <section className="mb-6 rounded-2xl border border-border/60 bg-card p-6">
+          <h2 className="mb-4 text-sm font-semibold">Mi foto de perfil</h2>
+          <ProfileAvatarUploader initialUrl={data.avatarUrl} name={data.ownerName} onUploaded={url => setData(previous => ({ ...previous, avatarUrl: url }))} />
+        </section>
+        {['owner', 'admin'].includes(data.userRole || '') && <section className="mb-6 rounded-2xl border border-border/60 bg-card p-6">
+          <h2 className="mb-4 text-sm font-semibold">Imagen pública del taller</h2>
+          <WorkshopImageUploader initialUrl={data.workshopImageUrl} name={data.workshopName} hasPrivateAvatar={Boolean(data.avatarUrl)} />
+        </section>}
         <form onSubmit={handleSubmit}>
           <div className="flex flex-col gap-6">
 
@@ -393,6 +391,12 @@ export default function ProfileClient() {
 
           </div>
         </form>
+        {['owner', 'admin'].includes(data.userRole || '') && (
+          <BusinessHoursEditor initialHours={data.businessHours} />
+        )}
+        {['owner', 'admin'].includes(data.userRole || '') && data.workshopSlug && (
+          <WorkshopQR name={data.workshopName} slug={data.workshopSlug} enabled={data.enrollmentEnabled} />
+        )}
       </div>
     </div>
   );

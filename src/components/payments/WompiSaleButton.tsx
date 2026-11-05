@@ -85,7 +85,7 @@ export function WompiSaleButton({ saleId, saleNumber, total, remainingBalance, c
           )}
 
           <p className="text-xs text-muted-foreground text-center">
-            Al hacer clic en "Pagar", se abrirá el checkout seguro de Wompi.
+            Al hacer clic en &quot;Pagar&quot;, se abrirá el checkout seguro de Wompi.
           </p>
 
           {/* Widget Wompi */}

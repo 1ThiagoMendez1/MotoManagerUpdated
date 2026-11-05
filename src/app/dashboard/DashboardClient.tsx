@@ -43,8 +43,6 @@ import {
 import { useState, useEffect } from 'react';
 import { getPendingReminders } from '@/lib/actions/reminders';
 import { getDashboardData } from '@/lib/actions/dashboard';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -91,7 +89,14 @@ export default function DashboardPage() {
   const planLimits = getPlanLimits(stats.subscriptionPlan);
   const isChartsLocked = planLimits.dashboard_level !== 'complete';
 
-  const generatePDFReport = (currentStats: typeof stats) => {
+  const generatePDFReport = async (currentStats: typeof stats) => {
+    let jsPDF, autoTable;
+    try {
+      [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+    } catch {
+      alert('No se pudo cargar el generador de PDF. Comprueba tu conexión e intenta de nuevo.');
+      return;
+    }
     const doc = new jsPDF();
     
     // Función para dibujar el reporte cuando la imagen cargue (o si falla)
@@ -307,7 +312,7 @@ export default function DashboardPage() {
     let isSubscribed = true;
     const fetchDashboard = async () => {
       try {
-        const resStats = await getDashboardData();
+        const [resStats, resRem] = await Promise.all([getDashboardData(), getPendingReminders()]);
         if (isSubscribed && resStats?.success && resStats?.data) {
           const d = resStats.data as any;
           setStats({
@@ -324,7 +329,6 @@ export default function DashboardPage() {
           });
         }
         
-        const resRem = await getPendingReminders();
         if (isSubscribed && resRem?.success && Array.isArray(resRem?.data)) {
           setReminders(resRem.data);
         }
@@ -466,7 +470,7 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">{Number(stats.activeWorkOrdersCount) || 0}</div>
                 <p className="text-xs text-emerald-500 flex items-center mt-1">
-                  En proceso
+                  En atención
                 </p>
               </CardContent>
             </Card>

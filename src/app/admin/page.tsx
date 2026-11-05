@@ -1,6 +1,6 @@
 
 import Link from 'next/link';
-import { LayoutDashboard, Store, Users, ChevronLeft, ReceiptText, HeartCrack } from 'lucide-react';
+import { LayoutDashboard, Store, Users, ChevronLeft, ReceiptText, HeartCrack, ChartNoAxesCombined, ArrowUpRight } from 'lucide-react';
 import WorkshopsTab from './WorkshopsTab';
 import UsersTab from './UsersTab';
 import KpiCards from './KpiCards';
@@ -13,12 +13,16 @@ import PlanesTab from './PlanesTab';
 import { getAllTicketsForAdmin } from '@/lib/data/tickets';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { resolveWorkshopPlan } from '@/lib/workshop-plan';
+import { getTrialState } from '@/lib/subscription-trial';
+import { requireSuperAdmin } from '@/lib/auth-server';
 
 export default async function AdminPage({
   searchParams,
 }: {
   searchParams: Promise<{ view?: string }>;
 }) {
+  await requireSuperAdmin();
   const supabase = await createClient();
   const adminSupabase = createAdminClient();
   
@@ -49,7 +53,7 @@ export default async function AdminPage({
     authData.users.forEach((u) => {
       authUsersMap.set(u.id, {
         email: u.email,
-        is_super_admin: u.user_metadata?.is_super_admin === true
+        is_super_admin: u.app_metadata?.is_super_admin === true
       });
     });
   }
@@ -58,9 +62,17 @@ export default async function AdminPage({
     id: org.id,
     name: org.name,
     slug: org.slug,
-    subscription_status: org.settings?.plan === 'demo' ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
-    subscription_plan: org.settings?.plan || 'monthly',
+    subscription_status: getTrialState(org.settings).expired ? 'past_due' : (getTrialState(org.settings).isTrial || org.settings?.plan === 'demo') ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
+    subscription_plan: resolveWorkshopPlan(org.settings),
+    // El ciclo de facturación es independiente del nivel basic/pro/full.
+    billing_cycle: ((): 'monthly' | 'biannual' | 'yearly' => {
+      const settings = org.settings || {};
+      const cycle = settings.billingCycle || settings.billing_cycle || settings.plan;
+      return cycle === 'biannual' || cycle === 'yearly' ? cycle : 'monthly';
+    })(),
     subscription_end_date: org.settings?.demoEndDate || null,
+    is_trial: getTrialState(org.settings).isTrial,
+    trial_expired: getTrialState(org.settings).expired,
     created_at: org.created_at,
     members: org.members?.map((m: any) => ({
       role: m.role,
@@ -128,13 +140,13 @@ export default async function AdminPage({
   const trialingWorkshops = workshops?.filter(w => w.subscription_status === 'trialing').length || 0;
   const pastDueWorkshops = workshops?.filter(w => w.subscription_status === 'past_due' || w.subscription_status === 'unpaid').length || 0;
   
-  const monthlyPlans = workshops?.filter(w => w.subscription_plan === 'monthly').length || 0;
-  const annualPlans = workshops?.filter(w => w.subscription_plan === 'yearly').length || 0;
+  const monthlyPlans = workshops?.filter(w => w.billing_cycle === 'monthly').length || 0;
+  const annualPlans = workshops?.filter(w => w.billing_cycle === 'yearly').length || 0;
   
   // Calculate Active Plans for MRR
-  const activeMonthly = workshops?.filter(w => w.subscription_status === 'active' && w.subscription_plan === 'monthly').length || 0;
-  const activeBiannual = workshops?.filter(w => w.subscription_status === 'active' && w.subscription_plan === 'biannual').length || 0;
-  const activeYearly = workshops?.filter(w => w.subscription_status === 'active' && w.subscription_plan === 'yearly').length || 0;
+  const activeMonthly = workshops?.filter(w => w.subscription_status === 'active' && w.billing_cycle === 'monthly').length || 0;
+  const activeBiannual = workshops?.filter(w => w.subscription_status === 'active' && w.billing_cycle === 'biannual').length || 0;
+  const activeYearly = workshops?.filter(w => w.subscription_status === 'active' && w.billing_cycle === 'yearly').length || 0;
 
   // Real MRR calculation based on actual COP prices
   const mrr = 
@@ -291,6 +303,9 @@ export default async function AdminPage({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-3 lg:gap-4 animate-in fade-in zoom-in-95 duration-700">
+                <Link href="/admin/analitica-web" className="group relative overflow-hidden rounded-3xl border border-blue-400/25 bg-gradient-to-br from-blue-500/15 via-card to-orange-400/10 p-5 shadow-lg transition hover:border-blue-400/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:col-span-8 lg:col-span-12">
+                  <div className="flex flex-wrap items-center justify-between gap-5"><div className="flex items-start gap-4"><span className="rounded-2xl bg-blue-500 p-3 text-white"><ChartNoAxesCombined className="h-6 w-6"/></span><div><h2 className="text-xl font-bold tracking-tight">Analítica web</h2><p className="mt-1 text-sm text-muted-foreground">Visitantes, fuentes, conversiones, accesos y mapas de calor de MotoManager.</p></div></div><span className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white">Abrir analítica<ArrowUpRight className="h-4 w-4"/></span></div>
+                </Link>
                 {/* 1. Hero Card - Dashboard Financiero */}
                 <div className="md:col-span-8 lg:col-span-8 flex flex-col h-full group">
                   <div className="relative h-full min-h-[180px] sm:min-h-[200px] flex flex-col justify-between p-5 sm:p-6 rounded-[24px] sm:rounded-[32px] bg-foreground/[0.03] dark:bg-white/[0.05] backdrop-blur-[50px] border border-foreground/[0.08] dark:border-white/[0.1] shadow-xl overflow-hidden transition-all duration-300 hover:bg-foreground/[0.05] dark:hover:bg-white/[0.08] hover:border-foreground/[0.15] dark:hover:border-white/[0.2]">

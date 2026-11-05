@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 760">
+<title>Papá Noel motero recorre un pueblo colombiano iluminado en diciembre, con regalos en su motocicleta</title>
+<defs>
+<radialGradient id="halo"><stop stop-color="#fddba3" stop-opacity=".6"/><stop offset=".53" stop-color="#ed9b43" stop-opacity=".18"/><stop offset="1" stop-color="#ff9945" stop-opacity="0"/></radialGradient>
+<linearGradient id="coat" x2=".88" y2="1"><stop stop-color="#fa4c42"/><stop offset=".48" stop-color="#bf1b2d"/><stop offset="1" stop-color="#751322"/></linearGradient>
+<linearGradient id="helmet" x2="1" y2="1"><stop stop-color="#f74137"/><stop offset=".55" stop-color="#ad142b"/><stop offset="1" stop-color="#721625"/></linearGradient>
+<linearGradient id="metal" x2="1" y2=".9"><stop stop-color="#e9f2f4"/><stop offset=".28" stop-color="#748390"/><stop offset=".67" stop-color="#2b3b45"/><stop offset="1" stop-color="#91a7b2"/></linearGradient>
+<linearGradient id="tank" x2=".8" y2=".9"><stop stop-color="#243846"/><stop offset=".47" stop-color="#0a1724"/><stop offset="1" stop-color="#354b53"/></linearGradient>
+<linearGradient id="gold" x2=".6" y2="1"><stop stop-color="#fff0a1"/><stop offset=".44" stop-color="#ffc054"/><stop offset="1" stop-color="#ec7525"/></linearGradient>
+<radialGradient id="lamp"><stop stop-color="#fffbd6"/><stop offset=".54" stop-color="#ffdf7b"/><stop offset="1" stop-color="#ef8a31"/></radialGradient>
+<linearGradient id="beard" x2=".9" y2=".8"><stop stop-color="#fffef1"/><stop offset=".52" stop-color="#edf5ed"/><stop offset="1" stop-color="#b5c8ce"/></linearGradient>
+<filter id="blur"><feGaussianBlur stdDeviation="11"/></filter>
+<filter id="shadow" x="-.3" y="-.3" width="1.6" height="1.7"><feDropShadow dx="0" dy="12" stdDeviation="13" flood-color="#000b11" flood-opacity=".55"/></filter>
+<filter id="light"><feGaussianBlur stdDeviation="13"/></filter>
+<g id="spoke" stroke="#bfc8ce" stroke-width="3.5" stroke-opacity=".65"><path d="M0-84V84M-84 0H84M-59-59L59 59M59-59L-59 59M-30-78L30 78M30-78L-30 78M-78-30L78 30M78-30L-78 30"/></g>
+</defs>
+<!-- Glowing December town / colombian alumbrados -->
+<ellipse cx="490" cy="430" rx="360" ry="315" fill="url(#halo)" opacity=".72"/>
+<g opacity=".75">
+<path d="M20 488V333l63-32 63 32v155M690 475V318l56-42 62 42v157M814 482V278l37-23 35 23v204" stroke="#ebaa62" stroke-opacity=".45" stroke-width="6" fill="#12382f"/>
+<path d="M18 333l66-37 65 37M690 320l58-44 64 44" fill="none" stroke="#f6ba6a" stroke-opacity=".7" stroke-width="7"/>
+<path d="M50 363h38v72H50zM111 360h20v40h-20zM710 347h31v54h-31zM766 339h29v54h-29zM828 308h21v48h-21z" fill="#efa751" opacity=".75"/>
+<path d="M54 366h30v67H54zM714 351h23v48h-23zM770 342h21v49h-21z" fill="#ffdc89" opacity=".35"/>
+<path d="M655 478h230M19 488h185" stroke="#e0a75c" stroke-width="5" opacity=".4"/>
+</g>
+<g fill="#ffd47c">
+<circle cx="79" cy="165" r="7"/><circle cx="128" cy="187" r="5"/><circle cx="200" cy="111" r="4"/><circle cx="765" cy="151" r="5"/><circle cx="829" cy="213" r="8"/><circle cx="873" cy="129" r="5"/><circle cx="60" cy="249" r="4"/>
+</g>
+<g fill="#ffb762" opacity=".5" filter="url(#blur)"><circle cx="79" cy="165" r="19"/><circle cx="128" cy="187" r="16"/><circle cx="765" cy="151" r="21"/><circle cx="829" cy="213" r="21"/><circle cx="873" cy="129" r="18"/></g>
+<path d="M20 123Q170 160 306 94M638 89Q776 145 881 99" fill="none" stroke="#d9af71" stroke-width="3" opacity=".58"/>
+<g fill="#ffd07e"><circle cx="58" cy="133" r="7"/><circle cx="115" cy="143" r="7"/><circle cx="173" cy="140" r="7"/><circle cx="228" cy="119" r="7"/><circle cx="284" cy="100" r="7"/><circle cx="676" cy="104" r="7"/><circle cx="735" cy="123" r="7"/><circle cx="791" cy="130" r="7"/><circle cx="849" cy="111" r="7"/></g>
+<g fill="none" stroke="#ebc170" stroke-width="3" opacity=".55"><path d="M145 225l9-19 9 19 21 5-21 6-9 17-9-17-21-6zM771 63l6-13 6 13 13 4-13 4-6 13-6-13-13-4z"/></g>
+<ellipse cx="460" cy="704" rx="390" ry="40" fill="#000b13" opacity=".56"/>
+<!-- Gifts and Santa sack, behind body -->
+<g filter="url(#shadow)">
+<path d="M265 320Q269 218 353 195Q419 178 449 263L424 440Q371 462 305 420Z" fill="#9c2830" stroke="#d86e50" stroke-width="7"/>
+<path d="M273 310Q334 289 405 311M289 349Q356 335 419 349" fill="none" stroke="#d66a45" stroke-width="9" opacity=".6"/>
+<rect x="289" y="257" width="89" height="77" rx="8" fill="url(#gold)" stroke="#ffda96" stroke-width="5"/>
+<path d="M334 257v77M289 289h89" stroke="#b92a39" stroke-width="13"/>
+<path d="M329 258Q274 210 292 203Q322 198 338 257Q361 207 382 216Q395 233 345 259" fill="#d93235" stroke="#ffd5aa" stroke-width="5"/>
+<path d="M356 221l31 0v16h-31z" fill="#fcd548"/><path d="M355 237h32v11h-32z" fill="#164aa0"/><path d="M355 249h32v11h-32z" fill="#d32c37"/>
+<rect x="248" y="356" width="74" height="76" rx="8" fill="#24754f" stroke="#f5c876" stroke-width="5"/>
+<path d="M284 356v76M248 391h74" stroke="#f8c353" stroke-width="8"/>
+</g>
+<!-- Wheels, frame and rear assembly -->
+<g filter="url(#shadow)">
+<circle cx="259" cy="598" r="110" fill="#0a131d" stroke="#293640" stroke-width="20"/>
+<circle cx="259" cy="598" r="91" fill="#162730" stroke="#98a9b2" stroke-width="9"/>
+<circle cx="259" cy="598" r="79" fill="#14212b" stroke="#445b65" stroke-width="2"/>
+<use href="#spoke" transform="translate(259 598)"/>
+<circle cx="259" cy="598" r="23" fill="url(#metal)" stroke="#131f29" stroke-width="8"/>
+<circle cx="678" cy="598" r="112" fill="#09121d" stroke="#303e47" stroke-width="21"/>
+<circle cx="678" cy="598" r="90" fill="#172832" stroke="#9baeb8" stroke-width="8"/>
+<circle cx="678" cy="598" r="79" fill="#18262f" stroke="#445c67" stroke-width="2"/>
+<use href="#spoke" transform="translate(678 598)"/>
+<circle cx="678" cy="598" r="23" fill="url(#metal)" stroke="#162530" stroke-width="8"/>
+<path d="M241 485Q307 437 366 492L377 535Q280 489 211 540" fill="#0c1a24" stroke="#667985" stroke-width="8"/>
+<path d="M256 476L337 450L410 506M330 453l-71 145M330 453l115 142M445 595l231 1M409 506l-61 100" stroke="url(#metal)" stroke-linecap="round" stroke-width="14" fill="none"/>
+<path d="M669 592L604 423M696 594L615 428" stroke="#b8c4c8" stroke-width="16" stroke-linecap="round"/>
+<path d="M252 598L300 597M655 598l43 0" stroke="#d59c53" stroke-width="6" stroke-linecap="round"/>
+<path d="M365 603q69 19 121-16l61 6" fill="none" stroke="#d6e0df" stroke-width="15" stroke-linecap="round"/>
+<path d="M380 603q55 13 96-15" fill="none" stroke="#526b78" stroke-width="5"/>
+<path d="M302 434Q353 420 416 450l75 24" fill="none" stroke="#172630" stroke-width="26" stroke-linecap="round"/>
+<rect x="301" y="412" width="135" height="37" rx="17" fill="#18262f" stroke="#526874" stroke-width="7"/>
+<path d="M411 439Q472 416 543 450l26 62q-68 45-143 5z" fill="url(#tank)" stroke="#7f8e91" stroke-width="7"/>
+<path d="M449 476q31-23 69-15" fill="none" stroke="#f9a04c" stroke-width="7" stroke-linecap="round"/>
+<path d="M485 486l17-17 12 13 17-21" fill="none" stroke="#ffac58" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="423" y="530" width="135" height="63" rx="20" fill="#202f38" stroke="#9db0b7" stroke-width="10"/>
+<circle cx="478" cy="560" r="25" fill="#4c626d" stroke="#bbcdd0" stroke-width="8"/>
+<circle cx="478" cy="560" r="10" fill="#aabfc5"/>
+<path d="M524 570l94 2" stroke="#15252f" stroke-width="24" stroke-linecap="round"/>
+<path d="M519 576l95 7" stroke="#8b9ba1" stroke-width="7"/>
+</g>
+<!-- Santa body/legs -->
+<g filter="url(#shadow)">
+<path d="M409 424Q466 402 530 445l43 85-39 64-100-40-68-50z" fill="url(#coat)" stroke="#6e1d29" stroke-width="8"/>
+<path d="M515 491q25 20 26 52l-31 53-56-9-2-42z" fill="#a12230" stroke="#f5f6ed" stroke-width="12"/>
+<path d="M514 583q26-1 47 20l-13 22-70 3q-21-12-10-29z" fill="#17212b" stroke="#eff5ee" stroke-width="9"/>
+<path d="M409 475l70 79-23 40-80-48q-26-16-22-47" fill="#cc2738" stroke="#6f1d28" stroke-width="7"/>
+<path d="M363 522q17 20 40 15l40 35-24 33q-47 5-81-37" fill="#202730" stroke="#f1f3ea" stroke-width="9"/>
+<path d="M356 255Q386 208 472 227q89 20 95 126l-11 90q-77 49-172 12l-24-94z" fill="url(#coat)" stroke="#74222c" stroke-width="9"/>
+<path d="M394 239q72-26 129 9" fill="none" stroke="#f0d6c6" stroke-width="23" stroke-linecap="round"/>
+<path d="M388 454q75 29 158-9" fill="none" stroke="#f6f4e8" stroke-width="22" stroke-linecap="round"/>
+<path d="M457 268l-8 172" stroke="#fff4dd" stroke-width="21" stroke-linecap="round"/>
+<path d="M463 280l-5 156" stroke="#c9d0ca" stroke-width="5" stroke-linecap="round"/>
+<path d="M388 396q81 18 159 7" stroke="#22252b" stroke-width="22" fill="none" stroke-linecap="round"/>
+<rect x="456" y="386" width="35" height="32" rx="6" fill="#ffcd79" stroke="#e28c43" stroke-width="5"/>
+<rect x="466" y="393" width="15" height="17" rx="2" fill="#24313a"/>
+<!-- Raised arm and thumbs up -->
+<path d="M367 279q-55 17-53-60l2-76 66 15 27 95" fill="url(#coat)" stroke="#f5eede" stroke-width="21" stroke-linejoin="round"/>
+<path d="M299 167q-27-22-17-47l23-7 10 23q16-20 30-7l6 19q-8 20-41 28z" fill="#222833" stroke="#f3efe5" stroke-width="10"/>
+<!-- Steering arm -->
+<path d="M545 305q51 6 75 78l-12 25-36 7-55-70" fill="url(#coat)" stroke="#f4eee2" stroke-width="18" stroke-linejoin="round"/>
+<path d="M603 391q29-23 51 1l-16 30-29 3-16-14z" fill="#222831" stroke="#ededdf" stroke-width="8"/>
+</g>
+<!-- Santa face -->
+<g filter="url(#shadow)">
+<path d="M382 211q-3-76 77-97 80-5 95 65 14 61-28 92-55 48-121 8z" fill="#f6bd9e" stroke="#a96e58" stroke-width="6"/>
+<path d="M383 226q-17 28 9 60 21 23 30 47 40 46 88 16 39-24 43-70 26-50-2-79-13 32-34 44-16 31-45 24-29-12-39-38-14 20-50-4z" fill="url(#beard)" stroke="#e0e7dc" stroke-width="7"/>
+<path d="M400 250q34-28 60-8 29-25 68-2" fill="none" stroke="#fdfcf1" stroke-width="25" stroke-linecap="round"/>
+<path d="M419 294q43 34 87-2" stroke="#a76358" stroke-width="6" fill="none" stroke-linecap="round"/>
+<ellipse cx="471" cy="257" rx="17" ry="13" fill="#f2a17a" stroke="#cb8468" stroke-width="5"/>
+<!-- Eyes / sunglasses -->
+<rect x="397" y="203" width="57" height="33" rx="15" fill="#141f2d" stroke="#da9c65" stroke-width="6"/>
+<rect x="468" y="203" width="58" height="33" rx="15" fill="#141f2d" stroke="#da9c65" stroke-width="6"/>
+<path d="M455 217q8-5 13 0" stroke="#bb855d" stroke-width="6" fill="none"/>
+<path d="M401 211q20-7 35-4M474 211q22-8 38-4" stroke="#7d9daa" stroke-width="4" stroke-opacity=".6"/>
+<!-- Hat -->
+<path d="M376 181q14-100 103-114 81-6 100 47l-27 45q-42-29-78-8-46-2-80 34z" fill="url(#helmet)" stroke="#77242f" stroke-width="9"/>
+<path d="M493 78q40-44 79-21 26 14 35 48" fill="none" stroke="#cc2436" stroke-width="20" stroke-linecap="round"/>
+<circle cx="610" cy="113" r="30" fill="#faf7e9" stroke="#c4d5d5" stroke-width="6"/>
+<path d="M385 183q74-47 166-27" stroke="#fafaf0" stroke-width="30" fill="none" stroke-linecap="round"/>
+<path d="M393 183q75-38 149-26" stroke="#dee7de" stroke-width="8" fill="none" opacity=".5"/>
+</g>
+<!-- Handlebar, headlight and front fender -->
+<g filter="url(#shadow)">
+<path d="M605 420l30-47 62 6" stroke="#aabcc2" stroke-width="14" stroke-linecap="round" fill="none"/>
+<path d="M646 376l61-6" stroke="#202d35" stroke-width="15" stroke-linecap="round"/>
+<circle cx="608" cy="431" r="63" fill="#f9b15c" opacity=".24" filter="url(#light)"/>
+<circle cx="608" cy="431" r="51" fill="#1d2c34" stroke="#b9b8a0" stroke-width="11"/>
+<circle cx="608" cy="431" r="37" fill="url(#lamp)" stroke="#f3c37f" stroke-width="6"/>
+<path d="M584 423l23-21m-15 36l29-25" stroke="#fffde6" stroke-opacity=".8" stroke-width="6" stroke-linecap="round"/>
+<path d="M594 522q92-46 171 15l12 33q-76-25-121-6" fill="#a5232e" stroke="#ef9c5e" stroke-width="9"/>
+</g>
+<!-- festive garlands and lantern near bike -->
+<g fill="#1d6e49" stroke="#154a34" stroke-width="4">
+<path d="M98 522l46-34-5 43 44-22-22 43 37-9-35 29-59 0z"/>
+<path d="M747 503l36-43 5 39 44-27-18 39 48-6-31 34-52 5z"/>
+</g>
+<g fill="#d62b33"><circle cx="145" cy="530" r="10"/><circle cx="158" cy="521" r="8"/><circle cx="801" cy="504" r="11"/><circle cx="819" cy="512" r="8"/></g>
+<g stroke="#ffd28b" stroke-width="4" stroke-linecap="round" opacity=".82"><path d="M156 95v22M145 106h22M810 222v21M800 233h21M718 75v16M710 83h16"/></g>
+</svg>

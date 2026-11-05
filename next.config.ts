@@ -59,6 +59,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false, // Remover header X-Powered-By
   compress: true, // Habilitar compresión gzip
   experimental: {
+    serverActions: { bodySizeLimit: '3mb' }, // Permite foto de hasta 2 MB con encabezados multipart
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'], // Optimizar imports
   },
   turbopack: {

@@ -1,5 +1,3 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { formatExactDateTime } from '@/lib/dateUtils';
 
 export interface ReceiptData {
@@ -47,6 +45,7 @@ export async function generateReceiptPDF(receiptData: ReceiptData): Promise<void
   document.body.appendChild(receiptElement);
 
   try {
+    const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([import('jspdf'), import('html2canvas')]);
     // Convertir HTML a canvas
     const canvas = await html2canvas(receiptElement, {
       scale: 2,
