@@ -71,6 +71,8 @@ export default async function AdminPage({
       return cycle === 'biannual' || cycle === 'yearly' ? cycle : 'monthly';
     })(),
     subscription_end_date: org.settings?.demoEndDate || null,
+    is_trial: getTrialState(org.settings).isTrial,
+    trial_expired: getTrialState(org.settings).expired,
     created_at: org.created_at,
     members: org.members?.map((m: any) => ({
       role: m.role,

@@ -13,9 +13,9 @@ test('prueba gratis is a mobile-first 3-step dialog, without checkbox barriers',
   assert.match(form,/reportValidity\(\)/);
   assert.match(form,/fieldGroups\[step\]/);
   assert.match(form,/type="hidden" name="termsAcknowledged" value="yes"/);
-  assert.match(form,/name="welcomeRequested" value=\{withoutWhatsApp \? 'no' : 'yes'\}/);
+  assert.match(form,/name="welcomeRequested" value="yes"/);
   assert.match(form,/Al elegir el botón naranja, solicitas/);
-  assert.match(form,/Prefiero activar sin WhatsApp/);
+  assert.doesNotMatch(form,/Prefiero activar sin WhatsApp|withoutWhatsApp/);
   assert.doesNotMatch(form,/type="checkbox"|name="terms"|name="whatsappConsent"/);
   assert.match(page,/<TrialForm \/>/);
 });

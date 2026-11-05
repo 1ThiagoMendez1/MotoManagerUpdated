@@ -1,25 +1,33 @@
-# Registro guiado y bienvenida WhatsApp — 4 de noviembre de 2026
+# Prueba Full y bienvenida por WhatsApp
 
 ## Registro
 
-La página pública /prueba-gratis abre un diálogo accesible de tres pasos, optimizado para móviles. Primero pide taller y ciudad, luego datos del dueño, y finalmente contraseña y confirmación. La prueba es Full por 15 días, sin tarjeta ni cobros automáticos.
+El formulario público de tres pasos conserva un único botón final: **Activar mis 15 días y recibir mi bienvenida**. Se eliminó la opción secundaria de activar sin WhatsApp. El aviso visible explica que esa acción solicita una bienvenida de activación y conserva su fecha, texto y origen en la cuenta. No autoriza publicidad. El backend sigue respetando una elección antigua de no recibir WhatsApp; quitar el enlace del formulario no transforma rechazos previos en autorizaciones.
 
-No existen casillas de términos ni WhatsApp en el flujo. El cliente ve un aviso breve antes de activar, indicando el tratamiento de datos y las reglas de la prueba. El botón principal «Activar mis 15 días y recibir mi bienvenida» manifiesta la solicitud expresa de recibir un mensaje de activación por WhatsApp desde MotoManager; el servidor conserva fecha, texto y origen del consentimiento de esa categoría. Un botón secundario permite activar sin WhatsApp. NO se autoriza ni se envía publicidad por el registro de prueba.
+## Gestión de talleres
 
-El backend valida en el servidor los seis campos, el reconocimiento de condiciones y la elección yes/no sobre WhatsApp. Se mantiene honeypot, límite de intentos por IP, unicidad de prueba, provisionamiento atómico, registro de analytics y acceso inmediato. Nada depende solo de controles del navegador.
+En **Administrador → Gestión de talleres**, las pruebas gratuitas muestran **Reenviar bienvenida**. Las pruebas vencidas tienen el botón deshabilitado y los planes pagados no lo muestran.
 
-## Diagnóstico de bienvenida
+Antes del envío se consulta en el servidor el taller, su único propietario activo y la cuenta de Auth. Se presentan el nombre, el número registrado, el inicio y el vencimiento en hora de Bogotá. La acción solo acepta identificadores de taller y solicitud; nunca acepta un teléfono elegido por el navegador. Se requiere una solicitud de bienvenida registrada y concordancia del teléfono y correo del propietario. Ambas acciones del administrador validan `requireSuperAdmin()` antes de consultar datos privilegiados.
 
-En producción, 4 de noviembre, el GET de plantilla por ID 152539709393366 respondió HTTP 400, Meta código 100, subcódigo 33. Logs de registro indicaron trial-whatsapp: provider_rejected HTTP 400. Un número y token emisor MotoManager estuvieron configurados y la consulta del número fue HTTP 200. Esta consulta a un ID de plantilla que no es accesible impedía TODOS los envíos antes de ejecutar POST. También bloqueaba el flujo la casilla opcional.
+El reenvío usa las fechas originales de los quince días. No crea otra prueba, amplía su vencimiento, cambia la contraseña ni ejecuta el envío de credenciales temporales. No realiza envíos masivos ni retroactivos al desplegar.
 
-Cambio: se elimina la consulta obligatoria al ID anterior y se envía UNA SOLA VEZ al endpoint oficial /messages por nombre de plantilla bienvenida_prueba_gratis_15_dias, idioma es_CO, cuatro parámetros de cuerpo según la plantilla descrita por el proyecto. Opcionalmente WHATSAPP_TRIAL_WELCOME_VAR_COUNT=5 si la plantilla de esa WABA tiene 5 variables. Meta decide si esa plantilla existe y está aprobada; se guarda en logs el resultado estructurado (HTTP/código Meta), sin datos privados ni tokens. No hay reintento automático, porque un timeout podría producir duplicados.
+La activación y el reenvío comparten una reserva por taller en `organizations.settings.trialWelcomeDelivery`. La escritura compara el documento JSON completo antes de modificarlo; si hubo un cambio concurrente de plan, horarios o cuota, vuelve a leerlo. El resultado también se guarda sin sobrescribir cambios simultáneos. Este estado es diagnóstico y de coordinación; no concede permisos, prueba de pago ni identidad. No requiere migraciones SQL adicionales.
 
-## Comprobaciones necesarias antes de prometer entrega
+Cada solicitud usa un UUID para evitar que una repetición de la misma acción produzca otro POST. Un envío en curso bloquea otros intentos durante 90 segundos y se exige un minuto entre envíos manuales. La activación automática nunca repite una reserva existente. El administrador puede pedir deliberadamente otro envío con una nueva solicitud después de revisar el resultado anterior y respetar el intervalo.
 
-1. En WhatsApp Manager de la WABA del número emisor, confirmar plantilla de nombre bienvenida_prueba_gratis_15_dias, es_CO, estado APPROVED, categoría correcta y exactamente 4 variables, encabezado y botón estáticos. Si se encuentra PENDING/REJECTED, aprobar/corregir en Meta; ningún código puede saltarse esa aprobación.
-2. Realizar prueba con un número propio autorizado. Verificar POST de Meta y webhook de estado delivered; HTTP 200 con wamid no demuestra entrega.
-3. Verificar que la aceptación se almacene por cada solicitud yes y que no se envíe cuando el usuario eligió «sin WhatsApp». No enviar publicidad ni mensajes a clientes no autorizados.
-4. Probar en 360, 390 y 430 px, teclado móvil, retorno entre pasos, validación, cierre y reanudación, dos tipos de submit.
-5. Revisar política de datos y opt-in de WhatsApp para Colombia; el botón es una acción explícita y la persona ve claramente qué mensaje recibirá.
+## Plantilla y resultados
 
-Fuentes: Política de mensajes de WhatsApp Business, septiembre 2026; Ley 1581 de Colombia.
+Se reutiliza `bienvenida_prueba_gratis_15_dias`, idioma `es_CO`, con encabezado y botón estáticos. El emisor actual empieza por cinco variables: nombre, taller, correo, inicio y fin. `WHATSAPP_TRIAL_WELCOME_VAR_COUNT` puede seleccionar cuatro o cinco. Únicamente un rechazo explícito Meta 132000 permite probar una vez la otra cantidad de variables. No se consulta el ID de plantilla obsoleto para poder enviar.
+
+La configuración utiliza las variables existentes del servidor: `WHATSAPP_API_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` y `WHATSAPP_GRAPH_API_VERSION` (por defecto `v23.0`). El tiempo límite de cada POST es de 20 segundos.
+
+El diálogo distingue aceptado por Meta, rechazo con código numérico y resultado no confirmado. Un HTTP exitoso con identificador de mensaje indica aceptación, no entrega; la entrega requiere confirmación del destinatario o un webhook de estado. Tras un timeout, pérdida de respuesta o fallo al guardar el resultado, no hay repetición automática. Se avisa al administrador que verifique la recepción antes de reenviar.
+
+El estado guarda identificador de solicitud, actor, origen, fechas, estado y diagnóstico mínimo del proveedor. No almacena contraseña, token, cuerpo del mensaje ni teléfono adicional. Los errores públicos no muestran credenciales ni datos del proveedor sin filtrar.
+
+## Validación
+
+`npm run typecheck` y `npm test`. Las pruebas nuevas cubren dos envíos simultáneos, repetición de una solicitud, consentimiento, pruebas vencidas y pagadas, conservación de fechas, cambios concurrentes de ajustes, rechazo, timeout y fallo al guardar después de un POST. Las llamadas a Meta están simuladas: estas pruebas no contactan a propietarios de talleres.
+
+La integración continua también se ejecuta al abrir un pull request contra la rama de producción. Ningún cambio de este módulo requiere actualizar paquetes o aplicar migraciones.

@@ -121,7 +121,7 @@ export async function sendTrialWelcomeViaMeta(
   const headers = { Authorization: 'Bearer ' + config.token, 'Content-Type': 'application/json' };
   const send = async (count: 4 | 5) => {
     const response = await fetcher(url, {
-      method: 'POST', headers, cache: 'no-store', signal: AbortSignal.timeout(12000),
+      method: 'POST', headers, cache: 'no-store', signal: AbortSignal.timeout(20000),
       body: JSON.stringify({
         messaging_product: 'whatsapp', to: input.phone, type: 'template',
         template: buildTrialWelcomeSendTemplate(input, count),
