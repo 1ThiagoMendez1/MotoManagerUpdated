@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - codex/v6.8.0-horarios-quota-hardening-20261023
+  pull_request:
+    branches:
+      - codex/v6.8.0-horarios-quota-hardening-20261023
   workflow_dispatch:
 permissions:
   contents: read

@@ -30,15 +30,13 @@ const initialData: Record<FieldName, string> = {
   workshopName: '', city: '', fullName: '', phone: '', email: '', password: '',
 };
 
-function Submit({ withoutWhatsApp = false }: { withoutWhatsApp?: boolean }) {
+function Submit() {
   const { pending } = useFormStatus();
-  return <button type="submit" name="welcomeRequested" value={withoutWhatsApp ? 'no' : 'yes'} disabled={pending}
-    className={withoutWhatsApp
-      ? 'min-h-11 w-full rounded-xl px-3 text-xs font-semibold text-slate-300 underline underline-offset-4 hover:text-white disabled:opacity-50'
-      : 'flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-sm font-extrabold text-[#081121] shadow-lg shadow-orange-500/10 transition hover:bg-[#ffa149] disabled:opacity-60'}>
-    {pending && !withoutWhatsApp ? <Loader2 className="h-5 w-5 animate-spin"/> : !withoutWhatsApp && <Gift className="h-5 w-5"/>}
-    {withoutWhatsApp ? 'Prefiero activar sin WhatsApp' : pending ? 'Estamos activando tu taller...' : 'Activar mis 15 días y recibir mi bienvenida'}
-    {!withoutWhatsApp && !pending && <ArrowRight className="h-5 w-5" />}
+  return <button type="submit" name="welcomeRequested" value="yes" disabled={pending}
+    className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-sm font-extrabold text-[#081121] shadow-lg shadow-orange-500/10 transition hover:bg-[#ffa149] disabled:opacity-60">
+    {pending ? <Loader2 className="h-5 w-5 animate-spin"/> : <Gift className="h-5 w-5"/>}
+    {pending ? 'Estamos activando tu taller...' : 'Activar mis 15 días y recibir mi bienvenida'}
+    {!pending && <ArrowRight className="h-5 w-5" />}
   </button>;
 }
 
@@ -147,7 +145,7 @@ export function TrialForm() {
             <div className="pt-2">
               {step < 2
                 ? <button type="button" onClick={next} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-base font-black text-[#081121] hover:bg-[#ffa149]">Continuar <ArrowRight className="h-5 w-5"/></button>
-                : <><Submit/><Submit withoutWhatsApp/></>}
+                : <Submit/>}
               {step > 0 && <button type="button" onClick={() => setStep(s => Math.max(s - 1,0))}
                 className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/5"><ArrowLeft className="h-4 w-4"/> Volver</button>}
             </div>

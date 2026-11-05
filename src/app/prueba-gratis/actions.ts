@@ -7,8 +7,8 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/auth-server';
-import { getTrialState, trialRegistrationSchema, TRIAL_WHATSAPP_CONSENT_TEXT } from '@/lib/subscription-trial';
-import { sendTrialWelcomeViaMeta } from '@/lib/whatsapp-trial';
+import { trialRegistrationSchema, TRIAL_WHATSAPP_CONSENT_TEXT } from '@/lib/subscription-trial';
+import { sendWorkshopTrialWelcome } from '@/lib/trial-welcome-server';
 import { scheduleAccountAccess } from '@/lib/analytics/web-server';
 
 export async function startFullTrial(_previous: { error: string }, form: FormData): Promise<{ error: string }> {
@@ -58,29 +58,13 @@ export async function startFullTrial(_previous: { error: string }, form: FormDat
   }
   if (organizationId) await scheduleAccountAccess(account.user, 'trial_activated', organizationId);
   if (optedIn && organizationId) {
-    // Run only after a successful account + workshop activation. Delivery must
-    // not delay or undo registration, even if Meta is reviewing the template.
+    // Shares the durable claim with administrator resends. Never changes the
+    // chosen password or rolls back a successful activation on delivery failure.
     after(async () => {
       try {
-        const { data: organization, error } = await admin.from('organizations')
-          .select('name,phone,email,settings').eq('id', organizationId).single();
-        const settings = organization?.settings || {};
-        const trial = getTrialState(settings);
-        if (error || !organization || !trial.isTrial || trial.expired || organization.email !== email) {
-          console.warn('[trial-whatsapp] Activation could not be verified');
-          return;
-        }
-        const result = await sendTrialWelcomeViaMeta({
-          phone: organization.phone || phone, fullName, workshopName: organization.name,
-          email, startsAt: settings.trialStartDate, endsAt: settings.trialEndDate, optedIn,
-        }, {
-          token: process.env.WHATSAPP_API_TOKEN, phoneId: process.env.WHATSAPP_PHONE_NUMBER_ID,
-          version: process.env.WHATSAPP_GRAPH_API_VERSION,
-          variableCount: Number(process.env.WHATSAPP_TRIAL_WELCOME_VAR_COUNT || '5'),
-        });
-        if (result.status !== 'accepted') console.warn('[trial-whatsapp] Welcome not confirmed', result);
+        const result = await sendWorkshopTrialWelcome(organizationId, randomUUID(), 'activation', account.user!.id);
+        if (!result.success) console.warn('[trial-whatsapp] Welcome status:', result.status);
       } catch {
-        // Keep errors and logs free of registration data, passwords and tokens.
         console.warn('[trial-whatsapp] Welcome could not be processed');
       }
     });
