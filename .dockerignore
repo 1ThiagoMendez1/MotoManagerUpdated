@@ -9,3 +9,10 @@ README.md
 docs
 scratch.ts
 .analytics
+.env
+.env.*
+!.env.example
+*.dump
+*.gpg
+*.log
+backups

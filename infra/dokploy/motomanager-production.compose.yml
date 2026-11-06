@@ -1,0 +1,553 @@
+# Production plus the existing isolated staging services. Secrets stay in private env files on the host.
+name: motomanagernew-motomanagernewmigration-ogl915
+networks:
+  dokploy-network:
+    external: true
+  production_egress:
+    driver: bridge
+  production_private:
+    driver: bridge
+    internal: true
+  staging_private:
+    driver: bridge
+    internal: true
+services:
+  gotrue:
+    cpus: 0.75
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      API_EXTERNAL_URL: https://api-staging.motomanager.com.co
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: '9999'
+      GOTRUE_DB_DATABASE_URL: postgres://gotrue_stage:${GOTRUE_STAGE_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage?sslmode=disable
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DISABLE_SIGNUP: 'true'
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: 'false'
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true'
+      GOTRUE_EXTERNAL_PHONE_ENABLED: 'false'
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: '3600'
+      GOTRUE_JWT_SECRET: ${PGRST_JWT_SECRET:?required}
+      GOTRUE_MAILER_AUTOCONFIRM: 'true'
+      GOTRUE_SITE_URL: https://staging.motomanager.com.co
+      GOTRUE_URI_ALLOW_LIST: https://staging.motomanager.com.co/**
+    image: supabase/gotrue:v2.189.0
+    mem_limit: 512m
+    networks:
+    - staging_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+  keycloak:
+    command:
+    - start
+    cpus: 1.5
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?staging Keycloak admin
+        secret required}
+      KC_BOOTSTRAP_ADMIN_USERNAME: stage-admin
+      KC_DB: postgres
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?staging Keycloak DB secret required}
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_stage
+      KC_DB_USERNAME: keycloak_stage
+      KC_HEALTH_ENABLED: 'true'
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HTTP_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'false'
+    image: quay.io/keycloak/keycloak:26.8.1
+    mem_limit: 2304m
+    networks:
+    - staging_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+  postgres:
+    cpus: 2.0
+    environment:
+      POSTGRES_DB: motomanager_stage
+      POSTGRES_INITDB_ARGS: --data-checksums
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?staging PostgreSQL secret required}
+      POSTGRES_USER: postgres
+    healthcheck:
+      interval: 10s
+      retries: 15
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d motomanager_stage
+      timeout: 5s
+    image: postgres:17.11-bookworm
+    mem_limit: 2g
+    networks:
+    - staging_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    shm_size: 256mb
+    stop_grace_period: 60s
+    volumes:
+    - pg17_stage_data:/var/lib/postgresql/data
+  production-auth:
+    cpus: 0.75
+    depends_on:
+      production-db:
+        condition: service_healthy
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/gotrue-production.env
+    image: supabase/gotrue:v2.189.0
+    mem_limit: 512m
+    networks:
+    - production_private
+    - production_egress
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+  production-db:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    command:
+    - postgres
+    - -c
+    - wal_level=logical
+    - -c
+    - max_replication_slots=10
+    - -c
+    - max_wal_senders=10
+    - -c
+    - max_slot_wal_keep_size=1GB
+    - -c
+    - shared_buffers=512MB
+    - -c
+    - max_connections=150
+    - -c
+    - output_plugin_libraries=pgoutput,wal2json
+    cpus: 2
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/motomanager-postgres-production.env
+    healthcheck:
+      interval: 5s
+      retries: 30
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d motomanager
+      timeout: 3s
+    image: motomanager-postgres:17.11-wal2json-20261105
+    mem_limit: 3g
+    networks:
+    - production_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    shm_size: 256mb
+    stop_grace_period: 60s
+    volumes:
+    - production_pg17_data:/var/lib/postgresql/data
+  production-functions:
+    command:
+    - start
+    - --main-service
+    - /home/deno/functions/main
+    cpus: 0.5
+    depends_on:
+      production-db:
+        condition: service_healthy
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/edge-production.env
+    image: supabase/edge-runtime:v1.74.0
+    mem_limit: 384m
+    networks:
+    - production_private
+    - production_egress
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    volumes:
+    - /opt/motomanager-production/functions:/home/deno/functions:ro
+  production-gateway:
+    cpus: 0.75
+    depends_on:
+      production-auth:
+        condition: service_started
+      production-functions:
+        condition: service_started
+      production-realtime:
+        condition: service_started
+      production-rest:
+        condition: service_started
+      production-storage:
+        condition: service_started
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/kong-production.env
+    image: kong/kong:3.9.1
+    mem_limit: 512m
+    networks:
+      dokploy-network:
+        aliases:
+        - motomanager-production-gateway
+      production_private:
+        aliases:
+        - production-gateway
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    ulimits:
+      nofile:
+        hard: 16384
+        soft: 16384
+    volumes:
+    - /opt/motomanager-production/gateway-kong.yml:/etc/kong/production.yml:ro
+  production-imgproxy:
+    cpus: 0.75
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/imgproxy-production.env
+    image: darthsim/imgproxy:v3.30.1
+    mem_limit: 384m
+    networks:
+    - production_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    volumes:
+    - production_storage_data:/var/lib/storage:ro
+  production-realtime:
+    cpus: 0.75
+    depends_on:
+      production-db:
+        condition: service_healthy
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/realtime-production.env
+    image: supabase/realtime:v2.102.3
+    mem_limit: 768m
+    networks:
+      production_private:
+        aliases:
+        - realtime-dev.production-realtime
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    ulimits:
+      nofile:
+        hard: 10000
+        soft: 10000
+  production-redis:
+    command:
+    - /bin/sh
+    - -ec
+    - umask 077; printf "%s\n" "bind 0.0.0.0" "protected-mode yes" "save \"\"" "appendonly
+      no" "maxmemory 256mb" "maxmemory-policy allkeys-lru" "requirepass $$REDIS_PASSWORD"
+      > /tmp/redis.conf; exec redis-server /tmp/redis.conf
+    cpus: 0.5
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/redis-production.env
+    healthcheck:
+      interval: 5s
+      retries: 20
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      timeout: 3s
+    image: redis:7.4.8-alpine
+    mem_limit: 384m
+    networks:
+    - production_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /data
+  production-rest:
+    cpus: 0.75
+    depends_on:
+      production-db:
+        condition: service_healthy
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/postgrest-production.env
+    image: postgrest/postgrest:v14.12
+    mem_limit: 512m
+    networks:
+    - production_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+  production-storage:
+    cpus: 0.75
+    depends_on:
+      production-db:
+        condition: service_healthy
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/storage-api-production.env
+    image: supabase/storage-api:v1.60.4
+    mem_limit: 768m
+    networks:
+    - production_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    volumes:
+    - production_storage_data:/var/lib/storage
+  production-web:
+    build:
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_WOMPI_PUBLIC_KEY: ${NEXT_PUBLIC_WOMPI_PUBLIC_KEY:-}
+      context: ../..
+      dockerfile: infra/dokploy/web/Dockerfile
+    command:
+    - node
+    - server.js
+    cpus: 2
+    depends_on:
+      production-gateway:
+        condition: service_started
+      production-redis:
+        condition: service_healthy
+    env_file:
+    - format: raw
+      path: /opt/motomanager-production/node-production.env
+    healthcheck:
+      interval: 15s
+      retries: 5
+      start_period: 30s
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      timeout: 5s
+    image: motomanager-next:production-20261106
+    mem_limit: 2g
+    networks:
+      dokploy-network:
+        aliases:
+        - motomanager-production-web
+      production_egress: {}
+      production_private:
+        aliases:
+        - production-web
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /app/.next/cache:uid=1000,gid=1000,mode=0700
+    user: node
+    volumes:
+    - production_geoip_data:/app/.analytics
+    working_dir: /app
+  redis-cache:
+    command:
+    - /bin/sh
+    - -ec
+    - 'case "$$REDIS_PASSWORD" in ''''|*[!a-fA-F0-9]*) exit 1;; esac
+
+      test "$${#REDIS_PASSWORD}" -ge 64 || exit 1
+
+      umask 077
+
+      printf ''%s\n'' ''bind 0.0.0.0'' ''protected-mode yes'' ''save ""'' ''appendonly
+      no'' ''maxmemory 256mb'' ''maxmemory-policy allkeys-lru'' > /tmp/redis-stage.conf
+
+      printf ''requirepass %s\n'' "$$REDIS_PASSWORD" >> /tmp/redis-stage.conf
+
+      exec redis-server /tmp/redis-stage.conf
+
+      '
+    cpus: 0.5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?staging Redis secret required}
+    healthcheck:
+      interval: 10s
+      retries: 8
+      test:
+      - CMD-SHELL
+      - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      timeout: 3s
+    image: redis:7.4.8-alpine
+    mem_limit: 384m
+    networks:
+      staging_private:
+        aliases:
+        - motomanager-read-cache
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /data
+  rest:
+    cpus: 0.75
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_MAX_ROWS: '1000'
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_URI: postgres://authenticator:${PGRST_DB_PASSWORD:?staging REST database
+        password required}@postgres:5432/motomanager_stage
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?staging JWT secret required}
+      PGRST_SERVER_HOST: 0.0.0.0
+    image: postgrest/postgrest:v14.12
+    mem_limit: 512m
+    networks:
+    - staging_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+  rest-runtime:
+    cpus: 0.75
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public,auth
+      PGRST_DB_MAX_ROWS: '1000'
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_URI: postgres://authenticator:${PGRST_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?required}
+      PGRST_SERVER_HOST: 0.0.0.0
+    image: postgrest/postgrest:v14.12
+    mem_limit: 512m
+    networks:
+    - staging_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+  stage-gateway:
+    cpus: 0.75
+    depends_on:
+      gotrue:
+        condition: service_started
+      rest-runtime:
+        condition: service_started
+      storage-runtime:
+        condition: service_started
+    environment:
+      KONG_ADMIN_LISTEN: 'off'
+      KONG_DATABASE: 'off'
+      KONG_DECLARATIVE_CONFIG: /etc/kong/stage.yml
+      KONG_PLUGINS: bundled
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+    image: kong/kong:3.9.1
+    mem_limit: 640m
+    networks:
+      dokploy-network:
+        aliases:
+        - motomanager-staging-gateway
+      staging_private:
+        aliases:
+        - stage-gateway
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    volumes:
+    - /opt/motomanagernewmigration-staging/gateway-kong.yml:/etc/kong/stage.yml:ro
+  staging-web:
+    command:
+    - node
+    - server.js
+    cpus: 1.5
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      stage-gateway:
+        condition: service_started
+    environment:
+      CACHE_ENABLED: 'true'
+      CACHE_NAMESPACE: motomanager:staging:reads:v1
+      CACHE_TTL_SECONDS: '15'
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${STAGING_ANON_KEY:?required}
+      NEXT_PUBLIC_SUPABASE_URL: https://api-staging.motomanager.com.co
+      NEXT_TELEMETRY_DISABLED: '1'
+      NODE_ENV: production
+      PORT: '3000'
+      REDIS_URL: redis://:${REDIS_PASSWORD:?required}@motomanager-read-cache:6379/0
+      SUPABASE_INTERNAL_URL: http://stage-gateway:8000
+      SUPABASE_SERVICE_ROLE_KEY: ${STAGING_SERVICE_KEY:?required}
+    healthcheck:
+      interval: 20s
+      retries: 3
+      start_period: 30s
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      timeout: 5s
+    image: node:24-bookworm-slim
+    mem_limit: 1536m
+    networks:
+      dokploy-network:
+        aliases:
+        - motomanager-staging-web
+      staging_private:
+        aliases:
+        - staging-web
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /app/.next/cache:uid=1000,gid=1000,mode=0700
+    user: node
+    volumes:
+    - /opt/motomanagernewmigration-staging/web/releases/3aKtlJnZtU_4c_ZbKBz8m:/app:ro
+    working_dir: /app
+  storage-runtime:
+    cpus: 1.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rest-runtime:
+        condition: service_started
+    environment:
+      ANON_KEY: ${STAGING_ANON_KEY:?required}
+      AUTH_JWT_SECRET: ${PGRST_JWT_SECRET:?required}
+      DATABASE_URL: postgres://storage_stage:${STAGING_STORAGE_DB_PASSWORD:?required}@postgres:5432/motomanager_runtime_stage
+      ENABLE_IMAGE_TRANSFORMATION: 'false'
+      FILE_SIZE_LIMIT: '52428800'
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: staging-assets
+      POSTGREST_URL: http://rest-runtime:3000
+      REGION: us-east-1
+      REQUEST_ALLOW_X_FORWARDED_PATH: 'true'
+      SERVICE_KEY: ${STAGING_SERVICE_KEY:?required}
+      STORAGE_BACKEND: file
+      STORAGE_PUBLIC_URL: http://stage-gateway:8000
+      TENANT_ID: stage
+    image: supabase/storage-api:v1.60.4
+    mem_limit: 768m
+    networks:
+    - staging_private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    volumes:
+    - storage_stage_data:/var/lib/storage
+volumes:
+  pg17_stage_data: null
+  production_geoip_data:
+    external: true
+    name: motomanagernew-motomanagernewmigration-ogl915_production_geoip_data
+  production_pg17_data: null
+  production_storage_data:
+    external: true
+    name: motomanagernew-motomanagernewmigration-ogl915_production_storage_data
+  storage_stage_data: null
