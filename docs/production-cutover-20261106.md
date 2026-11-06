@@ -1,6 +1,29 @@
 # MotoManager: corte a PostgreSQL propio — 6 de noviembre de 2026
 
-Estado de esta revisión: preparado para el corte. La evidencia final se registra después de completar la conciliación y abrir el tráfico.
+Estado: **migración completada** el 6 de noviembre de 2026 a las **08:29 de Bogotá (13:29 UTC)**. Los dominios `motomanager.com.co`, `www.motomanager.com.co` y `api.motomanager.com.co` sirven el entorno nuevo.
+
+## Resultado del corte
+
+| Dato conservado | Cantidad |
+| --- | ---: |
+| Cuentas Auth | 74 |
+| Talleres | 10 |
+| Clientes | 212 |
+| Motocicletas | 216 |
+| Órdenes | 77 |
+| Archivos | 43 |
+
+- Las 79 tablas comprobadas coincidieron en sus valores, estructura, restricciones, RLS, funciones, secuencias y totales antes de arrancar los servicios del destino.
+- Los 43 archivos coincidieron en contenido y atributos. También se comprobó su descarga después del corte mediante el dominio público.
+- Ocho apartados autenticados devolvieron HTTP 200 en Chromium contra el sitio público, sin errores JavaScript ni respuestas 500. Un dueño recibió 403 al intentar abrir el diagnóstico administrativo.
+- Se verificaron dos identidades copiadas y el aislamiento entre talleres después del corte, **sin consumir sus refresh tokens ni modificar registros de negocio para probarlos**.
+- La transmisión Realtime y su aislamiento se probaron sobre la copia de ensayo. En el destino definitivo quedaron activos los slots de wal2json y pgoutput.
+- Los tres dominios devolvieron el identificador del despliegue `mm20261106-60b4c064d7`.
+- El respaldo cifrado inicial, el respaldo final y el material de recuperación quedaron guardados fuera del VPS.
+- La web y las APIs originales quedaron detenidas; la base anterior permanece en modo de solo lectura. Sus volúmenes se conservan.
+
+Imagen web validada: `sha256:c5453814c41b859137ecf54ca87feb1ca6ce311aee1dedfbf9c9f9fdbb941d85`. Revisión de infraestructura: `dd13715d56301b91102f6348aa6b787810ea6b39`.
+
 
 ## Despliegue
 
