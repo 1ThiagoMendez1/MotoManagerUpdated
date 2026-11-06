@@ -60,6 +60,12 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Local IP-to-city lookup. The reference database is downloaded in the
+# background, without transmitting visitor addresses to an external service.
+RUN mkdir -p /app/.analytics && chown nextjs:nodejs /app/.analytics
+ENV ANALYTICS_GEOIP_DB=/app/.analytics/geoip.mmdb
+ENV ANALYTICS_GEOIP_DOWNLOAD=1
+
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache

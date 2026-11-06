@@ -1,6 +1,8 @@
 'use client';
 
 import { ArrowRight, Bike, Boxes, CheckCircle2, ClipboardList, LayoutGrid, PlayCircle, ShieldCheck, ShoppingBag, Wrench } from 'lucide-react';
+import Link from 'next/link';
+import { HalloweenHero } from './HalloweenCampaign';
 
 const SMALL_CARDS = [
   { name: 'Clientes', subtitle: 'Directorio y contactos', icon: ShieldCheck, bg: 'bg-emerald-500' },
@@ -9,7 +11,8 @@ const SMALL_CARDS = [
   { name: 'Ventas', subtitle: 'Caja y mostrador', icon: ShoppingBag, bg: 'bg-green-500' },
 ];
 
-export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void }) {
+export function LandingHero({ onScrollToPlanes, halloween = false }: { onScrollToPlanes: () => void; halloween?: boolean }) {
+  if (halloween) return <HalloweenHero onScrollToPlanes={onScrollToPlanes} />;
   return (
     <section className="relative isolate overflow-hidden bg-[#050b18] px-5 pb-20 pt-16 text-white sm:pt-20 lg:pb-28 lg:pt-24">
       <div aria-hidden="true" className="pointer-events-none absolute -right-44 top-0 h-[650px] w-[650px] rounded-full bg-[#347df1]/15 blur-[110px]" />
@@ -18,7 +21,7 @@ export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void
         <div className="max-w-xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#ff7e13]/30 bg-[#ff7e13]/10 px-4 py-2 text-xs font-bold tracking-wide text-[#ffad68]">
             <span className="h-2 w-2 rounded-full bg-[#ff851f]" />
-            EL SOFTWARE QUE ENTIENDE TU TALLER
+            15 DÍAS GRATIS · PLAN FULL TALLER
           </div>
           <h1 className="mt-7 text-[clamp(2.8rem,5.2vw,4.95rem)] font-extrabold leading-[1.055] tracking-[-0.06em]">
             Controla cada moto.
@@ -26,23 +29,23 @@ export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void
           </h1>
           <p className="mt-7 max-w-lg text-base leading-8 text-slate-300 sm:text-lg">
             Deja de buscar información entre cuadernos y chats. Con MotoManager conectas
-            órdenes de trabajo, clientes, motocicletas, inventario y ventas en un solo lugar.
+            órdenes de trabajo, clientes, motocicletas, inventario y ventas en un solo lugar. Pruébalo con tu taller durante 15 días: plan Full, por $0.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <a href="#demo" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-6 text-sm font-extrabold text-[#0a1425] shadow-[0_14px_40px_rgba(255,125,16,.23)] transition hover:-translate-y-0.5 hover:bg-[#ffa149]">
-              <PlayCircle className="h-5 w-5" /> Probar demo interactiva
-            </a>
-            <button onClick={onScrollToPlanes} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-6 text-sm font-bold text-white transition hover:bg-white/10">
+            <Link href="/prueba-gratis" data-analytics-id="hero_trial" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-6 text-sm font-extrabold text-[#0a1425] shadow-[0_14px_40px_rgba(255,125,16,.23)] transition hover:-translate-y-0.5 hover:bg-[#ffa149]">
+              Activar mis 15 días gratis <ArrowRight className="h-5 w-5" />
+            </Link>
+            <button data-analytics-id="hero_pricing" onClick={onScrollToPlanes} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-6 text-sm font-bold text-white transition hover:bg-white/10">
               Ver planes y precios <ArrowRight className="h-4 w-4" />
             </button>
           </div>
           <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-slate-400 sm:text-sm">
-            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Demo sin registro</span>
-            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Sin tarjeta para explorar</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Full por 15 días</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Sin tarjeta ni cobros automáticos</span>
             <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Diseñado para talleres de motos</span>
           </div>
-          <a href="#como-funciona" className="mt-9 inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white">
-            Descubre cómo funciona <ArrowRight className="h-4 w-4" />
+          <a href="#demo" data-analytics-id="hero_demo" className="mt-9 inline-flex items-center gap-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+            <PlayCircle className="h-4 w-4" /> Ver demo interactiva sin registro
           </a>
         </div>
 
@@ -92,7 +95,7 @@ export function LandingHero({ onScrollToPlanes }: { onScrollToPlanes: () => void
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-[#d6e0ea] pt-3 text-[10px] text-slate-500">
                 <span>Inspirado en la interfaz real del producto</span>
-                <a href="#demo" className="inline-flex items-center gap-1 font-extrabold text-[#347df1]">Explorar de verdad <ArrowRight className="h-3 w-3" /></a>
+                <a href="#demo" data-analytics-id="hero_demo" className="inline-flex items-center gap-1 font-extrabold text-[#347df1]">Explorar de verdad <ArrowRight className="h-3 w-3" /></a>
               </div>
             </div>
           </div>

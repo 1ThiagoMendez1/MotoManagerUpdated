@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowRight, BadgeCheck, ClipboardList, Handshake, PackageCheck } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { LandingNavbar } from './components/LandingNavbar';
 import { MetaPixelMarketing } from '@/components/MetaPixelMarketing';
 import { trackMarketingEvent } from '@/lib/analytics/metaPixel';
 import { LandingHero } from './components/LandingHero';
+import { LandingTrial } from './components/LandingTrial';
+import Link from 'next/link';
 import { LandingInteractiveDemo } from './components/LandingInteractiveDemo';
 import { LandingWhyChange } from './components/LandingWhyChange';
 import { LandingTopWorkshops } from './components/LandingTopWorkshops';
@@ -16,6 +18,11 @@ import { LandingPricing } from './components/LandingPricing';
 import { LandingTestimonialsAndFAQ } from './components/LandingTestimonialsAndFAQ';
 import { LandingFooter } from './components/LandingFooter';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
+import { HalloweenClosing, HalloweenRibbon } from './components/HalloweenCampaign';
+import halloweenStyles from './components/halloween.module.css';
+import christmasStyles from './components/christmas.module.css';
+import { ChristmasRibbon, ChristmasHero, ChristmasDemoGuide, ChristmasTrialOffer, ChristmasMobileDock, ChristmasClosing } from './components/ChristmasCampaign';
+import { isSuperAdmin } from '@/lib/super-admin';
 
 interface Plan {
   id: 'basic' | 'pro' | 'full';
@@ -67,11 +74,12 @@ function ProductFlow() {
   );
 }
 
-export default function PlanesPage({ plans = [], features = [], user, workshops = [] }: { plans?: any[]; features?: any[]; user?: any; workshops?: PublicWorkshop[] }) {
+export default function PlanesPage({ plans = [], features = [], user, workshops = [], checkoutReady = false, halloween = false, christmas = false }: { plans?: any[]; features?: any[]; user?: any; workshops?: PublicWorkshop[]; checkoutReady?: boolean; halloween?: boolean; christmas?: boolean }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const paymentStatus = searchParams.get('payment');
   const urlPlan = searchParams.get('plan');
-  const paymentRef = searchParams.get('ref');
+  const paymentRef = searchParams.get('id');
   const urlBillingCycle = searchParams.get('cycle');
 
   const [activePlan, setActivePlan] = useState<Plan | null>(null);
@@ -100,9 +108,12 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
     localStorage.removeItem('mm_prepayment');
   }, [paymentStatus, urlPlan, urlBillingCycle, paymentRef]);
 
-  const scrollToPlanes = () => document.getElementById('planes')?.scrollIntoView({ behavior:'smooth' });
+  const scrollToPlanes = () => document.getElementById('planes')?.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
 
   const selectPlan = (plan: Plan) => {
+    if (!checkoutReady) { router.push(user ? '/dashboard/subscription' : '/prueba-gratis'); return; }
     trackMarketingEvent('ViewContent', {
       content_name: `Plan ${plan.name}`,
       content_category: 'subscription',
@@ -112,31 +123,38 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
     setActivePlan(plan);
   };
 
+  const christmasEdition = christmas && !halloween;
+  const fullPrice = Number(plans.find(plan => plan.id === 'full')?.price || 119900);
   return (
-    <div className="min-h-screen bg-[#081121] text-white">
-      <MetaPixelMarketing />
-      <LandingNavbar user={user} />
+    <div className={`min-h-screen bg-[#081121] text-white ${halloween ? halloweenStyles.edition : ''} ${christmasEdition ? christmasStyles.edition : ''}`} data-campaign={halloween ? 'halloween-2026' : christmasEdition ? 'navidad-2026' : undefined}>
+      <MetaPixelMarketing excluded={isSuperAdmin(user)} />
+      <LandingNavbar user={user} halloween={halloween} christmas={christmasEdition} />
       <main>
-        <LandingHero onScrollToPlanes={scrollToPlanes} />
+        {halloween ? <HalloweenRibbon /> : christmasEdition ? <ChristmasRibbon /> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-orange-400/20 bg-[#ff831b]/10 px-5 py-3 text-center text-sm"><span><strong className="text-[#ffad68]">15 días de Full gratis.</strong> Sin tarjeta. Tu taller, con todo activado.</span><Link href="/prueba-gratis" className="inline-flex items-center gap-1 font-bold text-[#ffad68] underline underline-offset-4">Activar prueba <ArrowRight className="h-3.5 w-3.5" /></Link></div>}
+        {christmasEdition ? <ChristmasHero /> : <LandingHero onScrollToPlanes={scrollToPlanes} halloween={halloween} />}
+        {christmasEdition && <ChristmasDemoGuide />}
         <LandingInteractiveDemo />
-        <LandingWhyChange />
+        {christmasEdition && <ChristmasTrialOffer fullPrice={fullPrice} />}
+        <LandingWhyChange halloween={halloween} />
         <LandingFeatures />
         <ProductFlow />
-        <LandingPricing plans={plans} features={features} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes} />
+        {!christmasEdition && <LandingTrial fullPrice={fullPrice} halloween={halloween} />}
+        <LandingPricing plans={plans} features={features} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes} christmas={christmasEdition} />
         <LandingTopWorkshops initialWorkshops={workshops} />
         <LandingTestimonialsAndFAQ />
-        <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
+        {halloween ? <HalloweenClosing /> : christmasEdition ? <ChristmasClosing /> : <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
           <div className="mx-auto max-w-3xl">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Tu siguiente paso</span>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">¿Listo para dejar el desorden atrás?</h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Ya viste cómo se conecta el trabajo del taller. Ahora elige un plan para empezar con tus propios clientes, motos y órdenes.</p>
-            <button onClick={scrollToPlanes} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
-              Explorar planes <ArrowRight className="h-4 w-4" />
-            </button>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Dale 15 días a una nueva forma de trabajar. Prueba Full con tus clientes, tus motos y tu equipo. Después decides cómo seguir.</p>
+            <Link href="/prueba-gratis" data-analytics-id="closing_trial" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
+              Empezar mis 15 días gratis <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-        </section>
+        </section>}
       </main>
-      <LandingFooter />
+      <LandingFooter halloween={halloween} christmas={christmasEdition} />
+      {christmasEdition && <ChristmasMobileDock user={Boolean(user)} />}
 
       {activePlan && <PaymentModal plan={activePlan} onClose={() => setActivePlan(null)} appUrl={appUrl} />}
       <RegistrationModal

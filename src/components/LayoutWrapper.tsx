@@ -29,6 +29,7 @@ export function LayoutWrapper({ children, header, sidebar, footer, workshopSlug 
   const isPublicRoute = 
     pathname === '/login' || 
     pathname === '/register-workshop' || 
+    pathname === '/prueba-gratis' ||
     pathname === '/' || 
     pathname === '/change-password' || 
     pathname === '/no-workshop' || 

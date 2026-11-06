@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { createServerClient } from '@supabase/ssr';
 
 // Optional integration test: run against a disposable LOCAL Auth/PostgREST stack.
 // Credentials must belong to a fixture owner, never a customer or production user.
@@ -40,7 +41,7 @@ try {
   const rounds = [];
   for (let round = 0; round < 2; round++) {
     const times = {};
-    for (const path of ['/customers', '/motorcycles', '/inventory', '/work-orders', '/sales', '/services', '/appointments', '/dashboard']) {
+    for (const path of ['/customers', '/motorcycles', '/inventory', '/work-orders', '/sales', '/services', '/appointments', '/dashboard', '/dashboard/profile']) {
       const started = performance.now();
       const response = await page.goto(new URL(path, base).href, { waitUntil: 'networkidle' });
       assert.equal(response.status(), 200, `${path} HTTP status`);
@@ -68,6 +69,40 @@ try {
   assert.ok(Array.isArray((await exported.json()).items));
   const metrics = await page.request.get(new URL('/api/admin/performance', base).href);
   assert.equal(metrics.status(), 403, 'A workshop owner must not access superadmin diagnostics');
+  if (process.env.TEST_CUSTOMER_EMAIL) {
+    const authURL = new URL(process.env.TEST_AUTH_URL || 'http://127.0.0.1:16421');
+    assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(authURL.hostname), 'Fixture Auth must be local');
+    assert.ok(process.env.TEST_CUSTOMER_EMAIL.endsWith('@example.test') && process.env.TEST_CUSTOMER_PASSWORD && process.env.TEST_ANON_KEY);
+    const loginFixture = async (fixtureEmail, fixturePassword) => {
+      const cookies = [];
+      const auth = createServerClient(authURL.href, process.env.TEST_ANON_KEY, {
+        cookies: { getAll: () => [], setAll: values => cookies.push(...values) },
+      });
+      const result = await auth.auth.signInWithPassword({ email: fixtureEmail, password: fixturePassword });
+      assert.equal(result.error, null, 'Fixture sign-in');
+      return { token: result.data.session.access_token, cookies };
+    };
+    const anonymous = await page.request.get(new URL('/api/mobile/portal-data', base).href);
+    assert.equal(anonymous.status(), 401);
+    const owner = await loginFixture(email, password);
+    const unlinked = await page.request.get(new URL('/api/mobile/portal-data', base).href, { headers: { Authorization: `Bearer ${owner.token}` } });
+    assert.equal(unlinked.status(), 403, 'Workshop owner is not a linked customer');
+    const customer = await loginFixture(process.env.TEST_CUSTOMER_EMAIL, process.env.TEST_CUSTOMER_PASSWORD);
+    const mobile = await page.request.get(new URL('/api/mobile/portal-data', base).href, { headers: { Authorization: `Bearer ${customer.token}` } });
+    assert.equal(mobile.status(), 200, 'Linked customer mobile access');
+    const portal = await mobile.json();
+    assert.ok(portal.data.motorcycles.length > 0 && Number.isInteger(portal.data.motorcycles[0].year), 'Model year survives the mobile API mapping');
+    const context = await browser.newContext({ timezoneId: 'UTC' });
+    try {
+      await context.addCookies(customer.cookies.filter(cookie => cookie.value).map(({ name, value }) => ({ name, value, url: base.origin, sameSite: 'Lax' })));
+      const garage = await context.newPage();
+      garage.on('pageerror', error => errors.push({ path: '/clientes', message: error.message }));
+      const response = await garage.goto(new URL('/clientes', base).href);
+      assert.equal(response.status(), 200);
+      await garage.getByText('Cuenta vinculada a tu taller', { exact: true }).waitFor();
+      await garage.getByText(portal.data.motorcycles[0].license_plate, { exact: true }).first().waitFor();
+    } finally { await context.close(); }
+  }
   assert.deepEqual(errors, [], 'Navigation must not trigger JavaScript or hydration errors');
   console.log(JSON.stringify({ test: 'local production-mode browser; includes networkidle waiting, not production or SSR latency', rounds }));
 } finally {

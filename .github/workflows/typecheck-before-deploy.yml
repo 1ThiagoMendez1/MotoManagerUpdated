@@ -3,6 +3,11 @@ on:
   push:
     branches:
       - codex/v6.8.0-horarios-quota-hardening-20261023
+      - codex/v6.8.0-redis-navigation-20261028
+  pull_request:
+    branches:
+      - codex/v6.8.0-horarios-quota-hardening-20261023
+      - codex/v6.8.0-redis-navigation-20261028
   workflow_dispatch:
 permissions:
   contents: read

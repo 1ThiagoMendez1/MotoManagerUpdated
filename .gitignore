@@ -46,3 +46,5 @@ firestore-debug.log
 
 # codegraph
 .codegraph/
+# Runtime GeoIP reference database and temporary downloads.
+.analytics/

@@ -20,22 +20,23 @@ interface Props {
   onSelectPlan: (plan: any) => void;
   onScrollToPlanes: () => void;
   previewMode?: boolean;
+  christmas?: boolean;
 }
 
 const limitText = (value: number, single: string, multiple: string) =>
   value < 0 ? `${multiple} sin límite de plan` : `${value} ${value === 1 ? single : multiple}`;
 
-export function LandingPricing({ plans, onSelectPlan, previewMode = false }: Props) {
+export function LandingPricing({ plans, onSelectPlan, previewMode = false, christmas = false }: Props) {
   const [cycle, setCycle] = useState<Cycle>('monthly');
   const config = CYCLES[cycle];
   const sortedPlans = [...plans].filter(p => ['basic', 'pro', 'full'].includes(p.id)).sort((a,b) => a.price - b.price);
 
   return (
-    <section id="planes" className={`scroll-mt-20 bg-[#091426] px-5 text-white ${previewMode ? 'py-12' : 'py-24 lg:py-28'}`}>
+    <section id="planes" data-analytics-state={cycle} className={`scroll-mt-20 bg-[#091426] px-5 text-white ${previewMode ? 'py-12' : 'py-24 lg:py-28'}`}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff9e4c]">Elige el siguiente paso de tu taller</span>
-          <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">Invierte en control. <span className="text-[#ff9e4c]">Crece a tu ritmo.</span></h2>
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff9e4c]">{christmas ? 'Precios transparentes después de tus 15 días' : 'Elige el siguiente paso de tu taller'}</span>
+          <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">{christmas ? 'Que el taller crezca con orden.' : 'Invierte en control.'} <span className="text-[#ff9e4c]">{christmas ? 'Full para tu próxima etapa.' : 'Crece a tu ritmo.'}</span></h2>
           <p className="mt-5 text-base leading-7 text-slate-300">
             Precios claros, funciones reales y planes que acompañan el tamaño de tu operación. Sin necesidad de pagar para explorar la demo.
           </p>
@@ -59,6 +60,7 @@ export function LandingPricing({ plans, onSelectPlan, previewMode = false }: Pro
             const limits = getPlanLimits(plan.id);
             const isPro = plan.id === 'pro';
             const isFull = plan.id === 'full';
+            const featured = christmas ? isFull : isPro;
             const price = Number(plan.price) || 0;
             const total = Math.round(price * config.months * config.factor);
             const bullets = [
@@ -73,8 +75,8 @@ export function LandingPricing({ plans, onSelectPlan, previewMode = false }: Pro
               isFull ? 'Dashboard y permisos completos' : 'Permisos según tu plan',
             ];
             return (
-              <article key={plan.id} className={`relative flex flex-col rounded-[26px] border p-7 sm:p-8 ${isPro ? 'border-[#ff831b]/65 bg-[#15263a] shadow-[0_20px_70px_rgba(34,211,238,0.11)]' : 'border-white/15 bg-white/[0.045]'}`}>
-                {isPro && <span className="absolute -top-3 left-7 rounded-full bg-cyan-300 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-950">Para talleres que quieren avanzar</span>}
+              <article key={plan.id} className={`relative flex flex-col rounded-[26px] border p-7 sm:p-8 ${featured ? 'border-[#ffb35f]/80 bg-[#153126] shadow-[0_22px_68px_rgba(255,172,56,0.15)]' : 'border-white/15 bg-white/[0.045]'}`}>
+                {featured && <span className="absolute -top-3 left-7 rounded-full bg-[#ffb45a] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-950">{christmas ? 'Plan Full · Más herramientas para esta Navidad' : 'Para talleres que quieren avanzar'}</span>}
                 <div>
                   <p className="text-sm font-medium text-[#ffbd81]">{isFull ? 'Máxima capacidad' : isPro ? 'Para equipos en crecimiento' : 'Para comenzar organizado'}</p>
                   <h3 className="mt-2 text-2xl font-semibold tracking-tight">{plan.name}</h3>
@@ -106,8 +108,9 @@ export function LandingPricing({ plans, onSelectPlan, previewMode = false }: Pro
                 </ul>
                 <button
                   type="button"
+                  data-analytics-id={`plan_${plan.id}`}
                   onClick={() => onSelectPlan({ ...plan, price: total, amountInCents: total * 100, billingCycle: cycle, period: config.period })}
-                  className={`mt-9 inline-flex min-h-13 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold transition ${isPro ? 'bg-[#ff831b] text-[#081426] hover:bg-[#ffa149]' : 'bg-white text-slate-900 hover:bg-slate-200'}`}
+                  className={`mt-9 inline-flex min-h-13 items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold transition ${featured ? 'bg-[#ff831b] text-[#081426] hover:bg-[#ffa149]' : 'bg-white text-slate-900 hover:bg-slate-200'}`}
                 >
                   Elegir {plan.name} <ArrowRight className="h-4 w-4" />
                 </button>

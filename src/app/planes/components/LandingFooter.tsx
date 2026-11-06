@@ -3,20 +3,23 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { HalloweenDecor } from './HalloweenDecor';
+import styles from './halloween.module.css';
 
-export function LandingFooter() {
+export function LandingFooter({ halloween = false, christmas = false }: { halloween?: boolean; christmas?: boolean }) {
   return (
-    <footer className="border-t border-white/10 bg-[#07111f] px-5 py-12 text-slate-300">
+    <footer className={`border-t border-white/10 bg-[#07111f] px-5 py-12 text-slate-300 ${halloween ? styles.editionFooter : ''}`}>
       <div className="mx-auto grid max-w-7xl gap-10 border-b border-white/10 pb-12 md:grid-cols-[1.5fr_1fr_1fr]">
         <div>
           <Link href="/" className="inline-flex items-center gap-2 text-lg font-semibold text-white">
-            <span className="relative h-11 w-11 overflow-hidden rounded-xl bg-white/10"><Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" /></span>
+            <span className={`relative h-11 w-11 rounded-xl bg-white/10 ${christmas ? 'overflow-visible' : 'overflow-hidden'}`}><Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-1" />{christmas && <Image src="/campaigns/navidad-gorro-logo.svg" alt="" width={34} height={31} unoptimized className="pointer-events-none absolute -right-2 -top-3 z-10 rotate-[12deg]" />}</span>
             MotoManager
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-7 text-slate-400">
             Software de gestión para talleres de motocicletas. Clientes, motos, órdenes de trabajo y operación comercial conectadas.
           </p>
           <p className="mt-5 text-xs text-slate-500">Hecho para la operación de talleres en Colombia.</p>
+          {halloween && <p className={styles.editionFooterBadge}><HalloweenDecor kind="pumpkin" /> EDICIÓN HALLOWEEN · 2026</p>}
         </div>
         <div>
           <h3 className="text-sm font-semibold text-white">Explorar</h3>
@@ -31,6 +34,7 @@ export function LandingFooter() {
         <div>
           <h3 className="text-sm font-semibold text-white">Acceso</h3>
           <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">Si ya utilizas MotoManager, entra a tu taller con tu cuenta.</p>
+          <Link href="/clientes" className="mt-4 flex items-center gap-2 text-sm font-bold text-orange-300 hover:underline">Soy cliente de un taller · Mi garaje <ArrowUpRight className="h-4 w-4" /></Link>
           <Link href="/login" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/5">
             Iniciar sesión <ArrowUpRight className="h-4 w-4" />
           </Link>
@@ -41,7 +45,7 @@ export function LandingFooter() {
         <div className="flex flex-wrap items-center gap-3">
           <p>Información de funcionalidades y planes sujeta a la configuración vigente del servicio.</p>
           <button type="button" onClick={() => window.dispatchEvent(new Event('mm:marketing-consent-settings'))}
-            className="underline underline-offset-2 hover:text-white">Configurar cookies</button>
+            className="underline underline-offset-2 hover:text-white">Privacidad publicitaria</button>
         </div>
       </div>
     </footer>

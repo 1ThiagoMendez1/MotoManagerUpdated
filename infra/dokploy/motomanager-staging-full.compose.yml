@@ -253,6 +253,7 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: '3000'
       NEXT_PUBLIC_SUPABASE_URL: https://api-staging.motomanager.com.co
+      NEXT_PUBLIC_APP_URL: https://staging.motomanager.com.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${STAGING_ANON_KEY:?required}
       SUPABASE_SERVICE_ROLE_KEY: ${STAGING_SERVICE_KEY:?required}
       SUPABASE_INTERNAL_URL: http://stage-gateway:8000
@@ -260,8 +261,13 @@ services:
       CACHE_ENABLED: 'true'
       CACHE_TTL_SECONDS: '15'
       CACHE_NAMESPACE: motomanager:staging:reads:v1
+      MOBILE_OTP_PEPPER: ${MOBILE_OTP_PEPPER:?Configure an isolated staging OTP secret of at least 32 characters}
+      ANALYTICS_CLIENT_IP_HEADER: ${ANALYTICS_CLIENT_IP_HEADER:-x-real-ip}
+      WHATSAPP_API_TOKEN: ${STAGING_WHATSAPP_API_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${STAGING_WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_TRIAL_WELCOME_VAR_COUNT: '5'
     volumes:
-    - /opt/motomanagernewmigration-staging/web/releases/3aKtlJnZtU_4c_ZbKBz8m:/app:ro
+    - ${STAGING_WEB_RELEASE_DIR:?Set the absolute path to the validated standalone release}:/app:ro
     tmpfs:
     - /app/.next/cache:uid=1000,gid=1000,mode=0700
     networks:

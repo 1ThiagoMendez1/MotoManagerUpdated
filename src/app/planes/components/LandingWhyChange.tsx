@@ -1,4 +1,6 @@
 import { ArrowRight, CheckCircle2, ClipboardCheck, FileQuestion, PackageSearch, Smartphone } from 'lucide-react';
+import { HalloweenDecor } from './HalloweenDecor';
+import styles from './halloween.module.css';
 
 const BEFORE = [
   { icon: FileQuestion, problem: '¿En qué quedó esa moto?', solution: 'Consulta la orden, el técnico y el estado sin buscar en chats.' },
@@ -6,14 +8,15 @@ const BEFORE = [
   { icon: Smartphone, problem: '¿Quién tiene los datos del cliente?', solution: 'Mantén cliente, motocicleta e historial relacionados.' },
 ];
 
-export function LandingWhyChange() {
+export function LandingWhyChange({ halloween = false }: { halloween?: boolean }) {
   return (
-    <section className="bg-white px-5 py-20 text-[#101b2f] lg:py-24">
+    <section className={`bg-white px-5 py-20 text-[#101b2f] lg:py-24 ${halloween ? styles.whyEdition : ''}`}>
+      {halloween && <HalloweenDecor kind="skull" className={styles.whySkull} />}
       <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
         <div>
-          <span className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#e76a08]">El costo del desorden</span>
+          <span className="text-xs font-extrabold uppercase tracking-[0.2em] text-[#e76a08]">{halloween ? 'Los verdaderos sustos del taller' : 'El costo del desorden'}</span>
           <h2 className="mt-5 text-4xl font-extrabold leading-[1.13] tracking-[-0.05em] sm:text-5xl">
-            Tu tiempo vale más que buscar información.
+            {halloween ? <>Que lo único de miedo sea la decoración.</> : 'Tu tiempo vale más que buscar información.'}
           </h2>
           <p className="mt-5 text-base leading-8 text-slate-600">
             En un taller, los detalles hacen la diferencia. Una cotización por aquí,

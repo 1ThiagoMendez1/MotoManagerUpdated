@@ -311,7 +311,6 @@ export function PaymentModal({ plan, onClose, appUrl }: PayModalProps) {
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-    console.log('==== INICIO DE PAGO EN /PLANES ====', { name, email, planId: plan.id, billingCycle: plan.billingCycle, reference });
     localStorage.setItem('mm_prepayment', JSON.stringify({ name, email, plan: plan.id, billingCycle: plan.billingCycle }));
     trackMarketingEvent('InitiateCheckout', {
       content_name: `Plan ${plan.name}`,

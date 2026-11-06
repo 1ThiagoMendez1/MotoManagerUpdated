@@ -23,9 +23,14 @@ export function internalSupabaseFetch(baseFetch: typeof fetch = globalThis.fetch
   };
 }
 
-const readRPCs = new Set([
+// These RPCs cannot change the operational datasets stored in WorkshopCache.
+// Analytics writes touch only analytics tables: public traffic must not evict
+// every workshop's inventory/orders cache on each recorded pageview.
+const workshopNeutralRPCs = new Set([
   'workshop_dashboard_summary', 'public_workshop_storefront', 'workshop_technicians',
   'get_public_workshop_reputation', 'find_workshop_qr_phone_account',
+  'record_web_analytics_batch', 'record_web_analytics_access', 'prune_web_analytics',
+  'web_analytics_report', 'web_analytics_heatmap',
 ]);
 
 export function isDatabaseMutation(url: string, method = 'GET') {
@@ -33,7 +38,7 @@ export function isDatabaseMutation(url: string, method = 'GET') {
   const path = new URL(url).pathname;
   if (!path.includes('/rest/v1/')) return false;
   const rpc = path.match(/\/rest\/v1\/rpc\/([^/]+)$/)?.[1];
-  return !rpc || !readRPCs.has(rpc);
+  return !rpc || !workshopNeutralRPCs.has(rpc);
 }
 
 export function mutationWorkshops(url: string, body?: BodyInit | null): string[] {

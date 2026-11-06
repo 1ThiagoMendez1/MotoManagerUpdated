@@ -24,6 +24,7 @@ const SYSTEM_ROUTES = new Set([
   'admin',
   'login',
   'register-workshop',
+  'prueba-gratis',
   'change-password',
   'no-workshop',
   'tenant-select',
@@ -48,4 +49,4 @@ export function checkIsMainPage(pathname: string | null | undefined, workshopSlu
   }
 
   return false;
-}
+}

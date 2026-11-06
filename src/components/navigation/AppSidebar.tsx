@@ -19,7 +19,8 @@ import {
   Sparkles,
   Home,
   ChevronRight,
-  Crown
+  Crown,
+  ChartNoAxesCombined
 } from 'lucide-react';
 import {
   Sidebar,
@@ -46,6 +47,7 @@ interface AppSidebarProps {
   userRole?: string | null;
   customPermissions?: string[] | null;
   subscriptionPlan?: string | null;
+  isPlatformAdmin?: boolean;
 }
 
 export function AppSidebar({
@@ -54,6 +56,7 @@ export function AppSidebar({
   userRole = 'owner',
   customPermissions,
   subscriptionPlan = 'monthly',
+  isPlatformAdmin = false,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -174,6 +177,13 @@ export function AppSidebar({
           </SidebarMenu>
         </SidebarGroup>
 
+        {isPlatformAdmin && <SidebarGroup className="py-1.5">
+          <SidebarGroupLabel className="text-[11px] uppercase tracking-wider group-data-[collapsible=icon]:hidden">Plataforma</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem><SidebarMenuButton asChild tooltip="Panel de administración" isActive={pathname==='/admin'}><Link href="/admin" onClick={handleLinkClick}><Shield className="h-4 w-4"/><span>Administración</span></Link></SidebarMenuButton></SidebarMenuItem>
+            <SidebarMenuItem><SidebarMenuButton asChild tooltip="Analítica web" isActive={pathname.startsWith('/admin/analitica-web')}><Link href="/admin/analitica-web" onClick={handleLinkClick}><ChartNoAxesCombined className="h-4 w-4"/><span>Analítica web</span></Link></SidebarMenuButton></SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>}
         {groups.map((group) => {
           // Filtrar ítems permitidos por el rol del usuario
           const permittedItems = group.items.filter((item) =>

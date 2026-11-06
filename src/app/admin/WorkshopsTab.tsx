@@ -22,6 +22,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import WorkshopActions from './WorkshopActions';
+import TrialWelcomeResend from './TrialWelcomeResend';
 import { motion } from 'framer-motion';
 import { formatExactDateTime } from '@/lib/dateUtils';
 
@@ -224,7 +225,10 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                             </TableCell>
 
                                             <TableCell className="text-right py-4 pr-6">
-                                                <WorkshopActions workshop={workshop} />
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {workshop.is_trial && <TrialWelcomeResend workshopId={workshop.id} expired={workshop.trial_expired}/>}
+                                                    <WorkshopActions workshop={workshop} />
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     );

@@ -60,6 +60,11 @@ test('real managed SDK transport: successful writes invalidate, errors do not, a
     const fetchFailed = managedSupabaseFetch(async () => new Response('{}', { status: 400 }));
     await fetchFailed(mutation, { method: 'PATCH' });
     assert.equal(await workshopCache.remember(user, 'inventory', {}, source), before + 1);
+    for (const rpc of ['record_web_analytics_batch', 'record_web_analytics_access', 'prune_web_analytics', 'web_analytics_report', 'web_analytics_heatmap']) {
+      await fetchOK('https://public-project.example.test/rest/v1/rpc/' + rpc, { method: 'POST', body: '{}' });
+      assert.equal(await workshopCache.remember(user, 'inventory', {}, source), before + 1,
+        'Landing analytics must not evict operational workshop data');
+    }
     const client = createClient('https://public-project.example.test', 'local-fixture-key', {
       global: { fetch: async input => { requests.push(String(input)); return new Response('[]', { status: 200 }); } },
     });

@@ -78,44 +78,11 @@ export async function registerWorkshop(prevState: any, formData: FormData) {
         return { error: 'No se pudo crear el usuario.' }
     }
 
-    console.log('Signing in the new user in a memory client to create organization...');
-    
-    // Creamos un cliente en memoria que NO usa cookies, para no sobreescribir la sesión del admin
-    const tempClient = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            auth: {
-                persistSession: false,
-                autoRefreshToken: false,
-            }
-        }
-    );
-
-    const { error: signInError } = await tempClient.auth.signInWithPassword({
-        email,
-        password: generatedPassword
-    });
-
-    if (signInError) {
-        console.error('Sign In Error:', signInError);
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        return { error: 'Error de autenticación temporal: ' + signInError.message };
-    }
-
-    console.log('Calling create_organization_with_owner RPC...');
-    
-    // Llamar al RPC usando la sesión en memoria
-    const { data: orgId, error: rpcError } = await tempClient.rpc('create_organization_with_owner', {
-        org_name: workshopName,
-        org_slug: slug,
-        org_email: email,
-        org_phone: phone,
-        org_legal_name: legalName || null,
-        org_tax_identifier: taxIdentifier || null,
-        sub_plan: subscriptionPlan,
-        demo_start: demoStartDate || null,
-        demo_end: demoEndDate || null
+    const { data: orgId, error: rpcError } = await supabaseAdmin.rpc('provision_workshop_account', {
+        p_owner_id: authData.user.id, p_name: workshopName, p_slug: slug,
+        p_phone: phone, p_is_trial: false, p_plan: subscriptionPlan,
+        p_start: demoStartDate || null, p_end: demoEndDate || null,
+        p_legal_name: legalName || null, p_tax_identifier: taxIdentifier || null,
     });
 
     if (rpcError) {
