@@ -28,6 +28,8 @@ La migración `20261107035758_workshop_trial_review.sql` es transaccional y se a
 
 Los nuevos RPC administrativos son exclusivos de `service_role`, y el servidor comprueba al administrador antes de llamarlos. Las tablas de revisión y eventos permanecen en `motomanager_private`. Los cambios y el listado de estado no se cachean.
 
+El contenedor web declara `TZ=America/Bogota`, también en modo standalone, para que las fechas del panel coincidan entre servidor y navegador colombiano.
+
 ## Validación
 
 - Pruebas con PostgreSQL aislado (PGlite): permisos, metadatos manipulados, sesiones existentes, miembros del equipo, políticas amplias heredadas, archivos autenticados, notas privadas, idempotencia, conversión de pago y conservación de tiempo/preferencias.

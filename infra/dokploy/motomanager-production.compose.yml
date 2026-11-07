@@ -322,6 +322,8 @@ services:
     env_file:
     - format: raw
       path: /opt/motomanager-production/node-production.env
+    environment:
+      TZ: America/Bogota
     healthcheck:
       interval: 15s
       retries: 5

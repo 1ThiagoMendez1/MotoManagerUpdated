@@ -50,16 +50,39 @@ const browser = await chromium.launch({ headless: true, args: ['--no-sandbox','-
 const contexts = [];
 const errors = [];
 async function contextFor(actor, mobile = false) {
-  const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 }, locale: 'es-CO', userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/156.0.0.0 Safari/537.36' });
+  const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 }, locale: 'es-CO', timezoneId: 'America/Bogota', userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/156.0.0.0 Safari/537.36' });
   contexts.push(context);
   const proxy = async (route, target, host) => {
     const req = route.request();
-    const response = await route.fetch({ url: req.url().replace('https://' + host, target), headers: { ...req.headers(), host, 'x-forwarded-proto': 'https', 'x-forwarded-host': host }, maxRedirects: 0 });
-    await route.fulfill({ response });
+    try {
+      const response = await fetch(req.url().replace('https://' + host, target), {
+        method: req.method(), headers: { ...await req.allHeaders(), host, 'accept-encoding': 'identity', 'x-forwarded-proto': 'https', 'x-forwarded-host': host },
+        body: ['GET','HEAD'].includes(req.method()) ? undefined : req.postDataBuffer(), redirect: 'manual', signal: AbortSignal.timeout(20000),
+      });
+      const headers = Object.fromEntries(response.headers);
+      delete headers['content-encoding'];delete headers['content-length'];
+      const cookies = response.headers.getSetCookie();if (cookies.length) headers['set-cookie'] = cookies.join('\n');
+      // Browser interception is skipped for automatic redirect-chain hops.
+      // Start a new navigation so every hop stays in the disposable clone.
+      if ([301,302,303,307,308].includes(response.status) && headers.location && req.isNavigationRequest()) {
+        const destination = new URL(headers.location, req.url());
+        assert.equal(destination.origin, 'https://' + host);
+        delete headers.location;headers['content-type'] = 'text/html; charset=utf-8';
+        await route.fulfill({ status: 200, headers, body: '<!doctype html><script>location.replace(' + JSON.stringify(destination.href) + ')</script>' });
+        return;
+      }
+      await route.fulfill({ status: response.status, headers, body: Buffer.from(await response.arrayBuffer()) });
+    } catch {
+      await route.abort().catch(() => {});
+    }
   };
   await context.route('https://motomanager.com.co/**', route => proxy(route, web, 'motomanager.com.co'));
   await context.route('https://api.motomanager.com.co/**', route => proxy(route, gateway, 'api.motomanager.com.co'));
   for (const host of ['www.facebook.com','connect.facebook.net','www.googletagmanager.com','www.google-analytics.com']) await context.route('https://' + host + '/**', route => route.fulfill({ status: 204, body: '' }));
+  const page = await context.newPage();page.setDefaultTimeout(30000);page.on('pageerror', err => errors.push({ path: new URL(page.url()).pathname, message: err.message }));
+  // Load the entry page before restoring the mobile session, as a real new
+  // device does when it signs in. CSS/fonts must finish before the screenshot.
+  if (actor && mobile) await page.goto('https://motomanager.com.co/login');
   if (actor) {
     const cookie = 'base64-' + Buffer.from(JSON.stringify(actor.session)).toString('base64url');
     const parts = [];
@@ -67,7 +90,6 @@ async function contextFor(actor, mobile = false) {
     else for (let i = 0; i < Math.ceil(cookie.length / 3180); i++) parts.push({ name: 'sb-api-auth-token.' + i, value: cookie.slice(i * 3180, (i + 1) * 3180) });
     await context.addCookies(parts.map(item => ({ ...item, domain: 'motomanager.com.co', path: '/', secure: true, sameSite: 'Lax' })));
   }
-  const page = await context.newPage();page.on('pageerror', err => errors.push(err.message));
   return { context, page };
 }
 const report = { isolatedProject: project, checks: [] };
@@ -106,10 +128,15 @@ try {
   passed('old owner/staff tokens and direct API requests are denied; another workshop remains active');
   const staff = await contextFor(fixtures.staff, true);
   await staff.page.goto('https://motomanager.com.co/dashboard');
+  console.log('MOBILE_REVIEW_NAVIGATED',new URL(staff.page.url()).pathname);
   assert.equal(new URL(staff.page.url()).pathname, '/revision-prueba');
+  await staff.page.getByRole('heading', { name: 'Prueba gratuita en revisión' }).waitFor();
+  console.log('MOBILE_REVIEW_HEADING_READY');
+  await staff.page.waitForTimeout(700);
   assert.equal(await staff.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),true);
   await staff.page.screenshot({ path: path.join(evidenceDir, 'review-mobile.png'), fullPage: true });
   await staff.page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
+  console.log('MOBILE_LOGOUT_SUBMITTED');
   await staff.page.waitForURL('**/login');
   passed('review page fits mobile and allows secure logout');
   const newLogin = await contextFor(null);
@@ -143,6 +170,11 @@ try {
   report.syntheticUsersOnly = true;report.productionBusinessWrites = 0;report.javascriptErrors = errors;
   fs.writeFileSync(path.join(evidenceDir,'browser-report.json'),JSON.stringify(report,null,2));
   console.log('TRIAL_REVIEW_BROWSER_PASSED',report.checks.length);
+} catch (error) {
+  for (const context of contexts) for (const page of context.pages()) {
+    console.log('BROWSER_FAILURE_PAGE',new URL(page.url()).pathname,'reviewHeadings',await page.getByRole('heading',{name:'Prueba gratuita en revisión'}).count());
+  }
+  throw error;
 } finally {
   await Promise.all(contexts.map(context => context.close()));await browser.close();
 }
