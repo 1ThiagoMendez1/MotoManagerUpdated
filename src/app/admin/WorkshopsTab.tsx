@@ -96,8 +96,16 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                 {/* Subtle inner glow */}
                 <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none" />
                 
-                <div className="overflow-x-auto">
-                    <Table>
+                <div className="min-w-0">
+                    <Table className="min-w-[1050px] table-fixed">
+                        <colgroup>
+                            <col className="w-[19%]" />
+                            <col className="w-[10%]" />
+                            <col className="w-[8%]" />
+                            <col className="w-[22%]" />
+                            <col className="w-[19%]" />
+                            <col className="w-[22%]" />
+                        </colgroup>
                         <TableHeader>
                             <TableRow className="border-border dark:border-white/10 hover:bg-transparent">
                                 <TableHead className="text-muted-foreground font-semibold py-5 text-xs uppercase tracking-wider">Taller</TableHead>
@@ -139,11 +147,11 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                     return (
                                         <TableRow key={workshop.id} className="border-border dark:border-white/5 hover:bg-muted/50 dark:hover:bg-white/[0.04] transition-all text-sm group">
                                             <TableCell className="py-4 pl-4">
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-foreground dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-base">
+                                                <div className="flex min-w-0 flex-col">
+                                                    <span className="break-words font-bold text-foreground dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-base">
                                                         {workshop.name}
                                                     </span>
-                                                    <span className="text-xs text-muted-foreground font-mono mt-0.5">
+                                                    <span className="break-all text-xs text-muted-foreground font-mono mt-0.5">
                                                         {workshop.slug}.motomanager.app
                                                     </span>
                                                 </div>
@@ -169,8 +177,8 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                             <TableCell className="py-4">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <div className="flex items-center gap-3 cursor-pointer hover:bg-white/5 p-2 -ml-2 rounded-xl transition-all group/owner">
-                                                            <div className="h-9 w-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground overflow-hidden">
+                                                        <div className="flex min-w-0 items-center gap-3 cursor-pointer hover:bg-white/5 p-2 -ml-2 rounded-xl transition-all group/owner">
+                                                            <div className="h-9 w-9 shrink-0 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-muted-foreground overflow-hidden">
                                                                 {owner?.avatar_url ? (
                                                                     // eslint-disable-next-line @next/next/no-img-element
                                                                     <img src={owner.avatar_url} alt="" className="h-full w-full object-cover" />
@@ -178,11 +186,11 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                                                     <User className="h-4 w-4" />
                                                                 )}
                                                             </div>
-                                                            <div className="flex flex-col text-left">
-                                                                <span className="text-foreground dark:text-white font-medium text-sm flex items-center gap-1">
-                                                                    {owner?.name || 'Sin Asignar'} <ChevronDown className="w-3 h-3 opacity-40 group-hover/owner:opacity-100 transition-opacity" />
+                                                            <div className="flex min-w-0 flex-1 flex-col text-left">
+                                                                <span className="text-foreground dark:text-white font-medium text-sm flex min-w-0 items-center gap-1" title={owner?.name}>
+                                                                    <span className="truncate">{owner?.name || 'Sin Asignar'}</span> <ChevronDown className="w-3 h-3 shrink-0 opacity-40 group-hover/owner:opacity-100 transition-opacity" />
                                                                 </span>
-                                                                <span className="text-xs text-muted-foreground/60">{owner?.email}</span>
+                                                                <span className="truncate text-xs text-muted-foreground/60" title={owner?.email}>{owner?.email}</span>
                                                                 {owner?.phone && (
                                                                     <span className="text-[11px] text-blue-400/80 mt-0.5 flex items-center gap-1">
                                                                         <Phone className="w-3 h-3" /> {owner.phone}
@@ -235,8 +243,8 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                                 </div>
                                             </TableCell>
 
-                                            <TableCell className="text-right py-4 pr-6">
-                                                <div className="flex items-center justify-end gap-2">
+                                            <TableCell className="text-right py-4 px-3">
+                                                <div className="flex flex-wrap items-center justify-end gap-2">
                                                     {workshop.trial_review_available && ((workshop.is_trial && !workshop.trial_expired) || workshop.trial_review?.status === 'paused') && <TrialReviewControl workshop={workshop} />}
                                                     {workshop.is_trial && workshop.trial_review?.status !== 'paused' && <TrialWelcomeResend workshopId={workshop.id} expired={workshop.trial_expired}/>}
                                                     <WorkshopActions workshop={workshop} />

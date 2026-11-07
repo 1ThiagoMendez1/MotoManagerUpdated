@@ -291,7 +291,7 @@ export default async function AdminPage({
     <div className="w-full bg-transparent text-foreground font-sans selection:bg-blue-500/30 relative">
       <AdminRealtime />
       {/* Main Content Area */}
-      <main className="flex flex-col w-full max-w-7xl mx-auto z-10 relative">
+      <main className="flex min-w-0 flex-col w-full mx-auto z-10 relative">
         
         {currentView === 'menu' ? (
           /* MAIN MENU VIEW */
