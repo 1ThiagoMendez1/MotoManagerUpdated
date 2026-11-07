@@ -66,3 +66,16 @@ export function isTrialReviewRequestAllowed(path: string, method: string, server
   }
   return method === 'POST' && path === '/auth/signout';
 }
+
+// Next's internal request origin can be 0.0.0.0 behind the Docker proxy.
+// Validate against the configured public site, never that internal hostname.
+export function getTrialSignoutOrigin(appUrl: string, origin: string | null) {
+  const app = new URL(appUrl);
+  if (!['https:', 'http:'].includes(app.protocol)) return null;
+  const allowed = new Set([app.origin]);
+  if (['motomanager.com.co', 'www.motomanager.com.co'].includes(app.hostname)) {
+    allowed.add('https://motomanager.com.co');
+    allowed.add('https://www.motomanager.com.co');
+  }
+  return origin ? allowed.has(origin) ? origin : null : app.origin;
+}

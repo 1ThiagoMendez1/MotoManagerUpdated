@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pauseTrialSchema, verifyTrialSchema, TRIAL_REVIEW_MESSAGE, isTrialReviewRequestAllowed } from '../src/lib/trial-review';
+import { pauseTrialSchema, verifyTrialSchema, TRIAL_REVIEW_MESSAGE, isTrialReviewRequestAllowed, getTrialSignoutOrigin } from '../src/lib/trial-review';
 import { getTrialState } from '../src/lib/subscription-trial';
 import { getWorkshopWhatsAppLimit } from '../src/lib/workshop-plan';
 
@@ -35,4 +35,13 @@ test('the review page permits status and logout but cannot tunnel Server Actions
   for (const path of ['/revision-prueba','/api/trial-review/status']) assert.equal(isTrialReviewRequestAllowed(path, 'POST'), false);
   assert.equal(isTrialReviewRequestAllowed('/revision-prueba', 'GET', true), false);
   assert.equal(isTrialReviewRequestAllowed('/auth/signout', 'POST', true), false);
+});
+
+test('logout behind Dokploy uses a trusted public origin and rejects other sites', () => {
+  const app = 'https://motomanager.com.co';
+  assert.equal(getTrialSignoutOrigin(app, app), app);
+  assert.equal(getTrialSignoutOrigin(app, 'https://www.motomanager.com.co'), 'https://www.motomanager.com.co');
+  assert.equal(getTrialSignoutOrigin(app, null), app);
+  assert.equal(getTrialSignoutOrigin(app, 'https://motomanager.com.co.attacker.test'), null);
+  assert.equal(getTrialSignoutOrigin(app, 'https://0.0.0.0:3000'), null);
 });

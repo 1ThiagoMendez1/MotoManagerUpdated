@@ -31,7 +31,7 @@ Los nuevos RPC administrativos son exclusivos de `service_role`, y el servidor c
 ## Validación
 
 - Pruebas con PostgreSQL aislado (PGlite): permisos, metadatos manipulados, sesiones existentes, miembros del equipo, políticas amplias heredadas, archivos autenticados, notas privadas, idempotencia, conversión de pago y conservación de tiempo/preferencias.
-- Suite de unidad: 141 aprobadas, 2 omitidas que requieren Redis externo. TypeScript sin errores.
+- Suite de unidad: 142 aprobadas, 2 omitidas que requieren Redis externo. TypeScript sin errores.
 - Prueba HTTP en copia desechable de PostgreSQL 17: sesión existente recibe `403 PT403` al pausar; el aviso propio sigue disponible y otra cuenta conserva el acceso.
 - `tests/trial-review-browser.mjs` ejecuta el flujo completo con usuarios sintéticos en el proyecto Docker desechable `mm-trial-review-validation`. Exige `MM_TRIAL_REVIEW_VALIDATION=1` y nunca utiliza un taller real para probar pausas.
 

@@ -43,7 +43,7 @@ const provision = async (actor, name, slug) => {
 };
 const org = await provision(fixtures.owner, workshopName, 'review-' + nonce);
 const otherOrg = await provision(fixtures.other, 'Otro taller ' + nonce, 'other-' + nonce);
-assert.ifError((await admin.from('organization_members').insert({ organization_id: org, user_id: fixtures.staff.id, role: 'technician', status: 'active' })).error);
+assert.ifError((await admin.from('organization_members').insert({ organization_id: org, user_id: fixtures.staff.id, role: 'mechanic', status: 'active' })).error);
 assert.ifError((await admin.from('customers').insert([{ organization_id: org, first_name: 'Cliente', last_name: 'Ficticio' }, { organization_id: otherOrg, first_name: 'Otro', last_name: 'Cliente' }])).error);
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox','--disable-dev-shm-usage'] });

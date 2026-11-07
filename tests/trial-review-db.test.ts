@@ -47,7 +47,7 @@ test('trial review enforces access with existing JWTs and restores only unused f
     await db.query('INSERT INTO profiles(id) VALUES($1),($2)', [owner,other]);
     const org = await scalar("SELECT provision_workshop_account($1,'Taller de prueba','taller-prueba','573009990001')", [owner]);
     const otherOrg = await scalar("SELECT provision_workshop_account($1,'Otro taller','otro-taller','573009990002')", [other]);
-    await db.query("INSERT INTO organization_members VALUES($1,$2,'technician','active',now())",[org,employee]);
+    await db.query("INSERT INTO organization_members VALUES($1,$2,'mechanic','active',now())",[org,employee]);
     await db.query("UPDATE organizations SET settings=settings||'{\"business_hours\":{\"monday\":\"8-17\"}}' WHERE id=$1",[org]);
     await db.query("INSERT INTO customers(organization_id,name) VALUES($1,'Cliente ficticio'),($2,'Otro cliente')",[org,otherOrg]);
     let remaining = 0;
