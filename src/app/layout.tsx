@@ -48,6 +48,7 @@ import { PartRequestsNotifier } from '@/components/work-orders/PartRequestsNotif
 import { WebAnalyticsTracker } from '@/components/analytics/WebAnalyticsTracker';
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences';
 import { isSuperAdmin } from '@/lib/super-admin';
+import { TrialAccessMonitor } from '@/components/auth/TrialAccessMonitor';
 
 export default async function RootLayout({
   children,
@@ -129,6 +130,7 @@ export default async function RootLayout({
             {children}
           </LayoutWrapper>
           <Toaster />
+          {user && !isSuperAdmin(user) && <TrialAccessMonitor />}
           <WebAnalyticsTracker isInternal={isSuperAdmin(user)} />
           {!isSuperAdmin(user) && <MeasurementPreferences />}
         </TenantProvider>

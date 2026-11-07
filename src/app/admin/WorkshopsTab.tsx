@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import WorkshopActions from './WorkshopActions';
 import TrialWelcomeResend from './TrialWelcomeResend';
+import TrialReviewControl from './TrialReviewControl';
 import { motion } from 'framer-motion';
 import { formatExactDateTime } from '@/lib/dateUtils';
 
@@ -48,6 +49,11 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
             transition={{ duration: 0.5 }}
             className="space-y-6"
         >
+            {workshops.some(workshop => workshop.trial_review?.status === 'paused') && <div role="status" className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm">
+                <p className="font-semibold">{workshops.filter(workshop => workshop.trial_review?.status === 'paused').length} pruebas pausadas para verificar</p>
+                <p className="mt-1 text-muted-foreground">Revisa los datos del responsable, la ubicación y la evidencia del taller antes de reactivar el acceso.</p>
+            </div>}
+            {workshops.some(workshop => !workshop.trial_review_available) && <p role="alert" className="text-sm text-destructive">No se pudo cargar la revisión de pruebas. Actualiza la página antes de pausar un taller.</p>}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                     <div className="relative group">
@@ -69,6 +75,7 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                             <option value="all" className="bg-background dark:bg-[#0B0F19] text-foreground dark:text-white">Todos los estados</option>
                             <option value="active" className="bg-background dark:bg-[#0B0F19] text-foreground dark:text-white">Activos</option>
                             <option value="trialing" className="bg-background dark:bg-[#0B0F19] text-foreground dark:text-white">En Trial</option>
+                            <option value="under_review" className="bg-background dark:bg-[#0B0F19] text-foreground dark:text-white">Pruebas en revisión</option>
                             <option value="past_due" className="bg-background dark:bg-[#0B0F19] text-foreground dark:text-white">Vencidos (Past Due)</option>
                         </select>
                         <Button variant="outline" className="bg-background dark:bg-white/5 border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 text-foreground dark:text-white rounded-xl">
@@ -124,6 +131,9 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                     } else if (workshop.subscription_status === 'trialing') {
                                         statusColor = "bg-cyan-500/10 text-cyan-400 border-cyan-500/30 shadow-[0_0_10px_rgba(6,182,212,0.15)]";
                                         statusDot = "bg-cyan-400";
+                                    } else if (workshop.subscription_status === 'under_review') {
+                                        statusColor = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30";
+                                        statusDot = "bg-amber-500";
                                     }
 
                                     return (
@@ -142,8 +152,9 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                             <TableCell className="py-4">
                                                 <div className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-medium ${statusColor}`}>
                                                     <span className={`w-1.5 h-1.5 rounded-full mr-2 ${statusDot} ${workshop.subscription_status === 'active' ? 'animate-pulse' : ''}`} />
-                                                    {workshop.subscription_status.toUpperCase()}
+                                                    {workshop.subscription_status === 'under_review' ? 'EN REVISIÓN' : workshop.subscription_status.toUpperCase()}
                                                 </div>
+                                                {workshop.trial_review?.status === 'verified' && <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">Taller verificado</p>}
                                             </TableCell>
 
                                             <TableCell className="py-4">
@@ -213,7 +224,7 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
                                                         <span className="opacity-60">Inicio:</span>
                                                         <span className="text-foreground/80 dark:text-white/80">{formatExactDateTime(workshop.created_at)}</span>
                                                     </div>
-                                                    {workshop.subscription_end_date && (
+                                                    {workshop.trial_review?.status === 'paused' ? <span className="text-amber-600 dark:text-amber-400">{Math.ceil(workshop.trial_review.remainingSeconds / 86400)} días de prueba conservados</span> : workshop.subscription_end_date && (
                                                         <div className="flex justify-between items-center w-full min-w-[160px] mt-1">
                                                             <span className="opacity-60">Próx. Cobro:</span>
                                                             <span className="text-blue-400 font-medium">
@@ -226,7 +237,8 @@ export default function WorkshopsTab({ workshops }: WorkshopsTabProps) {
 
                                             <TableCell className="text-right py-4 pr-6">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    {workshop.is_trial && <TrialWelcomeResend workshopId={workshop.id} expired={workshop.trial_expired}/>}
+                                                    {workshop.trial_review_available && ((workshop.is_trial && !workshop.trial_expired) || workshop.trial_review?.status === 'paused') && <TrialReviewControl workshop={workshop} />}
+                                                    {workshop.is_trial && workshop.trial_review?.status !== 'paused' && <TrialWelcomeResend workshopId={workshop.id} expired={workshop.trial_expired}/>}
                                                     <WorkshopActions workshop={workshop} />
                                                 </div>
                                             </TableCell>

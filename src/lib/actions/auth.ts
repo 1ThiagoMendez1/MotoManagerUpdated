@@ -6,6 +6,8 @@ import { redirect } from 'next/navigation';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { getWorkshopDetails } from '@/lib/auth-server';
 import { scheduleAccountAccess } from '@/lib/analytics/web-server';
+import { getMyTrialReview } from '@/lib/trial-review-server';
+import { TRIAL_REVIEW_PATH } from '@/lib/trial-review';
 
 export async function loginAction(formData: FormData) {
   const email = formData.get('email') as string;
@@ -31,6 +33,8 @@ export async function loginAction(formData: FormData) {
   if (user) await scheduleAccountAccess(user, 'login');
 
   revalidatePath('/', 'layout');
+
+  if (!isSuperAdmin(user) && await getMyTrialReview()) redirect(TRIAL_REVIEW_PATH);
   
   if (user?.user_metadata?.needs_password_change === true) {
     redirect('/change-password');

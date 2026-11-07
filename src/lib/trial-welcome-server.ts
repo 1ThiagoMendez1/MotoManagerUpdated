@@ -60,6 +60,7 @@ export async function previewTrialWelcome(workshopId: string) {
   if ('error' in loaded) return { success: false as const, error: loaded.error };
   const { settings, input } = loaded.target;
   const trial = getTrialState(settings);
+  if (trial.paused) return { success: false as const, error: 'La prueba está pausada mientras verificamos los datos del taller.' };
   if (!trial.isTrial || trial.expired) return { success: false as const, error: 'Este taller no tiene una prueba gratuita vigente.' };
   if (typeof input.startsAt !== 'string' || !Number.isFinite(Date.parse(input.startsAt)) || Date.parse(input.startsAt) > Date.now())
     return { success: false as const, error: 'Las fechas de la prueba no son válidas.' };

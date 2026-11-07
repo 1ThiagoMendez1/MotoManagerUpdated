@@ -6,6 +6,8 @@ import { cache } from 'react';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { resolveWorkshopPlan } from '@/lib/workshop-plan';
 import { getTrialState } from '@/lib/subscription-trial';
+import { getMyTrialReview } from '@/lib/trial-review-server';
+import { TRIAL_REVIEW_PATH } from '@/lib/trial-review';
 
 export const getCurrentUserServer = cache(async () => {
   try {
@@ -13,6 +15,14 @@ export const getCurrentUserServer = cache(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
+      const accessReview = isSuperAdmin(user) ? null : await getMyTrialReview();
+      if (accessReview) {
+        return {
+          userId: user.id, email: user.email, user_metadata: user.user_metadata, app_metadata: user.app_metadata,
+          role: 'viewer', custom_permissions: null, workshopId: null,
+          availableWorkshops: [] as string[], organization: null, accessReview,
+        };
+      }
       // Use admin client to bypass RLS issues (e.g. infinite recursion in policies)
       // Safe because we explicitly filter by user.id
       const supabaseAdmin = createSupabaseClient(
@@ -26,6 +36,7 @@ export const getCurrentUserServer = cache(async () => {
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
+        .order('organization_id', { ascending: true })
         .limit(1);
       
       if (orgError) {
@@ -42,7 +53,8 @@ export const getCurrentUserServer = cache(async () => {
         custom_permissions: orgMember?.custom_permissions || null,
         workshopId: orgMember?.organization_id || null,
         availableWorkshops: orgMember ? [orgMember.organization_id] : [],
-        organization: Array.isArray(orgMember?.organization) ? orgMember.organization[0] : orgMember?.organization
+        organization: Array.isArray(orgMember?.organization) ? orgMember.organization[0] : orgMember?.organization,
+        accessReview: null,
       };
     }
   } catch (e) {
@@ -57,6 +69,7 @@ export async function requireWorkshop(options: { allowExpired?: boolean } = {}) 
   if (!user) {
     redirect('/login');
   }
+  if (user.accessReview) redirect(TRIAL_REVIEW_PATH);
   if (!user.workshopId) {
     if (isSuperAdmin(user)) {
         redirect('/admin');
@@ -75,6 +88,7 @@ export async function authorize(path: string) {
   if (!user) {
     redirect('/login');
   }
+  if (user.accessReview) redirect(TRIAL_REVIEW_PATH);
   if (!user.workshopId) {
     if (isSuperAdmin(user)) {
         redirect('/admin');
@@ -100,11 +114,13 @@ export async function authorize(path: string) {
 
 export const getWorkshopDetails = cache(async (knownUser?: any) => {
   const user = knownUser || await getCurrentUserServer();
+  if (user?.accessReview) return null;
   if (!user || (!user.workshopId && !user.id)) {
     return null;
   }
 
   try {
+    if (!isSuperAdmin(user) && await getMyTrialReview()) return null;
     const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -124,6 +140,7 @@ export const getWorkshopDetails = cache(async (knownUser?: any) => {
         .eq('user_id', actualUserId)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
+        .order('organization_id', { ascending: true })
         .limit(1);
        if (_orgMembers && _orgMembers.length > 0) {
            workshopId = _orgMembers[0].organization_id;

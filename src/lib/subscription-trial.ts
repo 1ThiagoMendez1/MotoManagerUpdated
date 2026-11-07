@@ -22,8 +22,9 @@ export function getTrialState(settings: Record<string, any> | null | undefined, 
   const isTrial = settings?.isTrial === true;
   const endsAt = isTrial ? settings?.trialEndDate : null;
   const end = typeof endsAt === 'string' ? Date.parse(endsAt) : NaN;
-  const expired = isTrial && (!Number.isFinite(end) || end <= now);
-  return { isTrial, expired, endsAt, daysRemaining: isTrial && !expired ? Math.ceil((end - now) / 86_400_000) : 0 };
+  const paused = settings?.trialReviewPaused === true;
+  const expired = isTrial && !paused && (!Number.isFinite(end) || end <= now);
+  return { isTrial, paused, expired, endsAt, daysRemaining: isTrial && !expired && !paused ? Math.ceil((end - now) / 86_400_000) : 0 };
 }
 
 export function subscriptionCycle(cycle: string) {

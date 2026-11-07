@@ -33,6 +33,7 @@ export function LayoutWrapper({ children, header, sidebar, footer, workshopSlug 
     pathname === '/' || 
     pathname === '/change-password' || 
     pathname === '/no-workshop' || 
+    pathname === '/revision-prueba' ||
     pathname === '/tenant-select' ||
     pathname.startsWith('/clientes') ||
     pathname.startsWith('/talleres/') ||

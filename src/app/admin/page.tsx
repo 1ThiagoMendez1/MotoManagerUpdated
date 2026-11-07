@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server';
 import { resolveWorkshopPlan } from '@/lib/workshop-plan';
 import { getTrialState } from '@/lib/subscription-trial';
 import { requireSuperAdmin } from '@/lib/auth-server';
+import type { AdminTrialReview } from '@/lib/trial-review';
 
 export default async function AdminPage({
   searchParams,
@@ -58,11 +59,14 @@ export default async function AdminPage({
     });
   }
 
+  const { data: reviewData, error: reviewError } = await adminSupabase.rpc('admin_list_trial_reviews');
+  const reviews = new Map<string, AdminTrialReview>((Array.isArray(reviewData) ? reviewData : []).map((review: AdminTrialReview) => [review.organizationId, review]));
+
   const workshops = orgs?.map((org: any) => ({
     id: org.id,
     name: org.name,
     slug: org.slug,
-    subscription_status: getTrialState(org.settings).expired ? 'past_due' : (getTrialState(org.settings).isTrial || org.settings?.plan === 'demo') ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
+    subscription_status: reviews.get(org.id)?.status === 'paused' ? 'under_review' : getTrialState(org.settings).expired ? 'past_due' : (getTrialState(org.settings).isTrial || org.settings?.plan === 'demo') ? 'trialing' : (org.status === 'active' ? 'active' : 'past_due'),
     subscription_plan: resolveWorkshopPlan(org.settings),
     // El ciclo de facturación es independiente del nivel basic/pro/full.
     billing_cycle: ((): 'monthly' | 'biannual' | 'yearly' => {
@@ -73,6 +77,11 @@ export default async function AdminPage({
     subscription_end_date: org.settings?.demoEndDate || null,
     is_trial: getTrialState(org.settings).isTrial,
     trial_expired: getTrialState(org.settings).expired,
+    trial_review: reviews.get(org.id) || null,
+    trial_review_available: !reviewError,
+    phone: org.phone || '',
+    city: org.settings?.city || '',
+    address: org.settings?.address || '',
     created_at: org.created_at,
     members: org.members?.map((m: any) => ({
       role: m.role,

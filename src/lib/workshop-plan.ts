@@ -37,6 +37,6 @@ export function getWorkshopWhatsAppLimit(settings: unknown): number {
   // Cron jobs also use this resolver with a service client. An expired free
   // account must not keep sending reminders outside the interactive UI.
   if (settings && typeof settings === 'object' && !Array.isArray(settings) &&
-      getTrialState(settings as Record<string, unknown>).expired) return 0;
+      (getTrialState(settings as Record<string, unknown>).expired || getTrialState(settings as Record<string, unknown>).paused)) return 0;
   return getPlanLimits(resolveWorkshopPlan(settings)).whatsapp_limit;
 }

@@ -104,6 +104,9 @@ test('writes invalidate, read-only RPCs do not, and ambiguous scopes invalidate 
   assert.equal(isDatabaseMutation(url + 'sales', 'PATCH'), true);
   assert.equal(isDatabaseMutation(url + 'rpc/decrement_inventory', 'POST'), true);
   assert.equal(isDatabaseMutation(url + 'rpc/workshop_dashboard_summary', 'POST'), false);
+  assert.equal(isDatabaseMutation(url + 'rpc/get_my_trial_review', 'POST'), false);
+  assert.equal(isDatabaseMutation(url + 'rpc/admin_list_trial_reviews', 'POST'), false);
+  assert.equal(isDatabaseMutation(url + 'rpc/admin_review_workshop_trial', 'POST'), true);
   assert.equal(isDatabaseMutation('https://api.test/auth/v1/token', 'POST'), false);
   assert.deepEqual(mutationWorkshops(url + 'sales?organization_id=eq.' + actor.workshopId), [actor.workshopId]);
   assert.deepEqual(mutationWorkshops(url + 'rpc/update_workshop_profile_fields', JSON.stringify({ p_organization_id: actor.workshopId })), [actor.workshopId]);
