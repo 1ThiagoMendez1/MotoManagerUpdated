@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { wompiService } from '@/lib/services/WompiService';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDirectSalePaidNotification, sendServiceSaleNotification, checkAndUpdateWhatsAppLimit } from '@/lib/whatsapp';
+import { subscriptionReferencePattern, validWompiEvent } from '@/lib/payments/wompi-protocol';
+import { fetchWompiTransaction, wompiConfig } from '@/lib/payments/wompi-config';
+import { applySubscriptionTransaction } from '@/lib/payments/subscription-checkout';
+import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,19 +32,17 @@ function mapWompiToDbMethod(type: string) {
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
-    console.log('[Wompi Webhook] Event received:', payload.event, 'Payload:', JSON.stringify(payload));
-
-    const eventsSecret = process.env.WOMPI_EVENTS_SECRET;
+    const { eventsSecret, production } = wompiConfig();
     if (eventsSecret) {
-      // Validate signature
-      const isValid = wompiService.validateWebhookSignature(payload, '', '');
+      const isValid = validWompiEvent(payload, eventsSecret, req.headers.get('x-event-checksum'));
       if (!isValid) {
         console.error('[Wompi Webhook] Invalid signature verification');
         return NextResponse.json({ error: 'Firma inválida' }, { status: 400 });
       }
-    } else {
-      console.warn('[Wompi Webhook] WOMPI_EVENTS_SECRET is not set, skipping signature validation.');
     }
+
+    if (payload.event !== 'transaction.updated') return NextResponse.json({ success: true, ignored: true });
+    if (payload.environment !== (production ? 'prod' : 'test')) return NextResponse.json({ error: 'Ambiente de pago inválido' }, { status: 400 });
 
     const transaction = payload.data?.transaction;
     if (!transaction) {
@@ -53,6 +54,19 @@ export async function POST(req: Request) {
     if (!reference) {
       return NextResponse.json({ error: 'No reference found in transaction' }, { status: 400 });
     }
+
+    if (subscriptionReferencePattern.test(reference)) {
+      // Always consult Wompi from the server. A forged event cannot grant a plan,
+      // even while an events secret is being configured after deployment.
+      const verified = await fetchWompiTransaction(transaction.id);
+      if (verified.reference !== reference) return NextResponse.json({ error: 'Referencia inválida' }, { status: 400 });
+      const result = await applySubscriptionTransaction(verified);
+      if (result.status === 'APPROVED') revalidatePath('/', 'layout');
+      return NextResponse.json({ success: true, ...result });
+    }
+
+    // Legacy sale and recurring-payment handlers require an authenticated event.
+    if (!eventsSecret) return NextResponse.json({ error: 'La recepción de pagos no está configurada.' }, { status: 503 });
 
     // 1. Subscription Webhook (Reference starting with sub_)
     if (reference.startsWith('sub_')) {

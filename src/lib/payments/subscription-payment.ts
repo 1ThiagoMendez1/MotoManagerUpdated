@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/auth-server';
 import { mergePlansWithDefaults } from '@/lib/constants/plans';
 import { subscriptionPrice } from '@/lib/subscription-trial';
+import { fetchWompiTransaction } from './wompi-config';
 
 export async function catalogSubscriptionPrice(plan: string, cycle: string) {
   const admin = await createAdminClient();
@@ -25,14 +26,7 @@ export function paidSubscriptionCredit(settings: Record<string, any>, planPrice:
 
 export async function verifySubscriptionPayment(input: { transactionId: string; email: string; referencePrefix: string; amount: number }) {
   if (!/^[a-zA-Z0-9-]{1,150}$/.test(input.transactionId)) throw new Error('Falta la confirmación de Wompi. Si acabas de pagar, regresa desde Wompi e intenta nuevamente.');
-  const privateKey = process.env.WOMPI_PRIVATE_KEY;
-  if (!privateKey) throw new Error('No se pudo verificar el pago. Comunícate con soporte para activar tu plan.');
-  const production = privateKey.startsWith('prv_prod_') || process.env.WOMPI_ENVIRONMENT === 'production';
-  const response = await fetch(`https://${production ? 'production' : 'sandbox'}.wompi.co/v1/transactions/${encodeURIComponent(input.transactionId)}`, {
-    headers: { Authorization: `Bearer ${privateKey}` }, cache: 'no-store', signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error('No pudimos verificar tu transacción con Wompi. Intenta de nuevo o contacta a soporte.');
-  const { data: transaction } = await response.json();
+  const transaction = await fetchWompiTransaction(input.transactionId);
   if (transaction?.status !== 'APPROVED') throw new Error('Wompi aún no confirma un pago aprobado. Espera la aprobación antes de activar el plan.');
   if (transaction.currency !== 'COP' || transaction.amount_in_cents !== Math.round(input.amount * 100) ||
     transaction.customer_email?.toLowerCase() !== input.email.toLowerCase() ||

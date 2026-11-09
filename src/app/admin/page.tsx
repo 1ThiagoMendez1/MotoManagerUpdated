@@ -163,17 +163,6 @@ export default async function AdminPage({
     (activeBiannual * Math.round(getPrice('biannual', defaultPrices.biannual) / 6)) + 
     (activeYearly * Math.round(getPrice('yearly', defaultPrices.yearly) / 12));
 
-  // Fetch Wompi payments (Cash flow for chart)
-  const { data: payments, error: paymentsError } = await adminSupabase
-    .from('wompi_payments')
-    .select('amount_in_cents, status, created_at')
-    .eq('status', 'APPROVED')
-    .order('created_at', { ascending: true });
-    
-  if (paymentsError && paymentsError.code !== 'PGRST205') {
-    console.error("Error loading payments:", paymentsError);
-  }
-
   // Fetch cancellation feedback
   const { data: rawCancellations, error: cancellationsError } = await adminSupabase
     .from('cancellation_feedback')
@@ -230,7 +219,7 @@ export default async function AdminPage({
     .limit(500);
 
   // Normalizar transacciones para el componente
-  const normalizedTransactions = (allTransactions || []).map((tx: any) => {
+  const legacyTransactions = (allTransactions || []).map((tx: any) => {
     const ownerProfile = tx.workshop?.members?.find((m: any) => m.role === 'owner')?.profile;
     const owner = ownerProfile ? `${ownerProfile.first_name || ''} ${ownerProfile.last_name || ''}`.trim() : undefined;
     return {
@@ -245,6 +234,22 @@ export default async function AdminPage({
       owner,
     };
   });
+
+  const { data: verifiedHistory, error: historyError } = await adminSupabase.rpc('admin_list_workshop_subscription_payments');
+  if (historyError) console.error('Error loading verified subscription payments:', historyError.code);
+  const verifiedTransactions = (Array.isArray(verifiedHistory) ? verifiedHistory : []).map((tx: any) => ({
+    ...tx,
+    amount: Number(tx.amount),
+    workshop: { name: tx.workshop_name },
+    owner: (() => {
+      const org = orgs?.find((o: any) => o.id === tx.workshop_id);
+      const profile = org?.members?.find((m: any) => m.role === 'owner')?.profile;
+      return profile ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() : undefined;
+    })(),
+  }));
+  const verifiedIds = new Set(verifiedTransactions.map((tx: any) => tx.wompi_transaction_id).filter(Boolean));
+  const normalizedTransactions = [...verifiedTransactions, ...legacyTransactions.filter(tx => !verifiedIds.has(tx.wompi_transaction_id))]
+    .sort((a,b) => Date.parse(b.created_at)-Date.parse(a.created_at));
 
   const txApproved = normalizedTransactions.filter(t => t.status === 'APPROVED').length;
   const txDeclined = normalizedTransactions.filter(t => t.status === 'DECLINED' || t.status === 'ERROR').length;
@@ -268,9 +273,9 @@ export default async function AdminPage({
     chartDataMap.set(`${monthName} ${d.getFullYear().toString().slice(-2)}`, 0);
   }
 
-  if (payments) {
-    payments.forEach(payment => {
-      const amount = (payment.amount_in_cents || 0) / 100;
+  {
+    normalizedTransactions.filter(payment => payment.status === 'APPROVED').forEach(payment => {
+      const amount = payment.amount || 0;
       totalEarnings += amount;
       
       const paymentDate = new Date(payment.created_at);

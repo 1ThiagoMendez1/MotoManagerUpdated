@@ -6,6 +6,7 @@ import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
 import { DEFAULT_FEATURES, mergePlansWithDefaults } from '@/lib/constants/plans'
 import { resolveWorkshopPlan } from '@/lib/workshop-plan'
+import { subscriptionCheckoutReady } from '@/lib/payments/wompi-config'
 import { getTrialState } from '@/lib/subscription-trial'
 import { catalogSubscriptionPrice, paidSubscriptionCredit } from '@/lib/payments/subscription-payment'
 
@@ -68,7 +69,7 @@ export default async function SubscriptionPage() {
                 <ManageSubscriptionClient 
                     isTrial={trial.isTrial}
                     serverCredit={credit}
-                    paymentReady={Boolean(process.env.WOMPI_PRIVATE_KEY && process.env.WOMPI_INTEGRITY_SECRET && process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY)}
+                    paymentReady={subscriptionCheckoutReady()}
                     currentPlan={currentPlan}
                     currentBillingCycle={currentBillingCycle}
                     startDate={startDate}

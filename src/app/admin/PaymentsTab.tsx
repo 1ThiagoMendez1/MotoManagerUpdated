@@ -16,6 +16,8 @@ interface Payment {
   status: string;
   payment_method_type: string;
   created_at: string;
+  plan?: string;
+  cycle?: string;
   workshop?: {
     name: string;
   } | null;
@@ -267,6 +269,10 @@ export default function PaymentsTab({
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground dark:text-white truncate">
                           {payment.workshop?.name || 'Sin taller'}
+                          {payment.plan && <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                            Plan {({ basic: 'Básico', pro: 'Pro', full: 'Full' } as Record<string,string>)[payment.plan] || payment.plan}
+                            {' · '}{({ monthly: '1 mes', biannual: '6 meses', yearly: '12 meses' } as Record<string,string>)[payment.cycle || ''] || payment.cycle}
+                          </span>}
                         </p>
                         <p className="text-xs text-muted-foreground dark:text-white/40 truncate">
                           {payment.owner || '—'}

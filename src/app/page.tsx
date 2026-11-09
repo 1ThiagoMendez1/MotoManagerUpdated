@@ -1,3 +1,4 @@
+import { subscriptionCheckoutReady } from '@/lib/payments/wompi-config';
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import PlanesPage from './planes/PlanesPage';
@@ -98,7 +99,7 @@ export default async function Page() {
             <div className="h-8 w-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         }>
-          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} halloween={isHalloweenEditionActive()} christmas={isChristmasEditionActive()} checkoutReady={Boolean(process.env.WOMPI_PRIVATE_KEY && process.env.WOMPI_INTEGRITY_SECRET && process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY)} />
+          <PlanesPage plans={plans} features={features} user={user} workshops={workshops} halloween={isHalloweenEditionActive()} christmas={isChristmasEditionActive()} checkoutReady={subscriptionCheckoutReady()} />
         </Suspense>
       </div>
     </>

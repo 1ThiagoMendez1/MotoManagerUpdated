@@ -1,36 +1,25 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { wompiConfig } from '@/lib/payments/wompi-config';
+import { subscriptionReferencePattern, wompiIntegrity } from '@/lib/payments/wompi-protocol';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
     const { reference, amountInCents, currency } = await req.json();
-
-    if (!reference || !amountInCents || !currency) {
-      return NextResponse.json({ error: 'Faltan parámetros requeridos: reference, amountInCents, currency' }, { status: 400 });
+    if (typeof reference !== 'string' || !/^[a-zA-Z0-9_-]{1,150}$/.test(reference) ||
+        !Number.isSafeInteger(amountInCents) || amountInCents < 150000 || currency !== 'COP') {
+      return NextResponse.json({ error: 'Referencia, moneda o importe inválido.' }, { status: 400 });
     }
-
-    const integritySecret = process.env.WOMPI_INTEGRITY_SECRET;
-
-    if (!integritySecret) {
-      console.warn('[Wompi Sign API] WOMPI_INTEGRITY_SECRET no está configurada.');
+    if (subscriptionReferencePattern.test(reference)) {
+      return NextResponse.json({ error: 'Prepara esta compra desde la suscripción de tu taller.' }, { status: 400 });
     }
-
-    // Concatenate according to Wompi guidelines: reference + amountInCents + currency + integritySecret
-    const concatenated = `${reference}${amountInCents}${currency}${integritySecret || ''}`;
-    const signature = crypto.createHash('sha256').update(concatenated).digest('hex');
-
-    console.log('[Wompi Sign API] Firma generada para referencia:', reference);
-
-    return NextResponse.json({
-      signature,
-      reference,
-      amountInCents,
-      currency
-    });
-  } catch (error: any) {
-    console.error('[Wompi Sign API] Error al generar firma de integridad:', error);
-    return NextResponse.json({ error: error.message || 'Error interno del servidor' }, { status: 500 });
+    const { publicKey, integritySecret } = wompiConfig();
+    if (!publicKey || !integritySecret) {
+      return NextResponse.json({ error: 'El pago en línea no está disponible temporalmente. Intenta nuevamente en unos minutos.' }, { status: 503 });
+    }
+    return NextResponse.json({ signature: wompiIntegrity(reference,amountInCents,integritySecret), publicKey, reference, amountInCents, currency });
+  } catch {
+    return NextResponse.json({ error: 'No pudimos preparar el pago. Revisa los datos e intenta nuevamente.' }, { status: 400 });
   }
 }

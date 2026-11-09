@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, CreditCard, Shield, Lock, Loader2, ArrowRight, HeartCrack, Gift, TrendingUp, Users, Wrench, Star, AlertTriangle, X, ChevronRight, Zap, Trophy, Sparkles, Clock } from 'lucide-react';
-import { WompiSubscriptionForm } from '@/components/payments/WompiSubscriptionForm';
-import { WompiButton } from '@/components/payments/WompiButton';
-import { updateSubscriptionPlan, requestSubscriptionActivation } from '@/lib/actions/subscription';
+import { SubscriptionCheckoutButton } from '@/components/payments/SubscriptionCheckoutButton';
+import { updateSubscriptionPlan, confirmSubscriptionPayment } from '@/lib/actions/subscription';
 import { saveCancellationFeedback } from '@/lib/actions/cancellation';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -67,9 +66,10 @@ export function ManageSubscriptionClient({
     currentBillingCycle || 'monthly'
   );
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
-  const [paymentMode, setPaymentMode] = useState<'automatic' | 'manual'>('manual');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [activationRequested, setActivationRequested] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState('');
+  const verificationInFlight = useRef(false);
   const [cancelStep, setCancelStep] = useState<0 | 1 | 2 | 3>(0);
   const [cancelReason, setCancelReason] = useState<string>('');
   const router = useRouter();
@@ -81,52 +81,53 @@ export function ManageSubscriptionClient({
     setActivePlan(currentPlan);
   }, [currentPlan]);
 
-  useEffect(() => {
-    setMounted(true);
-    // Process successful payment redirect
-    const paymentStatus = searchParams.get('payment');
-    const planToUpdate = searchParams.get('plan');
-    const cycleToUpdate = searchParams.get('cycle') || 'monthly';
-    const amountToUpdate = searchParams.get('amount') || '0';
+  useEffect(() => { setMounted(true); }, []);
+  const transactionId = searchParams.get('id') || '';
+  const paymentReturn = searchParams.get('payment');
 
-    if (paymentStatus === 'success' && planToUpdate && !isUpdating) {
-      handlePaymentSuccess(planToUpdate, cycleToUpdate, amountToUpdate, searchParams.get('id') || '');
-    }
-  }, [searchParams]);
-
-  const handlePaymentSuccess = async (plan: string, cycle?: string, amount?: string, transactionId?: string) => {
-    setIsUpdating(true);
-    const formData = new FormData();
-    formData.append('plan', plan);
-    if (cycle) formData.append('billingCycle', cycle);
-    if (amount) formData.append('paidAmount', amount);
-    if (transactionId) formData.append('transactionId', transactionId);
-
+  const verifyPayment = useCallback(async () => {
+    if (!transactionId || verificationInFlight.current) return;
+    verificationInFlight.current = true;
+    setIsUpdating(true); setPaymentError('');
     try {
-      const res = await updateSubscriptionPlan(formData);
-      if (res.error) throw new Error(res.error);
-
-      setActivePlan(plan);
-      if (cycle) setBillingCycle(cycle as any);
-
-      toast({
-        title: '¡Suscripción actualizada!',
-        description: 'Tu pago fue recibido y tu plan ha sido mejorado con éxito.',
-        variant: 'default',
-      });
-      setSelectedPlan(null);
-      router.replace('/dashboard/subscription');
-      router.refresh();
-    } catch (error: any) {
-      toast({
-        title: 'Error al actualizar',
-        description: error.message || 'Hubo un error al procesar tu cambio de plan.',
-        variant: 'destructive',
-      });
+      let result;
+      if (paymentReturn === 'success' && searchParams.get('plan')) {
+        const form = new FormData();
+        form.set('plan',searchParams.get('plan')!);
+        form.set('billingCycle',searchParams.get('cycle') || 'monthly');
+        form.set('transactionId',transactionId);
+        const legacy = await updateSubscriptionPlan(form);
+        result = legacy.error ? { error: legacy.error } : { status: 'APPROVED', plan: searchParams.get('plan')!, cycle: searchParams.get('cycle') || 'monthly' };
+      } else {
+        result = await confirmSubscriptionPayment(transactionId);
+      }
+      if ('error' in result && result.error) throw new Error(result.error);
+      if (!('status' in result)) throw new Error('No pudimos verificar el pago. Intenta nuevamente.');
+      setPaymentResult(result.status!);
+      if (result.status === 'APPROVED') {
+        setActivePlan(result.plan!);
+        setBillingCycle(result.cycle as 'monthly' | 'biannual' | 'yearly');
+        setSelectedPlan(null);
+        toast({ title: '¡Pago aprobado!', description: 'Tu plan y el periodo contratado ya están activos en tu taller.' });
+        router.replace('/dashboard/subscription');
+        router.refresh();
+      }
+    } catch (error) {
+      setPaymentError(error instanceof Error ? error.message : 'No pudimos verificar el pago. Puedes volver a intentarlo sin pagar otra vez.');
     } finally {
-      setIsUpdating(false);
+      verificationInFlight.current = false; setIsUpdating(false);
     }
-  };
+  }, [transactionId,paymentReturn,searchParams,router,toast]);
+
+  useEffect(() => {
+    if (transactionId && (paymentReturn === 'return' || paymentReturn === 'success')) void verifyPayment();
+  }, [transactionId,paymentReturn,verifyPayment]);
+
+  useEffect(() => {
+    if (paymentResult !== 'PENDING' || paymentError) return;
+    const timer = window.setTimeout(() => { void verifyPayment(); }, 10000);
+    return () => window.clearTimeout(timer);
+  }, [paymentResult,paymentError,isUpdating,verifyPayment]);
 
   const normalizedActivePlan = activePlan === 'monthly' ? 'basic' : activePlan;
 
@@ -242,12 +243,11 @@ export function ManageSubscriptionClient({
     : 0;
 
   const netAmountToPay = Math.max(0, planCyclePrice - applicableCredit);
-  const amountInCents = netAmountToPay * 100;
 
   const modalContent = selectedPlan ? (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setSelectedPlan(null)} />
-      <div className="relative w-full max-w-lg bg-background dark:bg-[#0d1117] border border-border/40 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg max-h-[90dvh] overflow-y-auto bg-background dark:bg-[#0d1117] border border-border/40 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200">
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 p-5 border-b border-border/40 bg-muted/30">
@@ -325,93 +325,25 @@ export function ManageSubscriptionClient({
             </div>
           </div>
 
-          {/* Payment execution */}
+          {/* Server prepares a workshop-bound purchase before opening the same Wompi checkout as the landing. */}
           {!paymentReady ? (
-            <div className="space-y-4 rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm leading-7">
-              <p>Solicita tu activación y el equipo de MotoManager te indicará cómo contratar. Conservas la información de tu taller. Esta solicitud no genera cobros.</p>
-              <button disabled={isUpdating || activationRequested} onClick={async () => {
-                setIsUpdating(true);
-                try {
-                  const result = await requestSubscriptionActivation(selectedPlan.id, billingCycle);
-                  if (result.error) throw new Error(result.error);
-                  setActivationRequested(true);
-                  toast({ title: 'Solicitud recibida', description: 'Tu solicitud de contratación quedó registrada. El equipo de MotoManager podrá verla en administración.' });
-                } catch (error) { toast({ title: 'No pudimos guardar la solicitud', description: error instanceof Error ? error.message : 'Intenta nuevamente.', variant: 'destructive' }); }
-                finally { setIsUpdating(false); }
-              }} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground disabled:opacity-60">{activationRequested ? 'Solicitud registrada' : isUpdating ? 'Registrando…' : `Quiero contratar ${selectedPlan.name}`}</button>
-            </div>
-          ) : netAmountToPay === 0 ? (
-            <div className="space-y-4 text-center">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs">
-                ¡Tu saldo a favor cubre el costo total de esta actualización! No se requiere ningún cobro adicional.
-              </div>
-              <button
-                disabled={isUpdating}
-                onClick={() => handlePaymentSuccess(selectedPlan.id, billingCycle, '0')}
-                className="w-full h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-              >
-                {isUpdating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                Confirmar Cambio de Plan Gratis
-              </button>
-            </div>
+            <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+              El pago en línea no está disponible temporalmente. Intenta nuevamente en unos minutos. No se ha generado ningún cobro.
+            </p>
+          ) : netAmountToPay < 1500 ? (
+            <p className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
+              Tu saldo a favor cubre este cambio. Contacta a soporte para aplicarlo sin realizar un cobro.
+            </p>
           ) : (
             <div className="space-y-4">
-              <div className="flex bg-muted/60 p-1 rounded-xl">
-                <button
-                  onClick={() => setPaymentMode('manual')}
-                  className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'manual' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  Pago Único (PSE, Nequi, Tarjetas)
-                </button>
-                {!isTrial && <button
-                  onClick={() => setPaymentMode('automatic')}
-                  className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-all ${paymentMode === 'automatic' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  Débito Automático (Tarjeta)
-                </button>}
-              </div>
-
-              {paymentMode === 'automatic' ? (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                  <p className="text-xs text-muted-foreground text-center mb-3">
-                    Ingresa los datos de tu tarjeta. Se cobrará {formatCOP(netAmountToPay)} COP de forma segura.
-                  </p>
-                  <div className="flex justify-center py-1">
-                    <WompiSubscriptionForm
-                      planId={selectedPlan.id}
-                      workshopId={workshopId}
-                      userEmail={userEmail}
-                      userName={userName}
-                      amountToPay={amountInCents}
-                      onSuccess={() => {
-                        setSelectedPlan(null);
-                        handlePaymentSuccess(selectedPlan.id, billingCycle, String(netAmountToPay));
-                      }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-4">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Paga con PSE, Nequi, Tarjeta o Bancolombia a través de la pasarela segura de Wompi.
-                  </p>
-                  <div className="flex justify-center">
-                    <WompiButton
-                      amountInCents={amountInCents}
-                      reference={`sub_${workshopId}_${selectedPlan.id}_${billingCycle}_${Date.now()}`}
-                      customerEmail={userEmail}
-                      customerName={userName}
-                      redirectUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard/subscription?payment=success&plan=${selectedPlan.id}&cycle=${billingCycle}&amount=${netAmountToPay}`}
-                      buttonLabel={`Pagar ${formatCOP(netAmountToPay)} con Wompi`}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-center gap-4 text-muted-foreground/60 text-xs pt-1">
-                    <span className="flex items-center gap-1"><Lock className="h-3.5 w-3.5" />Pago cifrado SSL</span>
-                    <span className="flex items-center gap-1"><Shield className="h-3.5 w-3.5" />Pasarela oficial Wompi</span>
-                  </div>
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground text-center">
+                Paga con PSE, Nequi o tarjeta en Wompi. Al aprobarse el pago, tu plan {selectedPlan.name} se activa automáticamente por {selectedCycleInfo.months} {selectedCycleInfo.months === 1 ? 'mes' : 'meses'}.
+              </p>
+              <SubscriptionCheckoutButton key={`${selectedPlan.id}-${billingCycle}`} plan={selectedPlan.id} cycle={billingCycle}
+                customerName={userName} label={`Pagar ${formatCOP(netAmountToPay)} con Wompi`} />
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5" /> Pago seguro. Sin cobros automáticos.
+              </p>
             </div>
           )}
         </div>
@@ -466,6 +398,13 @@ export function ManageSubscriptionClient({
           </button>
         </div>
       </div>
+
+      {(paymentResult || paymentError) && <div aria-live="polite" className="mx-auto w-full max-w-2xl rounded-2xl border border-border p-5 space-y-3">
+        <p className="font-semibold">{paymentError ? 'No pudimos confirmar tu pago todavía.' : paymentResult === 'APPROVED' ? 'Tu pago fue aprobado y tu plan está activo.' : paymentResult === 'PENDING' ? 'Tu pago está pendiente de confirmación en Wompi.' : 'El pago no fue aprobado. Tu suscripción no ha cambiado.'}</p>
+        {paymentError ? <p className="text-sm text-muted-foreground">{paymentError}</p> : paymentResult === 'PENDING' && <p className="text-sm text-muted-foreground">Tu plan se activará al aprobarse el pago. Puedes cerrar esta pantalla; no necesitas pagar nuevamente.</p>}
+        {transactionId && <p className="break-all text-xs text-muted-foreground">Transacción: {transactionId}</p>}
+        {(paymentError || paymentResult === 'PENDING') && <button disabled={isUpdating} onClick={() => { void verifyPayment(); }} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60">{isUpdating ? 'Verificando…' : 'Volver a verificar el pago'}</button>}
+      </div>}
 
       {isUpdating && (
         <div className="flex flex-col items-center justify-center p-8 bg-card/30 rounded-2xl border border-border/50 text-center animate-pulse">
@@ -581,7 +520,8 @@ export function ManageSubscriptionClient({
                 </button>
               ) : (
                 <button
-                  onClick={() => { setActivationRequested(false); setSelectedPlan(plan); }}
+                  disabled={isUpdating || paymentResult === 'PENDING'}
+                  onClick={() => setSelectedPlan(plan)}
                   className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r ${plan.btn} text-foreground font-semibold h-12 rounded-xl shadow-lg transition-all hover:scale-105 text-sm`}
                 >
                   <CreditCard className="h-4 w-4" />
