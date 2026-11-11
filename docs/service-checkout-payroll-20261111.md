@@ -23,4 +23,16 @@ Las pruebas de dinero/inventario cubren abonos repetidos, facturación completa,
 
 Para ejecutar la regresión de PostgreSQL debe usarse una copia desechable y establecer `motomanager.validation=isolated` en esa sesión. El archivo de regresión revierte todos sus datos de prueba. El navegador de integración utiliza exclusivamente el proyecto aislado `mm-workflow-validation` y contactos ficticios.
 
-Estado de publicación: en validación aislada. La confirmación de producción se añadirá después de completar la revisión de pantallas y el cambio de versión.
+Estado de publicación: **publicado y verificado en producción** el 11 de noviembre de 2026, 05:32 UTC.
+
+- Código de la imagen: `8d0e2c7c3faadd418bdf4f60ccbad3ffdd344514`.
+- Imagen activa: `sha256:ca381c8d3ad143a70fcf4de6965de732b54c5efaf9d1e333be17ce559f1b6eae`.
+- TypeScript y compilación aprobados. Suite: **167 pruebas aprobadas, 2 omitidas por requerir Redis local**.
+- Regresión de PostgreSQL 17 aprobada sobre una restauración aislada de producción, con roles y políticas reales.
+- Navegador aislado: SKU y cantidad, abono, Reparado, factura con abono/saldo, entrega, liquidación, exclusión de servicios ya pagados tras recargar y egreso de nómina en el cierre diario. Sin errores JavaScript. Anchos 1920, 1366 y 390 verificados.
+- Revisión en producción: órdenes y dos estados manuales; abonos ocultos en ventas; formulario de venta por servicio; nómina con medio de pago; administración de pagos. Sin errores JavaScript y sin crear ventas, pagos u órdenes durante esa comprobación.
+- La migración comprobó dentro de la transacción que no cambiaron importes, estados ni líneas de las ventas anteriores, pagos de nómina, estados de órdenes, stock ni pruebas pausadas. Se clasificaron los 9 abonos históricos; los 8 pagos de nómina anteriores se conservaron.
+- Se detectaron 6 órdenes históricas entregadas con abonos y sin factura final. Quedaron disponibles para facturación explícita desde Venta por servicio; no se reabrieron ni se cobraron automáticamente.
+- Se conservaron respaldos privados antes de la migración y la imagen anterior para reversión. La configuración local preexistente de staging quedó intacta.
+
+Las pruebas de escritura se realizaron exclusivamente en el entorno aislado y con contactos ficticios. No se hicieron cobros bancarios reales ni se enviaron mensajes a clientes durante la validación.
