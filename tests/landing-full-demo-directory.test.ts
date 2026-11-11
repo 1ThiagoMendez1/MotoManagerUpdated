@@ -12,7 +12,7 @@ const action = read('src/actions/public-workshops.ts');
 test('la demo incluye las doce áreas principales y los módulos adicionales del brochure', () => {
   for (const screen of [
     'dashboard', 'ordenes', 'clientes', 'motos', 'inventario', 'servicios',
-    'ventas', 'citas', 'contabilidad', 'tecnicos', 'permisos', 'soporte', 'portal', 'whatsapp',
+    'ventas', 'citas', 'contabilidad', 'tecnicos', 'permisos', 'soporte', 'portal',
   ]) {
     assert.match(demo, new RegExp("id: '" + screen + "'"), 'Falta navegación de ' + screen);
   }
@@ -29,7 +29,6 @@ test('las áreas adicionales contienen interacción real de navegador y datos fi
     'Directorio de Clientes', 'Catálogo de Servicios', 'Citas y Agenda',
     'Contabilidad y Finanzas', 'Técnicos y Asignaciones',
     'Usuarios y Permisos', 'Centro de Soporte', 'Portal del Cliente',
-    'Avisos por WhatsApp',
   ]) assert.ok(extras.includes(element), element);
   assert.match(extras, /onAssignTechnician/);
   assert.match(extras, /setSelectedServices/);
@@ -37,7 +36,7 @@ test('las áreas adicionales contienen interacción real de navegador y datos fi
   assert.match(extras, /setRolePermissions/);
   assert.match(extras, /setTickets/);
   assert.doesNotMatch(extras, /\bfetch\s*\(|\bsupabase\b|localStorage|sessionStorage|\baxios\b|window\.open/);
-  assert.match(extras, /Ningún mensaje se envió/);
+  assert.match(extras, /Los datos son inventados/);
   assert.match(extras, /type="number" min="1" max="100000000" step="1"/);
 });
 

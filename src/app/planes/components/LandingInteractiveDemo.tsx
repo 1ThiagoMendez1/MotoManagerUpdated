@@ -5,10 +5,10 @@ import { LandingDemoExtras } from './LandingDemoExtras';
 import {
   ArrowRight, BarChart3, Bike, Boxes, CalendarDays, Check, CheckCircle2,
   ClipboardList, CreditCard, LayoutGrid, Moon, Plus, RotateCcw, ShoppingBag,
-  Sparkles, Sun, Users, Wrench, X, FileText, Headphones, MessageCircle, ShieldCheck, UserRound, Wallet,
+  Sparkles, Sun, Users, Wrench, X, FileText, Headphones, ShieldCheck, UserRound, Wallet,
 } from 'lucide-react';
 
-type Screen = 'inicio' | 'dashboard' | 'ordenes' | 'motos' | 'inventario' | 'ventas' | 'clientes' | 'servicios' | 'citas' | 'contabilidad' | 'tecnicos' | 'permisos' | 'soporte' | 'portal' | 'whatsapp';
+type Screen = 'inicio' | 'dashboard' | 'ordenes' | 'motos' | 'inventario' | 'ventas' | 'clientes' | 'servicios' | 'citas' | 'contabilidad' | 'tecnicos' | 'permisos' | 'soporte' | 'portal';
 type WorkStatus = 'received' | 'diagnosis' | 'in_progress' | 'completed' | 'delivered';
 type WorkOrder = { id: number; plate: string; customer: string; bike: string; service: string; status: WorkStatus; total: number; technician?: string };
 type StockItem = { id: number; name: string; sku: string; units: number; price: number };
@@ -50,7 +50,6 @@ const NAV: { id: Screen; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'permisos', label: 'Permisos', icon: ShieldCheck },
   { id: 'soporte', label: 'Soporte', icon: Headphones },
   { id: 'portal', label: 'Portal cliente', icon: FileText },
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
 ];
 const money = (value: number) => new Intl.NumberFormat('es-CO', {
   style: 'currency', currency: 'COP', maximumFractionDigits: 0,
@@ -239,7 +238,6 @@ export function LandingInteractiveDemo() {
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button type="button" onClick={() => active('portal')} className="rounded-xl border border-[#347df1]/30 px-4 py-3 text-xs font-bold text-[#347df1] hover:bg-[#347df1]/10">Explorar portal del cliente <ArrowRight className="ml-1 inline h-3 w-3" /></button>
-                  <button type="button" onClick={() => active('whatsapp')} className="rounded-xl border border-[#347df1]/30 px-4 py-3 text-xs font-bold text-[#347df1] hover:bg-[#347df1]/10">Vista previa de WhatsApp <ArrowRight className="ml-1 inline h-3 w-3" /></button>
                 </div>
               </>}
 
@@ -284,7 +282,7 @@ export function LandingInteractiveDemo() {
               </>}
 
               {screen === 'ordenes' && <>
-                <Header title="Órdenes de Trabajo" subtitle="Avanza una orden para ver cómo cambia el seguimiento. No se envía nada a WhatsApp." />
+                <Header title="Órdenes de Trabajo" subtitle="Avanza una orden para ver cómo cambia el seguimiento. No se envían notificaciones reales." />
                 <div className="mb-4 flex flex-wrap gap-2">
                   {([['without', 'Motos sin orden'], ['active', 'Con orden activa'], ['completed', 'Finalizadas']] as const).map(([value, label]) => (
                     <button key={value} type="button" onClick={() => setOrderFilter(value)} aria-pressed={orderFilter === value}

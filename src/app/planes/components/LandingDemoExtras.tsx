@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
-  ArrowRight, BadgeCheck, Bike, CalendarDays, CheckCircle2, ClipboardList, CreditCard,
-  FileText, Headphones, MessageCircle, Plus, ShieldCheck, UserRound, Users, Wallet, Wrench,
+  ArrowRight, Bike, CalendarDays, CheckCircle2, ClipboardList, CreditCard,
+  FileText, Headphones, Plus, ShieldCheck, UserRound, Users, Wallet, Wrench,
 } from 'lucide-react';
 
 export type ExtraScreen = 'clientes' | 'servicios' | 'citas' | 'contabilidad' | 'tecnicos' |
-  'permisos' | 'soporte' | 'portal' | 'whatsapp';
+  'permisos' | 'soporte' | 'portal';
 type DemoOrder = { id: number; plate: string; customer: string; bike: string; service: string; status: string; total: number; technician?: string };
 type DemoBike = { plate: string; name: string; owner: string; year: number };
 type Appointment = { id: number; plate: string; date: string; time: string; status: 'Pendiente' | 'Confirmada' | 'Completada' | 'Cancelada' };
@@ -57,7 +57,6 @@ export function LandingDemoExtras({
   const [tickets, setTickets] = useState(INITIAL_TICKETS);
   const [ticketName, setTicketName] = useState('');
   const [portalPlate, setPortalPlate] = useState('DEMO-01');
-  const [messageOrder, setMessageOrder] = useState(1042);
   const [notice, setNotice] = useState('');
   useEffect(() => {
     setClients(initialClients); setClientSearch(''); setClientName('');
@@ -65,12 +64,11 @@ export function LandingDemoExtras({
     setApptPlate('DEMO-04'); setApptDate('2026-11-05'); setExpense(0);
     setExpenseName('Compra de insumos'); setExpenses([]); setRole('Técnico');
     setRolePermissions({}); setTickets(INITIAL_TICKETS); setTicketName('');
-    setPortalPlate('DEMO-01'); setMessageOrder(1042); setNotice('');
+    setPortalPlate('DEMO-01'); setNotice('');
   }, [resetVersion]);
 
   const totalQuote = useMemo(() => CATALOG.filter(x => selectedServices.includes(x.id))
     .reduce((sum, service) => sum + service.price, 0), [selectedServices]);
-  const currentOrder = orders.find(o => o.id === messageOrder) || orders[0];
   const card = 'rounded-2xl border p-5 shadow-sm ' + (dark ? 'border-white/10 bg-[#131f32]' : 'border-[#d7e1ed] bg-white');
   const muted = dark ? 'text-slate-400' : 'text-slate-500';
   const outline = dark ? 'border-white/10' : 'border-slate-200';
@@ -132,7 +130,7 @@ export function LandingDemoExtras({
     );
   };
 
-  if (!['clientes', 'servicios', 'citas', 'contabilidad', 'tecnicos', 'permisos', 'soporte', 'portal', 'whatsapp'].includes(screen)) return null;
+  if (!['clientes', 'servicios', 'citas', 'contabilidad', 'tecnicos', 'permisos', 'soporte', 'portal'].includes(screen)) return null;
   return (
     <div>
       {screen === 'clientes' && <>
@@ -341,32 +339,6 @@ export function LandingDemoExtras({
         </div>
       </>}
 
-      {screen === 'whatsapp' && <>
-        {heading('Avisos por WhatsApp', 'Vista previa de mensajes por estado, sin enviar nada. La disponibilidad depende del plan y de la integración del taller.')}
-        <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-          <div className={card}>
-            <h4 className="flex items-center gap-2 font-bold"><MessageCircle className="h-5 w-5 text-emerald-500" /> Preparar aviso</h4>
-            <label htmlFor="demo-whatsapp-order" className={'mt-5 block text-xs ' + muted}>Orden ficticia</label>
-            <select id="demo-whatsapp-order" value={currentOrder?.id ?? ''} onChange={e => setMessageOrder(Number(e.target.value))} className={fieldClass + ' mt-2'}>
-              {orders.map(o => <option key={o.id} value={o.id}>#{o.id} · {o.customer}</option>)}
-            </select>
-            <p className={'mt-5 text-sm leading-6 ' + muted}>El producto real dispone de avisos de recepción, cambios de estado, servicios y entrega; el envío depende de la configuración y la cuota.</p>
-            <button type="button" className={buttonClass + ' mt-5'} onClick={() => onNavigate('ordenes')}>Cambiar estado de orden <ArrowRight className="ml-1 inline h-4 w-4" /></button>
-          </div>
-          <div className="rounded-2xl bg-[#0e342c] p-5 text-white shadow-sm sm:p-7">
-            <p className="flex items-center gap-2 text-sm font-bold"><MessageCircle className="h-5 w-5 text-emerald-300" /> Vista previa · no enviado</p>
-            <div className="mt-6 ml-auto max-w-sm rounded-2xl rounded-tr-sm bg-[#d9f8d4] p-4 text-sm leading-7 text-[#173a27] shadow-lg">
-              Hola {currentOrder?.customer || 'cliente'}, te saluda el Taller Ejemplo de MotoManager.
-              La motocicleta {currentOrder?.plate || 'DEMO'} ({currentOrder?.bike || 'moto'}) está en estado
-              <strong> {currentOrder?.status === 'delivered' ? 'Entregada' : currentOrder?.status === 'completed' ? 'Lista para entrega' : currentOrder?.status === 'diagnosis' ? 'Diagnosticando' : currentOrder?.status === 'in_progress' ? 'En reparación' : 'Recibida'}.</strong>
-              Gracias por confiar en nosotros.
-            </div>
-            <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-200/20 bg-white/10 p-3 text-xs text-emerald-100">
-              <BadgeCheck className="h-4 w-4" /> Solo una simulación visual. Ningún mensaje se envió.
-            </div>
-          </div>
-        </div>
-      </>}
       {notice && note(notice)}
       <div className={'mt-7 flex flex-wrap items-center gap-3 border-t pt-4 text-xs ' + outline}>
         <CreditCard className="h-4 w-4 text-[#347df1]" />
