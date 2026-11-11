@@ -31,6 +31,7 @@ const workshopNeutralRPCs = new Set([
   'get_public_workshop_reputation', 'find_workshop_qr_phone_account',
   'record_web_analytics_batch', 'record_web_analytics_access', 'prune_web_analytics',
   'web_analytics_report', 'web_analytics_heatmap',
+  'web_trial_signup_diagnostics', 'record_trial_signup_failure', 'workshop_parts_profitability',
   'get_my_trial_review', 'admin_list_trial_reviews',
 ]);
 

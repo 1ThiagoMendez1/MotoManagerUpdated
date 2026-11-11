@@ -17,7 +17,7 @@ const fields: Record<TrialField, { label: string; placeholder: string; type: str
 };
 const initialData: Record<TrialField, string> = { workshopName: '', fullName: '', phone: '', email: '', password: '' };
 
-function FormControls({ step, back }: { step: number; back: () => void }) {
+function FormControls({ step, back, interactive }: { step: number; back: () => void; interactive: boolean }) {
   const { pending } = useFormStatus();
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -26,9 +26,9 @@ function FormControls({ step, back }: { step: number; back: () => void }) {
     return () => clearTimeout(timer);
   }, [pending]);
   return <div className="space-y-3 pt-2">
-    <button type="submit" disabled={pending} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-base font-extrabold text-[#081121] shadow-lg shadow-orange-500/10 transition hover:bg-[#ffa149] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-70">
+    <button type="submit" disabled={pending || !interactive} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-base font-extrabold text-[#081121] shadow-lg shadow-orange-500/10 transition hover:bg-[#ffa149] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-70">
       {pending ? <Loader2 className="h-5 w-5 animate-spin"/> : step === 1 ? <Gift className="h-5 w-5"/> : null}
-      {pending ? 'Creando tu taller…' : step === 0 ? 'Continuar con mi acceso' : 'Crear mi taller gratis'}
+      {pending ? 'Creando tu taller…' : !interactive ? 'Preparando el registro…' : step === 0 ? 'Continuar con mi acceso' : 'Crear mi taller gratis'}
       {!pending && <ArrowRight className="h-5 w-5 shrink-0"/>}
     </button>
     {pending && <p role="status" className="text-center text-xs leading-5 text-slate-300">{slow ? <>Está tomando más tiempo de lo esperado. Evita enviar otra solicitud. Si ya se creó tu cuenta, <Link href="/login" className="text-orange-200 underline">puedes iniciar sesión aquí</Link>.</> : 'Estamos preparando tu espacio. Entrarás directamente al taller.'}</p>}
@@ -37,6 +37,8 @@ function FormControls({ step, back }: { step: number; back: () => void }) {
 }
 
 export function TrialForm() {
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => setInteractive(true), []);
   const [step, setStep] = useState(0);
   const [data, setData] = useState(initialData);
   const [errors, setErrors] = useState<Partial<Record<TrialField, string>>>({});
@@ -118,7 +120,7 @@ export function TrialForm() {
       <div className="hidden" aria-hidden="true"><label htmlFor="trial-website">Sitio web</label><input id="trial-website" name="website" tabIndex={-1} autoComplete="off"/></div>
       {step === 1 && <div className="rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs leading-5 text-slate-300"><p className="flex items-start gap-2"><MessageCircle size={16} className="mt-0.5 shrink-0 text-emerald-300"/>Al crear tu taller, solicitas un mensaje de bienvenida por WhatsApp con tu enlace y las fechas de la prueba. No autorizas publicidad.</p><p className="mt-2 text-[11px] text-slate-400">Aceptas una prueba Full de 15 días por taller, correo y celular, sin cobros automáticos, y el tratamiento de datos para gestionar tu cuenta.</p></div>}
       {submittedError && state.error && <div role="alert" className="rounded-xl border border-red-300/25 bg-red-400/10 p-3 text-sm leading-6 text-red-100"><p>{state.error}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 font-semibold"><Link href="/login?redirect=/dashboard" className="underline underline-offset-4">Iniciar sesión</Link><Link href="/login?recovery=1" className="underline underline-offset-4">Recuperar contraseña</Link></div></div>}
-      <FormControls step={step} back={() => { setStep(0); setSubmittedError(false); }}/>
+      <FormControls step={step} interactive={interactive} back={() => { setStep(0); setSubmittedError(false); }}/>
     </form>
     <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos se usan para gestionar tu taller.</p>
     <p className="mt-4 border-t border-white/10 pt-4 text-center text-xs text-slate-300">¿Ya tienes cuenta? <Link href="/login" className="font-semibold text-orange-200 underline underline-offset-4">Inicia sesión</Link></p>

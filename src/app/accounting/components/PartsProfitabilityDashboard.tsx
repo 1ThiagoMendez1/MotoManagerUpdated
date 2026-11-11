@@ -140,7 +140,7 @@ export default function PartsProfitabilityDashboard({organizationId}:{organizati
             <Button size="sm" variant="outline" className="h-8 text-xs" disabled={data.page>=data.total_pages} onClick={()=>setFilters(current=>({...current,page:current.page+1}))}>Siguiente<ChevronRight className="w-3 h-3 ml-1"/></Button>
           </div></div>
         </CardContent></Card>
-        <div className="text-[11px] text-muted-foreground leading-relaxed flex items-start gap-2 px-1"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5"/><p>Utilidad bruta = ventas de repuestos después de descuentos − costo de las unidades vendidas. No incluye mano de obra, gastos del taller ni nómina. La cobertura de stock se estima con el promedio de ventas del periodo. Los abonos y ventas pendientes no se incluyen.</p></div>
+        <div className="text-[11px] text-muted-foreground leading-relaxed flex items-start gap-2 px-1"><Info className="w-3.5 h-3.5 shrink-0 mt-0.5"/><p>Utilidad bruta = ventas de repuestos después de descuentos − costo de las unidades vendidas. El costo de referencia es el último registrado en Inventario al emitir la venta; los históricos identifican las estimaciones. No incluye mano de obra, gastos del taller ni nómina. La cobertura de stock se estima con el promedio de ventas del periodo. Los abonos y ventas pendientes no se incluyen.</p></div>
       </>}
   </section>;
 }

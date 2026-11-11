@@ -50,6 +50,8 @@ const supplierData = [
 ];
 
 export default function AccountingClient({ subscriptionPlan, organizationId, inventory, purchases = [] }: AccountingClientProps) {
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => setInteractive(true), []);
   const [activeTab, setActiveTab] = useState<'resumen' | 'flujo' | 'compras' | 'proveedores' | 'categorias' | 'nomina' | 'cierre' | 'repuestos'>('resumen');
   const [periodFilter, setPeriodFilter] = useState<'day' | 'month' | 'year'>('day');
   const [realtimeData, setRealtimeData] = useState<RealtimeFinancialData | null>(null);
@@ -364,7 +366,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
             {isBasic && <Lock className="w-3 h-3 text-amber-500" />}
           </button>
 
-          <button type="button" onClick={() => setActiveTab('repuestos')}
+          <button type="button" disabled={!interactive} onClick={() => setActiveTab('repuestos')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'repuestos' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
             Rentabilidad de repuestos
           </button>

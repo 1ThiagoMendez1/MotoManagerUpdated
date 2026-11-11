@@ -36,7 +36,7 @@ Nueva pestaña **Rentabilidad de repuestos**, sujeta al permiso de Contabilidad 
 
 Solo se incluyen ventas pagadas, numeradas y que no sean abonos. Los ingresos se obtienen de las líneas de la factura, no del saldo cobrado después del abono. Los descuentos se distribuyen proporcionalmente: en ventas por servicio corresponden a los repuestos; en venta directa se reparten sobre las líneas correspondientes. Se corrige el centavo residual para conservar el descuento total.
 
-El costo queda en un registro privado al facturar, sin agregar campos de costo a `sale_items`, que puede ser consultada por otros roles. Un cambio posterior en Inventario no reescribe el costo de la venta. La captura de costos no modifica totales, facturas, existencias, órdenes ni nómina.
+El costo de referencia es el último costo registrado en Inventario al emitir la venta; no calcula FIFO ni distribuye lotes de compra. Queda en un registro privado al facturar, sin agregar campos de costo a `sale_items`, que puede ser consultada por otros roles. Un cambio posterior en Inventario no reescribe el costo de la venta. La captura de costos no modifica totales, facturas, existencias, órdenes ni nómina. La interfaz explica este método para que el taller interprete la utilidad correctamente.
 
 Para históricos se usa la última compra recibida antes de la venta cuando existe evidencia. Si solo hay costo actual, se conserva como **estimación histórica**, excluida por defecto y disponible con una opción explícita. Sin costo comprobable no se inventa utilidad ni margen. Una compra de costo cero documentada sí es válida; cero por defecto en Inventario se trata como costo desconocido. Una factura pendiente conserva su costo al emitirse, pero solo aparece cuando está pagada.
 
