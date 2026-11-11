@@ -63,6 +63,9 @@ test('service checkout, cash advances, inventory and technician settlements are 
     await db.query('INSERT INTO inventory_item_stock(item_id,location_id,quantity) VALUES($1,$2,23)',[product,location]);
     // Existing AB movements and text-only advances are classified without changing their cash amounts.
     const legacy=await order();
+    const legacyDelivered=await order('delivered');
+    await db.query("UPDATE work_orders SET customer_observations='Abono registrado: 100000' WHERE id=$1",[legacyDelivered]);
+    await db.query("INSERT INTO sales(organization_id,work_order_id,sale_number,total,status,notes) VALUES($1,$2,'AB-HISTORICAL',100000,'paid','Abono de orden')",[org,legacyDelivered]);
     await db.query("UPDATE work_orders SET customer_observations='Abono registrado: 100000' WHERE id=$1",[legacy]);
     await db.query("INSERT INTO sales(organization_id,work_order_id,sale_number,total,status,notes) VALUES($1,$2,'AB-150-0144',100000,'paid','Abono de orden #150')",[org,legacy]);
     await db.exec(await readFile(new URL('../supabase/migrations/20261111042449_service_checkout_deposits_payroll.sql',import.meta.url),'utf8'));
@@ -158,6 +161,12 @@ test('service checkout, cash advances, inventory and technician settlements are 
       assert.equal((await pending()).length,before.length+1);
       await db.query("INSERT INTO payroll_payments(organization_id,technician_id,period_start,period_end,total_services_amount,commission_percentage,total_paid,status) VALUES($1,$2,$3,$4,999,10,99.9,'paid')",[org,tech,start,end]);
       assert.equal((await pending()).length,before.length);
+    });    await t.test('historical delivered orders with advances can issue their missing invoice without reopening',async()=>{
+      const invoice=await close(legacyDelivered,150000);
+      assert.equal(Number(invoice.invoice_total),150000);assert.equal(Number(invoice.total),50000);
+      assert.equal(await scalar('SELECT status FROM work_orders WHERE id=$1',[legacyDelivered]),'delivered');
+      await assert.rejects(()=>order('delivered'),/debe iniciar/);
     });
+
   } finally { await db.close(); }
 });

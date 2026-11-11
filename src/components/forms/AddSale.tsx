@@ -190,7 +190,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const remainingBalanceTotal = Math.max(0, total - depositAmountValue);
 
   // Solo considerar órdenes de trabajo en estado Reparado para facturación
-  const activeWorkOrders = workOrders.filter(order => order.status === 'Reparado');
+  const activeWorkOrders = workOrders.filter(order => order.status === 'Reparado' || order.requiresServiceInvoice);
 
   // Filter work orders based on plate search (solo activas)
   const filteredWorkOrders = plateSearch
@@ -335,7 +335,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                             <SelectContent>
                               {filteredWorkOrders.map(order => (
                                 <SelectItem key={order.id} value={order.id}>
-                                  {order.workOrderNumber} - {order.motorcycle.make} {order.motorcycle.model} ({order.motorcycle.plate})
+                                  {order.workOrderNumber}{order.requiresServiceInvoice ? ' · Entregada pendiente de facturar' : ''} - {order.motorcycle.make} {order.motorcycle.model} ({order.motorcycle.plate})
                                 </SelectItem>
                               ))}
                             </SelectContent>

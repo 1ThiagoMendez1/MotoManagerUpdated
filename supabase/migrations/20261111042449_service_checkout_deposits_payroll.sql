@@ -155,7 +155,7 @@ BEGIN
     UPDATE public.work_orders SET status='delivered',completed_at=coalesce(completed_at,now()) WHERE id=w.id;
     RETURN to_jsonb(invoice)||jsonb_build_object('repeated',true);
   END IF;
-  IF w.status<>'completed' THEN RAISE EXCEPTION 'Marca la orden como Reparado antes de registrar la venta por servicio.'; END IF;
+  IF w.status<>'completed' AND NOT (w.status IN ('delivered','delivered_quote_rejected') AND EXISTS(SELECT 1 FROM public.sales WHERE work_order_id=w.id AND organization_id=p_org AND is_deposit AND status='paid')) THEN RAISE EXCEPTION 'Marca la orden como Reparado antes de registrar la venta por servicio.'; END IF;
   SELECT * INTO invoice FROM public.sales WHERE organization_id=p_org AND work_order_id=w.id AND NOT is_deposit
     AND invoice_total IS NOT NULL AND status='pending' ORDER BY created_at LIMIT 1;
   IF FOUND THEN RETURN to_jsonb(invoice)||jsonb_build_object('repeated',true); END IF;
@@ -263,6 +263,7 @@ RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 BEGIN
   IF TG_OP='INSERT' THEN
     IF NEW.status IN ('draft','received') THEN NEW.status='diagnosis'; END IF;
+    IF NEW.status NOT IN ('diagnosis','completed') THEN RAISE EXCEPTION 'La nueva orden debe iniciar en Diagnosticando o Reparado.'; END IF;
     RETURN NEW;
   END IF;
   IF OLD.status IS DISTINCT FROM NEW.status THEN
@@ -415,3 +416,11 @@ END $$;
 CREATE TRIGGER workflow_payroll_status AFTER UPDATE ON public.payroll_payments FOR EACH ROW EXECUTE FUNCTION public.workflow_payroll_status();
 REVOKE ALL ON FUNCTION public.workflow_payroll_status() FROM PUBLIC,anon;
 NOTIFY pgrst,'reload schema';
+
+CREATE FUNCTION public.workflow_deposit_kind() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+BEGIN
+  IF NEW.work_order_id IS NOT NULL AND (NEW.notes ILIKE 'Abono de orden%' OR NEW.sale_number ~* '^(SALE-)?AB-') THEN NEW.is_deposit=true; END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_deposit_kind BEFORE INSERT OR UPDATE OF work_order_id,sale_number,notes ON public.sales FOR EACH ROW EXECUTE FUNCTION public.workflow_deposit_kind();
+REVOKE ALL ON FUNCTION public.workflow_deposit_kind() FROM PUBLIC,anon;

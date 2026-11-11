@@ -77,6 +77,7 @@ export type WorkOrder = {
   workshop?: { name: string } | null;
   sales?: any[];
   invoiceTotal?: number;
+  requiresServiceInvoice?: boolean;
   work_order_services?: any[];
   images?: WorkOrderImage[];
   depositHistory?: any[];

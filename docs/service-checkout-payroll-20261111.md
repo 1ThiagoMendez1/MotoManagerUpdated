@@ -3,6 +3,7 @@
 ## Comportamiento
 
 - Los estados manuales son **Diagnosticando** y **Reparado**. La entrega se registra al pagar la venta por servicio. Una venta directa de mostrador no entrega una orden.
+- Las órdenes históricas entregadas que solo tienen abonos pueden emitir su factura pendiente desde Venta por servicio; no se reabren ni se facturan automáticamente.
 - Los abonos se conservan en caja y en el historial de la orden. No aparecen como facturas terminadas ni generan comisión. La factura muestra valor completo, abono y cobro final por separado.
 - `sales.total` sigue representando el dinero ingresado en ese movimiento, para conservar los cierres de caja existentes. `invoice_total` contiene el valor de la factura y `deposit_amount` su abono aplicado.
 - La factura y el inventario se cierran en una transacción. No se descuentan de nuevo repuestos ya reservados. Las cotizaciones, adiciones y devoluciones usan el registro de movimientos; repetir una aprobación no vuelve a descontar stock.

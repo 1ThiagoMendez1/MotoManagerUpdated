@@ -225,7 +225,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
   const offset = (page - 1) * limit;
 
   let q = supabase.from('work_orders')
-    .select('*, motorcycles(*), customers(*), sales(id, status), part_requests(id, status), assigned_mechanic:profiles!work_orders_assigned_mechanic_id_fkey(id, first_name, last_name, phone, avatar_path)', { count: 'exact' })
+    .select('*, motorcycles(*), customers(*), sales(id, status, is_deposit, notes, sale_number), part_requests(id, status), assigned_mechanic:profiles!work_orders_assigned_mechanic_id_fkey(id, first_name, last_name, phone, avatar_path)', { count: 'exact' })
     .eq('organization_id', user.workshopId)
     .order('created_at', { ascending: false });
 
@@ -287,6 +287,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     quote_status: wo.quote_status,
     customerObservations: wo.customer_observations || '',
     pendingPartRequestsCount,
+    requiresServiceInvoice: ['delivered','delivered_quote_rejected'].includes(wo.status) && wo.sales?.some((s: any) => isOrderDeposit(s) && s.status === 'paid') && !wo.sales?.some((s: any) => isIssuedServiceSale(s)),
     depositAmount: Number(wo.deposit_amount || 0)
     };
   });
