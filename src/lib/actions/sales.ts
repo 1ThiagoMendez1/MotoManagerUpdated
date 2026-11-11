@@ -20,7 +20,7 @@ const serviceSaleSchema = z.object({
     items: z.array(z.object({
         inventoryItemId: z.string().min(1, "Selecciona un producto"),
         quantity: z.coerce.number().int().min(1, "Mínimo 1"),
-        price: z.coerce.number(),
+        price: z.coerce.number().finite().min(0),
         fromWorkOrder: z.boolean().optional(),
         type: z.string().optional(),
         name: z.string().optional(),
@@ -108,469 +108,69 @@ async function generateSaleNumber(supabase: any, organizationId: string, prefix:
 // --- Actions ---
 
 export async function createServiceSale(prevState: any, formData: FormData) {
-    console.log('createServiceSale started');
     const user = await requireWorkshop();
-    const supabase = await createClient(); // Cliente real
-
-    // Fetch workshop name for receipt
-    const { data: orgData } = await supabase.from('organizations').select('name').eq('id', user.workshopId).single();
-    const workshopName = orgData?.name || 'MotoManager';
-
+    const supabase = await createClient();
     try {
-        const itemsRaw = formData.get('items') as string;
-        const items = JSON.parse(itemsRaw || '[]');
-        const workOrderId = formData.get('workOrderId') as string;
-        const laborCost = parseFloat(formData.get('laborCost') as string);
-        const paymentMethod = formData.get('paymentMethod') as string;
-        const date = formData.get('date') as string;
-        const discountPercentage = parseFloat(formData.get('discountPercentage') as string) || 0;
-        const depositAmount = parseFloat(formData.get('depositAmount') as string) || 0;
-
-        const validatedFields = serviceSaleSchema.safeParse({
-            workOrderId,
-            laborCost,
-            paymentMethod,
-            date,
-            items,
-            discountPercentage,
-            depositAmount,
+        const validation = serviceSaleSchema.safeParse({
+            workOrderId: formData.get('workOrderId'),
+            laborCost: formData.get('laborCost'), paymentMethod: formData.get('paymentMethod'),
+            date: formData.get('date'), items: JSON.parse(String(formData.get('items') || '[]')),
+            discountPercentage: formData.get('discountPercentage') || 0,
         });
-
-        if (!validatedFields.success) {
-            console.error('Validation failed:', validatedFields.error.flatten());
-            const firstError = Object.values(validatedFields.error.flatten().fieldErrors).flat()[0] || 'Error de validación.';
-            return { 
-                success: false, 
-                message: `Error de validación: ${firstError}`, 
-                errors: validatedFields.error.flatten().fieldErrors 
-            };
-        }
-
-        const data = validatedFields.data;
-        const dbPaymentMethod = mapPaymentMethodToDb(data.paymentMethod);
-        const saleNumber = await generateSaleNumber(supabase, user.workshopId, 'VS');
-
-        // Check if quote was approved before to know if inventory was already deducted
-        let quoteWasApproved = false;
-        if (data.workOrderId) {
-            const { data: currentWo } = await supabase
-                .from('work_orders')
-                .select('quote_status')
-                .eq('id', data.workOrderId)
-                .single();
-            quoteWasApproved = currentWo?.quote_status === 'approved';
-        }
-
-        // 2. Check Inventory (skip items already deducted from approved quote)
-        const itemsToTrack = new Map<string, { locationId: string, amount: number }[]>();
-
-        for (const item of data.items || []) {
-            if (item.type === 'service') continue;
-            if (item.fromWorkOrder && quoteWasApproved) continue;
-
-            const { data: invItem } = await supabase
-                .from('inventory_items')
-                .select('name, track_inventory')
-                .eq('id', item.inventoryItemId)
-                .single();
-
-            if (!invItem) {
-                return { message: `Producto no encontrado.` };
-            }
-
-            if (invItem.track_inventory !== false) {
-                const { data: stockData } = await supabase
-                    .from('inventory_item_stock')
-                    .select('quantity, location_id')
-                    .eq('item_id', item.inventoryItemId)
-                    .order('quantity', { ascending: false });
-                
-                let remainingToDeduct = item.quantity;
-                const plan: { locationId: string, amount: number }[] = [];
-
-                if (stockData) {
-                    for (const stock of stockData) {
-                        if (remainingToDeduct <= 0) break;
-                        const available = Number(stock.quantity);
-                        if (available > 0) {
-                            const deduct = Math.min(available, remainingToDeduct);
-                            plan.push({ locationId: stock.location_id, amount: deduct });
-                            remainingToDeduct -= deduct;
-                        }
-                    }
-                }
-
-                if (remainingToDeduct > 0) {
-                    return { message: `Stock insuficiente para ${invItem.name}.` };
-                }
-
-                itemsToTrack.set(item.inventoryItemId, plan);
-            }
-        }
-
-        // 3. Calculate Totals
-        const productItemsForTotal = (data.items || []).filter(item => item.type !== 'service');
-        const itemsTotal = productItemsForTotal.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const subtotal = itemsTotal + data.laborCost;
-        const discountAmount = itemsTotal * ((data.discountPercentage || 0) / 100);
-        const total = Math.max(0, subtotal - discountAmount - (data.depositAmount || 0));
-
-        // 4. Create or Update Sale Record
-        // Check if there is already a paid/completed sale for this work order to prevent duplicates
-        const { data: alreadyPaid } = await supabase
-            .from('sales')
-            .select('id')
-            .eq('work_order_id', data.workOrderId)
-            .eq('organization_id', user.workshopId)
-            .neq('status', 'pending')
-            .limit(1)
-            .maybeSingle();
-
-        if (alreadyPaid) {
-            // Auto-sanación: Si ya está pagada pero el usuario pudo abrir el modal,
-            // probablemente la orden quedó con estado 'Reparado' (completed) en lugar de 'Entregado' (delivered).
-            const supabaseAdmin = createAdminClient();
-            await supabaseAdmin.from('work_orders').update({
-                status: 'delivered',
-                completed_at: new Date().toISOString()
-            }).eq('id', data.workOrderId).eq('organization_id', user.workshopId);
-
-            revalidatePath('/sales');
-            revalidatePath('/work-orders');
-            revalidatePath('/', 'layout');
-
-            return { success: true, message: 'La venta ya estaba registrada correctamente. Se actualizó el estado de la orden.' };
-        }
-
-        let sale;
-        const { data: existingSale } = await supabase
-            .from('sales')
-            .select('id')
-            .eq('work_order_id', data.workOrderId)
-            .eq('organization_id', user.workshopId)
-            .eq('status', 'pending')
-            .maybeSingle();
-
-        if (existingSale) {
-            const { data: updatedSale, error: saleError } = await supabase
-                .from('sales')
-                .update({
-                    sale_number: saleNumber,
-                    payment_method: dbPaymentMethod,
-                    created_at: data.date,
-                    subtotal: subtotal,
-                    discount_total: discountAmount,
-                    total: total,
-                    status: data.paymentMethod === 'Wompi' ? 'pending' : 'paid',
-                    created_by: user.userId || null
-                })
-                .eq('id', existingSale.id)
-                .select()
-                .single();
-                
-            if (saleError) {
-                console.error('Error updating sale record:', saleError);
-                return { message: 'Error al actualizar el registro de venta: ' + saleError.message };
-            }
-            sale = updatedSale;
-        } else {
-            // If no pending sale exists, but the UI sent items from the work order, it's an inconsistent state
-            if ((data.items || []).some((i: any) => i.fromWorkOrder)) {
-                 return { success: false, message: 'La orden de trabajo no tiene una venta pendiente válida, pero contiene productos. Intenta recargar la página o contactar soporte.' };
-            }
-
-            const { data: newSale, error: saleError } = await supabase
-                .from('sales')
-                .insert({
-                    organization_id: user.workshopId,
-                    sale_number: saleNumber,
-                    work_order_id: data.workOrderId,
-                    payment_method: dbPaymentMethod,
-                    created_at: data.date,
-                    subtotal: subtotal,
-                    discount_total: discountAmount,
-                    total: total,
-                    status: data.paymentMethod === 'Wompi' ? 'pending' : 'paid',
-                    created_by: user.userId || null
-                })
-                .select()
-                .single();
-
-            if (saleError) {
-                console.error('Error creating sale record:', saleError);
-                return { message: 'Error al crear el registro de venta: ' + saleError.message };
-            }
-            sale = newSale;
-        }
-
-        // 5. Create Sale Items & Update Inventory
-        const serviceItems = (data.items || []).filter(item => item.type === 'service' && item.fromWorkOrder);
-        const productItems = (data.items || []).filter(item => item.type !== 'service');
-
-        for (const item of productItems) {
-            if (!item.fromWorkOrder) {
-                const { error: itemError } = await supabase
-                    .from('sale_items')
-                    .insert({
-                        sale_id: sale.id,
-                        item_type: 'inventory',
-                        inventory_item_id: item.inventoryItemId,
-                        description: item.name || 'Producto',
-                        quantity: item.quantity,
-                        unit_price: item.price,
-                        total: item.price * item.quantity
-                    });
-
-                if (itemError) throw new Error('Error al registrar uno de los productos de la venta.');
-            }
-
-            // Decrement stock using deduction plan
-            const plan = itemsToTrack.get(item.inventoryItemId);
-            if (plan) {
-                for (const deduction of plan) {
-                    const { error: updateError } = await supabase.rpc('decrement_inventory', {
-                        p_item_id: item.inventoryItemId,
-                        p_amount: deduction.amount,
-                        p_location_id: deduction.locationId,
-                        p_sale_id: sale.id,
-                        p_user_id: user.userId
-                    });
-                    
-                    if (updateError) throw new Error(`Error al descontar inventario del producto.`);
-                }
-            }
-        }
-
-        // 5.1 Registrar servicios detallados de la orden de trabajo
-        let detailedServicesSum = 0;
-        for (const srv of serviceItems) {
-             const serviceTotal = srv.price * srv.quantity;
-             detailedServicesSum += serviceTotal;
-             
-             await supabase
-                .from('sale_items')
-                .insert({
-                    sale_id: sale.id,
-                    item_type: 'service',
-                    description: srv.name || 'Servicio',
-                    quantity: srv.quantity,
-                    unit_price: srv.price,
-                    total: serviceTotal
-                });
-        }
-
-        // 5.2 Registrar diferencia de mano de obra como genérica si aplica
-        const genericLaborCost = data.laborCost - detailedServicesSum;
-        if (genericLaborCost > 0) {
-             await supabase
-                .from('sale_items')
-                .insert({
-                    sale_id: sale.id,
-                    item_type: 'service',
-                    description: 'Mano de Obra adicional',
-                    quantity: 1,
-                    unit_price: genericLaborCost,
-                    total: genericLaborCost
-                });
-        }
-
-        // 6. Conditionally Update Work Order Status (Skip if Wompi pending)
-        let workOrder = null;
-        if (data.paymentMethod !== 'Wompi') {
-            const supabaseAdmin = createAdminClient();
-            
-            // Separamos el update del select para evitar errores de .single() si algo falla en los joins
-            const { error: workOrderError } = await supabaseAdmin
-                .from('work_orders')
-                .update({
-                    status: 'delivered',
-                    quote_status: 'approved',
-                    completed_at: new Date().toISOString()
-                })
-                .eq('id', data.workOrderId)
-                .eq('organization_id', user.workshopId);
-
-            if (workOrderError) {
-                console.error('Error updating work order status (update step):', JSON.stringify(workOrderError, null, 2));
-            } else {
-                // Fetch the updated data for WhatsApp alert
-                const { data: updatedWorkOrder, error: fetchError } = await supabaseAdmin
-                    .from('work_orders')
-                    .select(`
-                        motorcycle_id, 
-                        order_number,
-                        customer_observations,
-                        motorcycles (
-                            customer_id,
-                            brand,
-                            model,
-                            license_plate,
-                            model_year,
-                            customers (
-                                first_name,
-                                last_name,
-                                phone
-                            )
-                        ),
-                        profiles!work_orders_assigned_mechanic_id_fkey (
-                            first_name,
-                            last_name
-                        )
-                    `)
-                    .eq('id', data.workOrderId)
-                    .eq('organization_id', user.workshopId)
-                    .maybeSingle();
-                
-                if (fetchError) {
-                    console.error('Error fetching work order after update:', JSON.stringify(fetchError, null, 2));
-                }
-                workOrder = updatedWorkOrder;
-            }
-        } else {
-            // Fetch work order details without updating status for Wompi
-            const { data: existingWo } = await supabase
-                .from('work_orders')
-                .select(`
-                    motorcycle_id, 
-                    order_number,
-                    customer_observations,
-                    motorcycles (
-                        customer_id,
-                        brand,
-                        model,
-                        license_plate,
-                        model_year,
-                        customers (
-                            first_name,
-                            last_name,
-                            phone
-                        )
-                    ),
-                    profiles!work_orders_assigned_mechanic_id_fkey (
-                        first_name,
-                        last_name
-                    )
-                `)
-                .eq('id', data.workOrderId)
-                .eq('organization_id', user.workshopId)
-                .single();
-            workOrder = existingWo;
-        }
-
-        revalidatePath('/sales');
-        revalidatePath('/customers');
-        revalidatePath('/motorcycles');
-        revalidatePath('/work-orders');
-        revalidatePath('/', 'layout');
-
-        // Obtener los items de la venta de forma segura
-        const { data: saleItems } = await supabase
-            .from('sale_items')
-            .select('*, inventory_items (name, code)')
-            .eq('sale_id', sale.id);
-
-        const wo = workOrder;
-        const fomattedMotorcycle = wo?.motorcycles ? (Array.isArray(wo.motorcycles) ? wo.motorcycles[0] : wo.motorcycles) : undefined;
-        const formattedCustomer = fomattedMotorcycle?.customers ? (Array.isArray(fomattedMotorcycle.customers) ? fomattedMotorcycle.customers[0] : fomattedMotorcycle.customers) : undefined;
-        const formattedTech = wo?.profiles ? (Array.isArray(wo.profiles) ? wo.profiles[0] : wo.profiles) : undefined;
-
-        // Check for manual depositAmount first, then fallback to parse
-        let parsedDeposit = data.depositAmount || 0;
-        if (parsedDeposit === 0 && wo?.customer_observations) {
-            const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
-            if (match) {
-                parsedDeposit = parseFloat(match[1]);
-            }
-        }
-
-        const formattedItems = saleItems ? saleItems.map((item: any) => ({
-            name: item.item_type === 'service' 
-                ? (item.description?.startsWith('Mano de Obra') ? item.description : `Mano de Obra - ${item.description || 'Servicio'}`)
-                : (item.inventory_items?.name || item.description || 'Producto'),
-            sku: item.inventory_items?.code || (item.item_type === 'service' ? 'SRV' : '-'),
-            quantity: item.quantity,
-            price: item.unit_price,
-            total: item.total || (item.quantity * item.unit_price),
-            type: item.item_type
-        })) : (data.items || []).map((item: any) => ({
-            name: item.name || 'Producto',
-            sku: item.sku || '-',
-            quantity: item.quantity,
-            price: item.price,
-            total: item.total || (item.quantity * item.price)
+        const requestId = z.string().uuid().safeParse(formData.get('requestId'));
+        if (!validation.success) return { success: false, message: validation.error.issues[0].message };
+        if (!requestId.success) return { success: false, message: 'Recarga el formulario e intenta de nuevo.' };
+        const data = validation.data;
+        const { data: sale, error } = await supabase.rpc('finalize_work_order_service_sale', {
+            p_org: user.workshopId, p_work_order: data.workOrderId, p_labor: data.laborCost,
+            p_discount: data.discountPercentage || 0, p_method: mapPaymentMethodToDb(data.paymentMethod),
+            p_date: data.date, p_items: (data.items || []).filter(item => item.type !== 'service'),
+            p_request_id: requestId.data,
+        });
+        if (error) throw new Error(error.message);
+        if (!sale) throw new Error('No se recibió el comprobante de la venta.');
+        const [woResult, itemsResult, orgResult] = await Promise.all([
+            supabase.from('work_orders').select(`order_number, motorcycles(brand,model,license_plate,model_year,customers(first_name,last_name,phone)),
+                profiles!work_orders_assigned_mechanic_id_fkey(first_name,last_name)`).eq('id', data.workOrderId).eq('organization_id', user.workshopId).single(),
+            supabase.from('sale_items').select('*, inventory_items(name,code)').eq('sale_id', sale.id),
+            supabase.from('organizations').select('name').eq('id', user.workshopId).single(),
+        ]);
+        const first = (v: any) => Array.isArray(v) ? v[0] : v;
+        const wo: any = woResult.data;
+        const moto = first(wo?.motorcycles);
+        const customer = first(moto?.customers);
+        const tech = first(wo?.profiles);
+        const labor = (itemsResult.data || []).filter((i: any) => i.item_type === 'service').reduce((sum: number, i: any) => sum + Number(i.total), 0);
+        const items = (itemsResult.data || []).map((i: any) => ({
+            name: i.inventory_items?.name || i.description || 'Servicio', sku: i.inventory_items?.code || 'SRV',
+            quantity: Number(i.quantity), price: Number(i.unit_price), total: Number(i.total), type: i.item_type,
         }));
-
-        // 7. Send Notification (Skip receipt if Wompi, webhook handles it)
-        console.log(`[Sales Action] Checking notification conditions. Customer Phone: ${formattedCustomer?.phone || 'NOT FOUND'}, Payment Method: ${data.paymentMethod}`);
-        if (formattedCustomer?.phone && data.paymentMethod !== 'Wompi') {
-            try {
-                const canSend = await checkAndUpdateWhatsAppLimit(user.workshopId);
-                if (canSend) {
-                    const firstName = formattedCustomer.first_name || '';
-                    const lastName = formattedCustomer.last_name || '';
-                    const customerFullName = formattedCustomer ? `${firstName} ${lastName}`.trim() || 'Cliente' : 'Cliente';
-                    
-                    console.log(`[Sales Action] Sending service sale notification to ${customerFullName} (${formattedCustomer.phone})...`);
-                    const notifyResult = await sendServiceSaleNotification(
-                        formattedCustomer.phone,
-                        customerFullName,
-                        wo?.order_number || saleNumber,
-                        total,
-                        {
-                            make: fomattedMotorcycle?.brand || 'Moto',
-                            model: fomattedMotorcycle?.model || '',
-                            plate: fomattedMotorcycle?.license_plate || 'Sin Placa'
-                        },
-                        formattedTech ? `${formattedTech.first_name} ${formattedTech.last_name}`.trim() : 'Técnico',
-                        data.laborCost > 0 ? data.laborCost : undefined,
-                        formattedItems,
-                        subtotal,
-                        data.discountPercentage,
-                        discountAmount,
-                        workshopName
-                    );
-                    
-                    console.log('[Sales Action] Notification result:', JSON.stringify(notifyResult, null, 2));
-                    
-                } else {
-                    console.warn(`WhatsApp limit reached for org ${user.workshopId}. Skipping sale notification.`);
-                }
-            } catch (notifyError: any) {
-                console.error('[Sales Action] Service sale notification error:', notifyError);
-            }
-        } else {
-            console.log('[Sales Action] Notification skipped because customer has no phone or payment method is Wompi.');
-        }
-
-        const formattedSale = {
-            id: sale.id,
-            saleNumber: saleNumber,
-            date: new Date().toISOString(),
-            subtotal: subtotal,
-            discountPercentage: data.discountPercentage,
-            discountAmount: discountAmount,
-            depositAmount: parsedDeposit,
-            remainingBalance: parsedDeposit > 0 ? total : undefined,
-            total: total,
-            paymentMethod: data.paymentMethod === 'Wompi' ? 'Wompi' : mapPaymentMethodToUi(dbPaymentMethod),
-            workOrderId: wo?.order_number,
-            customerName: formattedCustomer ? `${formattedCustomer.first_name} ${formattedCustomer.last_name}`.trim() : undefined,
-            workshopName: workshopName,
-            motorcycleInfo: fomattedMotorcycle ? {
-                make: fomattedMotorcycle.brand,
-                model: fomattedMotorcycle.model,
-                year: fomattedMotorcycle.model_year,
-                plate: fomattedMotorcycle.license_plate,
-            } : undefined,
-            technicianName: formattedTech ? `${formattedTech.first_name} ${formattedTech.last_name}` : undefined,
-            laborCost: data.laborCost > 0 ? data.laborCost : undefined,
-            items: formattedItems
+        const gross = Number(sale.invoice_total ?? (Number(sale.total) + Number(sale.deposit_amount || 0)));
+        const receipt = {
+            id: sale.id, saleNumber: sale.sale_number, date: sale.created_at,
+            subtotal: Number(sale.subtotal), discountPercentage: data.discountPercentage,
+            discountAmount: Number(sale.discount_total), depositAmount: Number(sale.deposit_amount || 0),
+            remainingBalance: Number(sale.total), total: gross, paymentMethod: mapPaymentMethodToUi(sale.payment_method),
+            workOrderId: wo?.order_number, customerName: customer ? `${customer.first_name} ${customer.last_name}`.trim() : undefined,
+            workshopName: orgResult.data?.name || 'MotoManager',
+            motorcycleInfo: moto ? { make: moto.brand, model: moto.model, year: moto.model_year, plate: moto.license_plate } : undefined,
+            technicianName: tech ? `${tech.first_name} ${tech.last_name}`.trim() : undefined, laborCost: labor, items,
         };
-
-        return { success: true, sale: formattedSale };
+        for (const path of ['/sales', '/accounting', '/customers', '/motorcycles', '/work-orders', `/work-orders/${data.workOrderId}`]) revalidatePath(path);
+        revalidatePath('/', 'layout');
+        if (sale.status === 'paid' && !sale.repeated && customer?.phone) {
+            try {
+                if (await checkAndUpdateWhatsAppLimit(user.workshopId)) {
+                    await sendServiceSaleNotification(customer.phone, receipt.customerName || 'Cliente', wo.order_number,
+                        gross, { make: moto.brand || 'Moto', model: moto.model || '', plate: moto.license_plate || 'Sin placa' },
+                        receipt.technicianName || 'Técnico', labor || undefined, items, receipt.subtotal,
+                        data.discountPercentage, receipt.discountAmount, receipt.workshopName);
+                }
+            } catch (notificationError) { console.error('No se pudo enviar el comprobante de servicio.', notificationError); }
+        }
+        return { success: true, sale: receipt };
     } catch (error: any) {
-        console.error('Error creating service sale:', error);
-        return { message: 'Error al crear la venta de servicio: ' + (error.message || error) };
+        return { success: false, message: 'No se pudo registrar la venta: ' + (error.message || 'Error inesperado.') };
     }
 }
 

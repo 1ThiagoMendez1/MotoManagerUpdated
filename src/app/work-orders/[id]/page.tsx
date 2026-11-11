@@ -43,13 +43,13 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   }
 
   const [inventory, { items: technicians }, reminders, services] = await Promise.all([
-    getInventory({ page: 1 } as any),
+    getInventory({ page: 1, limit: 1000 } as any),
     getTechnicians(),
     getRemindersByMotorcycleId(workOrder.motorcycle.id),
     getServices(workOrder.organizationId || '')
   ]);
 
-  const isCompleted = workOrder.status === 'Entregado';
+  const isCompleted = ['Entregado', 'Moto entregada por cotización rechazada'].includes(workOrder.status);
 
   // Calculate totals
   const itemsCost = (workOrder.sales || []).reduce((total: number, sale: any) => {
@@ -62,9 +62,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     return total + service.total;
   }, 0);
 
-  const totalCost = itemsCost + servicesCost;
+  const totalCost = workOrder.invoiceTotal ?? (itemsCost + servicesCost);
   const depositAmount = (workOrder as any).depositAmount ?? 0;
-  const pendingBalance = Math.max(0, totalCost - depositAmount);
+  const pendingBalance = isCompleted ? 0 : Math.max(0, totalCost - depositAmount);
 
   return (
     <WorkOrderDetailClient

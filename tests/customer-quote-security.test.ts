@@ -22,10 +22,9 @@ test('quote page and mutation require the same verified workshop/customer associ
 
 test('quote claim is atomic: concurrent responses cannot both discount stock',async()=>{
   const action=await readFile(new URL('../src/app/cotizacion/[id]/actions.ts',import.meta.url),'utf8');
-  assert.match(action,/\.or\('quote_status\.is\.null,quote_status\.eq\.pending'\)/);
-  assert.match(action,/\.select\('id'\)\s*\.maybeSingle\(\)/);
-  assert.match(action,/if \(!claimed\)[\s\S]*?cotización ya fue respondida/);
-  assert.match(action,/if \(!claimed\)[\s\S]*?if \(response === 'approved'\)/);
+  assert.match(action,/rpc\('change_work_order_parts'/);
+  assert.match(action,/p_action: 'customer_quote'/);
+  assert.match(action,/if \(error\) return/);
   assert.match(action,/slice\(0, 500\)/);
 });
 

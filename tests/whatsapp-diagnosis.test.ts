@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { buildDiagnosisMetaTemplate, DIAGNOSIS_TEMPLATE_NAME } from '../src/lib/whatsapp-diagnosis';
 import { WORK_ORDER_STATUS_OPTIONS, isChangeableOrderStatus } from '../src/lib/work-order-status';
 
-test('solo cuatro estados visibles, excluye estados obsoletos y entradas forzadas', () => {
+test('solo dos estados manuales visibles, excluye estados obsoletos y entradas forzadas', () => {
   assert.deepEqual(WORK_ORDER_STATUS_OPTIONS, [
-    'Diagnosticando', 'Reparado', 'Entregado', 'Moto entregada por cotización rechazada',
+    'Diagnosticando', 'Reparado',
   ]);
   assert.equal(isChangeableOrderStatus('Diagnosticando'), true);
+  assert.equal(isChangeableOrderStatus('Entregado'), false);
+  assert.equal(isChangeableOrderStatus('Moto entregada por cotización rechazada'), false);
   assert.equal(isChangeableOrderStatus('En proceso'), false);
   assert.equal(isChangeableOrderStatus('Ingreso a revisión'), false);
   assert.equal(isChangeableOrderStatus('draft'), false);
@@ -65,7 +67,7 @@ test('Meta recibe parámetros planos y valores alternativos válidos', () => {
   assert.equal(v[5], 'Consulta la dirección con el taller');
 });
 
-test('la nueva orden sigue pendiente hasta que el taller la pase a Diagnosticando', () => {
+test('Nueva orden se conserva en el historial y no es un estado manual', () => {
   assert.equal(isChangeableOrderStatus('Nueva orden'), false);
   assert.equal(isChangeableOrderStatus('Diagnosticando'), true);
 });

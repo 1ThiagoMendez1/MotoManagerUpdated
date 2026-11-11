@@ -118,7 +118,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
                 organization_id: user.workshopId,
                 motorcycle_id: motorcycleId,
                 assigned_mechanic_id: technicianId,
-                status: 'received',
+                status: 'diagnosis',
                 reported_symptoms: issueDescription,
                 created_by: user.userId || null
             })
@@ -134,7 +134,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
         // Asignar mecánico a la orden creada por RPC
         const { error: updateError } = await supabase
             .from('work_orders')
-            .update({ assigned_mechanic_id: technicianId, status: 'received' })
+            .update({ assigned_mechanic_id: technicianId, status: 'diagnosis' })
             .eq('id', newOrderId)
             .eq('organization_id', user.workshopId);
             
@@ -225,12 +225,7 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
 
 export async function updateWorkOrderStatus(prevState: any, formData: FormData) {
     const user = await requireWorkshop();
-    const { createClient: createSupabaseClient } = await import('@/lib/supabase/managed-client');
-    const supabase = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+    const supabase = await createClient();
 
     const id = formData.get('id') as string;
     const uiStatus = formData.get('status');
@@ -251,12 +246,14 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
     // Obtener estado anterior antes de actualizar
     const { data: oldWo } = await supabase
         .from('work_orders')
-        .select('status')
+        .select('status, assigned_mechanic_id')
         .eq('id', id)
         .eq('organization_id', user.workshopId)
         .single();
+    if (user.role === 'mechanic' && oldWo?.assigned_mechanic_id !== user.userId) return { message: 'Esta orden no está asignada a tu usuario.' };
     const oldStatus = oldWo?.status;
     if (!oldStatus) return { message: 'La orden no existe en este taller.' };
+    if (['delivered', 'delivered_quote_rejected', 'cancelled'].includes(oldStatus)) return { message: 'La orden está cerrada. Crea otra orden para un nuevo servicio.' };
     if (oldStatus === status) {
         return { message: 'La orden ya tiene ese estado. No se enviará un mensaje repetido.' };
     }
@@ -465,91 +462,18 @@ export async function reassignWorkOrderTechnician(prevState: any, formData: Form
 export async function addDepositToWorkOrder(formData: FormData) {
     const user = await requireWorkshop();
     const supabase = await createClient();
-
-    const workOrderId = formData.get('workOrderId') as string;
-    const amount = parseFloat(formData.get('amount') as string);
-    const mode = formData.get('mode') as string || 'add';
-    const paymentMethod = formData.get('paymentMethod') as string || 'Efectivo';
-
-    if (!workOrderId || isNaN(amount) || amount < 0) {
-        throw new Error('Datos inválidos');
-    }
-
-    // Obtener las observaciones actuales para sumar el abono
-    const { data: woData } = await supabase
-        .from('work_orders')
-        .select('customer_observations, order_number, motorcycle_id')
-        .eq('id', workOrderId)
-        .eq('organization_id', user.workshopId)
-        .single();
-
-        // Query current abonos directly from sales
-    const { data: depositSales } = await supabase
-        .from('sales')
-        .select('total')
-        .eq('work_order_id', workOrderId)
-        .ilike('notes', 'Abono de orden%');
-        
-    let currentAbono = 0;
-    if (depositSales) {
-        currentAbono = depositSales.reduce((sum, s) => sum + Number(s.total || 0), 0);
-    }
-    
-    const amountToAdd = mode === 'set' ? (amount - currentAbono) : amount;
-    
-    // RESTORE THE CUSTOMER OBSERVATIONS UPDATE FOR COMPATIBILITY
-    const totalAbono = currentAbono + amountToAdd;
-    let currentObs = woData?.customer_observations || '';
-    currentObs = currentObs.replace(/Abono registrado:\s*(\d+(\.\d+)?)\s*/, '').trim();
-    
-    const newObs = totalAbono > 0 
-        ? `Abono registrado: ${totalAbono}${currentObs ? '\n' + currentObs : ''}` 
-        : currentObs;
-
-    await supabase
-        .from('work_orders')
-        .update({ customer_observations: newObs })
-        .eq('id', workOrderId)
-        .eq('organization_id', user.workshopId);
-
-    // Manage cash flow entry for the deposit
-    if (amountToAdd !== 0) {
-        // Map payment method
-        let dbPaymentMethod = 'cash';
-        if (paymentMethod === 'Tarjeta') dbPaymentMethod = 'credit_card';
-        if (paymentMethod === 'Nequi') dbPaymentMethod = 'nequi';
-        if (paymentMethod === 'DaviPlata') dbPaymentMethod = 'daviplata';
-        if (paymentMethod === 'Transferencia') dbPaymentMethod = 'transfer';
-        if (paymentMethod === 'Otros') dbPaymentMethod = 'other';
-        
-        // ALWAYS insert a new sale record for the amountToAdd (to maintain independent history)
-        if (amountToAdd !== 0) {
-
-            // Get motorcycle for plate mapping
-            const { data: motoData } = await supabase
-                .from('motorcycles')
-                .select('license_plate')
-                .eq('id', woData?.motorcycle_id)
-                .single();
-            const plate = motoData?.license_plate || 'S/N';
-            
-            // Create a new sale for the deposit
-            const { data: newSale } = await supabase.from('sales').insert({
-                organization_id: user.workshopId,
-                work_order_id: workOrderId,
-                sale_number: `AB-${woData?.order_number}-${Math.floor(Date.now() / 1000).toString().slice(-4)}`,
-                subtotal: amountToAdd,
-                total: amountToAdd,
-                payment_method: dbPaymentMethod,
-                status: 'paid',
-                notes: `Abono de orden #${woData?.order_number} - ${plate}`
-            }).select().single();
-            
-            
-        }
-    }
-
-    revalidatePath('/work-orders/' + workOrderId);
+    const methods: Record<string, string> = { Efectivo: 'cash', Tarjeta: 'credit_card', Nequi: 'nequi', DaviPlata: 'daviplata', Transferencia: 'transfer', Otros: 'other' };
+    const requestId = z.string().uuid().safeParse(formData.get('requestId'));
+    if (!requestId.success) throw new Error('Recarga el formulario e intenta de nuevo.');
+    const workOrderId = String(formData.get('workOrderId') || '');
+    const { error } = await supabase.rpc('record_work_order_advance', {
+        p_org: user.workshopId, p_work_order: workOrderId,
+        p_amount: Number(formData.get('amount')), p_mode: formData.get('mode') || 'add',
+        p_method: methods[String(formData.get('paymentMethod') || 'Efectivo')] || 'invalid', p_request_id: requestId.data,
+    });
+    if (error) throw new Error(error.message);
+    for (const path of [`/work-orders/${workOrderId}`, '/work-orders', '/sales', '/accounting']) revalidatePath(path);
+    revalidatePath('/', 'layout');
 }
 
 export async function updateWorkOrderSolution(formData: FormData) {
@@ -571,171 +495,29 @@ export async function updateWorkOrderSolution(formData: FormData) {
 }
 
 export async function addItemToWorkOrder(formData: FormData) {
-    try {
-        const user = await requireWorkshop();
-        const supabase = await createClient();
-
-        const workOrderId = formData.get('workOrderId') as string;
-        const itemId = formData.get('inventoryItemId') as string;
-        const quantity = parseInt(formData.get('quantity') as string, 10) || 1;
-
-        if (!workOrderId) {
-            return { success: false, error: 'ID de la orden de trabajo no proporcionado.' };
-        }
-
-        if (!itemId) {
-            return { success: false, error: 'Por favor, selecciona un artículo del inventario.' };
-        }
-
-        // Obtener estado de la orden para saber si descontamos de una vez
-        const { data: orderData } = await supabase
-            .from('work_orders')
-            .select('status')
-            .eq('id', workOrderId)
-            .single();
-        
-        const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
-
-        // Obtener detalles del item
-        const { data: inventoryItem } = await supabase
-            .from('inventory_items')
-            .select('*')
-            .eq('id', itemId)
-            .single();
-            
-        if (!inventoryItem) {
-            return { success: false, error: 'El repuesto seleccionado no existe o no fue encontrado.' };
-        }
-
-        // Buscar si ya existe una venta para esta orden
-        let { data: sale } = await supabase
-            .from('sales')
-            .select('id')
-            .eq('work_order_id', workOrderId)
-            .maybeSingle();
-
-        if (!sale) {
-            const { data: newSale, error: saleError } = await supabase
-                .from('sales')
-                .insert({
-                    organization_id: user.workshopId,
-                    work_order_id: workOrderId,
-                    status: 'pending',
-                    total: 0
-                })
-                .select()
-                .single();
-                
-            if (saleError || !newSale) {
-                return { success: false, error: 'Error al crear la venta asociada a la orden.' };
-            }
-            sale = newSale;
-        }
-
-        if (!sale) {
-            return { success: false, error: 'No se pudo obtener la venta asociada.' };
-        }
-
-        const { error: itemError } = await supabase
-            .from('sale_items')
-            .insert({
-                sale_id: sale.id,
-                item_type: 'inventory',
-                inventory_item_id: itemId,
-                description: inventoryItem.name,
-                quantity: quantity,
-                unit_price: inventoryItem.unit_price,
-                total: quantity * inventoryItem.unit_price
-            });
-
-        if (itemError) {
-            return { success: false, error: 'Error al agregar el repuesto a la orden.' };
-        }
-
-        // Descontar inventario inmediatamente si la cotización ya fue aprobada y tiene control de inventario
-        if (isApproved && inventoryItem.track_inventory !== false) {
-            const { error: decrementError } = await supabase.rpc('decrement_inventory', {
-                p_item_id: itemId,
-                p_amount: quantity,
-                p_sale_id: sale.id,
-                p_user_id: user.userId
-            });
-            if (decrementError) {
-                console.error('Error al descontar inventario en orden aprobada:', decrementError);
-                return { success: false, error: 'Stock insuficiente o error al descontar del inventario.' };
-            }
-        }
-
-        revalidatePath('/work-orders/' + workOrderId);
-        return { success: true };
-    } catch (e: any) {
-        console.error('Error in addItemToWorkOrder server action:', e);
-        return { success: false, error: e.message || 'Ocurrió un error inesperado al agregar el artículo.' };
-    }
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+    const workOrderId = String(formData.get('workOrderId') || '');
+    const { error } = await supabase.rpc('change_work_order_parts', {
+        p_org: user.workshopId, p_work_order: workOrderId, p_action: 'add',
+        p_item: formData.get('inventoryItemId'), p_quantity: Number(formData.get('quantity')),
+    });
+    if (error) return { success: false, error: error.message };
+    revalidatePath(`/work-orders/${workOrderId}`);
+    revalidatePath('/inventory');
+    return { success: true };
 }
 
 export async function removeItemFromWorkOrder(formData: FormData) {
     const user = await requireWorkshop();
     const supabase = await createClient();
-
-    const workOrderId = formData.get('workOrderId') as string;
-    const saleItemId = formData.get('saleItemId') as string;
-
-    if (!workOrderId || !saleItemId) return;
-
-    // Verificar si la orden estaba aprobada y necesitamos devolver stock
-    const { data: orderData } = await supabase
-        .from('work_orders')
-        .select('status')
-        .eq('id', workOrderId)
-        .single();
-        
-    const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
-
-    const { data: saleItem } = await supabase
-        .from('sale_items')
-        .select('*')
-        .eq('id', saleItemId)
-        .single();
-
-    if (isApproved && saleItem && saleItem.item_type === 'inventory' && saleItem.inventory_item_id) {
-        // Devolver el stock a vitrina (storefront)
-        const { data: vitrinaLoc } = await supabase
-            .from('inventory_locations')
-            .select('id')
-            .eq('organization_id', user.workshopId)
-            .eq('type', 'storefront')
-            .limit(1)
-            .maybeSingle();
-
-        if (vitrinaLoc) {
-            const { data: currentStock } = await supabase
-                .from('inventory_item_stock')
-                .select('quantity')
-                .eq('item_id', saleItem.inventory_item_id)
-                .eq('location_id', vitrinaLoc.id)
-                .maybeSingle();
-
-            if (currentStock) {
-                await supabase
-                    .from('inventory_item_stock')
-                    .update({ quantity: Number(currentStock.quantity) + Number(saleItem.quantity) })
-                    .eq('item_id', saleItem.inventory_item_id)
-                    .eq('location_id', vitrinaLoc.id);
-            }
-        }
-    }
-
-    const { error: deleteError } = await supabase
-        .from('sale_items')
-        .delete()
-        .eq('id', saleItemId);
-        
-    if (deleteError) {
-        console.error("Error deleting sale item:", deleteError);
-    }
-
-    revalidatePath('/work-orders/' + workOrderId);
+    const workOrderId = String(formData.get('workOrderId') || '');
+    const { error } = await supabase.rpc('change_work_order_parts', {
+        p_org: user.workshopId, p_work_order: workOrderId, p_action: 'remove', p_line: formData.get('saleItemId'),
+    });
+    if (error) throw new Error(error.message);
+    revalidatePath(`/work-orders/${workOrderId}`);
+    revalidatePath('/inventory');
 }
 
 export async function sendQuoteWhatsApp(
@@ -752,7 +534,7 @@ export async function sendQuoteWhatsApp(
 
     // Actualizar estado de la orden a 'esperando aprobación'
     const { error: updateError } = await supabase.from('work_orders').update({
-        status: 'waiting_approval',
+        status: 'diagnosis',
         quote_status: 'pending'
     }).eq('id', workOrderId).eq('organization_id', user.workshopId);
 
@@ -797,100 +579,10 @@ export async function updateQuoteStatus(prevState: any, formData: FormData) {
                           quoteStatus === 'Rechazada' ? 'rejected' : 
                           'pending';
 
-    // Manejo inteligente e innovador del inventario según aprobación/rechazo
-    const { data: woData } = await supabase.from('work_orders').select('status, customer_observations').eq('id', id).single();
-    if (!woData) {
-        return { message: 'Orden de trabajo no encontrada.' };
-    }
-
-    const wasApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status);
-
-    const { data: sale } = await supabase.from('sales').select('id').eq('work_order_id', id).maybeSingle();
-    let quoteItems: any[] = [];
-    if (sale) {
-        const { data: items } = await supabase.from('sale_items').select('*').eq('sale_id', sale.id);
-        quoteItems = items || [];
-    }
-
-    let newStatus = woData.status;
-
-    if (dbQuoteStatus === 'approved') {
-        if (!wasApproved) {
-            // Si recién se aprueba, descontamos el stock reservado
-            for (const item of quoteItems) {
-                if (item.item_type === 'inventory' && item.inventory_item_id) {
-                    const { data: invItem } = await supabase.from('inventory_items').select('track_inventory').eq('id', item.inventory_item_id).single();
-                    if (invItem && invItem.track_inventory !== false) {
-                        await supabase.rpc('decrement_inventory', { 
-                            p_item_id: item.inventory_item_id, 
-                            p_amount: item.quantity,
-                            p_sale_id: sale?.id,
-                            p_user_id: user.userId
-                        });
-                    }
-                }
-            }
-        }
-        if (!['completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status)) {
-            newStatus = 'diagnosis';
-        }
-    } else if (dbQuoteStatus === 'rejected') {
-        if (wasApproved) {
-            // Devolver el inventario si la orden estaba aprobada (por error y la rechazan después)
-            const { data: vitrinaLoc } = await supabase
-                .from('inventory_locations')
-                .select('id')
-                .eq('organization_id', user.workshopId)
-                .eq('type', 'storefront')
-                .limit(1)
-                .maybeSingle();
-
-            for (const item of quoteItems) {
-                if (item.item_type === 'inventory' && item.inventory_item_id && vitrinaLoc) {
-                    const { data: currentStock } = await supabase
-                        .from('inventory_item_stock')
-                        .select('quantity')
-                        .eq('item_id', item.inventory_item_id)
-                        .eq('location_id', vitrinaLoc.id)
-                        .maybeSingle();
-                        
-                    if (currentStock) {
-                        await supabase
-                            .from('inventory_item_stock')
-                            .update({ quantity: Number(currentStock.quantity) + Number(item.quantity) })
-                            .eq('item_id', item.inventory_item_id)
-                            .eq('location_id', vitrinaLoc.id);
-                    }
-                }
-            }
-        }
-        if (!['completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status)) {
-            newStatus = 'diagnosis';
-        }
-
-        if (sale && quoteItems.length > 0) {
-            // Dejar historial
-            const rejectMsg = `\n[Cotización Rechazada]`;
-            const newObs = (woData.customer_observations || '') + rejectMsg;
-            await supabase.from('work_orders').update({ customer_observations: newObs }).eq('id', id);
-        }
-    } else {
-        if (!['completed', 'delivered', 'delivered_quote_rejected'].includes(woData.status)) {
-            newStatus = 'waiting_approval';
-        }
-    }
-
-    const { error } = await supabase
-        .from('work_orders')
-        .update({ 
-            status: newStatus,
-            quote_status: dbQuoteStatus,
-            quote_responded_at: dbQuoteStatus !== 'pending' ? new Date().toISOString() : null
-        })
-        .eq('id', id)
-        .eq('organization_id', user.workshopId);
-
-    if (error) return { message: 'Error al actualizar cotización: ' + error.message };
+    const { error } = await supabase.rpc('change_work_order_parts', {
+        p_org: user.workshopId, p_work_order: id, p_action: 'quote', p_quote: dbQuoteStatus,
+    });
+    if (error) return { message: error.message };
 
     // Notificación en vivo para el taller
     await createNotification({
@@ -1015,97 +707,15 @@ export async function requestPartForWorkOrder(formData: FormData) {
 }
 
 export async function fulfillPartRequest(requestId: string, workOrderId: string) {
-    try {
-        const user = await requireWorkshop();
-        const supabase = await createClient();
-
-        // 1. Get request details
-        const { data: request, error: reqError } = await supabase
-            .from('part_requests')
-            .select('*, inventory_items(*)')
-            .eq('id', requestId)
-            .eq('organization_id', user.workshopId)
-            .single();
-
-        if (reqError || !request) return { success: false, error: 'Solicitud no encontrada.' };
-        if (request.status !== 'pending') return { success: false, error: 'La solicitud ya fue procesada.' };
-
-        // 2. Add to sale_items
-        let { data: sale } = await supabase
-            .from('sales')
-            .select('id')
-            .eq('work_order_id', workOrderId)
-            .maybeSingle();
-
-        if (!sale) {
-            const { data: newSale, error: saleError } = await supabase
-                .from('sales')
-                .insert({
-                    organization_id: user.workshopId,
-                    work_order_id: workOrderId,
-                    status: 'pending',
-                    total: 0
-                })
-                .select()
-                .single();
-            if (saleError || !newSale) return { success: false, error: 'Error al crear venta.' };
-            sale = newSale;
-        }
-
-        const invItem = request.inventory_items;
-
-        const { error: itemError } = await supabase
-            .from('sale_items')
-            .insert({
-                sale_id: sale!.id,
-                item_type: 'inventory',
-                inventory_item_id: request.inventory_item_id,
-                description: invItem.name,
-                quantity: request.quantity,
-                unit_price: invItem.unit_price,
-                total: request.quantity * invItem.unit_price
-            });
-
-        if (itemError) return { success: false, error: 'Error al agregar a la factura.' };
-
-        // 3. Deduct inventory if order is approved or beyond
-        const { data: orderData } = await supabase
-            .from('work_orders')
-            .select('status')
-            .eq('id', workOrderId)
-            .single();
-            
-        const isApproved = ['approved', 'in_progress', 'waiting_parts', 'quality_check', 'completed', 'delivered', 'delivered_quote_rejected'].includes(orderData?.status);
-
-        if (isApproved && invItem && invItem.track_inventory !== false) {
-            const { error: decrementError } = await supabase.rpc('decrement_inventory', {
-                p_item_id: request.inventory_item_id,
-                p_amount: request.quantity,
-                p_sale_id: sale?.id,
-                p_user_id: user.userId
-            });
-            if (decrementError) {
-                console.error('Error al descontar inventario en orden aprobada:', decrementError);
-                return { success: false, error: 'Stock insuficiente o error al descontar del inventario.' };
-            }
-        }
-
-        // 4. Mark request as fulfilled
-        await supabase
-            .from('part_requests')
-            .update({
-                status: 'fulfilled',
-                fulfilled_by: user.userId,
-                fulfilled_at: new Date().toISOString()
-            })
-            .eq('id', requestId);
-
-        revalidatePath('/work-orders/' + workOrderId);
-        return { success: true };
-    } catch (e: any) {
-        console.error('Error in fulfillPartRequest:', e);
-        return { success: false, error: e.message };
-    }
+    const user = await requireWorkshop();
+    const supabase = await createClient();
+    const { error } = await supabase.rpc('change_work_order_parts', {
+        p_org: user.workshopId, p_work_order: workOrderId, p_action: 'fulfill', p_request: requestId,
+    });
+    if (error) return { success: false, error: error.message };
+    revalidatePath(`/work-orders/${workOrderId}`);
+    revalidatePath('/inventory');
+    return { success: true };
 }
 
 export async function rejectPartRequest(requestId: string, workOrderId: string) {

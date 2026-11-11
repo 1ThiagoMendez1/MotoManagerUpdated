@@ -1,3 +1,4 @@
+import { isOrderDeposit, isIssuedServiceSale, serviceInvoiceTotal } from '@/lib/work-order-finance';
 import { createClient } from '@/lib/supabase/server';
 import { workshopCache } from '@/lib/cache/redis';
 import { requireWorkshop } from '@/lib/auth-server';
@@ -251,7 +252,6 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
 
 
   const items: WorkOrder[] = data.map((wo: any) => {
-    const hasCompletedSale = wo.sales && wo.sales.some((s: any) => s.status === 'paid');
     
     const pendingPartRequestsCount = wo.part_requests ? wo.part_requests.filter((pr: any) => pr.status === 'pending').length : 0;
 
@@ -279,7 +279,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
-            wo.status === 'received' ? 'Nueva orden' :
+            wo.status === 'received' ? 'Diagnosticando' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
             'Diagnosticando',
@@ -287,16 +287,7 @@ export const getWorkOrders = async (params: { query?: string, page?: number, sta
     quote_status: wo.quote_status,
     customerObservations: wo.customer_observations || '',
     pendingPartRequestsCount,
-    depositAmount: (() => {
-      let parsed = 0;
-      if (wo.customer_observations) {
-          const match = wo.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
-          if (match) {
-              parsed = parseFloat(match[1]);
-          }
-      }
-      return parsed;
-    })()
+    depositAmount: Number(wo.deposit_amount || 0)
     };
   });
 
@@ -330,12 +321,11 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
   if (!wo) return null;
 
 
-  let parsedDeposit = 0;
+  let parsedDeposit = Number(wo.deposit_amount || 0);
   let depositHistory: any[] = [];
   if (wo.sales && wo.sales.length > 0) {
       wo.sales.forEach((sale: any) => {
-          if (sale.notes && sale.notes.includes('Abono de orden')) {
-              parsedDeposit += Number(sale.total);
+          if (isOrderDeposit(sale) && sale.status === 'paid') {
               depositHistory.push({
                   id: sale.id,
                   amount: sale.total,
@@ -379,7 +369,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     createdDate: wo.created_at,
     status: wo.status === 'delivered' ? 'Entregado' : 
             wo.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
-            wo.status === 'received' ? 'Nueva orden' :
+            wo.status === 'received' ? 'Diagnosticando' :
             wo.status === 'diagnosis' ? 'Diagnosticando' :
             wo.status === 'completed' ? 'Reparado' :
             'Diagnosticando',
@@ -393,9 +383,10 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         description: e.description,
         createdAt: e.created_at
     })) : [],
-    sales: wo.sales ? wo.sales.map((s: any) => ({
+    invoiceTotal: (() => { const invoice = wo.sales?.find((s: any) => isIssuedServiceSale(s)); return invoice ? serviceInvoiceTotal(invoice, parsedDeposit) : undefined; })(),
+    sales: wo.sales ? wo.sales.filter((s: any) => s.status !== 'cancelled').map((s: any) => ({
         id: s.id,
-        saleItems: s.sale_items ? s.sale_items.map((si: any) => ({
+        saleItems: s.sale_items ? s.sale_items.filter((si: any) => si.item_type === 'inventory').map((si: any) => ({
             id: si.id,
             quantity: si.quantity,
             price: si.unit_price,
@@ -434,7 +425,9 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
   let query = supabase.from('sales')
     .select('*, customers(*), sale_items(*, inventory_items(*)), work_orders(*, assigned_mechanic:profiles!work_orders_assigned_mechanic_id_fkey(id, first_name, last_name, phone, avatar_path), motorcycles(*, customers(*)))', { count: 'exact' })
     .eq('organization_id', user.workshopId)
-    .not('sale_number', 'is', null);
+    .not('sale_number', 'is', null)
+    .eq('is_deposit', false)
+    .in('status', ['paid', 'pending']);
     
   if (params.dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(params.dateFrom)) query = query.gte('created_at', `${params.dateFrom}T00:00:00-05:00`);
   if (params.dateTo && /^\d{4}-\d{2}-\d{2}$/.test(params.dateTo)) {
@@ -464,16 +457,15 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
 
   const items: Sale[] = data.map((s: any) => {
     // Buscar mano de obra entre los sale_items
-    const laborItem = s.sale_items?.find((si: any) => si.item_type === 'service');
-    const laborCost = laborItem ? Number(laborItem.unit_price) : 0;
+    const laborCost = (s.sale_items || []).filter((si: any) => si.item_type === 'service').reduce((sum: number, si: any) => sum + Number(si.total), 0);
 
     const woRaw = s.work_orders;
     const woData = Array.isArray(woRaw) ? woRaw[0] : woRaw;
 
     // Parse deposit amount from work order's deposit_amount, customer_observations o de la venta
-    let depositAmount = Number(woData?.deposit_amount) || Number(s.deposit_amount) || 0;
+    let depositAmount = s.invoice_total != null ? Number(s.deposit_amount || 0) : Number(woData?.deposit_amount || 0);
     
-    if (depositAmount === 0 && woData?.customer_observations) {
+    if (s.invoice_total == null && depositAmount === 0 && woData?.customer_observations) {
       const match = woData.customer_observations.match(/Abono registrado:\s*(\d+(\.\d+)?)/);
       if (match) {
         depositAmount = parseFloat(match[1]);
@@ -494,7 +486,7 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
         solutionDescription: woData.technical_diagnosis,
         status: woData.status === 'delivered' ? 'Entregado' : 
                 woData.status === 'delivered_quote_rejected' ? 'Moto entregada por cotización rechazada' :
-                woData.status === 'received' ? 'Nueva orden' :
+                woData.status === 'received' ? 'Diagnosticando' :
                 woData.status === 'diagnosis' ? 'Diagnosticando' :
                 woData.status === 'completed' ? 'Reparado' :
                 'Diagnosticando',
@@ -547,7 +539,8 @@ export const getSales = async (params: { type?: string, limit?: number, query?: 
         : (workOrder?.motorcycle?.customer?.name || 'Cliente de Mostrador'),
       workshopName,
       date: s.created_at,
-      total: Number(s.total) || 0,
+      total: serviceInvoiceTotal(s, depositAmount),
+      remainingBalance: Number(s.total || 0),
       subtotal,
       status: s.status,
       discountPercentage,

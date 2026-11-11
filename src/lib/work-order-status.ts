@@ -2,8 +2,6 @@
 export const WORK_ORDER_STATUS_OPTIONS = [
   'Diagnosticando',
   'Reparado',
-  'Entregado',
-  'Moto entregada por cotización rechazada',
 ] as const;
 export type ChangeableWorkOrderStatus = typeof WORK_ORDER_STATUS_OPTIONS[number];
 export function isChangeableOrderStatus(value: unknown): value is ChangeableWorkOrderStatus {

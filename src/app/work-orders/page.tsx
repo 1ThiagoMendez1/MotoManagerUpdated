@@ -235,7 +235,7 @@ export default async function WorkOrdersPage({
                             </div>
                           </TableCell>
                           <TableCell className="text-right pr-4">
-                            <div className="flex items-center justify-end gap-1.5">
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
                               <Link href={`/work-orders/${order.id}`}>
                                 <Button 
                                   size="sm" 

@@ -107,7 +107,7 @@ export function UpdateWorkOrderStatus({ workOrder }: UpdateWorkOrderStatusProps)
         <DialogHeader>
           <DialogTitle className="text-foreground">Actualizar Estado de Orden</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Cambia el estado de la orden de trabajo para {workOrder.motorcycle.make} {workOrder.motorcycle.model}.
+            Cambia la etapa de reparación de {workOrder.motorcycle.make} {workOrder.motorcycle.model}. La entrega se registra al cerrar la venta por servicio.
           </DialogDescription>
         </DialogHeader>
         <form action={handleSubmit} className="space-y-4">

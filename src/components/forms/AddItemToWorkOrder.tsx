@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { addItemToWorkOrder, requestPartForWorkOrder } from '@/lib/actions/work-orders';
 import { useState } from 'react';
+import { inventorySearchMatch } from '@/lib/work-order-finance';
 import { useToast } from '@/hooks/use-toast';
 import {
   Select,
@@ -29,12 +30,14 @@ export function AddItemToWorkOrder({ workOrderId, inventory, userRole = 'mechani
   const isMechanic = userRole === 'mechanic' || userRole === 'technician';
 
   // Filter inventory based on search term
-  const filteredInventory = searchTerm
-    ? inventory.filter(item =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    : inventory;
+  const filteredInventory = inventorySearchMatch(inventory, searchTerm).matches;
+
+  function searchInventory(value: string) {
+    setSearchTerm(value);
+    const result = inventorySearchMatch(inventory, value);
+    setSelectedItem(result.selectedId);
+    if (result.selectedId) setQuantity(current => current || 1);
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,7 +106,15 @@ export function AddItemToWorkOrder({ workOrderId, inventory, userRole = 'mechani
           type="text"
           placeholder="Buscar por nombre o SKU..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => searchInventory(e.target.value)}
+          disabled={isPending}
+          aria-label="Buscar repuesto por nombre o SKU"
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              event.currentTarget.form?.querySelector<HTMLInputElement>('input[name="quantity"]')?.focus();
+            }
+          }}
           className="bg-card/50 text-foreground border border-border/50 rounded-md p-2 w-full sm:w-64"
         />
         <Select

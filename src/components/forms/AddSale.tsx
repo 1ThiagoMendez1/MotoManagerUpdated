@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -75,10 +75,12 @@ type AddSaleProps = {
 
 export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const requestId = useRef<string>('');
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<any>(null);
   const [plateSearch, setPlateSearch] = useState('');
   const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const itemsLoad = useRef(0);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -110,6 +112,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   // Cargar automáticamente los ítems ya usados en la orden de trabajo seleccionada
   useEffect(() => {
     async function loadWorkOrderItems(workOrderId: string) {
+      const loadId = ++itemsLoad.current;
       setIsLoadingItems(true);
       try {
         const res = await fetch(`/api/work-orders/${workOrderId}/items`);
@@ -119,6 +122,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
           return;
         }
         const data = await res.json();
+        if (loadId !== itemsLoad.current) return;
         if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
           form.setValue('items', [], { shouldValidate: true });
           return;
@@ -149,10 +153,12 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
       } catch (error) {
         console.error('Unexpected error loading work order items for service sale:', error);
       } finally {
-        setIsLoadingItems(false);
+        if (loadId === itemsLoad.current) setIsLoadingItems(false);
       }
     }
 
+    requestId.current = '';
+    form.setValue('laborCost', 0);
     if (watchWorkOrderId) {
       loadWorkOrderItems(watchWorkOrderId);
       
@@ -166,6 +172,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
       form.setValue('items', [], { shouldValidate: true });
       form.setValue('depositAmount', undefined as any);
     }
+    return () => { itemsLoad.current += 1; };
   }, [watchWorkOrderId, form, workOrders]);
 
   const itemsTotal = watchItems?.filter(i => i.type !== 'service').reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
@@ -226,9 +233,10 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log('Submitting service sale with items:', values.items);
 
     const formData = new FormData();
+    requestId.current ||= crypto.randomUUID();
+    formData.append('requestId', requestId.current);
     formData.append('workOrderId', values.workOrderId);
     formData.append('laborCost', values.laborCost.toString());
     formData.append('paymentMethod', values.paymentMethod);
@@ -246,6 +254,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
       });
       setIsOpen(false);
       form.reset();
+      requestId.current = '';
       setPlateSearch('');
       router.refresh();
 
@@ -344,7 +353,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                             <CurrencyInput
                               placeholder="Ej: 120000"
                               value={field.value ?? ''}
-                              onChange={(val: any) => field.onChange(val === '' ? undefined : val)}
+                              onValueChange={field.onChange}
                               className="bg-background border-input focus:ring-primary/20 transition-all"
                             />
                           </FormControl>
@@ -357,12 +366,13 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                       name="depositAmount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Abono Recibido (COP)</FormLabel>
+                          <FormLabel>Abono registrado en la orden (COP)</FormLabel>
                           <FormControl>
                             <CurrencyInput
-                              placeholder="Ej: 50000"
+                              readOnly
+                              placeholder="Sin abonos"
                               value={field.value ?? ''}
-                              onChange={(val: any) => field.onChange(val === '' ? undefined : val)}
+                              onValueChange={field.onChange}
                               className="bg-background border-input focus:ring-primary/20 transition-all"
                             />
                           </FormControl>

@@ -120,7 +120,7 @@ export default async function RootLayout({
             }
             footer={
               <footer className="bg-card/20 backdrop-blur-sm border-t border-border/40 py-2.5 px-4 md:px-6 text-center mt-auto">
-                <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-muted-foreground">
+                <div className="max-w-none mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-muted-foreground">
                   <p>© {new Date().getFullYear()} MotoManager — Sistema de Gestión Integral</p>
                   <p className="text-[11px] text-muted-foreground/70">Potenciando talleres de motocicletas</p>
                 </div>

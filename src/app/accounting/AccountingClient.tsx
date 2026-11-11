@@ -1,4 +1,5 @@
 'use client';
+import { isOrderDeposit } from '@/lib/work-order-finance';
 import type { InventoryItem } from "@/lib/types";
 import { AddPurchase } from "@/components/forms/AddPurchase";
 
@@ -156,16 +157,16 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       const amount = Number(sale.total) || 0;
       aggregated[key].ingresos += amount;
       aggregated[key].utilidad += amount;
-      aggregated[key].ventas += 1;
+      if (!isOrderDeposit(sale)) aggregated[key].ventas += 1;
       
       totalIngresos += amount;
-      totalVentas += 1;
+      if (!isOrderDeposit(sale)) totalVentas += 1;
 
       const rawMethod = sale.payment_method || 'cash';
       const methodStr = uiMethods[rawMethod] || rawMethod;
       methodsMap[methodStr] = (methodsMap[methodStr] || 0) + amount;
 
-      sale.sale_items?.forEach((item: any) => {
+      if (!isOrderDeposit(sale)) sale.sale_items?.forEach((item: any) => {
         let cat = 'Otros';
         if (item.item_type === 'inventory' && item.inventory_items?.category) cat = item.inventory_items.category;
         else if (item.item_type === 'service' && item.service_catalog?.category) cat = item.service_catalog.category;
@@ -197,7 +198,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
     };
 
     realtimeData.expenses.forEach(exp => addExpense(exp.date, Number(exp.amount) || 0, exp.payment_method || 'Efectivo'));
-    realtimeData.payroll.forEach(pay => addExpense(pay.created_at, Number(pay.total_paid) || 0, 'Efectivo'));
+    realtimeData.payroll.forEach(pay => addExpense(pay.created_at, Number(pay.total_paid) || 0, pay.payment_method || 'cash'));
 
     let chartData = [];
     if (periodFilter === 'day') {

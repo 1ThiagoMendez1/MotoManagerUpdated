@@ -16,6 +16,9 @@ export async function GET(
     const resolvedParams = await Promise.resolve(params);
     const workOrderId = resolvedParams.id;
     
+    const { data: order } = await supabase.from('work_orders').select('id,assigned_mechanic_id').eq('id',workOrderId).eq('organization_id',user.workshopId).maybeSingle();
+    if (!order || (user.role === 'mechanic' && order.assigned_mechanic_id !== user.userId)) return NextResponse.json({error:'Orden no encontrada'}, {status:404});
+
     // 1. Obtener TODAS las ventas pendientes asociadas a esta orden de trabajo
     const { data: sales, error: salesError } = await supabase
       .from('sales')
@@ -23,24 +26,15 @@ export async function GET(
       .eq('work_order_id', workOrderId)
       .eq('organization_id', user.workshopId);
       
-    if (salesError || !sales || sales.length === 0) {
-      return NextResponse.json({ items: [] });
-    }
-    
-    const saleIds = sales.map(s => s.id);
-    
-    // 2. Obtener los items (sale_items)
-    const { data: saleItems, error: itemsError } = await supabase
-      .from('sale_items')
-      .select('*, inventory_items(name, code)')
-      .in('sale_id', saleIds);
-      
-    if (itemsError || !saleItems) {
-      return NextResponse.json({ items: [] });
-    }
-    
+    if (salesError) throw salesError;
+    const saleIds = (sales || []).map(s => s.id);
+    const { data: saleItems, error: itemsError } = saleIds.length ? await supabase
+      .from('sale_items').select('*, inventory_items(name, code)').in('sale_id', saleIds)
+      : { data: [], error: null };
+    if (itemsError) throw itemsError;
+
     // 3. Mapear al formato esperado por el frontend
-    const mappedItems = saleItems
+    const mappedItems = (saleItems || [])
       .filter((item: any) => item.item_type === 'inventory' && item.inventory_item_id)
       .map((item: any) => ({
         inventoryItemId: item.inventory_item_id,

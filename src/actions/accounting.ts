@@ -44,7 +44,7 @@ export async function getSalesByCategory(organizationId: string, startDate?: str
       )
     `)
     .eq('sales.organization_id', organizationId)
-    .eq('sales.status', 'paid');
+    .eq('sales.status', 'paid').eq('sales.is_deposit', false);
 
   if (startDate) {
     query = query.gte('sales.created_at', startDate);
@@ -146,113 +146,25 @@ export interface TechnicianWorkSummary {
   created_at: string;
 }
 
-export async function getTechnicianWork(
-  organizationId: string, 
-  technicianId: string, 
-  startDate?: string, 
-  endDate?: string
-): Promise<TechnicianWorkSummary[]> {
+export async function getTechnicianWork(organizationId: string, technicianId: string, startDate: string, endDate: string): Promise<TechnicianWorkSummary[]> {
   await assertAccountingScope(organizationId);
   const supabase = await createClient();
-
-  // The technician is assigned to the work_order.
-  // Their completed work translates to sale_items of type 'service' on the paid sale.
-  let query = supabase
-    .from('sale_items')
-    .select(`
-      id,
-      description,
-      total,
-      sales!inner (
-        created_at,
-        status,
-        work_orders!inner (
-          id,
-          assigned_mechanic_id,
-          organization_id
-        )
-      )
-    `)
-    .eq('item_type', 'service')
-    .eq('sales.status', 'paid')
-    .eq('sales.work_orders.assigned_mechanic_id', technicianId)
-    .eq('sales.work_orders.organization_id', organizationId);
-
-  if (startDate) {
-    query = query.gte('sales.created_at', startDate);
-  }
-  if (endDate) {
-    query = query.lte('sales.created_at', endDate);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching technician work:', error);
-    return [];
-  }
-
-  return (data || []).map((item: any) => {
-    // Extract data from the nested relations
-    let saleDate = item.sales?.created_at || new Date().toISOString();
-    let workOrderId = item.sales?.work_orders?.id || '';
-
-    // Handle array case if inner join returns array in Supabase JS client
-    if (Array.isArray(item.sales)) {
-      if (item.sales.length > 0) {
-        saleDate = item.sales[0].created_at;
-        workOrderId = item.sales[0].work_orders?.id || (Array.isArray(item.sales[0].work_orders) ? item.sales[0].work_orders[0]?.id : '');
-      }
-    } else if (item.sales && Array.isArray(item.sales.work_orders)) {
-      workOrderId = item.sales.work_orders[0]?.id || '';
-    }
-
-    return {
-      id: item.id,
-      work_order_id: workOrderId,
-      service_name: item.description || 'Servicio',
-      total: Number(item.total),
-      created_at: saleDate
-    };
+  const { data, error } = await supabase.rpc('pending_technician_services', {
+    p_org: organizationId, p_technician: technicianId, p_start: startDate, p_end: endDate,
   });
+  if (error) throw new Error(error.message);
+  return (data || []).map((item: any) => ({ ...item, total: Number(item.total) }));
 }
 
-export async function registerPayrollPayment(
-  organizationId: string,
-  technicianId: string,
-  periodStart: string,
-  periodEnd: string,
-  totalServicesAmount: number,
-  commissionPercentage: number,
-  totalPaid: number
-) {
+export async function registerPayrollPayment(organizationId: string, technicianId: string, periodStart: string, periodEnd: string,
+  commissionPercentage: number, paymentMethod: string, serviceIds: string[], requestId: string) {
   await assertAccountingScope(organizationId);
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
-
-  const { data, error } = await supabaseAdmin
-    .from('payroll_payments')
-    .insert({
-      organization_id: organizationId,
-      technician_id: technicianId,
-      period_start: periodStart,
-      period_end: periodEnd,
-      total_services_amount: totalServicesAmount,
-      commission_percentage: commissionPercentage,
-      total_paid: totalPaid,
-      status: 'paid'
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error registering payroll payment:', error);
-    throw new Error('No se pudo registrar el pago de nómina.');
-  }
-
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('settle_technician_services', {
+    p_org: organizationId, p_technician: technicianId, p_start: periodStart, p_end: periodEnd,
+    p_percentage: commissionPercentage, p_method: paymentMethod, p_service_ids: serviceIds, p_request_id: requestId,
+  });
+  if (error) throw new Error(error.message);
   revalidatePath('/accounting');
   return data;
 }
@@ -267,6 +179,8 @@ export interface PayrollPaymentSummary {
   commission_percentage: number;
   total_paid: number;
   created_at: string;
+  payment_method: string;
+  status: string;
 }
 
 export async function getPayrollHistory(organizationId: string): Promise<PayrollPaymentSummary[]> {
@@ -305,7 +219,8 @@ export async function getPayrollHistory(organizationId: string): Promise<Payroll
       total_services_amount: Number(p.total_services_amount),
       commission_percentage: Number(p.commission_percentage),
       total_paid: Number(p.total_paid),
-      created_at: p.created_at
+      created_at: p.created_at,
+      payment_method: p.payment_method, status: p.status
     };
   });
 }
@@ -472,7 +387,7 @@ export async function getDailyClosingSummary(
     getOrganizationTechnicians(organizationId),
     supabaseAdmin
       .from('payroll_payments')
-      .select('id, total_paid, created_at, profiles(first_name, last_name)')
+      .select('id, total_paid, created_at, payment_method, profiles(first_name, last_name)')
       .eq('organization_id', organizationId)
       .gte('created_at', startIso)
       .lte('created_at', endIso)
@@ -516,7 +431,7 @@ export async function getDailyClosingSummary(
         category: cat,
         description: `Pago de comisiones a ${techName}`,
         amount: amount,
-        payment_method: 'Efectivo'
+        payment_method: payment.payment_method || 'cash'
       });
     });
   }
@@ -741,7 +656,7 @@ export async function getRealtimeFinancialDataRaw(
   // 1. Fetch sales
   const { data: sales, error: salesError } = await supabaseAdmin
     .from('sales')
-    .select('id, total, status, created_at, payment_method, notes, sale_number, sale_items(item_type, total, inventory_items(category), service_catalog(category))')
+    .select('id, total, status, created_at, payment_method, notes, sale_number, is_deposit, sale_items(item_type, total, inventory_items(category), service_catalog(category))')
     .eq('organization_id', organizationId)
     .in('status', ['paid', 'completed'])
     .gte('created_at', startIso)
@@ -766,7 +681,7 @@ export async function getRealtimeFinancialDataRaw(
   // 3. Fetch payroll
   const { data: payroll, error: payrollError } = await supabaseAdmin
     .from('payroll_payments')
-    .select('id, total_paid, created_at')
+    .select('id, total_paid, created_at, payment_method')
     .eq('organization_id', organizationId)
     .eq('status', 'paid')
     .gte('created_at', startIso)

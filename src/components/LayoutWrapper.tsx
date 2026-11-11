@@ -16,7 +16,6 @@ interface LayoutWrapperProps {
 export function LayoutWrapper({ children, header, sidebar, footer, workshopSlug }: LayoutWrapperProps) {
   const pathname = usePathname();
   const isMainPage = checkIsMainPage(pathname, workshopSlug);
-  const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
   const [open, setOpen] = useState(false);
 
   // Cada vez que estamos en la página principal, aseguramos que el estado quede colapsado
@@ -56,7 +55,7 @@ export function LayoutWrapper({ children, header, sidebar, footer, workshopSlug 
       <SidebarInset className="flex min-w-0 flex-col w-full bg-background">
         {header}
         
-        <main className={`relative min-w-0 flex-1 p-3 sm:p-5 md:p-6 flex flex-col w-full mx-auto ${isAdminRoute ? 'max-w-none' : 'max-w-7xl'}`}>
+        <main className="relative min-w-0 max-w-none flex-1 p-3 sm:p-5 md:p-6 flex flex-col w-full">
           <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/5 via-background to-background dark:from-blue-900/10 dark:via-background dark:to-background pointer-events-none" />
           <div className="min-w-0 flex-1 flex flex-col w-full">
             {children}
