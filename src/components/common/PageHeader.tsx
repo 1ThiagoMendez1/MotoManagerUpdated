@@ -21,7 +21,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn('flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-border/40', className)}>
+    <div data-page-heading className={cn('flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-border/40', className)}>
       <div className="flex items-start gap-3 min-w-0">
         {Icon && (
           <div className={cn('p-2 rounded-xl shrink-0 mt-0.5 shadow-sm', iconBg)}>

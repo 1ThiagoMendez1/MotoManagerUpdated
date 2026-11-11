@@ -10,7 +10,7 @@ test('la landing no muestra escasez o compras ficticias', () => {
   assert.doesNotMatch(page, /<UrgencyBar\b|<SalesNotification\b|<DashboardPreview\b/);
   assert.match(page, /<LandingFeatures\b/);
   assert.match(page, /<LandingPricing\b/);
-  assert.match(page, /<LandingInteractiveDemo\b/);
+  assert.match(page, /<LandingDemoSection\b/);
 });
 
 test('el hero y el footer no anuncian valoraciones, estadísticas o teléfonos inventados', () => {

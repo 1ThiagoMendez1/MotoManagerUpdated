@@ -23,13 +23,14 @@ export function publicAnalyticsPath(value: string): string | null {
 
 export const SECTION_LABELS: Record<string, string> = {
   hero: 'Portada', demo: 'Demo interactiva', why: 'Beneficios', funciones: 'Funcionalidades',
-  'como-funciona': 'Cómo funciona', 'prueba-gratis': 'Oferta Full', planes: 'Planes',
+  'como-funciona': 'Cómo funciona', 'como-empezar': 'Primeros pasos', 'prueba-gratis': 'Oferta Full', planes: 'Planes',
   workshops: 'Talleres', faq: 'Preguntas frecuentes', closing: 'Cierre comercial', page: 'Página',
 };
 export const TARGET_LABELS: Record<string, string> = {
   hero_trial: 'Portada · Activar prueba', hero_demo: 'Portada · Ver demo', hero_pricing: 'Portada · Ver planes',
   nav_trial: 'Navegación · Activar prueba', ribbon_trial: 'Franja · Activar prueba',
   offer_trial: 'Oferta Full · Activar prueba', closing_trial: 'Cierre · Activar prueba',
+  demo_open: 'Demo · Abrir demostración', demo_trial: 'Demo · Crear mi taller gratis',
   plan_basic: 'Elegir Básico', plan_pro: 'Elegir Pro', plan_full: 'Elegir Full',
   link: 'Enlace', button: 'Botón', area: 'Zona de la página',
 };
@@ -63,7 +64,7 @@ export function trafficAttribution(url: string, referrer: string): Attribution {
 }
 
 export type AnalyticsLayout = {path:string;version:typeof ANALYTICS_LAYOUT_VERSION;variant:string;viewportWidth:number;viewportHeight:number;width:number;height:number;sections:{key:string;start:number;end:number}[]};
-export type AnalyticsEvent = {id:string;pageId:string;layout:number;kind:'pageview'|'click'|'scroll'|'engagement'|'form_start';ageMs:number;x?:number;y?:number;target?:string;depth?:number;seconds?:number};
+export type AnalyticsEvent = {id:string;pageId:string;layout:number;kind:'pageview'|'click'|'scroll'|'engagement'|'form_start'|'form_step'|'form_submit'|'form_error';ageMs:number;x?:number;y?:number;target?:string;depth?:number;seconds?:number};
 export type AnalyticsBatch = {mode:typeof ANALYTICS_MODE;batchId:string;visitorSeed:string;attribution:Attribution;layouts:AnalyticsLayout[];events:AnalyticsEvent[]};
 
 export function deviceFromAgent(agent: string) {
@@ -114,6 +115,14 @@ export type AnalyticsReport = {
   accesses: { userId:string; at:string; kind:string; name:string|null; email:string|null; workshop:string|null; device:string; browser:string; country:string|null; city:string|null }[];
   funnel: {visits:number; registration:number; formStarted:number; activated:number};
   coverage: { firstEvent:string|null; located:number; total:number; retentionDays:number };
+  signup?: TrialSignupDiagnostics;
+};
+export type TrialSignupDiagnostics = {
+  available: boolean; firstMeasuredAt: string | null;
+  visits: number; started: number; accessStep: number; submitted: number; submitAttempts: number;
+  confirmedTrials: number;
+  clientErrors: { code:string; attempts:number; visits:number }[];
+  serverErrors: { code:string; attempts:number }[];
 };
 export type HeatmapLayout = { id:string; path:string; variant:string; device:string; viewportWidth:number; viewportHeight:number; width:number; height:number; sections:AnalyticsLayout['sections']; clicks:number; visitors:number };
 export type HeatmapData = { layout:HeatmapLayout|null; layouts:HeatmapLayout[]; points:{x:number;y:number;target:string}[]; targets:{target:string;clicks:number}[]; scroll:{depth:number;visitors:number}[]; totalClicks:number; sampled:boolean };

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE, CHANNELS, publicAnalyticsPath } from './web-shared';
+import { validTrialDiagnostic } from './trial-events';
 
 export const layoutSchema = z.object({
   path: z.string().max(120).refine(path => publicAnalyticsPath(path) === path, 'Página no medible'),
@@ -16,7 +17,7 @@ export const layoutSchema = z.object({
 
 export const eventSchema = z.object({
   id: z.string().uuid(), pageId: z.string().uuid(), layout: z.number().int().min(0).max(7),
-  kind: z.enum(['pageview', 'click', 'scroll', 'engagement', 'form_start']),
+  kind: z.enum(['pageview', 'click', 'scroll', 'engagement', 'form_start', 'form_step', 'form_submit', 'form_error']),
   ageMs: z.number().int().min(0).max(60000),
   x: z.number().min(0).max(1).optional(), y: z.number().min(0).max(1).optional(),
   target: z.string().regex(/^[a-z0-9_:\-./>]{1,160}$/).optional(),
@@ -26,6 +27,8 @@ export const eventSchema = z.object({
   if (event.kind === 'click' && (event.x === undefined || event.y === undefined || !event.target)) ctx.addIssue({ code: 'custom', message: 'Clic incompleto' });
   if (event.kind === 'scroll' && event.depth === undefined) ctx.addIssue({ code: 'custom', message: 'Profundidad incompleta' });
   if (event.kind === 'engagement' && event.seconds === undefined) ctx.addIssue({ code: 'custom', message: 'Duración incompleta' });
+  if (['form_step','form_submit','form_error'].includes(event.kind) && !validTrialDiagnostic({kind:event.kind,target:event.target})) ctx.addIssue({code:'custom',message:'Paso de registro no permitido'});
+  if (event.kind.startsWith('form_') && [event.x,event.y,event.depth,event.seconds].some(value=>value!==undefined)) ctx.addIssue({code:'custom',message:'Sin valores de campos ni coordenadas de formularios'});
 });
 export const batchSchema = z.object({
   mode: z.literal(ANALYTICS_MODE), batchId: z.string().uuid(), visitorSeed: z.string().uuid(),
@@ -38,7 +41,7 @@ export const batchSchema = z.object({
 }).strict().superRefine((batch, ctx) => {
   for (const event of batch.events) {
     const layout = batch.layouts[event.layout];
-    if (!layout || (event.kind === 'form_start' && layout.path !== '/prueba-gratis')) ctx.addIssue({code:'custom',message:'Contexto no permitido'});
+    if (!layout || (event.kind.startsWith('form_') && layout.path !== '/prueba-gratis')) ctx.addIssue({code:'custom',message:'Contexto no permitido'});
     if (event.kind === 'click' && ['/login', '/register-workshop'].includes(layout?.path)) ctx.addIssue({code:'custom',message:'Formulario privado'});
   }
 });

@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import CategorySalesDashboard from './components/CategorySalesDashboard';
+import PartsProfitabilityDashboard from './components/PartsProfitabilityDashboard';
 import PayrollManager from './components/PayrollManager';
 import DailyClosingDashboard from './components/DailyClosingDashboard';
 import {
@@ -49,7 +50,7 @@ const supplierData = [
 ];
 
 export default function AccountingClient({ subscriptionPlan, organizationId, inventory, purchases = [] }: AccountingClientProps) {
-  const [activeTab, setActiveTab] = useState<'resumen' | 'flujo' | 'compras' | 'proveedores' | 'categorias' | 'nomina' | 'cierre'>('resumen');
+  const [activeTab, setActiveTab] = useState<'resumen' | 'flujo' | 'compras' | 'proveedores' | 'categorias' | 'nomina' | 'cierre' | 'repuestos'>('resumen');
   const [periodFilter, setPeriodFilter] = useState<'day' | 'month' | 'year'>('day');
   const [realtimeData, setRealtimeData] = useState<RealtimeFinancialData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -338,7 +339,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
       {/* Navigation Sub-bar & Filter Controls */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-card border border-border/60 p-2 rounded-xl shadow-sm">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg overflow-x-auto">
+        <div className="flex items-center gap-1 p-1 bg-muted/60 rounded-lg overflow-x-auto min-w-0">
           <button 
             onClick={() => setActiveTab('resumen')}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${
@@ -361,6 +362,11 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
           >
             <span>Flujo de Caja</span>
             {isBasic && <Lock className="w-3 h-3 text-amber-500" />}
+          </button>
+
+          <button type="button" onClick={() => setActiveTab('repuestos')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all whitespace-nowrap ${activeTab === 'repuestos' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+            Rentabilidad de repuestos
           </button>
 
           <button 
@@ -818,6 +824,8 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
             {activeTab === 'categorias' && (
               <CategorySalesDashboard organizationId={organizationId} />
             )}
+
+            {activeTab === 'repuestos' && <PartsProfitabilityDashboard organizationId={organizationId}/>}
 
             {activeTab === 'nomina' && (
               <PayrollManager organizationId={organizationId} onPaymentRegistered={() => setRefreshKey(value => value + 1)} />

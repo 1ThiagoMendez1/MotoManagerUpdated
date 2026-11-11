@@ -6,6 +6,7 @@ import { webMeasurementAllowed } from '@/lib/analytics/web-consent';
 import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE, ANALYTICS_SESSION_MS, LEGACY_WEB_ANALYTICS_STORAGE_KEYS, publicAnalyticsPath, SECTION_LABELS, TARGET_LABELS,
   trafficAttribution, type AnalyticsBatch, type AnalyticsEvent, type AnalyticsLayout } from '@/lib/analytics/web-shared';
 import { measuredDepth, normalizeClick, type ScrollGeometry } from '@/lib/analytics/web-geometry';
+import { TRIAL_DIAGNOSTIC_EVENT, validTrialDiagnostic } from '@/lib/analytics/trial-events';
 
 type Captured={layout:AnalyticsLayout;event:Omit<AnalyticsEvent,'layout'|'ageMs'>;at:number};
 const round=(value:number)=>Math.round(value*1000000)/1000000;
@@ -126,10 +127,14 @@ function createTracker(getPath:()=>string){
     push('click',{x:round(point.x),y:round(point.y),target},measured.layout);depth();
   };
   let formStarted=false;
-  const onFocus=(event:FocusEvent)=>{
-    if(current()&&path==='/prueba-gratis'&&!formStarted&&event.target instanceof Element&&event.target.closest('form')){
+  const onInput=(event:Event)=>{
+    if(current()&&path==='/prueba-gratis'&&!formStarted&&event.target instanceof Element&&event.target.closest('[data-trial-form]')){
       formStarted=true;capture();push('form_start');void flush();
     }
+  };
+  const onTrialProgress=(event:Event)=>{
+    if(!current()||path!=='/prueba-gratis'||!(event instanceof CustomEvent)||!validTrialDiagnostic(event.detail))return;
+    capture();push(event.detail.kind,{target:event.detail.target});void flush();
   };
   const onScroll=()=>{if(!scrollFrame)scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;depth();});};
   const onVisibility=()=>{
@@ -138,7 +143,8 @@ function createTracker(getPath:()=>string){
     else if(performance.now()-lastConfirmed>ANALYTICS_SESSION_MS)navigate(getPath(),true);
   };
   const onExit=()=>{engage();if(current())depth(true);void flush(true);};
-  document.addEventListener('click',onClick,true);document.addEventListener('focusin',onFocus,true);
+  document.addEventListener('click',onClick,true);document.addEventListener('input',onInput,true);
+  window.addEventListener(TRIAL_DIAGNOSTIC_EVENT,onTrialProgress);
   document.addEventListener('scroll',onScroll,true);document.addEventListener('visibilitychange',onVisibility);
   window.addEventListener('resize',onScroll);window.addEventListener('pagehide',onExit);
   const timer=window.setInterval(()=>{if(current()&&visible){engage();depth();void flush();}},15000);
@@ -146,7 +152,8 @@ function createTracker(getPath:()=>string){
     // No geometry is read after the router has entered a private page.
     if(current()){engage();depth(true);}if(webMeasurementAllowed())void flush(true);else queue=[];
     active=false;clearInterval(timer);cancelAnimationFrame(scrollFrame);
-    document.removeEventListener('click',onClick,true);document.removeEventListener('focusin',onFocus,true);
+    document.removeEventListener('click',onClick,true);document.removeEventListener('input',onInput,true);
+    window.removeEventListener(TRIAL_DIAGNOSTIC_EVENT,onTrialProgress);
     document.removeEventListener('scroll',onScroll,true);document.removeEventListener('visibilitychange',onVisibility);
     window.removeEventListener('resize',onScroll);window.removeEventListener('pagehide',onExit);
   }};

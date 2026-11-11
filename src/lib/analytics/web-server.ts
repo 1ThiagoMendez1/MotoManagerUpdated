@@ -5,6 +5,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSuperAdmin } from '@/lib/super-admin';
+import { TRIAL_ERROR_LABELS, type TrialErrorCode } from '@/lib/trial-signup';
 import { analyticsGeo, analyticsGeoStatus } from './geo';
 import {
   analyticsClientIp, AnalyticsInputError, AnalyticsNotReadyError,
@@ -71,6 +72,16 @@ export async function scheduleAccountAccess(user:User,kind:'login'|'trial_activa
   }catch{console.warn('[web-analytics] Access could not be scheduled');}
 }
 
+/** Aggregate service-health counts only: no identity, IP, form values or text. */
+export async function scheduleTrialFailure(code:TrialErrorCode){
+  if(!Object.hasOwn(TRIAL_ERROR_LABELS,code)||['validation','connection'].includes(code))return;
+  try{after(async()=>{
+    try{const {error}=await database().rpc('record_trial_signup_failure',{p_code:code});
+      if(error)console.warn('[trial] Diagnostic unavailable:',error.code);
+    }catch{console.warn('[trial] Diagnostic could not be recorded');}
+  });}catch{/* Health reporting must never block registration. */}
+}
+
 type Identity={email:string|null;name:string|null;expires:number};
 const identities=new Map<string,Identity>();
 async function enrichIdentities(report:AnalyticsReport,db:SupabaseClient){
@@ -106,8 +117,9 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
     db.rpc('web_analytics_report',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
     db.rpc('web_analytics_heatmap',{p_from:range.from,p_to:range.to,p_path:heatPath,p_device:device,p_layout:layout||null,p_channel:channel}).abortSignal(request.signal),
     analyticsGeoStatus(),
+    db.rpc('web_trial_signup_diagnostics',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
   ]);
-  for(const result of results){if(result.status==='rejected')throw new Error('Analytics unavailable');}
+  for(const result of results.slice(0,2)){if(result.status==='rejected')throw new Error('Analytics unavailable');}
   const reportResult=results[0].status==='fulfilled'?results[0].value:null;
   const heatResult=results[1].status==='fulfilled'?results[1].value:null;
   for(const result of [reportResult,heatResult]){
@@ -115,6 +127,8 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
   }
   const report=reportResult!.data as AnalyticsReport,heatmap=heatResult!.data as HeatmapData;
   if(!report?.totals || !heatmap?.layouts)throw new Error('Analytics unavailable');
+  const signup=results[3];
+  if(signup.status==='fulfilled'&&!signup.value.error&&signup.value.data?.available)report.signup=signup.value.data;
   // Do not expose legacy identity links in the anonymous navigation report.
   // Verified account access events remain a separate administrator-only log.
   for(const row of report.sessions){
@@ -132,5 +146,13 @@ export function analyticsCsv(payload:AnalyticsPayload){
   rows.push([],['Página','Vistas','Visitas']);
   for(const row of payload.report.pages)rows.push([row.path,row.views,row.visits]);
   rows.push([],['Fuente','Canal','Visitas']);for(const row of payload.report.sources)rows.push([row.label,row.channel,row.visits]);
+  if(payload.report.signup){
+    const signup=payload.report.signup;
+    rows.push([],['Registro v2 · navegaciones anónimas','Total'],['Llegadas',signup.visits],['Escritura',signup.started],['Paso de acceso',signup.accessStep],['Navegaciones con envío',signup.submitted],['Intentos de envío',signup.submitAttempts],
+      ['Pruebas creadas · todos los canales',signup.confirmedTrials],[],['Errores del navegador','Intentos','Navegaciones']);
+    for(const error of signup.clientErrors)rows.push([TRIAL_ERROR_LABELS[error.code as TrialErrorCode]||error.code,error.attempts,error.visits]);
+    rows.push([],['Fallos del servidor · todos los canales','Intentos']);
+    for(const error of signup.serverErrors)rows.push([TRIAL_ERROR_LABELS[error.code as TrialErrorCode]||error.code,error.attempts]);
+  }
   return '\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
 }

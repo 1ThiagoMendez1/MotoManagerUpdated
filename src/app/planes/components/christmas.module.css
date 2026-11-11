@@ -368,3 +368,20 @@
   .edition .giftAccent svg { animation: none !important; will-change: auto; }
   .edition .productCard { transition: none; }
 }
+
+/* Trial conversion: the offer leads; the optional demo has a quieter action. */
+.edition .secondaryCta {border-color:transparent;background:transparent;box-shadow:none;font-size:13px;color:#c4d3e1;text-decoration:underline;text-underline-offset:4px;}
+.edition .secondaryCta:hover {background:#ffffff08;}
+@media(max-width:639px){
+  .edition .heroContainer {padding:31px 17px 12px;}
+  .edition .eyebrow {display:none;}
+  .edition .holidayLabel {margin-top:0;font-size:11px;}
+  .edition .title {font-size:clamp(1.95rem,8.3vw,3rem);line-height:1.1;}
+  .edition .description {font-size:14px;line-height:1.55;margin-top:13px;}
+  .edition .actions {grid-template-columns:1fr;gap:3px;margin-top:18px;}
+  .edition .primaryCta {font-size:14px;min-height:52px;}
+  .edition .secondaryCta {min-height:39px;font-size:12px;}
+  .edition .assurances {margin-top:9px;gap:6px 11px;}
+  .edition .santaScene {min-height:0;max-height:230px;aspect-ratio:auto;animation:none;}
+  .edition .productStage {margin-top:4px;}
+}

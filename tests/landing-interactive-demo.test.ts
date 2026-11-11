@@ -5,13 +5,13 @@ import { readFileSync } from 'node:fs';
 const source = (path: string) => readFileSync(path, 'utf8');
 const demo = source('src/app/planes/components/LandingInteractiveDemo.tsx');
 
-test('La landing ofrece la demo en primer plano y navegación directa', () => {
+test('La landing mantiene la demo opcional y navegación directa', () => {
   const page = source('src/app/planes/PlanesPage.tsx');
   const hero = source('src/app/planes/components/LandingHero.tsx');
   const nav = source('src/app/planes/components/LandingNavbar.tsx');
-  assert.match(page, /<LandingInteractiveDemo\s*\/>/);
+  assert.match(page, /<LandingDemoSection\s*\/>/);
   assert.match(page, /<LandingWhyChange\b/);
-  assert.ok(page.indexOf('<LandingInteractiveDemo />') < page.indexOf('<LandingFeatures />'));
+  assert.ok(page.indexOf('<LandingDemoSection />') < page.indexOf('<LandingFeatures />'));
   assert.match(hero, /href="#demo"/);
   assert.match(nav, /href: '#demo'/);
 });

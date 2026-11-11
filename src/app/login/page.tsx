@@ -22,7 +22,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(kicked ? 'Tu sesión ha expirado porque se ha iniciado sesión desde otro dispositivo.' : '');
   
-  const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [isForgotOpen, setIsForgotOpen] = useState(searchParams.get('recovery') === '1');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotPhone, setForgotPhone] = useState('');
   const [isForgotLoading, setIsForgotLoading] = useState(false);
@@ -134,6 +134,7 @@ function LoginForm() {
           <CardDescription className="text-muted-foreground">Ingresa tus credenciales para acceder al sistema.</CardDescription>
         </CardHeader>
         <CardContent>
+          {searchParams.get('trial') === 'created' && <p role="status" className="mb-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm leading-6">Tu taller y tu prueba ya están creados. Entra con el correo y la contraseña que acabas de elegir; no necesitas registrarte otra vez.</p>}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Correo Electrónico</Label>

@@ -3,159 +3,124 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import Image from 'next/image';
-import {
-  ArrowLeft, ArrowRight, Check, CheckCircle2, Eye, EyeOff, Gift, LockKeyhole,
-  MessageCircle, ShieldCheck, Sparkles, X, Loader2,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Gift, Loader2, LockKeyhole, MessageCircle } from 'lucide-react';
 import { startFullTrial } from './actions';
+import { TRIAL_FIELDS, TRIAL_STEPS, trialFailure, validateTrialStep, type TrialField, type TrialFormState } from '@/lib/trial-signup';
+import { emitTrialDiagnostic } from '@/lib/analytics/trial-events';
 
-type FieldName = 'workshopName' | 'city' | 'fullName' | 'phone' | 'email' | 'password';
-const fieldGroups: { name: FieldName; label: string; placeholder: string; type?: string; autoComplete: string; minLength?: number; maxLength: number }[][] = [
-  [
-    { name: 'workshopName', label: '¿Cómo se llama tu taller?', placeholder: 'Ej. Taller Moto Rayo', autoComplete: 'organization', minLength: 3, maxLength: 120 },
-    { name: 'city', label: '¿En qué ciudad trabajas?', placeholder: 'Ej. Bogotá', autoComplete: 'address-level2', minLength: 2, maxLength: 120 },
-  ],
-  [
-    { name: 'fullName', label: '¿Cómo te llamas?', placeholder: 'Tu nombre y apellido', autoComplete: 'name', minLength: 2, maxLength: 120 },
-    { name: 'phone', label: 'Tu WhatsApp', placeholder: '300 123 4567', type: 'tel', autoComplete: 'tel', minLength: 10, maxLength: 25 },
-    { name: 'email', label: 'Tu correo electrónico', placeholder: 'tu@correo.com', type: 'email', autoComplete: 'email', maxLength: 254 },
-  ],
-  [
-    { name: 'password', label: 'Crea tu contraseña', placeholder: 'Mínimo 10 caracteres', type: 'password', autoComplete: 'new-password', minLength: 10, maxLength: 128 },
-  ],
-];
-
-const initialData: Record<FieldName, string> = {
-  workshopName: '', city: '', fullName: '', phone: '', email: '', password: '',
+const fields: Record<TrialField, { label: string; placeholder: string; type: string; autoComplete: string; maxLength: number }> = {
+  workshopName: { label: 'Nombre del taller', placeholder: 'Ej. Moto Taller Rayo', type: 'text', autoComplete: 'organization', maxLength: 120 },
+  fullName: { label: 'Tu nombre', placeholder: 'Nombre y apellido', type: 'text', autoComplete: 'name', maxLength: 120 },
+  phone: { label: 'WhatsApp del responsable', placeholder: '300 123 4567', type: 'tel', autoComplete: 'tel', maxLength: 25 },
+  email: { label: 'Correo para iniciar sesión', placeholder: 'tu@correo.com', type: 'email', autoComplete: 'email', maxLength: 254 },
+  password: { label: 'Crea tu contraseña', placeholder: 'Mínimo 10 caracteres', type: 'password', autoComplete: 'new-password', maxLength: 128 },
 };
+const initialData: Record<TrialField, string> = { workshopName: '', fullName: '', phone: '', email: '', password: '' };
 
-function Submit() {
+function FormControls({ step, back }: { step: number; back: () => void }) {
   const { pending } = useFormStatus();
-  return <button type="submit" name="welcomeRequested" value="yes" disabled={pending}
-    className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-sm font-extrabold text-[#081121] shadow-lg shadow-orange-500/10 transition hover:bg-[#ffa149] disabled:opacity-60">
-    {pending ? <Loader2 className="h-5 w-5 animate-spin"/> : <Gift className="h-5 w-5"/>}
-    {pending ? 'Estamos activando tu taller...' : 'Activar mis 15 días y recibir mi bienvenida'}
-    {!pending && <ArrowRight className="h-5 w-5" />}
-  </button>;
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) { setSlow(false); return; }
+    const timer = setTimeout(() => setSlow(true), 18000);
+    return () => clearTimeout(timer);
+  }, [pending]);
+  return <div className="space-y-3 pt-2">
+    <button type="submit" disabled={pending} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-base font-extrabold text-[#081121] shadow-lg shadow-orange-500/10 transition hover:bg-[#ffa149] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 disabled:cursor-wait disabled:opacity-70">
+      {pending ? <Loader2 className="h-5 w-5 animate-spin"/> : step === 1 ? <Gift className="h-5 w-5"/> : null}
+      {pending ? 'Creando tu taller…' : step === 0 ? 'Continuar con mi acceso' : 'Crear mi taller gratis'}
+      {!pending && <ArrowRight className="h-5 w-5 shrink-0"/>}
+    </button>
+    {pending && <p role="status" className="text-center text-xs leading-5 text-slate-300">{slow ? <>Está tomando más tiempo de lo esperado. Evita enviar otra solicitud. Si ya se creó tu cuenta, <Link href="/login" className="text-orange-200 underline">puedes iniciar sesión aquí</Link>.</> : 'Estamos preparando tu espacio. Entrarás directamente al taller.'}</p>}
+    {step === 1 && <button type="button" disabled={pending} onClick={back} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg text-sm text-slate-300 hover:bg-white/5 disabled:opacity-50"><ArrowLeft size={15}/> Corregir datos del taller</button>}
+  </div>;
 }
 
 export function TrialForm() {
-  const [open, setOpen] = useState(true);
   const [step, setStep] = useState(0);
   const [data, setData] = useState(initialData);
+  const [errors, setErrors] = useState<Partial<Record<TrialField, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [submittedError, setSubmittedError] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, action] = useActionState(startFullTrial, { error: '' });
-
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      const input = formRef.current?.querySelector<HTMLInputElement>('input:not([type="hidden"])');
-      input?.focus({ preventScroll: true });
+  const [state, action] = useActionState(async (previous: TrialFormState, form: FormData) => {
+    try { return await startFullTrial(previous, form); }
+    catch (error) {
+      // Next uses this control-flow exception for a successful server redirect.
+      if (typeof error === 'object' && error && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT')) throw error;
+      return trialFailure('connection');
     }
-  }, [step, open]);
+  }, { error: '' } as TrialFormState);
 
-  function next() {
-    if (!formRef.current?.reportValidity()) return;
-    setStep(s => Math.min(s + 1, 2));
+  const focusError = (next: Partial<Record<TrialField, string>>) => {
+    const first = TRIAL_FIELDS.find(field => next[field]);
+    if (first) requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`#trial-${first}`)?.focus());
+  };
+  useEffect(() => {
+    if (!state.error) return;
+    setSubmittedError(true);
+    emitTrialDiagnostic({ kind: 'form_error', target: state.code || 'interrupted' });
+    const next = state.fieldErrors || {};
+    setErrors(next);
+    if (next.workshopName || next.fullName) setStep(0);
+    focusError(next);
+  }, [state]);
+
+  function validate(event: React.FormEvent<HTMLFormElement>) {
+    const next = validateTrialStep(data, step);
+    setSubmittedError(false);
+    setErrors(next);
+    if (Object.keys(next).length) {
+      event.preventDefault();
+      emitTrialDiagnostic({ kind: 'form_error', target: 'validation' });
+      focusError(next);
+      return;
+    }
+    if (step === 0) {
+      event.preventDefault();
+      setStep(1);
+      emitTrialDiagnostic({ kind: 'form_step', target: 'access' });
+      // Focus the heading after an intentional step; don't open a phone keyboard
+      // or count programmatic focus as form engagement on page load.
+      requestAnimationFrame(() => heading.current?.focus({ preventScroll: false }));
+    } else emitTrialDiagnostic({ kind: 'form_submit', target: 'activate' });
   }
 
-  return <>
-    <button type="button" onClick={() => { setOpen(true); setStep(0); }}
-      className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#ff831b] px-5 text-base font-black text-[#071222] shadow-xl shadow-orange-500/15 transition hover:bg-[#ffad68] sm:w-auto">
-      <Gift className="h-5 w-5" /> Activar mis 15 días gratis <ArrowRight className="h-5 w-5"/>
-    </button>
-    {!open ? <p className="mt-4 text-xs text-slate-400">Sin tarjeta ni cobros automáticos. Puedes abrir el registro cuando quieras.</p> : null}
-
-    {open && <div className="fixed inset-0 z-[160] flex items-center justify-center p-0 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="trial-wizard-heading">
-      <button type="button" className="absolute inset-0 bg-black/85 backdrop-blur-md" onClick={() => setOpen(false)} aria-label="Cerrar registro" />
-      <section className="relative flex h-dvh w-full max-w-lg flex-col overflow-hidden bg-[#0d1b2e] text-white shadow-2xl sm:h-auto sm:max-h-[min(92dvh,760px)] sm:rounded-[28px] sm:border sm:border-white/15">
-        <header className="shrink-0 border-b border-white/10 px-5 pb-4 pt-5 sm:px-7">
-          <div className="flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2 font-black tracking-tight"><Image src="/logo.png" width={33} height={33} alt="" />MotoManager</span>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 text-slate-300 hover:bg-white/10"><X className="h-5 w-5"/></button>
+  return <section id="trial-registration" className="min-w-0 scroll-mt-6 rounded-2xl border border-white/15 bg-[#0d1b2e] p-5 shadow-2xl shadow-black/20 sm:p-7" aria-label="Crear tu taller gratis">
+    <ol className="mb-5 flex gap-3 text-xs" aria-label="Pasos para crear tu taller">
+      {['Tu taller', 'Tu acceso'].map((label, index) => <li key={label} aria-current={step === index ? 'step' : undefined} className={'flex flex-1 items-center gap-2 border-b-2 pb-3 font-semibold '+(index <= step ? 'border-orange-400 text-orange-200' : 'border-white/10 text-slate-400')}><span className={'grid h-6 w-6 shrink-0 place-items-center rounded-full '+(index < step ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/10')}>{index < step ? <Check size={14}/> : index+1}</span>{label}</li>)}
+    </ol>
+    <h2 ref={heading} tabIndex={-1} className="text-xl font-bold tracking-tight outline-none sm:text-2xl">{step === 0 ? 'Empecemos por tu taller' : 'Ya casi está tu taller'}</h2>
+    <p className="mb-5 mt-2 text-sm leading-6 text-slate-300">{step === 0 ? 'Solo necesitas estos datos y crear tu acceso. La ciudad y el resto del perfil los completas después.' : `Crea tu acceso para ${data.workshopName}. No necesitas tarjeta ni esperar una llamada para entrar.`}</p>
+    <form ref={formRef} action={action} noValidate onSubmit={validate} data-trial-form="v2" className="space-y-4">
+      {TRIAL_STEPS[step].map(name => {
+        const field = fields[name];
+        return <div key={name}>
+          <label htmlFor={'trial-'+name} className="block text-sm font-semibold text-slate-100">{field.label}</label>
+          <div className="relative mt-2">
+            <input id={'trial-'+name} name={name} type={name === 'password' && showPassword ? 'text' : field.type}
+              autoComplete={field.autoComplete} placeholder={field.placeholder} maxLength={field.maxLength} required value={data[name]}
+              inputMode={name === 'phone' ? 'tel' : name === 'email' ? 'email' : undefined} autoCapitalize={name === 'email' ? 'none' : undefined} spellCheck={name === 'email' || name === 'password' ? false : undefined}
+              aria-invalid={!!errors[name]} aria-describedby={errors[name] ? 'trial-'+name+'-error' : ['phone','password'].includes(name) ? 'trial-'+name+'-help' : undefined}
+              onChange={event => { setData(current => ({ ...current, [name]: event.target.value })); setErrors(current => ({ ...current, [name]: undefined })); }}
+              className={'h-12 w-full rounded-xl border bg-[#071221] px-3.5 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 '+(errors[name] ? 'border-red-400' : 'border-white/20')+(name === 'password' ? ' pr-12' : '')}/>
+            {name === 'password' && <button type="button" onClick={() => setShowPassword(current => !current)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-slate-300 hover:bg-white/5">{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
           </div>
-          <div className="mt-5 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[#ffb47d]">15 días Full, $0</span>
-            <span className="text-xs font-semibold text-slate-300">Paso {step + 1} de 3</span>
-          </div>
-          <div className="mt-3 flex gap-1.5" aria-label={'Progreso: paso '+(step+1)+' de 3'}>
-            {[0, 1, 2].map(i => <span key={i} className={'h-1.5 flex-1 rounded-full transition '+(i<=step?'bg-[#ff831b]':'bg-white/15')} />)}
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 sm:px-7">
-          <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1.5 text-[11px] font-bold text-emerald-200">
-            <CheckCircle2 className="h-3.5 w-3.5"/> Sin tarjeta. Sin cobros automáticos.
-          </span>
-          <h2 id="trial-wizard-heading" className="text-2xl font-black leading-tight tracking-tight sm:text-3xl">
-            {step === 0 ? 'Primero, cuéntanos de tu taller.' : step === 1 ? '¿Quién estará al frente?' : '¡Casi listo! Abre tu taller.'}
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            {step === 0 ? 'Son solo dos datos. Queremos configurar tu espacio para trabajar desde hoy.'
-              : step === 1 ? 'Estos datos te servirán para entrar y recibir los detalles de tu prueba.'
-              : 'Crea una contraseña segura y empieza a trabajar con MotoManager Full.'}
-          </p>
-
-          <form ref={formRef} id="trial-wizard-form" action={action} className="mt-6 space-y-4">
-            {fieldGroups[step].map(field =>
-              <label key={field.name} className="block text-sm font-semibold text-slate-100">
-                {field.label}
-                <span className="relative mt-2 block">
-                  <input name={field.name} type={field.type === 'password' && showPassword ? 'text' : field.type || 'text'}
-                    autoComplete={field.autoComplete} placeholder={field.placeholder} value={data[field.name]}
-                    required minLength={field.minLength} maxLength={field.maxLength} onChange={event => setData(v => ({ ...v, [field.name]: event.target.value }))}
-                    inputMode={field.name === 'phone' ? 'tel' : undefined}
-                    className={'h-14 w-full rounded-xl border border-white/20 bg-[#071221] px-4 text-base font-medium text-white outline-none transition placeholder:font-normal placeholder:text-slate-500 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 '+(field.name==='password'?'pr-12':'')} />
-                  {field.name === 'password' && <button type="button" onClick={() => setShowPassword(v=>!v)}
-                    className="absolute right-2 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center text-slate-400 hover:text-white"
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? <EyeOff size={19}/> : <Eye size={19}/>}</button>}
-                </span>
-              </label>
-            )}
-            {Object.entries(data).filter(([name]) => !fieldGroups[step].some(f => f.name === name)).map(([name,value]) =>
-              <input key={name} type="hidden" name={name} value={value} />
-            )}
-            <input type="hidden" name="termsAcknowledged" value="yes" />
-            <div className="hidden" aria-hidden="true"><label htmlFor="trial-website">Sitio web</label><input id="trial-website" name="website" tabIndex={-1} autoComplete="off" /></div>
-
-            {step === 2 && <div className="space-y-3">
-              <div className="rounded-xl border border-emerald-300/15 bg-emerald-500/10 p-3">
-                <p className="flex items-center gap-2 text-xs font-bold text-emerald-200"><MessageCircle size={17}/> Bienvenida a tu WhatsApp</p>
-                <p className="mt-1 text-xs leading-5 text-slate-300">Al elegir el botón naranja, solicitas a MotoManager que te envíe <strong>un único mensaje de activación</strong> con las fechas de tu prueba y el enlace de acceso. No autorizas publicidad.</p>
-              </div>
-              <p className="text-[11px] leading-5 text-slate-400">
-                Al activar, aceptas las condiciones de la prueba: 15 días por taller, correo y celular, sin cobros automáticos. Autorizas el tratamiento de tus datos para crear y gestionar tu cuenta. Puedes solicitar su actualización o eliminación a MotoManager.
-              </p>
-            </div>}
-
-            {state.error && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-200">{state.error}</p>}
-            <div className="pt-2">
-              {step < 2
-                ? <button type="button" onClick={next} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 text-base font-black text-[#081121] hover:bg-[#ffa149]">Continuar <ArrowRight className="h-5 w-5"/></button>
-                : <Submit/>}
-              {step > 0 && <button type="button" onClick={() => setStep(s => Math.max(s - 1,0))}
-                className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-slate-300 hover:bg-white/5"><ArrowLeft className="h-4 w-4"/> Volver</button>}
-            </div>
-          </form>
-          <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-slate-400"><LockKeyhole size={13}/> Tus datos se usan para activar el taller, no para venderlos.</p>
-        </div>
-        <footer className="shrink-0 border-t border-white/10 px-5 py-3 text-center text-xs text-slate-400">
-          ¿Ya tienes cuenta? <Link href="/login" className="font-bold text-[#ffb780] underline underline-offset-4">Inicia sesión</Link>
-        </footer>
-      </section>
-    </div>}
-  </>;
+          {name === 'phone' && <p id="trial-phone-help" className="mt-1.5 text-xs leading-5 text-slate-400">Colombia: 10 dígitos. Otro país: incluye el indicativo.</p>}
+          {name === 'password' && <p id="trial-password-help" className="mt-1.5 text-xs leading-5 text-slate-400">Mínimo 10 caracteres. Puedes usar una frase que recuerdes.</p>}
+          {errors[name] && <p id={'trial-'+name+'-error'} role="alert" className="mt-1.5 text-xs leading-5 text-red-200">{errors[name]}</p>}
+        </div>;
+      })}
+      {TRIAL_FIELDS.filter(name => !TRIAL_STEPS[step].includes(name)).map(name => <input key={'hidden-'+name} type="hidden" name={name} value={data[name]}/>)}
+      <input type="hidden" name="termsAcknowledged" value="yes"/>
+      <input type="hidden" name="welcomeRequested" value="yes"/>
+      <div className="hidden" aria-hidden="true"><label htmlFor="trial-website">Sitio web</label><input id="trial-website" name="website" tabIndex={-1} autoComplete="off"/></div>
+      {step === 1 && <div className="rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs leading-5 text-slate-300"><p className="flex items-start gap-2"><MessageCircle size={16} className="mt-0.5 shrink-0 text-emerald-300"/>Al crear tu taller, solicitas un mensaje de bienvenida por WhatsApp con tu enlace y las fechas de la prueba. No autorizas publicidad.</p><p className="mt-2 text-[11px] text-slate-400">Aceptas una prueba Full de 15 días por taller, correo y celular, sin cobros automáticos, y el tratamiento de datos para gestionar tu cuenta.</p></div>}
+      {submittedError && state.error && <div role="alert" className="rounded-xl border border-red-300/25 bg-red-400/10 p-3 text-sm leading-6 text-red-100"><p>{state.error}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 font-semibold"><Link href="/login?redirect=/dashboard" className="underline underline-offset-4">Iniciar sesión</Link><Link href="/login?recovery=1" className="underline underline-offset-4">Recuperar contraseña</Link></div></div>}
+      <FormControls step={step} back={() => { setStep(0); setSubmittedError(false); }}/>
+    </form>
+    <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos se usan para gestionar tu taller.</p>
+    <p className="mt-4 border-t border-white/10 pt-4 text-center text-xs text-slate-300">¿Ya tienes cuenta? <Link href="/login" className="font-semibold text-orange-200 underline underline-offset-4">Inicia sesión</Link></p>
+  </section>;
 }

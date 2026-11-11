@@ -10,7 +10,8 @@ export const trialRegistrationSchema = z.object({
     const digits = value.replace(/\D/g, '');
     return digits.length === 10 ? `57${digits}` : digits;
   }).pipe(z.string().regex(/^\d{10,15}$/, 'Escribe un celular válido, con indicativo si estás fuera de Colombia.')),
-  city: z.string().trim().min(2, 'Escribe la ciudad de tu taller.').max(120),
+  // Location is completed in the workshop profile; it is not needed to open it.
+  city: z.string().trim().max(120).optional().default(''),
   password: z.string().min(10, 'Usa una contraseña de al menos 10 caracteres.').max(128),
   // Affirmative final submit after a short, visible statement; no opt-in checkboxes.
   termsAcknowledged: z.literal('yes', { errorMap: () => ({ message: 'Confirma las condiciones al activar tu cuenta.' }) }),

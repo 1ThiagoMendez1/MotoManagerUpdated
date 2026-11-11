@@ -137,7 +137,7 @@ export function LandingInteractiveDemo() {
       : (dark ? 'bg-blue-400/15 text-blue-200' : 'bg-blue-50 text-blue-700');
 
   return (
-    <section id="demo" data-analytics-state={`${screen}-${dark ? 'dark' : 'light'}`} className="scroll-mt-20 bg-[#071224] px-4 py-20 text-white sm:px-6 lg:py-28">
+    <section id="demo-interactiva" data-analytics-state={`${screen}-${dark ? 'dark' : 'light'}`} className="scroll-mt-20 bg-[#071224] px-4 py-12 text-white sm:px-6 lg:py-16">
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-[#fd821b]/40 bg-[#fd821b]/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.15em] text-[#ffad69]">
@@ -391,10 +391,10 @@ export function LandingInteractiveDemo() {
         </div>
 
         <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <a href="#planes" className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 text-center text-sm font-extrabold text-[#091426] transition hover:bg-[#ffa14f] sm:w-auto">
-            Quiero MotoManager para mi taller <ArrowRight className="h-4 w-4" />
+          <a href="/prueba-gratis" data-analytics-id="demo_trial" className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 text-center text-sm font-extrabold text-[#091426] transition hover:bg-[#ffa14f] sm:w-auto">
+            Crear mi taller gratis <ArrowRight className="h-4 w-4" />
           </a>
-          <p className="text-center text-sm text-slate-400">¿Te convenció? Compara los planes y elige el adecuado.</p>
+          <p className="text-center text-sm text-slate-400">Prueba Full 15 días con tus propios datos. Sin tarjeta ni cobros automáticos.</p>
         </div>
       </div>
 

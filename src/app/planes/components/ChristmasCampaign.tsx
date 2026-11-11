@@ -7,12 +7,6 @@ import {
 } from 'lucide-react';
 import styles from './christmas.module.css';
 
-const WORKSHOP_TOOLS = [
-  { icon: UsersRound, label: 'Clientes', tone: 'green' },
-  { icon: Bike, label: 'Motocicletas', tone: 'orange' },
-  { icon: Boxes, label: 'Inventario', tone: 'gold' },
-  { icon: ShoppingBag, label: 'Ventas y caja', tone: 'blue' },
-];
 
 export function ChristmasRibbon() {
   return <div className={styles.ribbon}>
@@ -35,17 +29,17 @@ export function ChristmasHero() {
     <div className={styles.heroContainer}>
       <div className={styles.heroCopy}>
         <span className={styles.eyebrow}><Star size={14} fill="currentColor" /> NAVIDAD 2026 · PARA TALLERES DE COLOMBIA</span>
-        <span className={styles.holidayLabel}><Gift size={15} /> Que diciembre no te coja en desorden</span>
-        <h1 id="christmas-hero-title" className={styles.title}>Esta Navidad, pon tu taller en <span>modo Full.</span></h1>
-        <p className={styles.description}>En Colombia, diciembre pone a prueba la organización del taller. Lleva <strong>órdenes, clientes, motos, repuestos y ventas</strong> en un solo lugar y atiende con más tranquilidad.</p>
+        <span className={styles.holidayLabel}><Gift size={15} /> Esta Navidad, atiende con más tranquilidad</span>
+        <h1 id="christmas-hero-title" className={styles.title}>Menos “¿cómo va mi moto?”. <span>Más control de tu taller.</span></h1>
+        <p className={styles.description}>Tu cliente consulta el estado de su moto desde su portal. Tú organizas <strong>órdenes, repuestos y ventas</strong> en un solo lugar. Pruébalo con tu taller real durante 15 días.</p>
         <div className={styles.actions}>
-          <Link href="/prueba-gratis" data-analytics-id="hero_trial" className={styles.primaryCta}>Activar mis 15 días gratis <ArrowRight size={20} /></Link>
-          <a href="#demo" data-analytics-id="hero_demo" className={styles.secondaryCta}><Play size={17} fill="currentColor" /> Probar la demo</a>
+          <Link href="/prueba-gratis" data-analytics-id="hero_trial" className={styles.primaryCta}>Crear mi taller gratis <ArrowRight size={20} /></Link>
+          <a href="#demo" data-analytics-id="hero_demo" className={styles.secondaryCta}><Play size={17} /> Ver cómo funciona</a>
         </div>
         <div className={styles.assurances}>
           <span><CheckCircle2 size={15} /> Sin tarjeta</span>
           <span><CheckCircle2 size={15} /> Sin cobros automáticos</span>
-          <span><CheckCircle2 size={15} /> Prueba Full completa</span>
+          <span><CheckCircle2 size={15} /> Full durante 15 días</span>
         </div>
       </div>
       <div className={styles.productStage}>
@@ -62,32 +56,6 @@ export function ChristmasHero() {
           <span className={styles.santaSpark} aria-hidden="true">✦</span>
         </div>
         <div className={styles.starlight} aria-hidden="true">✦</div>
-        <div className={styles.productCard}>
-          <div className={styles.productBar}>
-            <div className={styles.brandMini}><span><Wrench size={17}/></span><div><strong>MotoManager</strong><small>Taller de ejemplo · Vista ilustrativa</small></div></div>
-            <span className={styles.newOrder}>+ Nueva orden</span>
-          </div>
-          <div className={styles.productContent}>
-            <div className={styles.productHeading}><small>TU CENTRO DE OPERACIONES</small><h2>Tu taller, bajo control.</h2><p>Todo conectado para tu día a día.</p></div>
-            <div className={styles.featureMain}>
-              <div className={styles.workOrder}>
-                <span className={styles.iconBlue}><ClipboardList size={18}/></span>
-                <strong>Órdenes de trabajo</strong>
-                <p>Recibe, diagnostica y entrega sin perder el hilo.</p>
-                <div className={styles.orderStatus}><span className={styles.statusDot} /> Moto DEMO-01 <b>En proceso</b></div>
-              </div>
-              <div className={styles.summaryCard}>
-                <span className={styles.iconGreen}><ShieldCheck size={18}/></span>
-                <strong>Historial listo</strong>
-                <p>Cliente, moto y servicios en un mismo lugar.</p>
-              </div>
-            </div>
-            <div className={styles.productModules}>
-              {WORKSHOP_TOOLS.map(item=>{const Icon=item.icon;return <div key={item.label} className={styles.productModule}><span data-tone={item.tone}><Icon size={15}/></span><strong>{item.label}</strong></div>;})}
-            </div>
-            <div className={styles.productFooter}><span><Check size={13}/> Demo con datos de ejemplo</span><a href="#demo">Explorar ahora <ArrowRight size={13}/></a></div>
-          </div>
-        </div>
         <span className={styles.giftAccent} aria-hidden="true"><Gift size={38}/></span>
       </div>
     </div>
@@ -101,13 +69,16 @@ export function ChristmasHero() {
 }
 
 export function ChristmasDemoGuide(){
-  return <div className={styles.demoGuide}>
-    <div className={styles.demoGuideInner}>
-      <span className={styles.playBadge}><Play size={19} fill="currentColor"/></span>
-      <div><span className={styles.miniEyebrow}>ANTES DE DECIDIR, PRUÉBALO</span><h2>La demo sí se puede usar.</h2><p>Abre una orden, mira inventario y recorre el sistema sin registrarte. Es un ejemplo, no tu taller real.</p></div>
-      <a href="#demo" data-analytics-id="hero_demo" className={styles.demoGuideButton}>Explorar demo <ArrowRight size={17}/></a>
+  return <section id="como-empezar" className="border-b border-white/10 bg-[#0b1928] px-5 py-8 text-white">
+    <div className="mx-auto max-w-6xl">
+      <p className="text-center text-xs font-bold uppercase tracking-widest text-orange-200">Tu primera orden empieza aquí</p>
+      <div className="mt-5 grid gap-4 sm:grid-cols-3">{[
+        ['1', 'Crea tu taller', 'Tu nombre, el taller y tu acceso. Sin tarjeta.'],
+        ['2', 'Registra una moto', 'Usa los datos de un cliente de tu propio taller.'],
+        ['3', 'Abre tu primera orden', 'Lleva el diagnóstico, los servicios y los repuestos.'],
+      ].map(([number,title,body]) => <div key={number} className="flex items-start gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-orange-300/25 text-sm font-bold text-orange-200">{number}</span><div><h2 className="text-sm font-bold">{title}</h2><p className="mt-1 text-xs leading-5 text-slate-400">{body}</p></div></div>)}</div>
     </div>
-  </div>;
+  </section>;
 }
 
 export function ChristmasTrialOffer({fullPrice}:{fullPrice:number}) {
@@ -128,7 +99,7 @@ export function ChristmasTrialOffer({fullPrice}:{fullPrice:number}) {
         <strong>15 <small>días</small></strong>
         <b>GRATIS</b>
         <p>Hoy: $0 · Sin tarjeta ni cargos automáticos.</p>
-        <Link href="/prueba-gratis" data-analytics-id="offer_trial" className={styles.offerButton}>Quiero mis 15 días gratis <ArrowRight size={18}/></Link>
+        <Link href="/prueba-gratis" data-analytics-id="offer_trial" className={styles.offerButton}>Crear mi taller gratis <ArrowRight size={18}/></Link>
         <p className={styles.afterTrial}>Después eliges: Full desde {monthly}/mes, otro plan o no continuar.</p>
       </div>
     </div>
@@ -146,6 +117,6 @@ export function ChristmasMobileDock({user=false}:{user?:boolean}) {
 
 export function ChristmasClosing(){
   return <section className={styles.closing}>
-    <div className={styles.closingInner}><span><Sparkles size={17}/> QUE DICIEMBRE TE ENCUENTRE PREPARADO</span><h2>Las motos seguirán llegando.<br/><em>Que tu taller tenga todo en orden.</em></h2><p>Conoce MotoManager durante 15 días sin pagar. Lo importante es descubrir si hace más sencillo tu trabajo.</p><Link href="/prueba-gratis" data-analytics-id="closing_trial">Empezar mi prueba gratis <ArrowRight size={19}/></Link></div>
+    <div className={styles.closingInner}><span><Sparkles size={17}/> QUE DICIEMBRE TE ENCUENTRE PREPARADO</span><h2>Las motos seguirán llegando.<br/><em>Que tu taller tenga todo en orden.</em></h2><p>Conoce MotoManager durante 15 días sin pagar. Lo importante es descubrir si hace más sencillo tu trabajo.</p><Link href="/prueba-gratis" data-analytics-id="closing_trial">Crear mi taller gratis <ArrowRight size={19}/></Link></div>
   </section>;
 }

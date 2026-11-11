@@ -17,9 +17,9 @@ test('Christmas landing keeps verified trial and plan routes, real demo and camp
     '../src/app/planes/components/LandingPricing.tsx','../src/app/planes/components/LandingNavbar.tsx',
     '../src/lib/seasonal-campaign.ts',
   ].map(p=>readFile(new URL(p,import.meta.url),'utf8')));
-  assert.match(page,/data-campaign=\{halloween \? 'halloween-2026' : christmasEdition \? 'navidad-2026'/);
+  assert.match(page,/data-campaign=\{halloween \? 'halloween-2026' : christmasEdition \? 'navidad-2026-v2'/);
   assert.match(page,/<ChristmasHero \/>/);
-  assert.match(page,/<LandingInteractiveDemo \/>/);
+  assert.match(page,/<LandingDemoSection \/>/);
   assert.match(page,/<ChristmasMobileDock/);
   assert.match(feature,/href="\/prueba-gratis"/);
   assert.match(feature,/href="#demo"/);

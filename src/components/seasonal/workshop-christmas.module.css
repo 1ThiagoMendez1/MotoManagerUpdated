@@ -1,0 +1,55 @@
+.season {
+  --holiday-pine: #316858;
+  --holiday-gold: #b68a40;
+  --holiday-light: #f9d587;
+  position: relative;
+}
+:global(.dark) .season {
+  --holiday-pine: #78a48d;
+  --holiday-gold: #cfab65;
+  --holiday-light: #ffe3a6;
+}
+.season :global(header) {
+  border-bottom-color: color-mix(in srgb, var(--holiday-gold) 24%, transparent);
+  box-shadow: 0 1px 12px -8px var(--holiday-gold);
+}
+.season [data-page-heading] {
+  border-bottom-color: color-mix(in srgb, var(--holiday-gold) 24%, transparent);
+}
+.season [data-page-heading] h1 { text-shadow: 0 1px 14px #d0a8500a; }
+.season [data-sidebar="sidebar"] { border-right: 1px solid color-mix(in srgb, var(--holiday-gold) 15%, transparent); }
+.season :global(footer) {
+  border-color: color-mix(in srgb, var(--holiday-gold) 23%, transparent);
+  background-image: linear-gradient(90deg,#bb914208,transparent 40%,#2f80ed05);
+}
+.garland { position: absolute; inset: 0 0 auto; height: 40px; z-index: 45; pointer-events: none; overflow: hidden; }
+.leftBranch,.rightBranch { position: absolute; top: -16px; width: 260px; height: 45px; opacity: .75; }
+.leftBranch { left: 0; }
+.rightBranch { right: 0; transform: scaleX(-1); }
+.lightThread { position: absolute; inset: 0 245px auto; height: 1px; background: linear-gradient(90deg,transparent,#b58b4140,transparent); }
+.seasonBar {
+  --holiday-pine: #316858; --holiday-gold: #b68a40;
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  min-height: 36px; padding: 5px 24px; border-bottom: 1px solid #b68a4029;
+  background: linear-gradient(90deg,#b68a400a,transparent 55%,#2f80ed05);
+  color: hsl(var(--muted-foreground)); font-size: 11px;
+}
+:global(.dark) .seasonBar { --holiday-pine: #87b69c; --holiday-gold: #cfab65; background: linear-gradient(90deg,#b68a4010,transparent 55%,#2f80ed08); }
+.seasonTitle { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.seasonTitle > span:nth-child(2) { color: hsl(var(--foreground)); font-weight: 600; white-space: nowrap; }
+.treeBadge { width: 24px; height: 24px; display: grid; place-items: center; color: var(--holiday-pine); background: #3168580d; border: 1px solid #31685814; border-radius: 8px; flex-shrink: 0; }
+.sparkle { color: var(--holiday-gold); flex-shrink: 0; }
+.seasonCaption { border-left: 1px solid #b68a4030; padding-left: 10px; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 7px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; font-weight: 500; transition: background .15s; }
+.toggle:hover { background: #b68a4010; color: hsl(var(--foreground)); }
+.toggle:focus-visible { outline: 2px solid #2f80ed; outline-offset: 2px; }
+.seasonBar[data-season-enabled="false"] { background: transparent; border-color: hsl(var(--border)); }
+.seasonBar[data-season-enabled="false"] .treeBadge,.seasonBar[data-season-enabled="false"] .sparkle { opacity: .45; }
+@media(max-width:768px) {
+  .seasonBar { padding: 5px 12px; gap: 4px; }
+  .seasonCaption { display: none; }
+  .leftBranch,.rightBranch { width: 135px; opacity: .5; top: -14px; }
+  .lightThread { inset-inline: 125px; }
+}
+@media(prefers-reduced-motion:reduce) { .toggle { transition: none; } }
+@media print { .garland,.seasonBar { display: none!important; } }
