@@ -7,6 +7,7 @@
 - Los abonos se conservan en caja y en el historial de la orden. No aparecen como facturas terminadas ni generan comisión. La factura muestra valor completo, abono y cobro final por separado.
 - `sales.total` sigue representando el dinero ingresado en ese movimiento, para conservar los cierres de caja existentes. `invoice_total` contiene el valor de la factura y `deposit_amount` su abono aplicado.
 - La factura y el inventario se cierran en una transacción. No se descuentan de nuevo repuestos ya reservados. Las cotizaciones, adiciones y devoluciones usan el registro de movimientos; repetir una aprobación no vuelve a descontar stock.
+- Los egresos de nómina aparecen en el cierre diario con su medio de pago; una transferencia no disminuye el efectivo de caja.
 - Las comisiones se calculan en PostgreSQL sobre la mano de obra facturada y cobrada pendiente del técnico registrado en la factura. Los repuestos y abonos no entran en la base. Cada liquidación guarda los servicios pagados, el porcentaje y el medio de pago.
 - Las liquidaciones históricas se conservan; sus periodos cubren únicamente facturas anteriores sin el nuevo detalle. Los nuevos servicios se controlan por su identificador y no quedan ocultos por un periodo antiguo.
 - La búsqueda de repuestos selecciona un SKU exacto o un resultado único. Una búsqueda ambigua requiere selección manual. Enter lleva a cantidad; no agrega el producto sin confirmación.

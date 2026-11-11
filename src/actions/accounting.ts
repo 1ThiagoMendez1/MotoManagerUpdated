@@ -1,5 +1,6 @@
 'use server';
 
+import { colombiaSettlementRange } from '@/lib/work-order-finance';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentUserServer } from '@/lib/auth-server';
 import { hasPermission } from '@/lib/permissions';
@@ -365,13 +366,9 @@ export async function getDailyClosingSummary(
     startIso = clientStartIso;
     endIso = clientEndIso;
   } else {
-    const startDate = new Date(date);
-    startDate.setHours(0, 0, 0, 0);
-    startIso = startDate.toISOString();
-
-    const endDate = new Date(date);
-    endDate.setHours(23, 59, 59, 999);
-    endIso = endDate.toISOString();
+    const range = colombiaSettlementRange(date,date);
+    startIso = range.start;
+    endIso = new Date(Date.parse(range.endExclusive)-1).toISOString();
   }
 
   const supabaseAdmin = createSupabaseClient(
@@ -387,7 +384,7 @@ export async function getDailyClosingSummary(
     getOrganizationTechnicians(organizationId),
     supabaseAdmin
       .from('payroll_payments')
-      .select('id, total_paid, created_at, payment_method, profiles(first_name, last_name)')
+      .select('id, total_paid, created_at, payment_method, profiles!payroll_payments_technician_id_fkey(first_name, last_name)')
       .eq('organization_id', organizationId)
       .gte('created_at', startIso)
       .lte('created_at', endIso)
@@ -470,6 +467,7 @@ export async function getDailyClosingSummary(
       total,
       sales!inner (
         status,
+        technician_id,
         created_at,
         work_orders!inner (
           organization_id,
@@ -478,7 +476,7 @@ export async function getDailyClosingSummary(
       )
     `)
     .eq('item_type', 'service')
-    .eq('sales.status', 'paid')
+    .eq('sales.status', 'paid').eq('sales.is_deposit',false)
     .eq('sales.work_orders.organization_id', organizationId)
     .gte('sales.created_at', startIso)
     .lte('sales.created_at', endIso);
@@ -492,7 +490,7 @@ export async function getDailyClosingSummary(
         const salesObj = Array.isArray(w.sales) ? w.sales[0] : w.sales;
         if (salesObj?.work_orders) {
           const woObj = Array.isArray(salesObj.work_orders) ? salesObj.work_orders[0] : salesObj.work_orders;
-          mechanicId = woObj?.assigned_mechanic_id;
+          mechanicId = salesObj.technician_id || woObj?.assigned_mechanic_id;
         }
       }
 

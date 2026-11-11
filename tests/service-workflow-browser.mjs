@@ -119,6 +119,11 @@ try{
  const payroll=scalar(`SELECT to_jsonb(p) FROM payroll_payments p WHERE organization_id='${actor.workshop_id}' AND settlement_version=2 ORDER BY created_at DESC LIMIT 1;`);
  assert.equal(Number(payroll.total_paid),Math.round(Number(payroll.total_services_amount)*40)/100);
  assert.equal(payroll.payment_method,'transfer');
+ await page.getByRole('button',{name:'Cierre Diario',exact:true}).click();
+ const payrollExpense=page.getByText('Pago de comisiones a Técnico Validación',{exact:true}).last();
+ await payrollExpense.waitFor();
+ assert.equal(Number((await payrollExpense.locator('..').textContent()).replace(/\D/g,'')),Number(payroll.total_paid));
+ report.scenarios.push('daily closing includes the technician payment as an expense');
  await page.reload({waitUntil:'domcontentloaded'});await page.getByRole('button',{name:'Nómina de Técnicos',exact:true}).click();await page.locator('select').first().selectOption(ids.tech);
  await page.getByText('No hay servicios pendientes de pago en este periodo.',{exact:true}).waitFor();
  report.scenarios.push('payroll excludes advances/parts and persists settled services after reload');
