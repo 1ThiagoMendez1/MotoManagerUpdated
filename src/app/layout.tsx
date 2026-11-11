@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as NotificationToaster } from 'sonner';
 import { cn } from '@/lib/utils';
 import Header from '@/components/Header';
 import { AppSidebar } from '@/components/navigation/AppSidebar';
@@ -130,6 +131,7 @@ export default async function RootLayout({
             {children}
           </LayoutWrapper>
           <Toaster />
+          <NotificationToaster richColors closeButton position="top-right" />
           {user && !isSuperAdmin(user) && <TrialAccessMonitor />}
           <WebAnalyticsTracker isInternal={isSuperAdmin(user)} />
           {!isSuperAdmin(user) && <MeasurementPreferences />}

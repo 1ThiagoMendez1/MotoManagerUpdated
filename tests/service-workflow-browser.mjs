@@ -86,8 +86,8 @@ try{
  assert.equal(await page.getByText(new RegExp('SALE-AB-'+orderNumber+'-')).count(),0);
  assert.equal(scalar(`SELECT to_jsonb(status) FROM work_orders WHERE id='${ids.order}';`),'diagnosis');
  report.scenarios.push('advance stays in cash and never appears as final sale');
- await page.goto(orderURL,{waitUntil:'domcontentloaded'});
- await page.getByRole('button',{name:'Cambiar Estado',exact:true}).first().click();
+ await page.goto('https://motomanager.com.co/work-orders',{waitUntil:'domcontentloaded'});
+ await page.getByRole('row').filter({hasText:`WO-${orderNumber}`}).getByRole('button',{name:'Cambiar Estado',exact:true}).click();
  let dialog=page.getByRole('dialog');await dialog.getByRole('combobox').click();
  assert.deepEqual(await page.getByRole('option').allTextContents(),['Diagnosticando','Reparado']);
  await page.getByRole('option',{name:'Reparado',exact:true}).click();
@@ -97,7 +97,7 @@ try{
  await page.goto('https://motomanager.com.co/sales',{waitUntil:'domcontentloaded'});
  await page.getByRole('button',{name:'Venta por Servicio',exact:true}).click();
  dialog=page.getByRole('dialog');await dialog.getByPlaceholder('Ingresa la placa para buscar...').fill(plate);
- await dialog.getByText('Mano de obra validación',{exact:true}).first().waitFor();
+ await dialog.locator('input[value="Mano de obra validación"]').waitFor();
  const labor=dialog.getByLabel('Costo Mano de Obra (COP)');await labor.fill('100000');
  assert.equal(await dialog.getByLabel('Abono registrado en la orden (COP)').getAttribute('readonly'),'');
  await dialog.getByRole('button',{name:'Confirmar Pagar',exact:true}).click();
