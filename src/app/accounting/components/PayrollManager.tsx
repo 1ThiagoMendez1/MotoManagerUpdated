@@ -12,9 +12,10 @@ const localDate = (date: Date) => date.toLocaleDateString('sv-SE', { timeZone: '
 
 interface PayrollManagerProps {
   organizationId: string;
+  onPaymentRegistered?: () => void;
 }
 
-export default function PayrollManager({ organizationId }: PayrollManagerProps) {
+export default function PayrollManager({ organizationId, onPaymentRegistered }: PayrollManagerProps) {
   const [technicians, setTechnicians] = useState<{id: string, name: string}[]>([]);
   const [selectedTech, setSelectedTech] = useState<string>('');
   const [startDateStr, setStartDateStr] = useState(() => {
@@ -94,6 +95,7 @@ export default function PayrollManager({ organizationId }: PayrollManagerProps) 
         commissionPct, paymentMethod, workItems.map(item => item.id), requestId.current);
       requestId.current = '';
       toast.success('Pago de nómina registrado exitosamente.');
+      onPaymentRegistered?.();
       setWorkItems([]);
       setLoadVersion(value => value + 1);
       

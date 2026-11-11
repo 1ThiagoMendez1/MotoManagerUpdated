@@ -51,6 +51,7 @@ export function SaleDetails({ sale, inventoryItems }: SaleDetailsProps) {
       }) || [];
 
       const receiptData = {
+        status: sale.status,
         saleNumber: sale.saleNumber.replace('SALE-', ''),
         date: sale.date,
         customerName: sale.customerName || sale.customer?.name || 'Cliente de Mostrador',

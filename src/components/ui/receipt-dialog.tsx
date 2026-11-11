@@ -232,7 +232,7 @@ function generateReceiptHTML(data: ReceiptData): string {
         </div>
         ${(data.remainingBalance !== undefined && data.remainingBalance !== data.total) ? `
           <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-top: 5px; color: #d32f2f;">
-            <span>Saldo a Pagar:</span>
+            <span>${data.status === 'paid' ? 'Pagado al finalizar:' : 'Saldo a pagar:'}</span>
             <span>${formatCurrency(data.remainingBalance)}</span>
           </div>
         ` : ''}
@@ -442,7 +442,7 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
 
             {(receiptData.remainingBalance !== undefined && receiptData.remainingBalance !== receiptData.total) && (
               <div className="flex justify-between text-sm font-bold text-red-600 mt-1">
-                <span>Saldo a Pagar:</span>
+                <span>{receiptData.status === 'paid' ? 'Pagado al finalizar:' : 'Saldo a pagar:'}</span>
                 <span>{formatCurrency(receiptData.remainingBalance)}</span>
               </div>
             )}
@@ -470,7 +470,7 @@ export function ReceiptDialog({ isOpen, onClose, receiptData }: ReceiptDialogPro
         </div>
 
         <DialogFooter className="flex gap-2">
-          {receiptData.paymentMethod === 'Wompi' && (
+          {receiptData.paymentMethod === 'Wompi' && receiptData.status !== 'paid' && (
             <WompiButton
               amountInCents={Math.round((receiptData.remainingBalance !== undefined ? receiptData.remainingBalance : receiptData.total) * 100)}
               reference={`MM-SALE-${receiptData.saleNumber}`}

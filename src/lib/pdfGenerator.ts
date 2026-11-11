@@ -1,6 +1,7 @@
 import { formatExactDateTime } from '@/lib/dateUtils';
 
 export interface ReceiptData {
+  status?: string;
   saleNumber: string;
   date: string;
   customerName?: string;
@@ -269,7 +270,7 @@ function generateReceiptHTML(data: ReceiptData): string {
       ${data.remainingBalance && data.remainingBalance > 0 ? `
       <div style="margin-bottom: 10px; padding: 8px; background: #fef9c3; border-radius: 4px;">
         <div style="display: flex; justify-content: space-between;">
-          <span style="font-weight: bold;">Saldo pendiente:</span>
+          <span style="font-weight: bold;">${data.status === 'paid' ? 'Pagado al finalizar:' : 'Saldo pendiente:'}</span>
           <span>${formatCurrency(data.remainingBalance)}</span>
         </div>
       </div>

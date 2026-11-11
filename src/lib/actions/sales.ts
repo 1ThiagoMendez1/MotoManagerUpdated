@@ -147,7 +147,7 @@ export async function createServiceSale(prevState: any, formData: FormData) {
         }));
         const gross = Number(sale.invoice_total ?? (Number(sale.total) + Number(sale.deposit_amount || 0)));
         const receipt = {
-            id: sale.id, saleNumber: sale.sale_number, date: sale.created_at,
+            id: sale.id, status: sale.status, saleNumber: sale.sale_number, date: sale.created_at,
             subtotal: Number(sale.subtotal), discountPercentage: data.discountPercentage,
             discountAmount: Number(sale.discount_total), depositAmount: Number(sale.deposit_amount || 0),
             remainingBalance: Number(sale.total), total: gross, paymentMethod: mapPaymentMethodToUi(sale.payment_method),

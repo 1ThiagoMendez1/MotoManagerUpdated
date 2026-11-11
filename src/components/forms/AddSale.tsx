@@ -80,6 +80,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
   const [receiptData, setReceiptData] = useState<any>(null);
   const [plateSearch, setPlateSearch] = useState('');
   const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [itemsLoadFailed, setItemsLoadFailed] = useState(false);
   const itemsLoad = useRef(0);
   const { toast } = useToast();
   const router = useRouter();
@@ -114,10 +115,12 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
     async function loadWorkOrderItems(workOrderId: string) {
       const loadId = ++itemsLoad.current;
       setIsLoadingItems(true);
+      setItemsLoadFailed(false);
       try {
         const res = await fetch(`/api/work-orders/${workOrderId}/items`);
         if (!res.ok) {
-          console.error('Error fetching work order items for service sale:', await res.text());
+          if (loadId !== itemsLoad.current) return;
+          setItemsLoadFailed(true);
           form.setValue('items', [], { shouldValidate: true });
           return;
         }
@@ -151,7 +154,7 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
         }
 
       } catch (error) {
-        console.error('Unexpected error loading work order items for service sale:', error);
+        if (loadId === itemsLoad.current) setItemsLoadFailed(true);
       } finally {
         if (loadId === itemsLoad.current) setIsLoadingItems(false);
       }
@@ -708,9 +711,9 @@ export function AddSale({ workOrders, inventory }: AddSaleProps) {
                   <DialogTrigger asChild>
                     <Button type="button" variant="outline" className="px-6">Cancelar</Button>
                   </DialogTrigger>
-                  <Button type="submit" disabled={isSubmitting} className="px-8 shadow-lg shadow-primary/20">
+                  <Button type="submit" disabled={isSubmitting || isLoadingItems || itemsLoadFailed} className="px-8 shadow-lg shadow-primary/20">
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirmar Pagar
+                    {isLoadingItems ? 'Cargando orden…' : itemsLoadFailed ? 'Recarga la orden para continuar' : 'Confirmar Pagar'}
                   </Button>
                 </div>
               </div>

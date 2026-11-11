@@ -820,7 +820,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
             )}
 
             {activeTab === 'nomina' && (
-              <PayrollManager organizationId={organizationId} />
+              <PayrollManager organizationId={organizationId} onPaymentRegistered={() => setRefreshKey(value => value + 1)} />
             )}
 
             {activeTab === 'cierre' && (

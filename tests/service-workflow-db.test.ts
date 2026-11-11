@@ -127,6 +127,12 @@ test('service checkout, cash advances, inventory and technician settlements are 
       await close(w,50000,[{inventoryItemId:product,quantity:1,price:80000}]);
       assert.equal(Number(await scalar('SELECT quantity FROM inventory_item_stock WHERE item_id=$1',[product])),21);
     });
+    await t.test('an incomplete browser cart cannot omit parts already recorded in the order',async()=>{
+      const w=await order();await parts(w,'add',product,1);
+      await db.query("UPDATE work_orders SET status='completed' WHERE id=$1",[w]);
+      await assert.rejects(()=>close(w,50000),/Faltan repuestos/);
+      assert.equal(await scalar('SELECT status FROM work_orders WHERE id=$1',[w]),'completed');
+    });
     await t.test('Wompi pending checkout delivers only when paid; inventory and service-only orders work',async()=>{
       const w=await order('completed');const sale=await close(w,50000,[],uuid(),'wompi');
       assert.equal(sale.status,'pending');assert.equal(await scalar('SELECT status FROM work_orders WHERE id=$1',[w]),'completed');
@@ -143,9 +149,15 @@ test('service checkout, cash advances, inventory and technician settlements are 
       await assert.rejects(()=>advance(w,10),/permiso/);
       await db.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[user]);
     });
-    await t.test('historical paid payroll periods are respected without rewriting past payments',async()=>{
+    await t.test('historical payments cover only old invoices; future work in the same period remains payable',async()=>{
+      const before = await pending();
+      const w=await order('completed');
+      const sale=await scalar("INSERT INTO sales(organization_id,work_order_id,total) VALUES($1,$2,999) RETURNING id",[org,w]);
+      await db.query("INSERT INTO sale_items(sale_id,item_type,description,quantity,unit_price,total) VALUES($1,'service','Legado',1,999,999)",[sale]);
+      await db.query("UPDATE sales SET sale_number='VS-LEGACY',status='paid',created_at=$2 WHERE id=$1",[sale,date]);
+      assert.equal((await pending()).length,before.length+1);
       await db.query("INSERT INTO payroll_payments(organization_id,technician_id,period_start,period_end,total_services_amount,commission_percentage,total_paid,status) VALUES($1,$2,$3,$4,999,10,99.9,'paid')",[org,tech,start,end]);
-      assert.equal((await pending()).length,0);
+      assert.equal((await pending()).length,before.length);
     });
   } finally { await db.close(); }
 });

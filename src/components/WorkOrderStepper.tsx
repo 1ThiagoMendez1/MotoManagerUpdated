@@ -7,18 +7,17 @@ type StepperProps = {
 };
 
 const STEPS = [
-  { id: 'Recibida', label: 'Recibida' },
-  { id: 'Diagnosticando', label: 'En Diagnóstico' },
+  { id: 'Diagnosticando', label: 'Diagnosticando' },
   { id: 'Reparado', label: 'Reparado' },
-  { id: 'Entregado', label: 'Entregado / Lista' },
+  { id: 'Entregado', label: 'Entregado' },
 ];
 
 export function WorkOrderStepper({ currentStatus }: StepperProps) {
   // Map possible status variants to our steps
-  const normalizedStatus = currentStatus === 'Entregado' ? 'Entregado' 
+  const normalizedStatus = ['Entregado', 'Moto entregada por cotización rechazada'].includes(currentStatus) ? 'Entregado' 
     : currentStatus === 'Reparado' ? 'Reparado'
     : currentStatus === 'Diagnosticando' ? 'Diagnosticando'
-    : 'Recibida';
+    : 'Diagnosticando';
 
   const currentIndex = STEPS.findIndex(s => s.id === normalizedStatus);
 

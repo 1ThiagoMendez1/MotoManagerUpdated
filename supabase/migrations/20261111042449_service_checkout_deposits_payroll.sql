@@ -69,7 +69,7 @@ BEGIN
       AND NOT EXISTS(SELECT 1 FROM public.payroll_payment_items pi WHERE pi.sale_item_id=si.id AND pi.paid)
       -- Historical settlements had no per-service ledger. Respect their recorded periods.
       AND NOT EXISTS(SELECT 1 FROM public.payroll_payments p WHERE p.organization_id=p_org AND p.technician_id=p_technician
-        AND p.status='paid' AND p.settlement_version=1 AND s.created_at BETWEEN p.period_start AND p.period_end)
+        AND p.status='paid' AND p.settlement_version=1 AND s.invoice_total IS NULL AND s.created_at<=p.created_at AND s.created_at BETWEEN p.period_start AND p.period_end)
     ORDER BY s.created_at,si.id;
 END $$;
 
@@ -181,6 +181,11 @@ BEGIN
     IF NOT FOUND THEN RAISE EXCEPTION 'El repuesto no pertenece al taller.' USING ERRCODE='42501'; END IF;
     products_total=products_total+round(price*qty,2);
   END LOOP;
+  IF EXISTS(SELECT 1 FROM public.sale_items si WHERE si.sale_id=ANY(draft_ids) AND si.item_type='inventory'
+    GROUP BY si.inventory_item_id HAVING sum(si.quantity) > coalesce((SELECT sum((j.value->>'quantity')::numeric)
+      FROM jsonb_array_elements(p_items) j WHERE (j.value->>'inventoryItemId')::uuid=si.inventory_item_id AND coalesce(j.value->>'type','inventory')<>'service'),0)) THEN
+    RAISE EXCEPTION 'Faltan repuestos de la orden en la factura. Recarga la orden antes de cobrar.';
+  END IF;
   discounted=round(products_total*p_discount/100,2);gross=round(products_total+p_labor-discounted,2);
   advance=coalesce(w.deposit_amount,0);
   IF advance>gross THEN RAISE EXCEPTION 'Los abonos superan el valor del servicio. Corrige o devuelve el excedente antes de facturar.'; END IF;
