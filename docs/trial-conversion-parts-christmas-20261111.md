@@ -42,6 +42,8 @@ Para históricos se usa la última compra recibida antes de la venta cuando exis
 
 La utilidad es bruta, antes de nómina y gastos operativos. El margen se calcula sobre ingresos de las unidades con costo incluido. La cobertura usa stock actual y el promedio de venta del periodo; no es una promesa de demanda futura.
 
+El resumen previo llamaba «Utilidad neta» a entradas menos salidas registradas, incluyendo abonos, sin medir el costo vendido. Se corrigen esas etiquetas y se añade una explicación del alcance, conservando los importes existentes. El detalle de utilidad de repuestos utiliza su propio cálculo de ingresos y costos, sin confundir caja con rentabilidad.
+
 ### Navidad interna
 
 Del 1 de noviembre al 6 de enero, según el calendario de Bogotá, se muestran ramas de pino, luces estáticas cálidas y acentos dorados en la cabecera privada. Se conservan el logo y los colores funcionales. Cada navegador puede ocultar y volver a mostrar la decoración. Las páginas públicas no usan esta decoración; conservan su campaña propia. La impresión oculta los adornos.

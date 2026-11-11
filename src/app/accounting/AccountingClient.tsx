@@ -482,6 +482,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                   </div>
                 ) : (
                   <>
+                    <p className="text-xs leading-6 text-muted-foreground">El resumen reúne entradas y salidas registradas, incluidos los abonos recibidos. Consulta costos, utilidad bruta y margen por artículo en Rentabilidad de repuestos.</p>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                       <Card className="bg-card border-border/50 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -495,7 +496,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
 
                       <Card className="bg-card border-border/50 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Utilidad Neta {metrics.label}</CardTitle>
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Entradas menos salidas {metrics.label}</CardTitle>
                           <DollarSign className="h-4 w-4 text-indigo-500" />
                         </CardHeader>
                         <CardContent>
@@ -505,7 +506,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
 
                       <Card className="bg-card border-border/50 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos Totales {metrics.label}</CardTitle>
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Entradas registradas {metrics.label}</CardTitle>
                           <TrendingUp className="h-4 w-4 text-emerald-500" />
                         </CardHeader>
                         <CardContent>
@@ -515,7 +516,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
                       
                       <Card className="bg-card border-border/50 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Gastos Operativos {metrics.label}</CardTitle>
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Salidas registradas {metrics.label}</CardTitle>
                           <TrendingDown className="h-4 w-4 text-rose-500" />
                         </CardHeader>
                         <CardContent>
@@ -525,7 +526,7 @@ export default function AccountingClient({ subscriptionPlan, organizationId, inv
 
                       <Card className="bg-card border-border/50 shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <CardTitle className="text-sm font-medium text-muted-foreground">Margen de Operación {metrics.label}</CardTitle>
+                          <CardTitle className="text-sm font-medium text-muted-foreground">Balance / entradas {metrics.label}</CardTitle>
                           <Percent className="h-4 w-4 text-amber-500" />
                         </CardHeader>
                         <CardContent>
