@@ -58,7 +58,7 @@ El reporte financiero usa `SECURITY INVOKER`, permisos explícitos y aislamiento
 ## Validación de desarrollo
 
 - TypeScript sin errores.
-- Suite de 193 pruebas: 191 aprobadas y 2 omitidas por Redis local no disponible.
+- Suite de 193 pruebas: 191 aprobadas localmente; las 2 que requieren Redis se ejecutaron y aprobaron con Redis real en el VPS.
 - PostgreSQL aislado con PGlite: costos históricos, descuentos, costo inmutable, facturación con abonos, exclusión de ventas pendientes/anuladas, búsqueda/rotación/paginación y permisos financieros.
 - Pruebas de registro: validación, normalización, sesión existente, limitación, duplicados, limpieza únicamente tras fallo confirmado y protección frente a respuesta perdida.
 - PostgreSQL de diagnósticos: separación de cohortes, reintentos, conteo real de pruebas, filtros, códigos permitidos y denegación de acceso a roles del navegador.
@@ -66,4 +66,23 @@ El reporte financiero usa `SECURITY INVOKER`, permisos explícitos y aislamiento
 
 ## Publicación
 
-Pendiente de completar la validación con PostgreSQL 17 y navegador en el entorno aislado del VPS, y registrar aquí el resultado del despliegue. No se deben aplicar datos ficticios ni enviar WhatsApp a clientes durante las pruebas.
+Publicada y verificada el **11 de noviembre de 2026 a las 16:05 de Bogotá (21:05 UTC)**.
+
+- Aplicación: `e4318b190fd270cbd0bb42983bc58648b51ff7a0`.
+- Imagen: `sha256:7408f99766f7e8c554251d5b2d0781f9ed49e56c314e34a43cf26bc64df75bae`.
+- Integración: [PR 20](https://github.com/1ThiagoMendez1/MotoManagerUpdated/pull/20), incorporada a `codex/migration-production-20261106`.
+- PostgreSQL 17.11: ambas migraciones aplicadas en copia aislada antes de producción; firmas verificadas al publicar.
+- Navegador sobre la imagen final: registro de un taller ficticio con sesión autenticada y 15 días Full, descuentos, costos históricos/desconocidos, búsqueda, rotación, anchuras 1920/1366/390, tema oscuro, decoración ocultable y demo bajo demanda. Sin errores JavaScript.
+- Comprobación adicional con datos productivos, antes y después del cambio: órdenes y sus dos estados manuales, abonos fuera de ventas finales, venta por servicio, nómina, rentabilidad, pagos administrativos y diagnóstico de registro. Sin escrituras de negocio de las pruebas ni cambios de tokens de sesión reales.
+- Durante las migraciones se compararon firmas de las filas de ventas, líneas, órdenes, servicios, nómina, productos, existencias, movimientos, compras y líneas de compra en una transacción protegida. Se conservaron sin cambios.
+- Se conservaron la imagen anterior y una copia privada de la base previa a la entrega. Se preservó la modificación local existente del compose de staging y se reactivó el despliegue automático.
+- La copia aislada utilizó mensajería y pagos deshabilitados. Los talleres ficticios solo existieron en esa copia; no se enviaron mensajes ni se procesaron pagos reales durante las pruebas.
+
+Firmas SHA-256 de las migraciones:
+
+| Migración | SHA-256 |
+| --- | --- |
+| `20261111193529_parts_profitability_cost_snapshots.sql` | `cd20ebe44e7702942bd93b289b3e74675ca757750aa8de95224f359fe0975bb2` |
+| `20261111200459_trial_signup_conversion_diagnostics.sql` | `925b93e7bb7ce21e94ad436d48dee3fe5ba255b4cd491e91546e57131f8affdc` |
+
+La medición nueva empieza al publicar esta versión. Los registros históricos de foco automático no se convierten retrospectivamente en escritura, envíos ni clientes.
