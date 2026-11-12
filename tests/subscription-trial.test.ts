@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getTrialState, trialRegistrationSchema, subscriptionPrice } from '../src/lib/subscription-trial';
+import { getTrialState, trialRegistrationSchema, subscriptionPrice, trialWhatsAppPermissions } from '../src/lib/subscription-trial';
 import { resolveWorkshopPlan, getWorkshopWhatsAppLimit } from '../src/lib/workshop-plan';
 
 test('la prueba es Full y vence exactamente al alcanzar su fecha, sin afectar planes existentes', () => {
@@ -24,10 +24,25 @@ test('el registro por pasos requiere acción afirmativa, no casillas, y normaliz
   assert.equal(parsed.email,'ana@example.test');
   assert.equal(parsed.phone,'573001234567');
   assert.equal(parsed.welcomeRequested,'yes');
+  assert.equal(parsed.marketingRequested,'no');
   assert.equal(trialRegistrationSchema.safeParse({...input,welcomeRequested:'no'}).success,true);
   assert.equal(trialRegistrationSchema.safeParse({...input,termsAcknowledged:''}).success,false);
   assert.equal(trialRegistrationSchema.safeParse({...input,password:'123'}).success,false);
   assert.equal(trialRegistrationSchema.safeParse({...input,website:'spam'}).success,false);
+});
+
+test('welcome and promotional permission remain independent; a trial never requires marketing', () => {
+  const at='2026-11-12T21:00:00.000Z';
+  const no=trialWhatsAppPermissions({welcomeRequested:'yes',marketingRequested:'no'},at);
+  assert.ok(no.trial_whatsapp_opt_in);
+  assert.equal(no.trial_whatsapp_marketing_consent.granted,false);
+  const yes=trialWhatsAppPermissions({welcomeRequested:'yes',marketingRequested:'yes'},at);
+  assert.equal(yes.trial_whatsapp_marketing_consent.granted,true);
+  assert.equal(yes.trial_whatsapp_marketing_consent.at,at);
+  assert.equal(yes.trial_whatsapp_marketing_consent.source,'/prueba-gratis');
+  const marketingOnly=trialWhatsAppPermissions({welcomeRequested:'no',marketingRequested:'yes'},at);
+  assert.equal(marketingOnly.trial_whatsapp_opt_in,undefined);
+  assert.equal(marketingOnly.trial_whatsapp_marketing_consent.granted,true);
 });
 
 test('el precio de conversión respeta mensual, semestral y anual', () => {

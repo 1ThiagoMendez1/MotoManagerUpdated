@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, ClipboardList, Gift, MessageCircle, ShieldCheck, Wallet } from 'lucide-react';
 import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
 import { TrialForm } from './TrialForm';
+import { TRIAL_FIELD_CAMPAIGN } from '@/lib/analytics/trial-fields';
 
 export const metadata: Metadata = {
   title: 'Crea tu taller · 15 días de Full gratis | MotoManager',
@@ -17,7 +18,7 @@ export default async function TrialPage() {
     const workshop = await getWorkshopDetails(user);
     redirect(workshop?.trial_expired ? '/dashboard/subscription' : '/' + (workshop?.slug || 'dashboard'));
   }
-  return <main data-campaign="trial-v2" className="relative min-h-dvh overflow-x-clip bg-[#050b18] px-4 pb-10 pt-4 text-white sm:px-6 sm:py-7">
+  return <main data-campaign={TRIAL_FIELD_CAMPAIGN} className="relative min-h-dvh overflow-x-clip bg-[#050b18] px-4 pb-10 pt-4 text-white sm:px-6 sm:py-7">
     <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-80 w-72 rounded-full bg-orange-500/5 blur-3xl"/>
     <div className="relative mx-auto w-full max-w-6xl">
       <header className="flex min-h-11 items-center justify-between gap-3">

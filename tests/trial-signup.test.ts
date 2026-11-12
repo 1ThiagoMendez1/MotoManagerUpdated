@@ -4,6 +4,10 @@ import type { User } from '@supabase/supabase-js';
 import { registerTrialAccount, trialAccountFailure, validateTrialStep, type TrialSignupDependencies } from '../src/lib/trial-signup';
 import { validTrialDiagnostic } from '../src/lib/analytics/trial-events';
 import { analyticsClientIp } from '../src/lib/analytics/web-http';
+import { TRIAL_PROGRESS_FIELDS, trialFieldTarget } from '../src/lib/analytics/trial-fields';
+import { batchSchema } from '../src/lib/analytics/web-validation';
+import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE } from '../src/lib/analytics/web-shared';
+import { randomUUID } from 'node:crypto';
 
 const input = { workshopName:'Taller de prueba',fullName:'Ana Prueba',phone:'300 000 0000',email:' ANA@example.test ',password:'frase de prueba segura',termsAcknowledged:'yes',welcomeRequested:'yes' };
 const owner = { id:'00000000-0000-4000-8000-000000000001' } as User;
@@ -79,6 +83,29 @@ test('milestone payloads reject submitted values, free-text messages and invente
   assert.equal(validTrialDiagnostic({kind:'form_submit',target:'activate'}),true);
   assert.equal(validTrialDiagnostic({kind:'form_error',target:'rate_limited'}),true);
   for(const value of [{kind:'form_error',target:input.email},{kind:'form_error',target:'sql_details'},{kind:'form_submit',target:'activate',email:input.email},{kind:'form_step',target:'password'}])assert.equal(validTrialDiagnostic(value),false);
+});
+test('field measurement accepts only fixed milestones, without field contents or coordinates',()=>{
+  for(const field of TRIAL_PROGRESS_FIELDS)for(const stage of ['view','edit','valid','invalid'] as const){
+    const target=trialFieldTarget(field.name,stage);
+    assert.equal(validTrialDiagnostic({kind:'form_step',target}),true);
+    assert.equal(validTrialDiagnostic({kind:'form_step',target,value:input.phone}),false);
+  }
+  for(const target of ['field_v1:phone:'+input.phone,'field_v1:email:'+input.email,'field_v1:password:'+input.password,'field_v1:city:view'])assert.equal(validTrialDiagnostic({kind:'form_step',target}),false);
+  const batch={mode:ANALYTICS_MODE,batchId:randomUUID(),visitorSeed:randomUUID(),attribution:{channel:'direct',source:null,medium:null,campaign:null,referrer:null},
+    layouts:[{path:'/prueba-gratis',version:ANALYTICS_LAYOUT_VERSION,variant:'trial-v2-fields-v1',viewportWidth:390,viewportHeight:844,width:390,height:1900,sections:[]}],
+    events:[{id:randomUUID(),pageId:randomUUID(),layout:0,kind:'form_step',target:'field_v1:phone:edit',ageMs:0}]};
+  assert.equal(batchSchema.safeParse(batch).success,true);
+  assert.equal(batchSchema.safeParse({...batch,events:[{...batch.events[0],x:.5}]}).success,false);
+  assert.equal(batchSchema.safeParse({...batch,events:[{...batch.events[0],phone:input.phone}]}).success,false);
+  assert.equal(batchSchema.safeParse({...batch,layouts:[{...batch.layouts[0],path:'/login'}]}).success,false);
+});
+
+test('declining promotions does not block account creation; selection is passed separately',async()=>{
+  for(const choice of [undefined,'no','yes']){
+    const h=harness({createAccount:async value=>{assert.equal(value.marketingRequested,choice==='yes'?'yes':'no');return {user:owner};}});
+    const result=await registerTrialAccount({...input,...(choice?{marketingRequested:choice}:{})},h.deps);
+    assert.equal(result.ok,true);
+  }
 });
 test('different visitors behind a verified Cloudflare edge do not share a signup rate address',()=>{
   const headers=new Headers({'x-real-ip':'104.16.1.1','cf-connecting-ip':'190.1.2.3'});

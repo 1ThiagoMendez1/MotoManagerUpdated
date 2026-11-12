@@ -124,6 +124,10 @@ export type TrialSignupDiagnostics = {
   confirmedTrials: number;
   clientErrors: { code:string; attempts:number; visits:number }[];
   serverErrors: { code:string; attempts:number }[];
+  fields?: {
+    available:boolean; firstMeasuredAt:string|null; measuredNavigations:number; ambiguousLastEdits:number;
+    rows:{field:import('./trial-fields').TrialProgressField;viewed:number;edited:number;valid:number;invalid:number;lastWithoutSubmit:number}[];
+  };
 };
 export type HeatmapLayout = { id:string; path:string; variant:string; device:string; viewportWidth:number; viewportHeight:number; width:number; height:number; sections:AnalyticsLayout['sections']; clicks:number; visitors:number };
 export type HeatmapData = { layout:HeatmapLayout|null; layouts:HeatmapLayout[]; points:{x:number;y:number;target:string}[]; targets:{target:string;clicks:number}[]; scroll:{depth:number;visitors:number}[]; totalClicks:number; sampled:boolean };

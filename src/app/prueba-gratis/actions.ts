@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/auth-server';
-import { TRIAL_WHATSAPP_CONSENT_TEXT } from '@/lib/subscription-trial';
+import { trialWhatsAppPermissions } from '@/lib/subscription-trial';
 import { registerTrialAccount, trialAccountFailure, type TrialFormState } from '@/lib/trial-signup';
 import { sendWorkshopTrialWelcome } from '@/lib/trial-welcome-server';
 import { scheduleAccountAccess, scheduleTrialFailure } from '@/lib/analytics/web-server';
@@ -34,7 +34,7 @@ export async function startFullTrial(_previous: TrialFormState, form: FormData):
       const { data: allowed, error } = await admin.rpc('claim_trial_signup_attempt', { p_key: key });
       return error ? 'unavailable' : allowed ? 'allowed' : 'limited';
     },
-    createAccount: async ({ email, password, fullName, phone, welcomeRequested }) => {
+    createAccount: async ({ email, password, fullName, phone, welcomeRequested, marketingRequested }) => {
       const acceptedAt = new Date().toISOString();
       const { data, error } = await admin!.auth.admin.createUser({
         email, password, email_confirm: true,
@@ -42,9 +42,7 @@ export async function startFullTrial(_previous: TrialFormState, form: FormData):
           first_name: fullName.split(' ')[0], last_name: fullName.split(' ').slice(1).join(' '), phone,
           trial_terms_accepted: { at: acceptedAt, source: '/prueba-gratis', version: '2026-11-11',
             text: 'Prueba Full de 15 días por taller, correo y celular, sin cobros automáticos. Autorizo el tratamiento de datos para gestionar la cuenta.' },
-          ...(welcomeRequested === 'yes' ? { trial_whatsapp_opt_in: {
-            at: acceptedAt, source: '/prueba-gratis', text: TRIAL_WHATSAPP_CONSENT_TEXT,
-          } } : {}),
+          ...trialWhatsAppPermissions({ welcomeRequested, marketingRequested }, acceptedAt),
         },
       });
       return { user: error ? null : data.user, errorCode: error ? trialAccountFailure(error) : undefined };

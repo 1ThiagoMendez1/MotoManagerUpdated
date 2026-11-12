@@ -104,7 +104,7 @@ test('writes invalidate, read-only RPCs do not, and ambiguous scopes invalidate 
   assert.equal(isDatabaseMutation(url + 'sales', 'PATCH'), true);
   assert.equal(isDatabaseMutation(url + 'rpc/decrement_inventory', 'POST'), true);
   assert.equal(isDatabaseMutation(url + 'rpc/workshop_dashboard_summary', 'POST'), false);
-  for (const rpc of ['workshop_parts_profitability', 'web_trial_signup_diagnostics', 'record_trial_signup_failure']) {
+  for (const rpc of ['workshop_parts_profitability', 'web_trial_signup_diagnostics', 'web_trial_signup_field_diagnostics', 'record_trial_signup_failure']) {
     assert.equal(isDatabaseMutation(url + 'rpc/' + rpc, 'POST'), false);
   }
   assert.equal(isDatabaseMutation(url + 'rpc/get_my_trial_review', 'POST'), false);

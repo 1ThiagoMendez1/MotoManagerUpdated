@@ -1,7 +1,15 @@
 import { z } from 'zod';
 
 export const TRIAL_DAYS = 15;
-export const TRIAL_WHATSAPP_CONSENT_TEXT = 'Al activar con el botón principal, solicito un mensaje de WhatsApp de MotoManager con los datos de mi prueba gratis y el enlace de acceso; no autorizo publicidad.';
+export const TRIAL_WHATSAPP_CONSENT_TEXT = 'Al crear mi taller, solicito un mensaje de WhatsApp de MotoManager con los datos de mi prueba gratis y el enlace de acceso. Las promociones requieren mi elección opcional por separado.';
+export const TRIAL_WHATSAPP_MARKETING_TEXT = 'Quiero recibir consejos, novedades y promociones de MotoManager por WhatsApp. Es opcional y puedo pedir que dejen de enviármelos respondiendo al mensaje.';
+export function trialWhatsAppPermissions(input: { welcomeRequested: 'yes' | 'no'; marketingRequested: 'yes' | 'no' }, at: string) {
+  const source = '/prueba-gratis', version = '2026-11-12';
+  return {
+    ...(input.welcomeRequested === 'yes' ? { trial_whatsapp_opt_in: { at, source, version, text: TRIAL_WHATSAPP_CONSENT_TEXT } } : {}),
+    trial_whatsapp_marketing_consent: { granted: input.marketingRequested === 'yes', at, source, version, text: TRIAL_WHATSAPP_MARKETING_TEXT },
+  };
+}
 export const trialRegistrationSchema = z.object({
   fullName: z.string().trim().min(2, 'Escribe tu nombre completo.').max(120),
   workshopName: z.string().trim().min(3, 'El nombre del taller debe tener al menos 3 caracteres.').max(120),
@@ -16,6 +24,7 @@ export const trialRegistrationSchema = z.object({
   // Affirmative final submit after a short, visible statement; no opt-in checkboxes.
   termsAcknowledged: z.literal('yes', { errorMap: () => ({ message: 'Confirma las condiciones al activar tu cuenta.' }) }),
   welcomeRequested: z.enum(['yes', 'no']),
+  marketingRequested: z.enum(['yes', 'no']).optional().default('no'),
   website: z.string().max(0).optional(),
 });
 

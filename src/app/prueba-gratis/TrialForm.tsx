@@ -3,10 +3,11 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Gift, Loader2, LockKeyhole, MessageCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Gift, Loader2, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
 import { startFullTrial } from './actions';
 import { TRIAL_FIELDS, TRIAL_STEPS, trialFailure, validateTrialStep, type TrialField, type TrialFormState } from '@/lib/trial-signup';
 import { emitTrialDiagnostic } from '@/lib/analytics/trial-events';
+import { trialFieldTarget, type TrialFieldStage } from '@/lib/analytics/trial-fields';
 
 const fields: Record<TrialField, { label: string; placeholder: string; type: string; autoComplete: string; maxLength: number }> = {
   workshopName: { label: 'Nombre del taller', placeholder: 'Ej. Moto Taller Rayo', type: 'text', autoComplete: 'organization', maxLength: 120 },
@@ -49,9 +50,13 @@ export function TrialForm() {
   const [data, setData] = useState(initialData);
   const [errors, setErrors] = useState<Partial<Record<TrialField, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [marketingRequested, setMarketingRequested] = useState(false);
   const [submittedError, setSubmittedError] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const viewedFields = useRef(new Set<TrialField>());
+  const lastEditedField = useRef<TrialField | null>(null);
+  const fieldResults = useRef(new Map<TrialField, 'valid' | 'invalid'>());
   const [state, action] = useActionState(async (previous: TrialFormState, form: FormData) => {
     try { return await startFullTrial(previous, form); }
     catch (error) {
@@ -62,14 +67,42 @@ export function TrialForm() {
   }, { error: '' } as TrialFormState);
 
   const readCurrentForm = (form: HTMLFormElement | null) => trialFormValues(form, data);
+  function measureField(name: TrialField, stage: TrialFieldStage) {
+    if (stage === 'view') {
+      if (viewedFields.current.has(name)) return;
+      viewedFields.current.add(name);
+    } else if (stage === 'edit') {
+      // Record a new edit when changing fields, never every keystroke.
+      if (lastEditedField.current === name) return;
+      lastEditedField.current = name;
+    } else {
+      if (fieldResults.current.get(name) === stage) return;
+      fieldResults.current.set(name, stage);
+    }
+    emitTrialDiagnostic({ kind: 'form_step', target: trialFieldTarget(name, stage) });
+  }
   useEffect(() => {
     // Preserve values filled by the browser before hydration finishes.
     setData(previous => trialFormValues(formRef.current, previous));
     setInteractive(true);
   }, []);
 
+  useEffect(() => {
+    if (!interactive || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.55) continue;
+        const name = entry.target.getAttribute('data-trial-field') as TrialField;
+        if (TRIAL_FIELDS.includes(name)) measureField(name, 'view');
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.55 });
+    formRef.current?.querySelectorAll('[data-trial-field]').forEach(field => observer.observe(field));
+    return () => observer.disconnect();
+  }, [interactive, step]);
+
   const focusError = (next: Partial<Record<TrialField, string>>) => {
-    const first = TRIAL_FIELDS.find(field => next[field]);
+    const first = TRIAL_STEPS[step].find(field => next[field]) || TRIAL_FIELDS.find(field => next[field]);
     if (first) requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`#trial-${first}`)?.focus());
   };
   useEffect(() => {
@@ -77,6 +110,7 @@ export function TrialForm() {
     setSubmittedError(true);
     emitTrialDiagnostic({ kind: 'form_error', target: state.code || 'interrupted' });
     const next = state.fieldErrors || {};
+    for (const field of TRIAL_FIELDS) if (next[field]) measureField(field, 'invalid');
     setErrors(next);
     if (next.workshopName || next.fullName) setStep(0);
     focusError(next);
@@ -88,6 +122,7 @@ export function TrialForm() {
     // and retain them when changing steps, rather than treating them as empty.
     const values = readCurrentForm(event.currentTarget);
     const next = validateTrialStep(values, step);
+    for (const field of TRIAL_STEPS[step]) measureField(field, next[field] ? 'invalid' : 'valid');
     setData(values);
     setSubmittedError(false);
     setErrors(next);
@@ -116,18 +151,25 @@ export function TrialForm() {
     <form ref={formRef} action={action} noValidate onSubmit={validate} data-trial-form="v2" className="space-y-4">
       {TRIAL_STEPS[step].map(name => {
         const field = fields[name];
-        return <div key={name}>
+        return <div key={name} data-trial-field={name}>
           <label htmlFor={'trial-'+name} className="block text-sm font-semibold text-slate-100">{field.label}</label>
           <div className="relative mt-2">
             <input id={'trial-'+name} name={name} type={name === 'password' && showPassword ? 'text' : field.type}
               autoComplete={field.autoComplete} placeholder={field.placeholder} maxLength={field.maxLength} required value={data[name]}
               inputMode={name === 'phone' ? 'tel' : name === 'email' ? 'email' : undefined} autoCapitalize={name === 'email' ? 'none' : undefined} spellCheck={name === 'email' || name === 'password' ? false : undefined}
-              aria-invalid={!!errors[name]} aria-describedby={errors[name] ? 'trial-'+name+'-error' : ['phone','password'].includes(name) ? 'trial-'+name+'-help' : undefined}
-              onChange={event => { setData(readCurrentForm(event.currentTarget.form)); setErrors(current => ({ ...current, [name]: undefined })); }}
+              aria-invalid={!!errors[name]} aria-describedby={[errors[name] ? 'trial-'+name+'-error' : '', ['phone','password'].includes(name) ? 'trial-'+name+'-help' : '', name === 'phone' ? 'trial-phone-purpose' : ''].filter(Boolean).join(' ') || undefined}
+              onChange={event => { setData(readCurrentForm(event.currentTarget.form)); setErrors(current => ({ ...current, [name]: undefined })); measureField(name, 'edit'); }}
+              onBlur={event => { const values = readCurrentForm(event.currentTarget.form); if (values[name].trim() && !validateTrialStep(values, step)[name]) measureField(name, 'valid'); }}
               className={'h-12 w-full rounded-xl border bg-[#071221] px-3.5 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 '+(errors[name] ? 'border-red-400' : 'border-white/20')+(name === 'password' ? ' pr-12' : '')}/>
             {name === 'password' && <button type="button" onClick={() => { setData(readCurrentForm(formRef.current)); setShowPassword(current => !current); }} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-slate-300 hover:bg-white/5">{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
           </div>
-          {name === 'phone' && <p id="trial-phone-help" className="mt-1.5 text-xs leading-5 text-slate-400">Colombia: 10 dígitos. Otro país: incluye el indicativo.</p>}
+          {name === 'phone' && <>
+            <p id="trial-phone-help" className="mt-1.5 text-xs leading-5 text-slate-400">En Colombia escribe tus 10 dígitos, sin +57. Otro país: incluye el indicativo.</p>
+            <div id="trial-phone-purpose" className="mt-3 flex items-start gap-2.5 rounded-xl border border-emerald-300/15 bg-emerald-300/[.04] p-3 text-xs leading-5 text-slate-300">
+              <ShieldCheck size={18} className="mt-0.5 shrink-0 text-emerald-300"/>
+              <div><p className="font-semibold text-emerald-100">Tu enlace de acceso, a la mano</p><p className="mt-1">Te enviaremos la bienvenida y el enlace a tu taller. Este registro no conecta tu WhatsApp ni permite leer tus chats.</p><p className="mt-1 text-slate-400">Las promociones solo si tú las eliges, abajo.</p></div>
+            </div>
+          </>}
           {name === 'password' && <p id="trial-password-help" className="mt-1.5 text-xs leading-5 text-slate-400">Mínimo 10 caracteres. Puedes usar una frase que recuerdes.</p>}
           {errors[name] && <p id={'trial-'+name+'-error'} role="alert" className="mt-1.5 text-xs leading-5 text-red-200">{errors[name]}</p>}
         </div>;
@@ -135,12 +177,19 @@ export function TrialForm() {
       {TRIAL_FIELDS.filter(name => !TRIAL_STEPS[step].includes(name)).map(name => <input key={'hidden-'+name} type="hidden" name={name} value={data[name]}/>)}
       <input type="hidden" name="termsAcknowledged" value="yes"/>
       <input type="hidden" name="welcomeRequested" value="yes"/>
+      <input type="hidden" name="marketingRequested" value={marketingRequested ? 'yes' : 'no'}/>
       <div className="hidden" aria-hidden="true"><label htmlFor="trial-website">Sitio web</label><input id="trial-website" name="website" tabIndex={-1} autoComplete="off"/></div>
-      {step === 1 && <div className="rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs leading-5 text-slate-300"><p className="flex items-start gap-2"><MessageCircle size={16} className="mt-0.5 shrink-0 text-emerald-300"/>Al crear tu taller, solicitas un mensaje de bienvenida por WhatsApp con tu enlace y las fechas de la prueba. No autorizas publicidad.</p><p className="mt-2 text-[11px] text-slate-400">Aceptas una prueba Full de 15 días por taller, correo y celular, sin cobros automáticos, y el tratamiento de datos para gestionar tu cuenta.</p></div>}
+      {step === 1 && <>
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 p-3 text-xs leading-5 text-slate-300">
+          <input id="trial-marketing" type="checkbox" checked={marketingRequested} onChange={event => { setData(readCurrentForm(formRef.current)); setMarketingRequested(event.currentTarget.checked); }} className="mt-1 h-4 w-4 shrink-0 accent-orange-400"/>
+          <span><span className="flex items-center gap-1.5 font-semibold text-slate-100"><MessageCircle size={14}/>También quiero consejos y promociones <span className="font-normal text-slate-400">· Opcional</span></span><span className="mt-1 block">Por WhatsApp, de MotoManager. Puedes pedir que dejen de enviártelos respondiendo al mensaje. Tu prueba se activa igual si no marcas esta opción.</span></span>
+        </label>
+        <p className="text-[11px] leading-5 text-slate-400">Al crear tu taller, solicitas la bienvenida por WhatsApp y aceptas la prueba Full de 15 días por taller, correo y celular, sin cobros automáticos, y el tratamiento de datos para gestionar tu cuenta.</p>
+      </>}
       {submittedError && state.error && <div role="alert" className="rounded-xl border border-red-300/25 bg-red-400/10 p-3 text-sm leading-6 text-red-100"><p>{state.error}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 font-semibold"><Link href="/login?redirect=/dashboard" className="underline underline-offset-4">Iniciar sesión</Link><Link href="/login?recovery=1" className="underline underline-offset-4">Recuperar contraseña</Link></div></div>}
       <FormControls step={step} interactive={interactive} back={() => { setData(readCurrentForm(formRef.current)); setStep(0); setSubmittedError(false); }}/>
     </form>
-    <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos se usan para gestionar tu taller.</p>
+    <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos gestionan tu cuenta. Tú eliges si recibes promociones.</p>
     <p className="mt-4 border-t border-white/10 pt-4 text-center text-xs text-slate-300">¿Ya tienes cuenta? <Link href="/login" className="font-semibold text-orange-200 underline underline-offset-4">Inicia sesión</Link></p>
   </section>;
 }

@@ -10,6 +10,10 @@ const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM
 try {
   for (const mode of ['typed', 'autofill', 'mixed']) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await context.addInitScript(() => {
+      window.__trialMilestones = [];
+      window.addEventListener('mm:trial-progress', event => window.__trialMilestones.push(event.detail));
+    });
     await context.routeWebSocket('**', socket => socket.close());
     const posts = [], analytics = [], errors = [];
     await context.route('**/*', async route => {
@@ -50,6 +54,9 @@ try {
     } else await enter({ workshopName: 'Taller de prueba', fullName: 'Ana Prueba' });
     await page.getByRole('button', { name: 'Continuar con mi acceso', exact: true }).click();
     await page.locator('#trial-phone').waitFor();
+    assert.equal(await page.locator('#trial-marketing').isChecked(), false, 'Promotions must be optional and unchecked');
+    assert.equal(await page.locator('input[name="marketingRequested"]').inputValue(), 'no');
+    assert.equal(await page.locator('#trial-phone-purpose').isVisible(), true);
     assert.equal(await page.locator('input[name="workshopName"]').inputValue(), 'Taller de prueba');
     assert.equal(posts.length, 0);
     if (mode === 'mixed') {
@@ -58,20 +65,41 @@ try {
         setter.call(document.querySelector('#trial-email'), 'ana@example.test');
         setter.call(document.querySelector('#trial-password'), 'frase de prueba segura');
       });
+      await page.locator('#trial-marketing').check();
+      assert.equal(await page.locator('#trial-email').inputValue(), 'ana@example.test', 'Changing optional permission must preserve autofill');
+      assert.equal(await page.locator('#trial-password').inputValue(), 'frase de prueba segura');
       await enter({ phone: '3000000000' });
       await page.getByRole('button', { name: 'Mostrar contraseña', exact: true }).click();
       assert.equal(await page.locator('#trial-password').inputValue(), 'frase de prueba segura');
       await page.getByRole('button', { name: 'Corregir datos del taller', exact: true }).click();
       await page.getByRole('button', { name: 'Continuar con mi acceso', exact: true }).click();
       assert.equal(await page.locator('#trial-email').inputValue(), 'ana@example.test');
-    } else await enter({ phone: '3000000000', email: 'ana@example.test', password: 'frase de prueba segura' });
+    } else await enter({ email: 'ana@example.test', password: 'frase de prueba segura', phone: '3000000000' });
+    if (mode === 'typed') {
+      await page.locator('#trial-phone').fill('12');
+      await page.getByRole('button', { name: 'Crear mi taller gratis', exact: true }).click();
+      await page.locator('#trial-phone-error').waitFor();
+      assert.equal(posts.length, 0, 'Invalid phone must not reach Auth');
+      await page.locator('#trial-phone').fill('3000000000');
+    }
+    assert.equal(await page.locator('input[name="marketingRequested"]').inputValue(), mode === 'mixed' ? 'yes' : 'no');
     await page.getByRole('button', { name: 'Crear mi taller gratis', exact: true }).click();
     await page.getByText('No recibimos respuesta.', { exact: false }).waitFor();
     assert.equal(posts.length, 1, mode + ': valid fields must reach exactly one server action');
     assert.equal(await page.locator('#trial-email').inputValue(), 'ana@example.test');
     assert.equal(await page.locator('#trial-password').inputValue(), 'frase de prueba segura');
+    assert.equal(await page.locator('#trial-marketing').isChecked(), mode === 'mixed', 'A failed request must preserve the optional choice');
+    assert.equal(await page.locator('input[name="marketingRequested"]').inputValue(), mode === 'mixed' ? 'yes' : 'no');
     const measured = JSON.stringify(analytics);
-    for (const value of ['Taller de prueba', 'ana@example.test', '3000000000', 'frase de prueba segura']) assert.ok(!measured.includes(value), 'Form values must stay out of analytics.');
+    const milestones = await page.evaluate(() => window.__trialMilestones);
+    assert.ok(milestones.some(event => event.target === 'field_v1:phone:view'), 'Viewing WhatsApp must be measured separately');
+    assert.ok(milestones.some(event => event.target === 'field_v1:phone:valid'));
+    if (mode === 'typed') assert.ok(milestones.some(event => event.target === 'field_v1:phone:invalid'));
+    if (mode !== 'autofill') assert.ok(milestones.some(event => event.target === 'field_v1:phone:edit'));
+    for (const value of ['Taller de prueba', 'Ana Prueba', 'ana@example.test', '3000000000', 'frase de prueba segura']) {
+      assert.ok(!measured.includes(value), 'Form values must stay out of analytics.');
+      assert.ok(!JSON.stringify(milestones).includes(value), 'Milestones must contain labels only');
+    }
     assert.deepEqual(errors, []);
     await context.close();
     console.log('TRIAL_SIGNUP_' + mode.toUpperCase() + '_PASSED');

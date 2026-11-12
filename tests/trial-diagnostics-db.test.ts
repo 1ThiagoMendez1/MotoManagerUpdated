@@ -15,11 +15,12 @@ test('trial funnel SQL separates old focus events, new milestones, real creation
       CREATE TABLE motomanager_private.workshop_trial_claims(organization_id uuid PRIMARY KEY,starts_at timestamptz NOT NULL);
       GRANT USAGE ON SCHEMA public,auth,motomanager_private TO service_role;
       GRANT SELECT ON public.organizations,public.organization_members,motomanager_private.workshop_trial_claims TO service_role;`);
-    for(const migration of ['20261030220017_web_analytics.sql','20261111200459_trial_signup_conversion_diagnostics.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8'));
+    for(const migration of ['20261030220017_web_analytics.sql','20261111200459_trial_signup_conversion_diagnostics.sql','20261112215121_trial_field_progress.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+migration,import.meta.url),'utf8'));
     const scalar=async(sql:string,args:unknown[]=[])=>Object.values((await db.query<Record<string,unknown>>(sql,args)).rows[0])[0] as any;
     const layouts=[
       {id:'a'.repeat(32),path:'/prueba-gratis',variant:'old',viewportWidth:390,viewportHeight:844,width:390,height:1800,sections:[]},
       {id:'b'.repeat(32),path:'/prueba-gratis',variant:'trial-v2',viewportWidth:390,viewportHeight:844,width:390,height:1500,sections:[]},
+      {id:'d'.repeat(32),path:'/prueba-gratis',variant:'trial-v2-fields-v1',viewportWidth:390,viewportHeight:844,width:390,height:1900,sections:[]},
     ];
     const event=(kind:string,layout=1,target?:string)=>({id:randomUUID(),pageId:randomUUID(),kind,layout,ageMs:0,...(target?{target}:{})});
     const session=randomUUID(),visitor=randomUUID();
@@ -59,6 +60,32 @@ test('trial funnel SQL separates old focus events, new milestones, real creation
       await assert.rejects(()=>write([event('form_step',1,'password')]),/constraint/);
       await assert.rejects(()=>db.query("SELECT record_trial_signup_failure('private@example.test')"),/constraint/);
     });
+    await t.test('field report excludes historical visits and counts a navigation once per field/stage',async()=>{
+      const fields=async(channel='all',path:string|null=null)=>scalar("SELECT web_trial_signup_field_diagnostics(date_trunc('day',now() AT TIME ZONE 'America/Bogota') AT TIME ZONE 'America/Bogota',(date_trunc('day',now() AT TIME ZONE 'America/Bogota')+interval '1 day') AT TIME ZONE 'America/Bogota',$1,$2)",[channel,path]);
+      assert.equal((await fields()).firstMeasuredAt,null);
+      assert.equal((await fields()).measuredNavigations,0);
+      const pageId=randomUUID(),s=randomUUID(),v=randomUUID();
+      const progress=(field:string,stage:string,ageMs=0)=>({...event('form_step',2,'field_v1:'+field+':'+stage),pageId,ageMs});
+      const events=[{...event('pageview',2),pageId},progress('phone','view',60),progress('phone','edit',50),progress('phone','valid',40),progress('phone','edit',30),progress('phone','invalid',20),progress('email','view',10)];
+      await write(events,{session:s,visitor:v});await write(events,{session:s,visitor:v});
+      const row=(r:any,key:string)=>r.rows.find((x:any)=>x.field===key);
+      let r=await fields();assert.ok(r.firstMeasuredAt);assert.equal(r.measuredNavigations,1);
+      assert.deepEqual(row(r,'phone'),{field:'phone',viewed:1,edited:1,valid:1,invalid:1,lastWithoutSubmit:1});
+      assert.equal(row(r,'email').lastWithoutSubmit,0,'viewing a later field is not editing it');
+      const completePage=randomUUID();
+      await write([progress('phone','edit',30),progress('email','edit',20),{...event('form_submit',2,'activate'),ageMs:10}].map(e=>({...e,pageId:completePage})),{session:s,visitor:v});
+      const revisitPage=randomUUID();
+      await write([progress('email','edit',40),progress('phone','edit',30),progress('password','view',20)].map(e=>({...e,pageId:revisitPage})),{session:s,visitor:v});
+      r=await fields();assert.equal(r.measuredNavigations,3);assert.equal(row(r,'phone').edited,3);assert.equal(row(r,'phone').lastWithoutSubmit,2);assert.equal(row(r,'email').lastWithoutSubmit,0);
+      const tie=randomUUID();await write([progress('email','edit'),progress('phone','edit')].map(e=>({...e,pageId:tie})));
+      r=await fields();assert.equal(r.ambiguousLastEdits,1,'simultaneous autofill must not invent a last field');
+      const direct=randomUUID();await write([progress('phone','view'),progress('phone','edit',10)].map(e=>({...e,pageId:direct})),{session:randomUUID(),visitor:randomUUID(),channel:'direct'});
+      assert.equal((await fields('direct')).measuredNavigations,1);assert.equal(row(await fields('direct'),'phone').lastWithoutSubmit,1);
+      assert.equal((await fields('all','/login')).measuredNavigations,0);
+      for(const target of ['field_v1:phone:573001234567','field_v1:email:private@example.test','field_v1:city:view'])await assert.rejects(()=>write([event('form_step',2,target)]),/constraint/);
+      await assert.rejects(()=>write([{...progress('phone','view'),x:.5,y:.2}]),/constraint/);
+      assert.doesNotMatch(JSON.stringify(r),/573001234567|private@example/);
+    });
     await t.test('browser roles cannot read counters, create health failures or execute the report',async()=>{
       await db.exec('RESET ROLE');
       for(const role of ['anon','authenticated']){
@@ -66,9 +93,12 @@ test('trial funnel SQL separates old focus events, new milestones, real creation
         await assert.rejects(()=>db.query('SELECT * FROM private.trial_signup_failures'),/permission denied/);
         await assert.rejects(()=>db.query("SELECT record_trial_signup_failure('rate_limited')"),/permission denied/);
         await assert.rejects(()=>report(),/permission denied/);
+        await assert.rejects(()=>db.query("SELECT web_trial_signup_field_diagnostics(now()-interval '1 day',now())"),/permission denied/);
         await db.exec('RESET ROLE');
       }
       assert.equal(await scalar("SELECT count(*)::int FROM pg_proc WHERE proname IN ('web_trial_signup_diagnostics','record_trial_signup_failure') AND prosecdef"),0);
+      assert.equal(await scalar("SELECT count(*)::int FROM pg_proc WHERE proname='web_trial_signup_field_diagnostics' AND prosecdef"),0);
+      await assert.rejects(()=>db.query("SELECT web_trial_signup_field_diagnostics(now(),now()-interval '1 hour')"),/Invalid analytics/);
       await assert.rejects(()=>db.query("SELECT web_trial_signup_diagnostics(now(),now()-interval '1 hour')"),/Invalid analytics range/);
       await assert.rejects(()=>db.query("SELECT web_trial_signup_diagnostics(NULL,now())"),/Invalid analytics range/);
     });

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { TRIAL_ERROR_LABELS, type TrialErrorCode } from '@/lib/trial-signup';
+import { TRIAL_PROGRESS_FIELDS } from './trial-fields';
 import { analyticsGeo, analyticsGeoStatus } from './geo';
 import {
   analyticsClientIp, AnalyticsInputError, AnalyticsNotReadyError,
@@ -118,6 +119,7 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
     db.rpc('web_analytics_heatmap',{p_from:range.from,p_to:range.to,p_path:heatPath,p_device:device,p_layout:layout||null,p_channel:channel}).abortSignal(request.signal),
     analyticsGeoStatus(),
     db.rpc('web_trial_signup_diagnostics',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
+    db.rpc('web_trial_signup_field_diagnostics',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
   ]);
   for(const result of results.slice(0,2)){if(result.status==='rejected')throw new Error('Analytics unavailable');}
   const reportResult=results[0].status==='fulfilled'?results[0].value:null;
@@ -129,6 +131,8 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
   if(!report?.totals || !heatmap?.layouts)throw new Error('Analytics unavailable');
   const signup=results[3];
   if(signup.status==='fulfilled'&&!signup.value.error&&signup.value.data?.available)report.signup=signup.value.data;
+  const fields=results[4];
+  if(report.signup&&fields.status==='fulfilled'&&!fields.value.error&&fields.value.data?.available)report.signup.fields=fields.value.data;
   // Do not expose legacy identity links in the anonymous navigation report.
   // Verified account access events remain a separate administrator-only log.
   for(const row of report.sessions){
@@ -153,6 +157,12 @@ export function analyticsCsv(payload:AnalyticsPayload){
     for(const error of signup.clientErrors)rows.push([TRIAL_ERROR_LABELS[error.code as TrialErrorCode]||error.code,error.attempts,error.visits]);
     rows.push([],['Fallos del servidor · todos los canales','Intentos']);
     for(const error of signup.serverErrors)rows.push([TRIAL_ERROR_LABELS[error.code as TrialErrorCode]||error.code,error.attempts]);
+    if(signup.fields?.available){
+      rows.push([],['Registro por campo · navegaciones, no personas'],['Primera medición',signup.fields.firstMeasuredAt||'Sin actividad nueva'],
+        ['Campo','Vieron','Editaron','Dato válido','Aviso de corrección','Último editado sin envío medido']);
+      for(const field of signup.fields.rows)rows.push([TRIAL_PROGRESS_FIELDS.find(row=>row.key===field.field)?.label||field.field,field.viewed,field.edited,field.valid,field.invalid,field.lastWithoutSubmit]);
+      rows.push(['Últimos campos no distinguibles por edición simultánea',signup.fields.ambiguousLastEdits]);
+    }
   }
   return '\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
 }

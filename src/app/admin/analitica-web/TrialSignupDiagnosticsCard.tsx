@@ -2,6 +2,7 @@ import { AlertCircle, ShieldCheck } from 'lucide-react';
 import type { TrialSignupDiagnostics } from '@/lib/analytics/web-shared';
 import { TRIAL_ERROR_LABELS, type TrialErrorCode } from '@/lib/trial-signup';
 import styles from './analytics.module.css';
+import { TRIAL_PROGRESS_FIELDS } from '@/lib/analytics/trial-fields';
 
 const n = (value:number) => Math.round(value).toLocaleString('es-CO');
 export function TrialSignupDiagnosticsCard({ data }: { data?: TrialSignupDiagnostics }) {
@@ -16,6 +17,18 @@ export function TrialSignupDiagnosticsCard({ data }: { data?: TrialSignupDiagnos
           ['Llegaron al registro nuevo',data.visits],['Escribieron algún dato',data.started],['Avanzaron a crear el acceso',data.accessStep],['Enviaron el registro',data.submitted],
         ].map(([label,value],index) => <div key={String(label)}><span className={styles.funnelNumber}>0{index+1}</span><span>{label}</span><strong>{n(Number(value))}</strong></div>)}</div><p className={styles.footnote}>{n(data.submitAttempts)} envíos en {n(data.submitted)} navegaciones medidas. Una persona puede reintentar. Las recargas crean otra navegación y DNT/GPC no se miden.</p></div>
         <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/[.04] p-5"><p className="flex items-center gap-2 text-xs font-semibold text-emerald-500"><ShieldCheck size={15}/>Talleres con prueba creada</p><strong className="mt-3 block text-3xl font-bold">{n(data.confirmedTrials)}</strong><p className={styles.footnote}>Total real del periodo, leído del registro de pruebas. Incluye todos los canales y páginas; es independiente de la medición anónima. No se calcula una conversión individual con estos totales.</p></div>
+      </div>
+      <div className="mt-6 border-t border-white/10 pt-5" aria-label="Avance por campo del registro">
+        <h3 className="text-sm font-semibold">¿Hasta qué campo llegaron?</h3>
+        <p className={styles.footnote}>Distingue ver el campo de editarlo. Cada columna cuenta navegaciones distintas con esa actividad; una recarga puede contar otra navegación. No se guarda el nombre, correo, número ni contraseña escritos.</p>
+        {!data.fields?.available ? <p className={styles.footnote}>La medición por campo estará disponible al completar la actualización de datos.</p> : <>
+          {!data.fields.firstMeasuredAt && <p className={styles.footnote}>Esperando actividad del formulario actualizado. Los registros anteriores no permiten reconstruir en qué campo se detuvieron.</p>}
+          <div className={styles.tableScroll}><table><thead><tr><th>Campo</th><th>Vieron</th><th>Editaron</th><th>Dato válido</th><th>Aviso de corrección</th><th>Último editado sin envío</th></tr></thead><tbody>{data.fields.rows.map(field => <tr key={field.field}>
+            <td>{TRIAL_PROGRESS_FIELDS.find(row => row.key === field.field)?.label || field.field}</td><td>{n(field.viewed)}</td><td>{n(field.edited)}</td><td>{n(field.valid)}</td><td>{n(field.invalid)}</td><td>{n(field.lastWithoutSubmit)}</td>
+          </tr>)}</tbody></table></div>
+          <p className={styles.footnote}>“Vieron” exige que al menos el 55 % del bloque del campo haya sido visible. “Dato válido” solo comprueba el formato; no verifica que el número o correo pertenezcan a esa persona. El autocompletado puede aportar un dato válido sin edición medida.</p>
+          <p className={styles.footnote}>“Último editado sin envío” indica el último campo editado en navegaciones sin envío medido en el periodo. Pueden seguir abiertas o continuar después: no confirma abandono ni desconfianza. Las ediciones simultáneas no se asignan a un campo.{data.fields.ambiguousLastEdits > 0 ? ' Navegaciones con edición simultánea: '+n(data.fields.ambiguousLastEdits)+'.' : ''}{data.fields.firstMeasuredAt ? ' Primera medición por campo: '+new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',dateStyle:'short',timeStyle:'short'}).format(new Date(data.fields.firstMeasuredAt))+'.' : ''}</p>
+        </>}
       </div>
       {correction && <div role="note" className="mt-5 rounded-xl border border-amber-400/20 bg-amber-500/[.04] p-4 text-xs leading-6">
         <strong>{n(correction.attempts)} {correction.attempts === 1 ? 'intento pidió' : 'intentos pidieron'} corregir datos en {n(correction.visits)} {correction.visits === 1 ? 'navegación' : 'navegaciones'}.</strong>
