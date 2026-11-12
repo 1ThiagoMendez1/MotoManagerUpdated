@@ -186,7 +186,7 @@ export function AddSale({ workOrders, inventory, initialWorkOrderId, autoOpen = 
                 {totals.remaining > 0 && <div>
                   <p className="mb-2 text-sm font-semibold">¿Cómo te paga el cliente?</p>
                   <div role="group" aria-label="Método de pago" className="grid grid-cols-3 gap-2 sm:grid-cols-6">{METHODS.map(method => <button key={method} type="button" aria-pressed={paymentMethod === method} onClick={() => setPaymentMethod(method)} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-semibold transition ${paymentMethod === method ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}>
-                    {method === 'Efectivo' ? <Banknote className="h-4 w-4" /> : method === 'Tarjeta' ? <CreditCard className="h-4 w-4" /> : <span className="grid h-4 w-4 place-items-center text-xs font-extrabold">{method.slice(0,1)}</span>}{method}
+                    {method === 'Efectivo' ? <Banknote className="h-4 w-4" /> : method === 'Tarjeta' ? <CreditCard className="h-4 w-4" /> : <span aria-hidden="true" className="grid h-4 w-4 place-items-center text-xs font-extrabold">{method.slice(0,1)}</span>}{method}
                   </button>)}</div>
                 </div>}
                 <details className="rounded-xl border" open={additionsOpen} onToggle={event => setAdditionsOpen(event.currentTarget.open)}>
@@ -216,8 +216,8 @@ export function AddSale({ workOrders, inventory, initialWorkOrderId, autoOpen = 
             {submitError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{submitError}</p>}
           </div>
           <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-muted/20 px-5 py-4">
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => changeOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={!ready || isSubmitting || totals.excess > 0} className="min-h-11 bg-emerald-600 px-5 text-white hover:bg-emerald-700">
+            <Button type="button" variant="outline" className="px-3 text-xs sm:px-4 sm:text-sm" disabled={isSubmitting} onClick={() => changeOpen(false)}>Cancelar</Button>
+            <Button type="submit" disabled={!ready || isSubmitting || totals.excess > 0} className="min-h-11 bg-emerald-600 px-3 text-xs text-white hover:bg-emerald-700 sm:px-5 sm:text-sm">
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ReceiptText className="mr-2 h-4 w-4" />}{isSubmitting ? 'Facturando…' : 'Facturar y entregar'}
             </Button>
           </div>

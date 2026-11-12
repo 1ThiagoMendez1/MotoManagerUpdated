@@ -105,9 +105,9 @@ try{
  assert.equal(await dialog.getByRole('combobox',{name:'Orden de trabajo para facturar'}).count(),0);
  await dialog.getByRole('button',{name:'Nequi',exact:true}).click();
  for(const viewport of [{width:1366,height:900},{width:390,height:844},{width:320,height:640}]){
-  await page.setViewportSize(viewport);
-  const bounds=await dialog.evaluate(el=>{const r=el.getBoundingClientRect(),b=[...el.querySelectorAll('button')].find(x=>x.textContent.includes('Facturar y entregar')).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,buttonBottom:b.bottom,viewport:innerWidth,body:document.documentElement.scrollWidth};});
-  assert.ok(bounds.left>=0&&bounds.right<=viewport.width+1&&bounds.top>=0&&bounds.bottom<=viewport.height+1&&bounds.buttonBottom<=viewport.height&&bounds.body<=viewport.width+1,JSON.stringify(bounds));
+  await page.setViewportSize(viewport);await page.waitForTimeout(400);
+  const bounds=await dialog.evaluate(el=>{const r=el.getBoundingClientRect(),b=[...el.querySelectorAll('button')].find(x=>x.textContent.includes('Facturar y entregar')).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,buttonRight:b.right,buttonBottom:b.bottom,viewport:innerWidth,body:document.documentElement.scrollWidth};});
+  assert.ok(bounds.left>=0&&bounds.right<=viewport.width+1&&bounds.top>=0&&bounds.bottom<=viewport.height+1&&bounds.buttonRight<=viewport.width&&bounds.buttonBottom<=viewport.height&&bounds.body<=viewport.width+1,JSON.stringify(bounds));
   await page.screenshot({path:B+'/invoice-'+viewport.width+'.png',mask:[page.locator('header').first()]});
  }
  await page.setViewportSize({width:1920,height:1080});
