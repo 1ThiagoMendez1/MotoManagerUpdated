@@ -39,6 +39,8 @@ import { AddReminderForm } from '@/components/forms/AddReminderForm';
 import { ReassignTechnician } from '@/components/forms/ReassignTechnician';
 import { PartRequestsSection } from '@/components/work-orders/PartRequestsSection';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { AddSale } from '@/components/forms/AddSale';
+import { canInvoiceWorkOrder } from '@/lib/service-checkout';
 import WorkOrdersRealtime from '../WorkOrdersRealtime';
 
 interface WorkOrderDetailClientProps {
@@ -54,6 +56,9 @@ interface WorkOrderDetailClientProps {
   totalCost: number;
   depositAmount: number;
   pendingBalance: number;
+  canInvoice?: boolean;
+  autoInvoice?: boolean;
+  initialTab?: string;
 }
 
 export function WorkOrderDetailClient({
@@ -69,8 +74,11 @@ export function WorkOrderDetailClient({
   totalCost,
   depositAmount,
   pendingBalance,
+  canInvoice = false,
+  autoInvoice = false,
+  initialTab = 'resumen',
 }: WorkOrderDetailClientProps) {
-  const [activeTab, setActiveTab] = useState('resumen');
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   return (
     <div className="w-full space-y-4 text-foreground pb-12">
@@ -127,6 +135,14 @@ export function WorkOrderDetailClient({
               quoteStatus={workOrder.quote_status}
             />
           </div>
+          {canInvoice && <AddSale
+            key={workOrder.id}
+            workOrders={[workOrder]}
+            inventory={inventory.items}
+            initialWorkOrderId={workOrder.id}
+            autoOpen={autoInvoice && canInvoiceWorkOrder(workOrder)}
+            onReviewDeposit={() => setActiveTab('pagos')}
+          />}
         </div>
       </div>
 

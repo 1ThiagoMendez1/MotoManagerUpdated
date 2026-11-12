@@ -3,11 +3,13 @@ import { getServices } from '@/actions/services';
 import { requireWorkshop } from '@/lib/auth-server';
 import { AlertCircle } from 'lucide-react';
 import { WorkOrderDetailClient } from './WorkOrderDetailClient';
+import { hasPermission } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function WorkOrderDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ facturar?: string; tab?: string }> }) {
   const resolvedParams = await params;
+  const query = await searchParams;
   const workOrder = await getWorkOrderById(resolvedParams.id);
 
   if (!workOrder) {
@@ -80,6 +82,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
       totalCost={totalCost}
       depositAmount={depositAmount}
       pendingBalance={pendingBalance}
+      canInvoice={hasPermission(user.role, '/sales', user.custom_permissions)}
+      autoInvoice={query.facturar === '1'}
+      initialTab={query.tab === 'pagos' ? 'pagos' : 'resumen'}
     />
   );
 }

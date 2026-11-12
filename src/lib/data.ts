@@ -385,6 +385,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
         createdAt: e.created_at
     })) : [],
     invoiceTotal: (() => { const invoice = wo.sales?.find((s: any) => isIssuedServiceSale(s)); return invoice ? serviceInvoiceTotal(invoice, parsedDeposit) : undefined; })(),
+    requiresServiceInvoice: ['delivered','delivered_quote_rejected'].includes(wo.status) && wo.sales?.some((s: any) => isOrderDeposit(s) && s.status === 'paid') && !wo.sales?.some((s: any) => isIssuedServiceSale(s)),
     sales: wo.sales ? wo.sales.filter((s: any) => s.status !== 'cancelled').map((s: any) => ({
         id: s.id,
         saleItems: s.sale_items ? s.sale_items.filter((si: any) => si.item_type === 'inventory').map((si: any) => ({

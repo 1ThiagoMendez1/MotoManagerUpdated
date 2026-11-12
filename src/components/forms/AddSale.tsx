@@ -1,734 +1,228 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { CalendarIcon, Loader2, Wrench, PlusCircle, Trash2, Search, Banknote, CreditCard } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { CurrencyInput } from '@/components/ui/currency-input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Card } from '@/components/ui/card';
-import { Calendar } from '@/components/ui/calendar';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import type { WorkOrder, InventoryItem } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { createServiceSale } from '@/lib/actions/sales';
-import { ReceiptDialog } from '@/components/ui/receipt-dialog';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Banknote, Check, CreditCard, Loader2, Plus, ReceiptText, Search, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { ReceiptDialog } from '@/components/ui/receipt-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { createServiceSale } from '@/lib/actions/sales';
+import { inventorySearchMatch } from '@/lib/work-order-finance';
+import { canInvoiceWorkOrder, serviceCheckoutTotals, type CheckoutItem } from '@/lib/service-checkout';
+import type { InventoryItem, WorkOrder } from '@/lib/types';
 
-const saleItemSchema = z.object({
-  inventoryItemId: z.string().min(1, "Selecciona un producto"),
-  sku: z.string().optional(),
-  name: z.string().optional(),
-  type: z.string().optional(),
-  quantity: z.coerce.number().int().min(1, "Mínimo 1"),
-  price: z.coerce.number(),
-  // Marca si el ítem viene precargado desde la orden de trabajo
-  fromWorkOrder: z.boolean().optional(),
-});
-
-const formSchema = z.object({
-  workOrderId: z.string().min(1, 'Se requiere la orden de trabajo.'),
-  laborCost: z.coerce.number().min(0, "El costo no puede ser negativo."),
-  paymentMethod: z.enum(['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'], {
-    required_error: "Selecciona un medio de pago.",
-  }),
-  date: z.date({
-    required_error: "Se requiere una fecha.",
-  }),
-  items: z.array(saleItemSchema).optional(),
-  discountPercentage: z.coerce.number().min(0).max(100, "El descuento no puede ser mayor al 100%").optional(),
-  depositAmount: z.coerce.number().min(0, "El abono no puede ser negativo.").optional(),
-});
+const METHODS = ['Efectivo', 'Nequi', 'DaviPlata', 'Transferencia', 'Tarjeta', 'Otros'] as const;
+const money = (value: number) => value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 2 });
 
 type AddSaleProps = {
   workOrders: WorkOrder[];
   inventory: InventoryItem[];
+  initialWorkOrderId?: string;
+  autoOpen?: boolean;
+  onReviewDeposit?: () => void;
 };
 
-export function AddSale({ workOrders, inventory }: AddSaleProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const requestId = useRef<string>('');
-  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
-  const [receiptData, setReceiptData] = useState<any>(null);
+export function AddSale({ workOrders, inventory, initialWorkOrderId, autoOpen = false, onReviewDeposit }: AddSaleProps) {
+  const fixedOrder = Boolean(initialWorkOrderId);
+  const [isOpen, setIsOpen] = useState(autoOpen);
+  const [orderId, setOrderId] = useState(initialWorkOrderId || '');
   const [plateSearch, setPlateSearch] = useState('');
-  const [isLoadingItems, setIsLoadingItems] = useState(false);
-  const [itemsLoadFailed, setItemsLoadFailed] = useState(false);
-  const itemsLoad = useRef(0);
+  const [items, setItems] = useState<CheckoutItem[]>([]);
+  const [labor, setLabor] = useState(0);
+  const [deposit, setDeposit] = useState(0);
+  const [discount, setDiscount] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<typeof METHODS[number]>('Efectivo');
+  const [customDate, setCustomDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadedOrderId, setLoadedOrderId] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [reload, setReload] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [receipt, setReceipt] = useState<any>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [productId, setProductId] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [additionsOpen, setAdditionsOpen] = useState(false);
+  const [extraLabor, setExtraLabor] = useState(0);
+  const requestId = useRef('');
+  const submitting = useRef(false);
+  const prefix = useId();
+  const searchInput = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const selectedOrder = workOrders.find(order => order.id === orderId);
+  const eligible = workOrders.filter(canInvoiceWorkOrder);
+  const orderMatches = eligible.filter(order => `${order.motorcycle.plate} ${order.workOrderNumber} ${order.motorcycle.customer.name}`.toLocaleLowerCase('es-CO').includes(plateSearch.trim().toLocaleLowerCase('es-CO')));
+  const productMatches = inventorySearchMatch(inventory, productSearch).matches;
+  const product = inventory.find(item => item.id === productId);
+  const extraQuantity = items.filter(item => !item.fromWorkOrder && item.inventoryItemId === productId).reduce((sum, item) => sum + item.quantity, 0);
+  const available = product ? Math.max(0, product.quantity - extraQuantity) : 0;
+  const canAddProduct = product && Number.isInteger(Number(quantity)) && Number(quantity) > 0 && (product.trackInventory === false || Number(quantity) <= available);
+  const totals = serviceCheckoutTotals(items, labor + extraLabor, discount, deposit);
+  const ready = Boolean(orderId) && loadedOrderId === orderId && !loading && !loadError;
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      workOrderId: '',
-      laborCost: undefined,
-      paymentMethod: 'Efectivo',
-      date: new Date(),
-      items: [],
-      discountPercentage: 0,
-      depositAmount: undefined,
-    },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "items",
-  });
-
-  const { isSubmitting } = form.formState;
-  const watchItems = form.watch("items");
-  const watchLaborCost = form.watch("laborCost");
-  const watchDiscount = form.watch("discountPercentage");
-  const watchWorkOrderId = form.watch("workOrderId");
-  const watchDepositAmount = form.watch("depositAmount");
-
-  // Cargar automáticamente los ítems ya usados en la orden de trabajo seleccionada
   useEffect(() => {
-    async function loadWorkOrderItems(workOrderId: string) {
-      const loadId = ++itemsLoad.current;
-      setIsLoadingItems(true);
-      setItemsLoadFailed(false);
+    if (!isOpen || !orderId) return;
+    const controller = new AbortController();
+    setLoading(true); setLoadedOrderId(''); setLoadError(''); setSubmitError('');
+    setItems([]); setLabor(0); setExtraLabor(0); setDeposit(0); setDiscount(0);
+    setPaymentMethod('Efectivo'); setCustomDate(''); setProductSearch(''); setProductId(''); setQuantity('1'); setAdditionsOpen(false);
+    requestId.current = crypto.randomUUID();
+    void (async () => {
       try {
-        const res = await fetch(`/api/work-orders/${workOrderId}/items`);
-        if (!res.ok) {
-          if (loadId !== itemsLoad.current) return;
-          setItemsLoadFailed(true);
-          form.setValue('items', [], { shouldValidate: true });
-          return;
-        }
-        const data = await res.json();
-        if (loadId !== itemsLoad.current) return;
-        if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
-          form.setValue('items', [], { shouldValidate: true });
-          return;
-        }
+        const response = await fetch(`/api/work-orders/${orderId}/items`, { cache: 'no-store', signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'No se pudo cargar la cuenta.');
+        if (!data.billable) throw new Error('La orden debe estar reparada y pendiente de facturar.');
+        if (!Array.isArray(data.items) || !Number.isFinite(Number(data.depositAmount)) || Number(data.depositAmount) < 0 || !Number.isFinite(Number(data.laborCost)) || Number(data.laborCost) < 0) throw new Error('No se recibió la cuenta completa.');
+        const loaded: CheckoutItem[] = data.items.map((item: CheckoutItem) => ({ ...item, price: Number(item.price), quantity: Number(item.quantity), fromWorkOrder: true }));
+        if (loaded.some(item => !item.inventoryItemId || !Number.isFinite(item.price) || item.price < 0 || !Number.isInteger(item.quantity) || item.quantity <= 0)) throw new Error('Revisa los cargos de la orden antes de facturar.');
+        if (controller.signal.aborted) return;
+        setItems(loaded); setLabor(Number(data.laborCost));
+        setDeposit(Number(data.depositAmount)); setLoadedOrderId(orderId);
+      } catch (error: any) {
+        if (!controller.signal.aborted) setLoadError(error.message || 'No se pudo cargar la cuenta.');
+      } finally { if (!controller.signal.aborted) setLoading(false); }
+    })();
+    return () => controller.abort();
+  }, [isOpen, orderId, reload]);
 
-        const mappedItems = data.items.map((item: any) => ({
-          inventoryItemId: item.inventoryItemId,
-          name: item.name,
-          sku: item.sku,
-          quantity: item.quantity,
-          price: item.price,
-          total: item.total,
-          type: item.type,
-          fromWorkOrder: true,
-        }));
+  function changeOpen(open: boolean) {
+    if (submitting.current) return;
+    if (open) setLoadedOrderId('');
+    setIsOpen(open);
+  }
 
-        form.setValue('items', mappedItems, { shouldValidate: true });
-
-        // Calculate labor cost from services
-        const servicesTotal = mappedItems
-          .filter((item: any) => item.type === 'service')
-          .reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-        
-        if (servicesTotal > 0) {
-          form.setValue('laborCost', servicesTotal, { shouldValidate: true });
-        }
-
-      } catch (error) {
-        if (loadId === itemsLoad.current) setItemsLoadFailed(true);
-      } finally {
-        if (loadId === itemsLoad.current) setIsLoadingItems(false);
-      }
-    }
-
-    requestId.current = '';
-    form.setValue('laborCost', 0);
-    if (watchWorkOrderId) {
-      loadWorkOrderItems(watchWorkOrderId);
-      
-      const selectedWO = workOrders.find(o => o.id === watchWorkOrderId);
-      if (selectedWO?.depositAmount) {
-        form.setValue('depositAmount', selectedWO.depositAmount);
-      } else {
-        form.setValue('depositAmount', undefined as any);
-      }
-    } else {
-      form.setValue('items', [], { shouldValidate: true });
-      form.setValue('depositAmount', undefined as any);
-    }
-    return () => { itemsLoad.current += 1; };
-  }, [watchWorkOrderId, form, workOrders]);
-
-  const itemsTotal = watchItems?.filter(i => i.type !== 'service').reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
-  const laborCostValue = watchLaborCost ? parseFloat(String(watchLaborCost)) : 0;
-  // Subtotal general (productos + mano de obra)
-  const subtotal = itemsTotal + laborCostValue;
-  // El descuento solo aplica sobre el valor de los productos
-  const discountAmount = itemsTotal * ((watchDiscount || 0) / 100);
-  const total = subtotal - discountAmount;
-
-  const depositAmountValue = watchDepositAmount ? parseFloat(String(watchDepositAmount)) : 0;
-  const remainingBalanceTotal = Math.max(0, total - depositAmountValue);
-
-  // Solo considerar órdenes de trabajo en estado Reparado para facturación
-  const activeWorkOrders = workOrders.filter(order => order.status === 'Reparado' || order.requiresServiceInvoice);
-
-  // Filter work orders based on plate search (solo activas)
-  const filteredWorkOrders = plateSearch
-    ? activeWorkOrders.filter(order =>
-      order.motorcycle.plate.toLowerCase().includes(plateSearch.toLowerCase())
-    )
-    : activeWorkOrders;
-
-  // Auto-select work order if only one matches the plate search (solo activas)
-  const handlePlateSearch = (value: string) => {
+  function searchOrder(value: string) {
     setPlateSearch(value);
-    if (value) {
-      const matchingOrders = activeWorkOrders.filter(order =>
-        order.motorcycle.plate.toLowerCase().includes(value.toLowerCase())
-      );
-      if (matchingOrders.length === 1) {
-        form.setValue('workOrderId', matchingOrders[0].id);
-      } else if (matchingOrders.length === 0) {
-        // Clear selection if no matches
-        form.setValue('workOrderId', '');
-      }
-    } else {
-      // Clear selection if search is empty
-      form.setValue('workOrderId', '');
-    }
-  };
-
-  function handleProductChange(value: string, index: number) {
-    const selectedProduct = inventory.find(item => item.id === value);
-    if (selectedProduct) {
-      form.setValue(`items.${index}.price`, selectedProduct.price);
-      form.setValue(`items.${index}.inventoryItemId`, selectedProduct.id);
-      form.setValue(`items.${index}.sku`, selectedProduct.sku);
-    }
+    const matches = eligible.filter(order => `${order.motorcycle.plate} ${order.workOrderNumber} ${order.motorcycle.customer.name}`.toLocaleLowerCase('es-CO').includes(value.trim().toLocaleLowerCase('es-CO')));
+    setOrderId(value.trim() && matches.length === 1 ? matches[0].id : '');
   }
 
-  function handleSkuChange(sku: string, index: number) {
-    const selectedProduct = inventory.find(item => item.sku.toLowerCase() === sku.toLowerCase());
-    if (selectedProduct) {
-      form.setValue(`items.${index}.price`, selectedProduct.price);
-      form.setValue(`items.${index}.inventoryItemId`, selectedProduct.id, { shouldValidate: true });
-    }
+  function addProduct() {
+    if (!canAddProduct || !product) return;
+    setItems(current => [...current, { inventoryItemId: product.id, name: product.name, sku: product.sku, quantity: Number(quantity), price: product.price, type: 'inventory', fromWorkOrder: false }]);
+    setProductSearch(''); setProductId(''); setQuantity('1');
+    searchInput.current?.focus();
   }
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-
-    const formData = new FormData();
-    requestId.current ||= crypto.randomUUID();
-    formData.append('requestId', requestId.current);
-    formData.append('workOrderId', values.workOrderId);
-    formData.append('laborCost', values.laborCost.toString());
-    formData.append('paymentMethod', values.paymentMethod);
-    formData.append('date', values.date.toISOString());
-    formData.append('items', JSON.stringify(values.items || []));
-    formData.append('discountPercentage', (values.discountPercentage || 0).toString());
-    formData.append('depositAmount', (values.depositAmount || 0).toString());
-
-    const result = await createServiceSale(null, formData);
-
-    if (result.success && result.sale) {
-      toast({
-        title: "Éxito",
-        description: "Nueva venta registrada correctamente.",
-      });
-      setIsOpen(false);
-      form.reset();
-      requestId.current = '';
-      setPlateSearch('');
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting.current || !ready || totals.excess > 0) return;
+    // A typed/selected extra must be added explicitly, rather than silently left off the invoice.
+    if (productSearch.trim() || productId || Number(quantity) !== 1) {
+      setSubmitError('Tienes un repuesto sin agregar. Agrégalo o limpia la búsqueda antes de facturar.');
+      setAdditionsOpen(true); searchInput.current?.focus(); return;
+    }
+    if (!Number.isFinite(labor + extraLabor) || labor + extraLabor < 0 || !Number.isFinite(discount) || discount < 0 || discount > 100) {
+      setSubmitError('Revisa la mano de obra y el descuento.'); return;
+    }
+    submitting.current = true; setIsSubmitting(true); setSubmitError('');
+    try {
+      const data = new FormData();
+      data.set('requestId', requestId.current); data.set('workOrderId', orderId);
+      data.set('laborCost', String(labor + extraLabor)); data.set('paymentMethod', paymentMethod);
+      data.set('date', (customDate ? new Date(customDate) : new Date()).toISOString());
+      data.set('items', JSON.stringify(items)); data.set('discountPercentage', String(discount));
+      data.set('depositAmount', String(deposit));
+      const result = await createServiceSale(null, data);
+      if (!result.success || !result.sale) throw new Error(result.message || 'No se pudo facturar.');
+      setReceipt(result.sale); setReceiptOpen(true); setIsOpen(false);
+      toast({ title: 'Servicio facturado', description: 'La moto quedó entregada. Tu comprobante está listo.' });
       router.refresh();
-
-      // Show receipt dialog
-      setReceiptData(result.sale);
-      setReceiptDialogOpen(true);
-    } else {
-      toast({
-        title: "Error",
-        description: result.message || "Error al registrar la venta.",
-        variant: "destructive",
-      });
-    }
+    } catch (error: any) { setSubmitError(error.message || 'No se pudo facturar. Intenta de nuevo.'); }
+    finally { submitting.current = false; setIsSubmitting(false); }
   }
 
-  return (
-    <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline">
-            <Wrench className="mr-2 h-4 w-4" />
-            Venta por Servicio
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-background">
-          <div className="p-6 pb-2 border-b border-border/40 bg-muted/20">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                <Wrench className="h-6 w-6 text-primary" />
-                Registrar Venta por Servicio
-              </DialogTitle>
-              <DialogDescription className="text-muted-foreground text-sm">
-                Asocia una venta a una orden de trabajo, agrega repuestos y mano de obra.
-              </DialogDescription>
-            </DialogHeader>
+  return <>
+    <Dialog open={isOpen} onOpenChange={changeOpen}>
+      {(!fixedOrder || (selectedOrder && canInvoiceWorkOrder(selectedOrder))) && <DialogTrigger asChild>
+        <Button variant={fixedOrder ? 'default' : 'outline'} className={fixedOrder ? 'bg-emerald-600 text-white hover:bg-emerald-700' : undefined}>
+          <ReceiptText className="mr-2 h-4 w-4" />{fixedOrder ? 'Facturar' : 'Venta por Servicio'}
+        </Button>
+      </DialogTrigger>}
+      <DialogContent className="flex max-h-[92dvh] w-[calc(100vw-1.5rem)] flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-2xl" onEscapeKeyDown={event => { if (isSubmitting) event.preventDefault(); }}>
+        <DialogHeader className="shrink-0 border-b px-5 py-4 text-left">
+          <DialogTitle className="flex items-center gap-2 text-xl"><ReceiptText className="h-5 w-5 text-emerald-500" />Facturar servicio</DialogTitle>
+          <DialogDescription>Revisa el saldo, elige cómo te pagan y factura. La moto quedará entregada.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+            {!fixedOrder && <div className="space-y-2">
+              <label htmlFor={prefix + '-order-search'} className="text-sm font-semibold">Busca la moto o el cliente</label>
+              <div className="relative"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input id={prefix + '-order-search'} placeholder="Placa, cliente o número de orden" value={plateSearch} onChange={event => searchOrder(event.target.value)} className="pl-9" disabled={isSubmitting} /></div>
+              <select aria-label="Orden de trabajo para facturar" value={orderId} onChange={event => setOrderId(event.target.value)} disabled={isSubmitting} className="h-11 w-full rounded-md border bg-background px-3 text-sm">
+                <option value="">Selecciona una orden reparada</option>
+                {orderMatches.map(order => <option key={order.id} value={order.id}>{order.motorcycle.plate} · {order.workOrderNumber} · {order.motorcycle.customer.name}</option>)}
+              </select>
+              {eligible.length === 0 && <p className="text-sm text-muted-foreground">No hay órdenes reparadas pendientes de facturar.</p>}
+            </div>}
+            {selectedOrder && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-muted/30 p-3 text-sm">
+              <div><strong className="font-mono">{selectedOrder.motorcycle.plate}</strong><span className="ml-2 text-muted-foreground">{selectedOrder.workOrderNumber}</span><p className="mt-1 break-words text-xs text-muted-foreground">{selectedOrder.motorcycle.customer.name} · {selectedOrder.motorcycle.make} {selectedOrder.motorcycle.model}</p></div>
+              <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{selectedOrder.requiresServiceInvoice ? 'Pendiente de facturar' : 'Reparado'}</span>
+            </div>}
+            {loading && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Preparando la cuenta…</p>}
+            {loadError && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm"><p>{loadError}</p><Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => setReload(value => value + 1)}>Volver a cargar</Button></div>}
+            {ready && <>
+              <div className="rounded-xl border bg-card p-4" aria-label="Resumen para facturar">
+                <div className="flex justify-between gap-3 text-sm"><span className="text-muted-foreground">Total del servicio</span><strong>{money(totals.total)}</strong></div>
+                {totals.discountAmount > 0 && <p className="mt-1 text-xs text-muted-foreground">Incluye {money(totals.discountAmount)} de descuento en repuestos.</p>}
+                <div className="mt-3 flex justify-between gap-3 text-sm text-emerald-600 dark:text-emerald-400"><span>Abonos recibidos</span><strong>−{money(deposit)}</strong></div>
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-2 border-t pt-3"><span className="font-semibold">Cobrar ahora</span><strong className="text-3xl tracking-tight text-primary" aria-live="polite">{money(totals.remaining)}</strong></div>
+                {totals.remaining === 0 && totals.excess === 0 && <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"><Check className="h-4 w-4" />{deposit > 0 ? 'Cubierto con los abonos. No hay otro cobro.' : 'Sin saldo por cobrar.'}</p>}
+              </div>
+              {totals.excess > 0 && <div role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                <p>Los abonos superan la factura en <strong>{money(totals.excess)}</strong>. Revisa los cargos o registra la devolución del excedente antes de facturar.</p>
+                {onReviewDeposit ? <Button type="button" variant="link" className="h-auto px-0 pt-2" onClick={() => { setIsOpen(false); onReviewDeposit(); }}>Revisar abonos</Button> : <Link href={`/work-orders/${orderId}?tab=pagos`} className="mt-2 inline-block font-semibold underline">Revisar abonos</Link>}
+              </div>}
+              <fieldset disabled={isSubmitting} className="min-w-0 space-y-4">
+                {totals.remaining > 0 && <div>
+                  <p className="mb-2 text-sm font-semibold">¿Cómo te paga el cliente?</p>
+                  <div role="group" aria-label="Método de pago" className="grid grid-cols-3 gap-2 sm:grid-cols-6">{METHODS.map(method => <button key={method} type="button" aria-pressed={paymentMethod === method} onClick={() => setPaymentMethod(method)} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] font-semibold transition ${paymentMethod === method ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}>
+                    {method === 'Efectivo' ? <Banknote className="h-4 w-4" /> : method === 'Tarjeta' ? <CreditCard className="h-4 w-4" /> : <span className="grid h-4 w-4 place-items-center text-xs font-extrabold">{method.slice(0,1)}</span>}{method}
+                  </button>)}</div>
+                </div>}
+                <details className="rounded-xl border" open={additionsOpen} onToggle={event => setAdditionsOpen(event.currentTarget.open)}>
+                  <summary className="cursor-pointer px-3 py-3 text-sm font-semibold">Agregar algo más <span className="font-normal text-muted-foreground">· opcional</span></summary>
+                  <div className="space-y-3 border-t p-3">
+                    <label htmlFor={prefix + '-product'} className="block text-xs font-semibold">Repuesto por nombre o código</label>
+                    <Input ref={searchInput} id={prefix + '-product'} placeholder="Ej. FA-001 o filtro de aceite" value={productSearch} onChange={event => { setProductSearch(event.target.value); setProductId(inventorySearchMatch(inventory, event.target.value).selectedId); setSubmitError(''); }} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addProduct(); } }} />
+                    {productSearch.trim() && <>
+                      <select aria-label="Repuesto adicional" value={productId} onChange={event => setProductId(event.target.value)} className="h-11 w-full rounded-md border bg-background px-2 text-sm"><option value="">{productMatches.length ? 'Selecciona un repuesto' : 'Sin coincidencias'}</option>{productMatches.slice(0,100).map(item => <option key={item.id} value={item.id}>{item.name} · {item.sku} · {money(item.price)}</option>)}</select>
+                      <div className="flex items-end gap-2"><div className="flex-1"><label htmlFor={prefix + '-quantity'} className="mb-1 block text-xs">Cantidad</label><Input id={prefix + '-quantity'} type="number" min="1" step="1" value={quantity} onChange={event => setQuantity(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addProduct(); } }} /></div><Button type="button" variant="outline" disabled={!canAddProduct} onClick={addProduct}><Plus className="mr-1 h-4 w-4" />Agregar</Button></div>
+                      {product && <p className="text-xs text-muted-foreground">{product.trackInventory === false ? 'Artículo sin control de existencias.' : `Disponibles para agregar: ${available}`}</p>}
+                    </>}
+                    {items.some(item => !item.fromWorkOrder) && <ul className="space-y-2">{items.map((item,index) => !item.fromWorkOrder && <li key={index} className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 p-2 text-xs"><span className="min-w-0 break-words">{item.quantity} × {item.name} · {money(item.quantity * item.price)}</span><Button type="button" variant="ghost" size="icon" aria-label={`Quitar ${item.name}`} onClick={() => setItems(current => current.filter((_,position) => position !== index))}><Trash2 className="h-4 w-4" /></Button></li>)}</ul>}
+                    <div><label htmlFor={prefix + '-extra-labor'} className="mb-1 block text-xs font-semibold">Mano de obra adicional (COP)</label><CurrencyInput id={prefix + '-extra-labor'} value={extraLabor} onValueChange={setExtraLabor} /></div>
+                  </div>
+                </details>
+                <details className="rounded-xl border">
+                  <summary className="cursor-pointer px-3 py-3 text-sm text-muted-foreground">Ver cargos y otras opciones</summary>
+                  <div className="space-y-3 border-t p-3">
+                    <ul className="space-y-2 text-xs">{items.filter(item => item.fromWorkOrder).map((item,index) => <li key={index} className="flex justify-between gap-3"><span className="min-w-0 break-words">{item.quantity} × {item.name}</span><span className="shrink-0">{money(item.price * item.quantity)}</span></li>)}</ul>
+                    <div className="grid gap-3 sm:grid-cols-2"><div><label htmlFor={prefix + '-labor'} className="mb-1 block text-xs">Costo mano de obra (COP)</label><CurrencyInput id={prefix + '-labor'} value={labor} onValueChange={setLabor} /></div><div><label htmlFor={prefix + '-discount'} className="mb-1 block text-xs">Descuento en repuestos (%)</label><Input id={prefix + '-discount'} type="number" min="0" max="100" step="0.01" value={discount} onChange={event => setDiscount(Number(event.target.value))} /></div></div>
+                    <div><label htmlFor={prefix + '-date'} className="mb-1 block text-xs">Fecha y hora del cobro (opcional)</label><Input id={prefix + '-date'} type="datetime-local" value={customDate} onChange={event => setCustomDate(event.target.value)} /><p className="mt-1 text-xs text-muted-foreground">Si lo dejas vacío, se usa la fecha y hora al facturar.</p></div>
+                  </div>
+                </details>
+              </fieldset>
+            </>}
+            {submitError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{submitError}</p>}
           </div>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col max-h-[75vh]">
-              <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 custom-scrollbar">
-                
-                {/* Service Information */}
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <span className="w-6 h-px bg-border"></span>
-                    Información del Servicio
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <FormItem>
-                      <FormLabel>Buscar por Placa</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                          <Input
-                            placeholder="Ingresa la placa para buscar..."
-                            value={plateSearch}
-                            onChange={(e) => handlePlateSearch(e.target.value)}
-                            className="bg-background border-input pl-10 focus:ring-primary/20 transition-all"
-                          />
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                    <FormField
-                      control={form.control}
-                      name="workOrderId"
-                      render={({ field }) => (
-                        <FormItem className="lg:col-span-2">
-                          <FormLabel>Orden de Trabajo</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} name={field.name}>
-                            <FormControl>
-                              <SelectTrigger className="bg-background border-input focus:ring-primary/20 transition-all">
-                                <SelectValue placeholder="Se autocompletará con la placa" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {filteredWorkOrders.map(order => (
-                                <SelectItem key={order.id} value={order.id}>
-                                  {order.workOrderNumber}{order.requiresServiceInvoice ? ' · Entregada pendiente de facturar' : ''} - {order.motorcycle.make} {order.motorcycle.model} ({order.motorcycle.plate})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="laborCost"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Costo Mano de Obra (COP)</FormLabel>
-                          <FormControl>
-                            <CurrencyInput
-                              placeholder="Ej: 120000"
-                              value={field.value ?? ''}
-                              onValueChange={field.onChange}
-                              className="bg-background border-input focus:ring-primary/20 transition-all"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="depositAmount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Abono registrado en la orden (COP)</FormLabel>
-                          <FormControl>
-                            <CurrencyInput
-                              readOnly
-                              placeholder="Sin abonos"
-                              value={field.value ?? ''}
-                              onValueChange={field.onChange}
-                              className="bg-background border-input focus:ring-primary/20 transition-all"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fecha</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("pl-3 text-left font-normal bg-background border-input hover:bg-accent transition-all w-full", !field.value && "text-muted-foreground")}
-                                >
-                                  {field.value ? format(field.value, "PPP") : <span>Elige una fecha</span>}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                        <span className="w-6 h-px bg-border"></span>
-                        Repuestos y Productos
-                      </h3>
-                      {isLoadingItems && (
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span className="text-xs">Cargando...</span>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
-                      onClick={() => append({ inventoryItemId: '', sku: '', quantity: 1, price: 0 })}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Agregar Producto
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {fields.map((field, index) => {
-                      const currentItem = watchItems?.[index];
-                      const selectedItem = inventory.find(item => item.id === currentItem?.inventoryItemId);
-                      const isOutOfStock = selectedItem && selectedItem.quantity === 0;
-                      const itemPrice = currentItem?.price || 0;
-                      const itemQuantity = currentItem?.quantity || 0;
-                      const itemSubtotal = itemPrice * itemQuantity;
-                      const isFromWorkOrder = (currentItem as any)?.fromWorkOrder === true;
-
-                      return (
-                        <Card key={field.id} className="p-3 border-border/50 bg-background/50 hover:bg-muted/10 transition-colors">
-                          <div className="grid grid-cols-[1fr,2fr,120px,auto] items-start gap-4">
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.sku`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input
-                                      placeholder="SKU..." {...field}
-                                      className="bg-background border-input focus:ring-primary/20"
-                                      disabled={isFromWorkOrder}
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        handleSkuChange(e.target.value, index);
-                                      }}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.inventoryItemId`}
-                              render={({ field: selectField }) => {
-                                if (currentItem?.type === 'service') {
-                                  return (
-                                    <FormItem>
-                                      <FormControl>
-                                        <Input
-                                          disabled
-                                          value={currentItem?.name || 'Servicio'}
-                                          className="bg-background border-input opacity-70 cursor-not-allowed"
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  );
-                                }
-                                return (
-                                  <FormItem>
-                                    <Select
-                                      onValueChange={(value) => handleProductChange(value, index)}
-                                      value={selectField.value}
-                                      disabled={isFromWorkOrder}
-                                    >
-                                      <FormControl>
-                                        <SelectTrigger className={`bg-background border-input ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''} ${isFromWorkOrder ? 'opacity-70 cursor-not-allowed' : ''}`}>
-                                          <SelectValue placeholder="Selecciona un producto" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {inventory.map(item => (
-                                          <SelectItem
-                                            key={item.id}
-                                            value={item.id}
-                                            disabled={item.quantity === 0}
-                                            className={item.quantity === 0 ? 'text-red-500' : ''}
-                                          >
-                                            {item.name} - ${item.price.toLocaleString('es-CO')} (Disp: {item.quantity})
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </FormItem>
-                                );
-                              }}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`items.${index}.quantity`}
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <div className="relative">
-                                      <Input
-                                        type="number"
-                                        {...field}
-                                        min={1}
-                                        max={selectedItem?.quantity || 9999}
-                                        className={`bg-background border-input pr-8 ${isOutOfStock ? 'text-red-500 border-red-500/50' : ''}`}
-                                        disabled={isOutOfStock || isFromWorkOrder}
-                                        placeholder={isOutOfStock ? "0" : undefined}
-                                        onChange={(e) => {
-                                          const val = parseInt(e.target.value);
-                                          if (selectedItem && val > selectedItem.quantity && !isFromWorkOrder) {
-                                            toast({
-                                              title: "Stock insuficiente",
-                                              description: `Solo hay ${selectedItem.quantity} unidades de ${selectedItem.name}.`,
-                                              variant: "destructive"
-                                            });
-                                            field.onChange(selectedItem.quantity);
-                                          } else {
-                                            field.onChange(e);
-                                          }
-                                        }}
-                                      />
-                                      <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-medium pointer-events-none">
-                                        und
-                                      </span>
-                                    </div>
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            {!isFromWorkOrder ? (
-                              <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                                <Trash2 className="h-5 w-5" />
-                              </Button>
-                            ) : (
-                              <div className="w-10"></div>
-                            )}
-                          </div>
-                          
-                          {/* Item Subtotal Line */}
-                          {watchItems?.[index]?.inventoryItemId && (
-                            <div className="mt-3 flex justify-between items-center text-sm">
-                              <div className={isOutOfStock ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
-                                {isOutOfStock ? "⚠️ Producto sin stock" : `Precio unitario: $${itemPrice.toLocaleString('es-CO')}`}
-                              </div>
-                              {!isOutOfStock && (
-                                <div className="font-medium text-foreground">
-                                  Subtotal: ${itemSubtotal.toLocaleString('es-CO')}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </Card>
-                      );
-                    })}
-                    <FormMessage>{form.formState.errors.items?.message}</FormMessage>
-                  </div>
-                </div>
-
-                {/* Checkout Section (Payment & Totals) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border/40">
-                  <div className="space-y-4">
-                     <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <span className="w-6 h-px bg-border"></span>
-                      Pago
-                    </h3>
-                    
-                    <FormField
-                      control={form.control}
-                      name="paymentMethod"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Método de Pago</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-background border-input h-12">
-                                <SelectValue placeholder="Selecciona el medio de pago" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Efectivo">
-                                <div className="flex items-center gap-2">
-                                  <Banknote className="w-4 h-4 text-green-500" />
-                                  <span>Efectivo</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="Nequi">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-4 h-4 rounded bg-[#FF0077] inline-block" />
-                                  <span>Nequi</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="DaviPlata">
-                                <div className="flex items-center gap-2">
-                                  <span className="w-4 h-4 rounded bg-red-600 inline-block" />
-                                  <span>DaviPlata</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="Transferencia">
-                                <div className="flex items-center gap-2">
-                                  <Banknote className="w-4 h-4 text-blue-500" />
-                                  <span>Transferencia Bancaria</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="Tarjeta">
-                                <div className="flex items-center gap-2">
-                                  <CreditCard className="w-4 h-4 text-purple-500" />
-                                  <span>Tarjeta Crédito/Débito</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="Otros">
-                                <div className="flex items-center gap-2">
-                                  <Banknote className="w-4 h-4 text-gray-500" />
-                                  <span>Otros</span>
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Selecciona el medio de pago utilizado por el cliente.
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="discountPercentage"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Descuento Especial (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} className="bg-background border-input w-32" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  {/* Totals Summary */}
-                  <Card className="bg-primary/5 border-primary/20 p-6 flex flex-col justify-center space-y-3 rounded-xl">
-                    <div className="flex justify-between items-center text-sm text-muted-foreground">
-                      <span>Subtotal bruto:</span>
-                      <span>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(subtotal)}</span>
-                    </div>
-                    
-                    {discountAmount > 0 && (
-                      <div className="flex justify-between items-center text-sm text-red-500 font-medium bg-red-500/10 p-2 rounded-md">
-                        <span>Descuento aplicado ({watchDiscount}%):</span>
-                        <span>-{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(discountAmount)}</span>
-                      </div>
-                    )}
-                    
-                    {depositAmountValue > 0 && (
-                      <div className="flex justify-between items-center text-sm text-emerald-700 font-medium bg-emerald-500/10 p-2 rounded-md">
-                        <span>Abono registrado:</span>
-                        <span>-{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(depositAmountValue)}</span>
-                      </div>
-                    )}
-
-                    {depositAmountValue > 0 && remainingBalanceTotal > 0 && (
-                      <div className="flex justify-between items-center text-sm text-amber-700 font-medium bg-amber-500/10 p-2 rounded-md">
-                        <span>Saldo pendiente (Total - Abono):</span>
-                        <span>{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(remainingBalanceTotal)}</span>
-                      </div>
-                    )}
-                    
-                    <div className="border-t border-primary/20 pt-3 flex justify-between items-end mt-2">
-                      <span className="text-base font-semibold text-foreground">Total a Cobrar:</span>
-                      <span className="text-3xl font-bold tracking-tight text-primary">
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(remainingBalanceTotal)}
-                      </span>
-                    </div>
-                  </Card>
-                </div>
-                
-              </div>
-              
-              <div className="p-6 border-t border-border/40 bg-muted/10">
-                <div className="flex justify-end gap-3">
-                  <DialogTrigger asChild>
-                    <Button type="button" variant="outline" className="px-6">Cancelar</Button>
-                  </DialogTrigger>
-                  <Button type="submit" disabled={isSubmitting || isLoadingItems || itemsLoadFailed} className="px-8 shadow-lg shadow-primary/20">
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isLoadingItems ? 'Cargando orden…' : itemsLoadFailed ? 'Recarga la orden para continuar' : 'Confirmar Pagar'}
-                  </Button>
-                </div>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      {receiptData && (
-        <ReceiptDialog
-          isOpen={receiptDialogOpen}
-          onClose={() => setReceiptDialogOpen(false)}
-          receiptData={receiptData}
-        />
-      )}
-    </>
-  );
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t bg-muted/20 px-5 py-4">
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => changeOpen(false)}>Cancelar</Button>
+            <Button type="submit" disabled={!ready || isSubmitting || totals.excess > 0} className="min-h-11 bg-emerald-600 px-5 text-white hover:bg-emerald-700">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ReceiptText className="mr-2 h-4 w-4" />}{isSubmitting ? 'Facturando…' : 'Facturar y entregar'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+    {receipt && <ReceiptDialog isOpen={receiptOpen} onClose={() => setReceiptOpen(false)} receiptData={receipt} />}
+  </>;
 }

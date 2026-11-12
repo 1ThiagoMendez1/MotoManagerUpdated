@@ -28,7 +28,9 @@ import { SearchWorkOrders } from '@/components/forms/SearchWorkOrders';
 import { formatExactDateTime } from '@/lib/dateUtils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, Eye, BellRing, CheckCircle2, Clock, Bike } from 'lucide-react';
+import { ClipboardList, Eye, BellRing, CheckCircle2, Clock, Bike, ReceiptText } from 'lucide-react';
+import { canInvoiceWorkOrder } from '@/lib/service-checkout';
+import { hasPermission } from '@/lib/permissions';
 import WorkOrdersRealtime from './WorkOrdersRealtime';
 import { PageHeader } from '@/components/common/PageHeader';
 import { ModuleToolbar } from '@/components/common/ModuleToolbar';
@@ -43,6 +45,7 @@ export default async function WorkOrdersPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await authorize('/work-orders');
+  const canInvoice = hasPermission(user.role, '/sales', user.custom_permissions);
   const resolvedSearchParams = await searchParams;
   const query = (resolvedSearchParams.query as string) || '';
   const activePage = Number(resolvedSearchParams.activePage) || 1;
@@ -236,6 +239,9 @@ export default async function WorkOrdersPage({
                           </TableCell>
                           <TableCell className="text-right pr-4">
                             <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              {canInvoice && canInvoiceWorkOrder(order) && <Button asChild size="sm" className="h-8 bg-emerald-600 px-2.5 text-xs text-white hover:bg-emerald-700">
+                                <Link href={`/work-orders/${order.id}?facturar=1`}><ReceiptText className="mr-1 h-3.5 w-3.5" />Facturar</Link>
+                              </Button>}
                               <Link href={`/work-orders/${order.id}`}>
                                 <Button 
                                   size="sm" 
@@ -353,6 +359,9 @@ export default async function WorkOrdersPage({
                             </div>
                           </TableCell>
                           <TableCell className="text-right pr-4">
+                            {canInvoice && canInvoiceWorkOrder(order) && <Button asChild size="sm" className="mr-2 h-8 bg-emerald-600 px-2.5 text-xs text-white hover:bg-emerald-700">
+                              <Link href={`/work-orders/${order.id}?facturar=1`}><ReceiptText className="mr-1 h-3.5 w-3.5" />Facturar</Link>
+                            </Button>}
                             <Link href={`/work-orders/${order.id}`}>
                               <Button 
                                 variant="outline" 

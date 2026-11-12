@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { requireWorkshop } from '@/lib/auth-server';
+import { isIssuedServiceSale, isOrderDeposit } from '@/lib/work-order-finance';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,17 +17,21 @@ export async function GET(
     const resolvedParams = await Promise.resolve(params);
     const workOrderId = resolvedParams.id;
     
-    const { data: order } = await supabase.from('work_orders').select('id,assigned_mechanic_id').eq('id',workOrderId).eq('organization_id',user.workshopId).maybeSingle();
+    const { data: order, error: orderError } = await supabase.from('work_orders').select('id,assigned_mechanic_id,status,deposit_amount').eq('id',workOrderId).eq('organization_id',user.workshopId).maybeSingle();
+    if (orderError) throw orderError;
     if (!order || (user.role === 'mechanic' && order.assigned_mechanic_id !== user.userId)) return NextResponse.json({error:'Orden no encontrada'}, {status:404});
 
     // 1. Obtener TODAS las ventas pendientes asociadas a esta orden de trabajo
     const { data: sales, error: salesError } = await supabase
       .from('sales')
-      .select('id')
+      .select('id,sale_number,status,is_deposit,notes')
       .eq('work_order_id', workOrderId)
-      .eq('organization_id', user.workshopId);
+      .eq('organization_id', user.workshopId)
+      .neq('status', 'cancelled');
       
     if (salesError) throw salesError;
+    const billable = !sales?.some(isIssuedServiceSale) && (order.status === 'completed' ||
+      (['delivered', 'delivered_quote_rejected'].includes(order.status) && sales?.some(sale => isOrderDeposit(sale) && sale.status === 'paid')));
     const saleIds = (sales || []).map(s => s.id);
     const { data: saleItems, error: itemsError } = saleIds.length ? await supabase
       .from('sale_items').select('*, inventory_items(name, code)').in('sale_id', saleIds)
@@ -52,7 +57,8 @@ export async function GET(
       .select('*')
       .eq('work_order_id', workOrderId);
 
-    if (!servicesError && services && services.length > 0) {
+    if (servicesError) throw servicesError;
+    if (services && services.length > 0) {
        const mappedServices = services.map((service: any) => ({
          inventoryItemId: service.id, // Using service ID here to satisfy UI requirements
          name: service.description || 'Servicio',
@@ -65,7 +71,12 @@ export async function GET(
        mappedItems.push(...mappedServices);
     }
       
-    return NextResponse.json({ items: mappedItems });
+    return NextResponse.json({
+      items: mappedItems,
+      depositAmount: Number(order.deposit_amount || 0),
+      laborCost: (services || []).reduce((sum, service) => sum + Number(service.total || 0), 0),
+      billable: Boolean(billable),
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     console.error('Error fetching work order items:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
