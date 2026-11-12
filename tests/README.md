@@ -27,3 +27,15 @@ La [integración con el principal del 5 de noviembre](../docs/sync-new-motomanag
 - `workshop-access.test.ts` comprueba mensajes de Auth, normalización del correo, retorno PKCE, aislamiento de rutas de imágenes y rechazo de archivos SVG/MIME falsificados.
 - `test:db` aplica `20261025155215_public_workshop_images.sql` con una tabla mínima de metadatos Storage y ejecuta `workshop-image-regression.sql`. Valida permisos reales de PostgreSQL, aislamiento entre talleres, conservación de ajustes y una política restrictiva que bloquea escrituras/listado desde clientes incluso frente a una política permisiva previa. Este fixture no valida el servidor HTTP de Storage ni SMTP.
 - En entornos donde el socket IPC de la CLI `tsx` esté restringido, ejecutar la misma suite con `node --import tsx --test tests/*.test.ts`.
+
+## Autocompletado del registro de prueba
+
+`TRIAL_TEST_BASE_URL=http://127.0.0.1:3000 CHROMIUM_PATH=/usr/bin/chromium node tests/trial-signup-browser.mjs`
+
+Usar una compilación local o de staging del cambio. Recorre escritura normal,
+autocompletado sin eventos y la combinación de ambos, incluyendo mostrar la
+contraseña y volver al primer paso. Intercepta las acciones de servidor y los
+lotes de estadísticas antes de enviarlos, por lo que no crea cuentas ni modifica
+las métricas. La activación real de Auth/taller queda cubierta por su validación
+separada; este ensayo comprueba que los datos visibles llegan a la acción una
+sola vez y sobreviven a un fallo de conexión.

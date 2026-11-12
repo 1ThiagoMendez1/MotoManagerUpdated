@@ -6,7 +6,7 @@ export const TRIAL_FIELDS = ['workshopName', 'fullName', 'phone', 'email', 'pass
 export type TrialField = typeof TRIAL_FIELDS[number];
 export const TRIAL_STEPS: readonly (readonly TrialField[])[] = [['workshopName', 'fullName'], ['phone', 'email', 'password']];
 export const TRIAL_ERROR_LABELS = {
-  validation: 'Datos por corregir', session_open: 'Sesión ya abierta', rate_limited: 'Límite de intentos',
+  validation: 'Datos incompletos o formato inválido', session_open: 'Sesión ya abierta', rate_limited: 'Límite de intentos',
   rate_unavailable: 'Verificación de intentos no disponible', account_exists: 'Cuenta ya registrada',
   account_failed: 'No se pudo crear la cuenta', trial_used: 'Celular o taller con prueba previa',
   provision_failed: 'No se pudo crear el taller', interrupted: 'Conexión interrumpida',

@@ -17,6 +17,13 @@ const fields: Record<TrialField, { label: string; placeholder: string; type: str
 };
 const initialData: Record<TrialField, string> = { workshopName: '', fullName: '', phone: '', email: '', password: '' };
 
+function trialFormValues(form: HTMLFormElement | null, previous: Record<TrialField, string>) {
+  if (!form) return previous;
+  const submitted = new FormData(form);
+  return Object.fromEntries(TRIAL_FIELDS.map(field => [field, String(submitted.get(field) ?? previous[field])])) as Record<TrialField, string>;
+}
+
+
 function FormControls({ step, back, interactive }: { step: number; back: () => void; interactive: boolean }) {
   const { pending } = useFormStatus();
   const [slow, setSlow] = useState(false);
@@ -38,7 +45,6 @@ function FormControls({ step, back, interactive }: { step: number; back: () => v
 
 export function TrialForm() {
   const [interactive, setInteractive] = useState(false);
-  useEffect(() => setInteractive(true), []);
   const [step, setStep] = useState(0);
   const [data, setData] = useState(initialData);
   const [errors, setErrors] = useState<Partial<Record<TrialField, string>>>({});
@@ -55,6 +61,13 @@ export function TrialForm() {
     }
   }, { error: '' } as TrialFormState);
 
+  const readCurrentForm = (form: HTMLFormElement | null) => trialFormValues(form, data);
+  useEffect(() => {
+    // Preserve values filled by the browser before hydration finishes.
+    setData(previous => trialFormValues(formRef.current, previous));
+    setInteractive(true);
+  }, []);
+
   const focusError = (next: Partial<Record<TrialField, string>>) => {
     const first = TRIAL_FIELDS.find(field => next[field]);
     if (first) requestAnimationFrame(() => formRef.current?.querySelector<HTMLInputElement>(`#trial-${first}`)?.focus());
@@ -70,7 +83,12 @@ export function TrialForm() {
   }, [state]);
 
   function validate(event: React.FormEvent<HTMLFormElement>) {
-    const next = validateTrialStep(data, step);
+    // Password managers and browser autofill can update the displayed inputs
+    // without emitting React's change event. Validate the actual submitted values
+    // and retain them when changing steps, rather than treating them as empty.
+    const values = readCurrentForm(event.currentTarget);
+    const next = validateTrialStep(values, step);
+    setData(values);
     setSubmittedError(false);
     setErrors(next);
     if (Object.keys(next).length) {
@@ -105,9 +123,9 @@ export function TrialForm() {
               autoComplete={field.autoComplete} placeholder={field.placeholder} maxLength={field.maxLength} required value={data[name]}
               inputMode={name === 'phone' ? 'tel' : name === 'email' ? 'email' : undefined} autoCapitalize={name === 'email' ? 'none' : undefined} spellCheck={name === 'email' || name === 'password' ? false : undefined}
               aria-invalid={!!errors[name]} aria-describedby={errors[name] ? 'trial-'+name+'-error' : ['phone','password'].includes(name) ? 'trial-'+name+'-help' : undefined}
-              onChange={event => { setData(current => ({ ...current, [name]: event.target.value })); setErrors(current => ({ ...current, [name]: undefined })); }}
+              onChange={event => { setData(readCurrentForm(event.currentTarget.form)); setErrors(current => ({ ...current, [name]: undefined })); }}
               className={'h-12 w-full rounded-xl border bg-[#071221] px-3.5 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 '+(errors[name] ? 'border-red-400' : 'border-white/20')+(name === 'password' ? ' pr-12' : '')}/>
-            {name === 'password' && <button type="button" onClick={() => setShowPassword(current => !current)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-slate-300 hover:bg-white/5">{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
+            {name === 'password' && <button type="button" onClick={() => { setData(readCurrentForm(formRef.current)); setShowPassword(current => !current); }} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-slate-300 hover:bg-white/5">{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button>}
           </div>
           {name === 'phone' && <p id="trial-phone-help" className="mt-1.5 text-xs leading-5 text-slate-400">Colombia: 10 dígitos. Otro país: incluye el indicativo.</p>}
           {name === 'password' && <p id="trial-password-help" className="mt-1.5 text-xs leading-5 text-slate-400">Mínimo 10 caracteres. Puedes usar una frase que recuerdes.</p>}
@@ -120,7 +138,7 @@ export function TrialForm() {
       <div className="hidden" aria-hidden="true"><label htmlFor="trial-website">Sitio web</label><input id="trial-website" name="website" tabIndex={-1} autoComplete="off"/></div>
       {step === 1 && <div className="rounded-xl border border-white/10 bg-white/[.025] p-3 text-xs leading-5 text-slate-300"><p className="flex items-start gap-2"><MessageCircle size={16} className="mt-0.5 shrink-0 text-emerald-300"/>Al crear tu taller, solicitas un mensaje de bienvenida por WhatsApp con tu enlace y las fechas de la prueba. No autorizas publicidad.</p><p className="mt-2 text-[11px] text-slate-400">Aceptas una prueba Full de 15 días por taller, correo y celular, sin cobros automáticos, y el tratamiento de datos para gestionar tu cuenta.</p></div>}
       {submittedError && state.error && <div role="alert" className="rounded-xl border border-red-300/25 bg-red-400/10 p-3 text-sm leading-6 text-red-100"><p>{state.error}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 font-semibold"><Link href="/login?redirect=/dashboard" className="underline underline-offset-4">Iniciar sesión</Link><Link href="/login?recovery=1" className="underline underline-offset-4">Recuperar contraseña</Link></div></div>}
-      <FormControls step={step} interactive={interactive} back={() => { setStep(0); setSubmittedError(false); }}/>
+      <FormControls step={step} interactive={interactive} back={() => { setData(readCurrentForm(formRef.current)); setStep(0); setSubmittedError(false); }}/>
     </form>
     <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos se usan para gestionar tu taller.</p>
     <p className="mt-4 border-t border-white/10 pt-4 text-center text-xs text-slate-300">¿Ya tienes cuenta? <Link href="/login" className="font-semibold text-orange-200 underline underline-offset-4">Inicia sesión</Link></p>
