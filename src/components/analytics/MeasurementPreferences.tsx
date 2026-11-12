@@ -12,6 +12,7 @@ import { LEGACY_WEB_ANALYTICS_STORAGE_KEYS, MEASUREMENT_CHANGED, publicAnalytics
 export function MeasurementPreferences(){
   const pathname=usePathname();
   const publicPage=publicAnalyticsPath(pathname)===pathname;
+  const trialPage=pathname==='/prueba-gratis';
   const [open,setOpen]=useState(false);
   const [marketing,setMarketing]=useState(false);
   const [blocked,setBlocked]=useState(false);
@@ -51,10 +52,10 @@ export function MeasurementPreferences(){
   };
 
   if(!publicPage)return null;
-  return <div data-analytics-ignore="true">
+  return <div data-analytics-ignore="true" className={trialPage?'bg-[#050b18] px-4 py-3':undefined}>
     <button type="button" aria-label="Configurar privacidad publicitaria"
       aria-expanded={open} onClick={()=>setOpen(value=>!value)}
-      className="fixed bottom-3 left-3 z-[110] inline-flex items-center gap-2 rounded-full border border-white/20 bg-[#111c2e]/95 px-3 py-2 text-[11px] font-semibold text-slate-200 shadow-lg transition hover:border-orange-400/50 hover:text-white">
+      className={(trialPage?'mx-auto flex':'fixed bottom-3 left-3 z-[110] inline-flex')+' items-center gap-2 rounded-full border border-white/20 bg-[#111c2e]/95 px-3 py-2 text-[11px] font-semibold text-slate-200 shadow-lg transition hover:border-orange-400/50 hover:text-white'}>
       <ShieldCheck size={14}/>Privacidad
     </button>
     {open&&<section role="dialog" aria-modal="false" aria-label="Privacidad publicitaria" className="fixed bottom-14 left-3 z-[120] w-[min(340px,calc(100vw-24px))] rounded-2xl border border-white/20 bg-[#111c2e] p-4 text-white shadow-2xl">

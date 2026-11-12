@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Gift, Loader2, LockKeyhole, MessageCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Gift, Loader2, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { startFullTrial } from './actions';
 import { TRIAL_FIELDS, TRIAL_STEPS, trialFailure, validateTrialStep, type TrialField, type TrialFormState } from '@/lib/trial-signup';
 import { emitTrialDiagnostic } from '@/lib/analytics/trial-events';
@@ -182,7 +182,7 @@ export function TrialForm() {
       {step === 1 && <>
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 p-3 text-xs leading-5 text-slate-300">
           <input id="trial-marketing" type="checkbox" checked={marketingRequested} onChange={event => { setData(readCurrentForm(formRef.current)); setMarketingRequested(event.currentTarget.checked); }} className="mt-1 h-4 w-4 shrink-0 accent-orange-400"/>
-          <span><span className="flex items-center gap-1.5 font-semibold text-slate-100"><MessageCircle size={14}/>También quiero consejos y promociones <span className="font-normal text-slate-400">· Opcional</span></span><span className="mt-1 block">Por WhatsApp, de MotoManager. Puedes pedir que dejen de enviártelos respondiendo al mensaje. Tu prueba se activa igual si no marcas esta opción.</span></span>
+          <span className="min-w-0 flex-1"><span className="block font-semibold text-slate-100">Quiero consejos y promociones</span><span className="mt-1 block"><span className="text-orange-200">Opcional</span> · Por WhatsApp, de MotoManager. La prueba se activa igual sin marcarlo. Puedes pedir dejar de recibirlos.</span></span>
         </label>
         <p className="text-[11px] leading-5 text-slate-400">Al crear tu taller, solicitas la bienvenida por WhatsApp y aceptas la prueba Full de 15 días por taller, correo y celular, sin cobros automáticos, y el tratamiento de datos para gestionar tu cuenta.</p>
       </>}

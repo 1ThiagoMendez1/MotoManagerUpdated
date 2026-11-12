@@ -54,6 +54,7 @@ try {
     } else await enter({ workshopName: 'Taller de prueba', fullName: 'Ana Prueba' });
     await page.getByRole('button', { name: 'Continuar con mi acceso', exact: true }).click();
     await page.locator('#trial-phone').waitFor();
+    assert.notEqual(await page.getByRole('button', { name: 'Configurar privacidad publicitaria', exact: true }).evaluate(button => getComputedStyle(button).position), 'fixed', 'Privacy preferences must stay clear of form controls');
     assert.equal(await page.locator('#trial-marketing').isChecked(), false, 'Promotions must be optional and unchecked');
     assert.equal(await page.locator('input[name="marketingRequested"]').inputValue(), 'no');
     assert.equal(await page.locator('#trial-phone-purpose').isVisible(), true);
