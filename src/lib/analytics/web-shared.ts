@@ -31,6 +31,7 @@ export const TARGET_LABELS: Record<string, string> = {
   nav_trial: 'Navegación · Activar prueba', ribbon_trial: 'Franja · Activar prueba',
   offer_trial: 'Oferta Full · Activar prueba', closing_trial: 'Cierre · Activar prueba',
   demo_open: 'Demo · Abrir demostración', demo_trial: 'Demo · Crear mi taller gratis',
+  whatsapp_floating: 'WhatsApp · Botón flotante comercial', whatsapp_advice: 'WhatsApp · Asesoría para mi taller',
   plan_basic: 'Elegir Básico', plan_pro: 'Elegir Pro', plan_full: 'Elegir Full',
   link: 'Enlace', button: 'Botón', area: 'Zona de la página',
 };

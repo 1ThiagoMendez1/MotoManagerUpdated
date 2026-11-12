@@ -17,6 +17,7 @@ import { LandingFeatures } from './components/LandingFeatures';
 import { LandingPricing } from './components/LandingPricing';
 import { LandingTestimonialsAndFAQ } from './components/LandingTestimonialsAndFAQ';
 import { LandingFooter } from './components/LandingFooter';
+import { LandingWhatsAppWidget } from './components/LandingWhatsAppWidget';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
 import { HalloweenClosing, HalloweenRibbon } from './components/HalloweenCampaign';
 import halloweenStyles from './components/halloween.module.css';
@@ -155,6 +156,7 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
       </main>
       <LandingFooter halloween={halloween} christmas={christmasEdition} />
       {christmasEdition && <ChristmasMobileDock user={Boolean(user)} />}
+      {!activePlan && !regModal.open && <LandingWhatsAppWidget hasMobileDock={christmasEdition} />}
 
       {activePlan && <PaymentModal plan={activePlan} onClose={() => setActivePlan(null)} appUrl={appUrl} />}
       <RegistrationModal

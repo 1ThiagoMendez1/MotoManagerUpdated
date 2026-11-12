@@ -1,0 +1,62 @@
+.widget {
+  position: fixed;
+  z-index: 90;
+  right: 24px;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  width: min(326px, calc(100vw - 28px));
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+  font-family: inherit;
+}
+.launcher, .invitation { pointer-events: auto; }
+.launcher {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 15px 9px 10px;
+  border: 1px solid #53d89680;
+  border-radius: 100px;
+  background: #0c2230;
+  color: #fff;
+  box-shadow: 0 10px 35px #0005, 0 0 0 4px #25d36612;
+  text-decoration: none;
+  transition: transform .18s, background .18s;
+}
+.launcher:hover { transform: translateY(-2px); background: #123143; }
+.icon { display: grid; width: 44px; height: 44px; flex: none; place-items: center; border-radius: 50%; background: #25d366; color: #052b1b; }
+.launcherCopy { display: flex; flex-direction: column; gap: 4px; }
+.launcherCopy strong { font-size: 13px; font-weight: 800; line-height: 1.2; }
+.launcherCopy > span { color: #a8eac6; font-size: 11px; font-weight: 500; line-height: 1.2; }
+.arrow { color: #98e5ba; }
+.invitation { width: 100%; padding: 17px; border: 1px solid #cdded5; border-radius: 20px; background: #fff; color: #142333; box-shadow: 0 16px 50px #0004; animation: enter .22s ease-out; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.brand { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; }
+.brand > svg { color: #087c45; }
+.brand > span { color: #64748b; font-size: 11px; font-weight: 500; }
+.close { display: grid; min-width: 36px; min-height: 36px; place-items: center; margin: -7px -7px -7px 0; border-radius: 50%; color: #526274; }
+.close:hover { background: #edf4f0; }
+.title { margin-top: 15px; max-width: 240px; font-size: 21px; font-weight: 800; line-height: 1.25; letter-spacing: -.035em; }
+.description { margin-top: 10px; color: #526274; font-size: 13px; line-height: 1.65; }
+.description strong { color: #142333; font-weight: 700; }
+.action { display: flex; min-height: 48px; align-items: center; justify-content: center; gap: 7px; margin-top: 16px; padding: 10px 12px; border-radius: 12px; background: #128c4a; color: #fff; font-size: 12px; font-weight: 800; text-decoration: none; transition: background .18s; }
+.action:hover { background: #08783b; }
+.launcher:focus-visible, .action:focus-visible, .close:focus-visible { outline: 3px solid #2f80ed; outline-offset: 4px; }
+@keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 639px) {
+  .widget { right: 14px; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); gap: 10px; }
+  .widget[data-mobile-dock="true"] { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .launcher { min-height: 58px; gap: 10px; padding: 7px 12px 7px 8px; }
+  .icon { width: 40px; height: 40px; }
+  .launcherCopy strong { font-size: 12px; }
+  .launcherCopy > span { font-size: 10px; }
+  .invitation { max-height: calc(100dvh - 230px); overflow-y: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .invitation { animation: none; }
+  .launcher, .action { transition: none; }
+  .launcher:hover { transform: none; }
+}
