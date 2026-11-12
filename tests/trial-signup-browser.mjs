@@ -75,6 +75,11 @@ try {
       await page.getByRole('button', { name: 'Continuar con mi acceso', exact: true }).click();
       assert.equal(await page.locator('#trial-email').inputValue(), 'ana@example.test');
     } else await enter({ email: 'ana@example.test', password: 'frase de prueba segura', phone: '3000000000' });
+    if (mode === 'autofill') {
+      await page.locator('#trial-marketing').check();
+      await page.locator('#trial-marketing').uncheck();
+      assert.equal(await page.locator('#trial-password').inputValue(), 'frase de prueba segura');
+    }
     if (mode === 'typed') {
       await page.locator('#trial-phone').fill('12');
       await page.getByRole('button', { name: 'Crear mi taller gratis', exact: true }).click();
@@ -91,6 +96,7 @@ try {
     assert.equal(await page.locator('#trial-marketing').isChecked(), mode === 'mixed', 'A failed request must preserve the optional choice');
     assert.equal(await page.locator('input[name="marketingRequested"]').inputValue(), mode === 'mixed' ? 'yes' : 'no');
     const measured = JSON.stringify(analytics);
+    if (mode === 'autofill') assert.ok(!analytics.flatMap(batch => batch.events).some(event => event.kind === 'form_start'), 'Choosing an optional checkbox is not writing a signup field');
     const milestones = await page.evaluate(() => window.__trialMilestones);
     assert.ok(milestones.some(event => event.target === 'field_v1:phone:view'), 'Viewing WhatsApp must be measured separately');
     assert.ok(milestones.some(event => event.target === 'field_v1:phone:valid'));

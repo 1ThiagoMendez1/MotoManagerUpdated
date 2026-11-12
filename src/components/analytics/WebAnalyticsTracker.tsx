@@ -7,6 +7,7 @@ import { ANALYTICS_LAYOUT_VERSION, ANALYTICS_MODE, ANALYTICS_SESSION_MS, LEGACY_
   trafficAttribution, type AnalyticsBatch, type AnalyticsEvent, type AnalyticsLayout } from '@/lib/analytics/web-shared';
 import { measuredDepth, normalizeClick, type ScrollGeometry } from '@/lib/analytics/web-geometry';
 import { TRIAL_DIAGNOSTIC_EVENT, validTrialDiagnostic } from '@/lib/analytics/trial-events';
+import { TRIAL_FIELDS, type TrialField } from '@/lib/trial-signup';
 
 type Captured={layout:AnalyticsLayout;event:Omit<AnalyticsEvent,'layout'|'ageMs'>;at:number};
 const round=(value:number)=>Math.round(value*1000000)/1000000;
@@ -128,7 +129,8 @@ function createTracker(getPath:()=>string){
   };
   let formStarted=false;
   const onInput=(event:Event)=>{
-    if(current()&&path==='/prueba-gratis'&&!formStarted&&event.target instanceof Element&&event.target.closest('[data-trial-form]')){
+    if(current()&&path==='/prueba-gratis'&&!formStarted&&event.target instanceof HTMLInputElement&&
+      TRIAL_FIELDS.includes(event.target.name as TrialField)&&event.target.closest('[data-trial-form]')){
       formStarted=true;capture();push('form_start');void flush();
     }
   };
