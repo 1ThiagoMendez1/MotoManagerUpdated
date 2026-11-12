@@ -53,7 +53,7 @@
   .icon { width: 40px; height: 40px; }
   .launcherCopy strong { font-size: 12px; }
   .launcherCopy > span { font-size: 10px; }
-  .invitation { max-height: calc(100dvh - 230px); overflow-y: auto; }
+  .invitation { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .invitation { animation: none; }

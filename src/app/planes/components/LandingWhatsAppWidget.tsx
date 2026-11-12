@@ -11,7 +11,9 @@ export function LandingWhatsAppWidget({ hasMobileDock = false }: { hasMobileDock
   const [showInvitation, setShowInvitation] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowInvitation(true), 8000);
+    const timer = window.setTimeout(() => {
+      if (window.matchMedia('(min-width: 640px)').matches) setShowInvitation(true);
+    }, 8000);
     return () => window.clearTimeout(timer);
   }, []);
 
