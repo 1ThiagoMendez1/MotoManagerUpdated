@@ -205,7 +205,8 @@ export async function POST(req: Request) {
                   sale.subtotal,
                   0, 
                   sale.discount_total,
-                  workshopName
+                  workshopName,
+                  sale.organization_id
                );
             } else {
                await sendDirectSalePaidNotification(
@@ -214,7 +215,9 @@ export async function POST(req: Request) {
                  workshopName,
                  sale.sale_number,
                  sale.total,
-                 friendlyMethod
+                 friendlyMethod,
+                 undefined,
+                 sale.organization_id
                );
             }
           } else {

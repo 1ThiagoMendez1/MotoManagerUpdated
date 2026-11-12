@@ -103,7 +103,8 @@ export async function GET(request: Request) {
           workshopName,
           lastServiceDate,
           reminder.service_type,
-          workshopAddress
+          workshopAddress,
+          reminder.organization_id
         );
 
         if (result.success) {
