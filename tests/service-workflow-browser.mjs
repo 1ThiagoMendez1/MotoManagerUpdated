@@ -7,7 +7,8 @@ import { createRequire } from 'node:module';
 const require=createRequire(process.env.PLAYWRIGHT_PACKAGE || '/opt/motomanager-migration-validation-20261105/repo/package.json');
 const {chromium}=require('playwright');
 const B=process.env.WORKFLOW_VALIDATION_ROOT || '/opt/motomanager-service-workflow-20261111';
-const project='mm-workflow-validation';
+const project=process.env.WORKFLOW_VALIDATION_PROJECT || 'mm-workflow-validation';
+assert.ok(project.endsWith('-validation'), 'A disposable validation project is required');
 const inspect=n=>JSON.parse(execFileSync('docker',['inspect',n],{encoding:'utf8'}))[0];
 const sql=q=>execFileSync('docker',['exec','-i',project+'-production-db-1','psql','-XqAt','-U','postgres','-d','motomanager','-v','ON_ERROR_STOP=1'],{input:q,encoding:'utf8',stdio:['pipe','pipe','pipe']}).trim();
 const scalar=q=>JSON.parse(sql(q));
@@ -47,6 +48,9 @@ const value='base64-'+enc({access_token:token,refresh_token:'isolated-validation
 const cookies=[];for(let i=0;i<Math.ceil(value.length/3180);i++)cookies.push({name:'sb-api-auth-token'+(value.length>3180?'.'+i:''),value:value.slice(i*3180,(i+1)*3180),domain:'motomanager.com.co',path:'/',secure:true,sameSite:'Lax'});
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 const context=await browser.newContext({viewport:{width:1920,height:1080},locale:'es-CO',timezoneId:'America/Bogota'});
+await context.route('**/*',route=>route.fulfill({status:204,body:''}));
+assert.equal(typeof context.routeWebSocket,'function');
+await context.routeWebSocket('**',socket=>socket.close());
 await context.addCookies(cookies);await context.addInitScript(()=>localStorage.setItem('theme','light'));
 for(const [origin,target] of [['https://motomanager.com.co',web],['https://api.motomanager.com.co',gateway]])await context.route(origin+'/**',async route=>{
  const req=route.request();try{
@@ -94,20 +98,101 @@ try{
  await dialog.getByRole('button',{name:'Actualizar Estado',exact:true}).click();
  await dialog.waitFor({state:'hidden'});
  assert.equal(scalar(`SELECT to_jsonb(status) FROM work_orders WHERE id='${ids.order}';`),'completed');
- await page.goto('https://motomanager.com.co/sales',{waitUntil:'domcontentloaded'});
- await page.getByRole('button',{name:'Venta por Servicio',exact:true}).click();
- dialog=page.getByRole('dialog');await dialog.getByPlaceholder('Ingresa la placa para buscar...').fill(plate);
- await dialog.locator('input[value="Mano de obra validación"]').waitFor();
- const labor=dialog.getByLabel('Costo Mano de Obra (COP)');await labor.fill('100000');
- assert.equal(await dialog.getByLabel('Abono registrado en la orden (COP)').getAttribute('readonly'),'');
- await dialog.getByRole('button',{name:'Confirmar Pagar',exact:true}).click();
+ await page.getByRole('row').filter({hasText:`WO-${orderNumber}`}).getByRole('link',{name:'Facturar',exact:true}).click();
+ dialog=page.getByRole('dialog');await dialog.getByRole('heading',{name:'Facturar servicio',exact:true}).waitFor();
+ await dialog.getByText('Cobrar ahora',{exact:true}).waitFor();
+ assert.match(await dialog.locator('[aria-label="Resumen para facturar"]').textContent(),/180\.000[\s\S]*100\.000[\s\S]*80\.000/);
+ assert.equal(await dialog.getByRole('combobox',{name:'Orden de trabajo para facturar'}).count(),0);
+ await dialog.getByRole('button',{name:'Nequi',exact:true}).click();
+ for(const viewport of [{width:1366,height:900},{width:390,height:844},{width:320,height:640}]){
+  await page.setViewportSize(viewport);
+  const bounds=await dialog.evaluate(el=>{const r=el.getBoundingClientRect(),b=[...el.querySelectorAll('button')].find(x=>x.textContent.includes('Facturar y entregar')).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,buttonBottom:b.bottom,viewport:innerWidth,body:document.documentElement.scrollWidth};});
+  assert.ok(bounds.left>=0&&bounds.right<=viewport.width+1&&bounds.top>=0&&bounds.bottom<=viewport.height+1&&bounds.buttonBottom<=viewport.height&&bounds.body<=viewport.width+1,JSON.stringify(bounds));
+  await page.screenshot({path:B+'/invoice-'+viewport.width+'.png',mask:[page.locator('header').first()]});
+ }
+ await page.setViewportSize({width:1920,height:1080});
+ await dialog.getByRole('button',{name:'Facturar y entregar',exact:true}).dblclick();
  await page.getByText('TOTAL SERVICIO:',{exact:true}).waitFor();
  const receipt=page.getByRole('dialog');await receipt.getByText('Pagado al finalizar:',{exact:true}).waitFor();
  const invoice=scalar(`SELECT to_jsonb(s) FROM sales s WHERE work_order_id='${ids.order}' AND NOT is_deposit AND status='paid';`);
  assert.equal(Number(invoice.invoice_total),180000);assert.equal(Number(invoice.total),80000);
+ assert.equal(invoice.payment_method,'nequi');
+ assert.equal(scalar(`SELECT to_jsonb(count(*)) FROM sales WHERE work_order_id='${ids.order}' AND NOT is_deposit AND status='paid';`),1);
  assert.equal(scalar(`SELECT to_jsonb(sum(total)) FROM sales WHERE work_order_id='${ids.order}';`),180000);
  assert.equal(scalar(`SELECT to_jsonb(status) FROM work_orders WHERE id='${ids.order}';`),'delivered');
- report.scenarios.push('service invoice shows gross, advance and paid balance and delivers once');
+ report.scenarios.push('order-list invoice entry preselects the motorcycle, applies advances and delivers once after a payment chip and confirmation');
+ report.scenarios.push('invoice fits desktop and 320/390px mobiles with confirmation always visible');
+
+ // New orders/contacts exist only inside this isolated database.
+ const fixture=(labor)=>{
+  const id=crypto.randomUUID(),moto=crypto.randomUUID(),tag='VQ'+id.replaceAll('-','').slice(0,4).toUpperCase();
+  sql(`INSERT INTO motorcycles(id,organization_id,customer_id,license_plate,brand,model) VALUES('${moto}','${actor.workshop_id}','${ids.customer}','${tag}','Moto','Cobro');
+   INSERT INTO work_orders(id,organization_id,customer_id,motorcycle_id,assigned_mechanic_id,status) VALUES('${id}','${actor.workshop_id}','${ids.customer}','${moto}','${ids.tech}','completed');
+   INSERT INTO work_order_services(work_order_id,description,quantity,unit_price,total) VALUES('${id}','Mano de obra cobro rápido',1,${labor},${labor});`);
+  return {id,plate:tag};
+ };
+ const advance=(id,amount)=>sql(`BEGIN;SELECT set_config('request.jwt.claim.sub','${actor.id}',true);SET LOCAL ROLE authenticated;
+  SELECT record_work_order_advance('${actor.workshop_id}','${id}',${amount},'add','cash','${crypto.randomUUID()}');COMMIT;`);
+ const paid=fixture(80000);advance(paid.id,80000);
+ await page.goto('https://motomanager.com.co/work-orders/'+paid.id,{waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Facturar',exact:true}).click();dialog=page.getByRole('dialog');
+ await dialog.getByText('Cubierto con los abonos. No hay otro cobro.',{exact:true}).waitFor();
+ assert.equal(await dialog.getByRole('group',{name:'Método de pago',exact:true}).count(),0);
+ await dialog.getByRole('button',{name:'Facturar y entregar',exact:true}).click();
+ await page.getByText('TOTAL SERVICIO:',{exact:true}).waitFor();
+ const zero=scalar(`SELECT to_jsonb(s) FROM sales s WHERE work_order_id='${paid.id}' AND NOT is_deposit AND status='paid';`);
+ assert.equal(Number(zero.total),0);assert.equal(Number(zero.invoice_total),80000);
+ assert.equal(scalar(`SELECT to_jsonb(status) FROM work_orders WHERE id='${paid.id}';`),'delivered');
+ report.scenarios.push('fully prepaid order invoices in two clicks with no additional collection');
+
+ const excess=fixture(80000);
+ await page.goto('https://motomanager.com.co/work-orders/'+excess.id,{waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Facturar',exact:true}).waitFor();advance(excess.id,100000);
+ await page.getByRole('button',{name:'Facturar',exact:true}).click();dialog=page.getByRole('dialog');
+ await dialog.getByText(/Los abonos superan la factura/).waitFor();
+ assert.equal(await dialog.getByRole('button',{name:'Facturar y entregar',exact:true}).isDisabled(),true);
+ assert.match(await dialog.getByRole('alert').textContent(),/20\.000/);
+ await dialog.getByRole('button',{name:'Revisar abonos',exact:true}).click();
+ await dialog.waitFor({state:'hidden'});assert.equal(await page.getByRole('tab',{name:/Abonos/}).getAttribute('data-state'),'active');
+ assert.equal(scalar(`SELECT to_jsonb(count(*)) FROM sales WHERE work_order_id='${excess.id}' AND NOT is_deposit;`),0);
+ report.scenarios.push('fresh advances override the page snapshot and overpayment blocks invoicing with direct access to review advances');
+
+ const extra=fixture(100000);let failedOnce=false;
+ const itemsURL='https://motomanager.com.co/api/work-orders/'+extra.id+'/items';
+ await context.route(itemsURL,async route=>{if(!failedOnce){failedOnce=true;await route.fulfill({status:500,contentType:'application/json',body:'{"error":"Fallo temporal de validación"}'});}else await route.fallback();});
+ await page.goto('https://motomanager.com.co/work-orders/'+extra.id,{waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Facturar',exact:true}).click();dialog=page.getByRole('dialog');
+ await dialog.getByText('Fallo temporal de validación',{exact:true}).waitFor();
+ assert.equal(await dialog.getByRole('button',{name:'Facturar y entregar',exact:true}).isDisabled(),true);
+ await dialog.getByRole('button',{name:'Volver a cargar',exact:true}).click();
+ await dialog.getByText('Cobrar ahora',{exact:true}).waitFor();
+ await dialog.locator('summary').filter({hasText:'Agregar algo más'}).click();
+ const extraSearch=dialog.getByLabel('Repuesto por nombre o código');await extraSearch.fill(sku);
+ assert.equal(await dialog.getByRole('combobox',{name:'Repuesto adicional',exact:true}).inputValue(),ids.product);
+ await dialog.getByRole('button',{name:'Facturar y entregar',exact:true}).click();
+ await dialog.getByText(/Tienes un repuesto sin agregar/).waitFor();
+ assert.equal(scalar(`SELECT to_jsonb(count(*)) FROM sales WHERE work_order_id='${extra.id}';`),0);
+ await extraSearch.press('Enter');await dialog.getByRole('button',{name:'Quitar Filtro validación',exact:true}).waitFor();
+ await dialog.getByLabel('Mano de obra adicional (COP)').fill('10000');
+ await dialog.getByRole('button',{name:'Tarjeta',exact:true}).click();
+ await dialog.getByRole('button',{name:'Facturar y entregar',exact:true}).click();
+ await page.getByText('TOTAL SERVICIO:',{exact:true}).waitFor();
+ const added=scalar(`SELECT to_jsonb(s) FROM sales s WHERE work_order_id='${extra.id}' AND NOT is_deposit AND status='paid';`);
+ assert.equal(Number(added.invoice_total),190000);assert.equal(Number(added.total),190000);assert.equal(added.payment_method,'credit_card');
+ assert.equal(scalar(`SELECT to_jsonb(sum(total)) FROM sale_items WHERE sale_id='${added.id}' AND item_type='service';`),110000);
+ assert.equal(scalar(`SELECT to_jsonb(quantity) FROM inventory_item_stock WHERE item_id='${ids.product}' AND location_id='${ids.location}';`),21);
+ report.scenarios.push('failed account load blocks charging and retries; SKU + Enter adds an optional part, extra labor and card payment in the same invoice');
+
+ // The entry from Sales uses the same checkout and selects an exact plate automatically.
+ const fromSales=fixture(50000);
+ await page.goto('https://motomanager.com.co/sales',{waitUntil:'domcontentloaded'});
+ await page.getByRole('button',{name:'Venta por Servicio',exact:true}).click();dialog=page.getByRole('dialog');
+ await dialog.getByLabel('Busca la moto o el cliente').fill(fromSales.plate);
+ await dialog.getByText('Cobrar ahora',{exact:true}).waitFor();
+ assert.equal(await dialog.getByRole('combobox',{name:'Orden de trabajo para facturar',exact:true}).inputValue(),fromSales.id);
+ await dialog.getByRole('button',{name:'Cancelar',exact:true}).click();
+ assert.equal(scalar(`SELECT to_jsonb(count(*)) FROM sales WHERE work_order_id='${fromSales.id}';`),0);
+ report.scenarios.push('Sales retains the simplified checkout and cancel never creates a sale');
  await page.goto('https://motomanager.com.co/accounting',{waitUntil:'domcontentloaded'});
  await page.getByRole('button',{name:'Nómina de Técnicos',exact:true}).click();
  const techSelect=page.locator('select').first();await techSelect.selectOption(ids.tech);

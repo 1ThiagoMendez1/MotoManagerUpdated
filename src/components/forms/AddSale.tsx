@@ -107,6 +107,7 @@ export function AddSale({ workOrders, inventory, initialWorkOrderId, autoOpen = 
 
   function addProduct() {
     if (!canAddProduct || !product) return;
+    setSubmitError('');
     setItems(current => [...current, { inventoryItemId: product.id, name: product.name, sku: product.sku, quantity: Number(quantity), price: product.price, type: 'inventory', fromWorkOrder: false }]);
     setProductSearch(''); setProductId(''); setQuantity('1');
     searchInput.current?.focus();
@@ -116,7 +117,7 @@ export function AddSale({ workOrders, inventory, initialWorkOrderId, autoOpen = 
     event.preventDefault();
     if (submitting.current || !ready || totals.excess > 0) return;
     // A typed/selected extra must be added explicitly, rather than silently left off the invoice.
-    if (productSearch.trim() || productId || Number(quantity) !== 1) {
+    if (productSearch.trim() || productId) {
       setSubmitError('Tienes un repuesto sin agregar. Agrégalo o limpia la búsqueda antes de facturar.');
       setAdditionsOpen(true); searchInput.current?.focus(); return;
     }
