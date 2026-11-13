@@ -27,3 +27,8 @@ so they remain readable even with expired or restricted sessions. Their CSP
 disables scripts and external resources; all styling and branding are local.
 Footer and registration links make the policy discoverable. No database,
 connection mode, credentials or message delivery configuration changes.
+
+Public delivery also needs to preserve contact addresses without JavaScript.
+The body uses Cloudflare's documented `email_off` HTML markers so its email
+obfuscation does not hide the privacy contact or inject a decode script:
+https://developers.cloudflare.com/waf/tools/scrape-shield/email-address-obfuscation/
