@@ -242,7 +242,7 @@ function RegistrationForm({ plan, billingCycle, name, email, reference, info }: 
       </form>
 
       <p className="text-center text-xs text-muted-foreground">
-        Al registrarte aceptas nuestros términos de servicio y política de privacidad.
+        Al registrarte aceptas nuestros términos de servicio y la <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">política de privacidad</a>.
       </p>
     </>
   );

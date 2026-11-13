@@ -189,7 +189,7 @@ export function TrialForm() {
       {submittedError && state.error && <div role="alert" className="rounded-xl border border-red-300/25 bg-red-400/10 p-3 text-sm leading-6 text-red-100"><p>{state.error}</p><div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 font-semibold"><Link href="/login?redirect=/dashboard" className="underline underline-offset-4">Iniciar sesión</Link><Link href="/login?recovery=1" className="underline underline-offset-4">Recuperar contraseña</Link></div></div>}
       <FormControls step={step} interactive={interactive} back={() => { setData(readCurrentForm(formRef.current)); setStep(0); setSubmittedError(false); }}/>
     </form>
-    <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos gestionan tu cuenta. Tú eliges si recibes promociones.</p>
+    <p className="mt-4 flex flex-wrap items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><LockKeyhole size={13} className="shrink-0"/>Tus datos gestionan tu cuenta. Tú eliges si recibes promociones. <Link href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-orange-200 underline underline-offset-4">Política de privacidad</Link></p>
     <p className="mt-4 border-t border-white/10 pt-4 text-center text-xs text-slate-300">¿Ya tienes cuenta? <Link href="/login" className="font-semibold text-orange-200 underline underline-offset-4">Inicia sesión</Link></p>
   </section>;
 }

@@ -3,8 +3,12 @@ import { createServerClient } from '@supabase/ssr'
 import { isSuperAdmin } from '@/lib/super-admin'
 import { internalSupabaseFetch } from '@/lib/supabase/transport'
 import { isTrialReviewRequestAllowed, TRIAL_REVIEW_PATH } from '@/lib/trial-review'
+import { PUBLIC_LEGAL_PATHS } from '@/lib/legal-paths'
 
 export async function middleware(request: NextRequest) {
+  // Legal notices stay readable with no login, including expired or restricted sessions.
+  if (PUBLIC_LEGAL_PATHS.some(path => path === request.nextUrl.pathname)) return NextResponse.next();
+
   let supabaseResponse = NextResponse.next({
     request,
   })

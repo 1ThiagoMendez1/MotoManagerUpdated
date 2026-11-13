@@ -44,6 +44,8 @@ export function LandingFooter({ halloween = false, christmas = false }: { hallow
         <p>© {new Date().getFullYear()} MotoManager.</p>
         <div className="flex flex-wrap items-center gap-3">
           <p>Información de funcionalidades y planes sujeta a la configuración vigente del servicio.</p>
+          <Link href="/privacidad" className="underline underline-offset-2 hover:text-white">Política de privacidad</Link>
+          <Link href="/eliminacion-de-datos" className="underline underline-offset-2 hover:text-white">Eliminación de datos</Link>
           <button type="button" onClick={() => window.dispatchEvent(new Event('mm:marketing-consent-settings'))}
             className="underline underline-offset-2 hover:text-white">Privacidad publicitaria</button>
         </div>
