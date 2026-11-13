@@ -164,7 +164,9 @@ export async function createServiceSale(prevState: any, formData: FormData) {
                     await sendServiceSaleNotification(customer.phone, receipt.customerName || 'Cliente', wo.order_number,
                         gross, { make: moto.brand || 'Moto', model: moto.model || '', plate: moto.license_plate || 'Sin placa' },
                         receipt.technicianName || 'Técnico', labor || undefined, items, receipt.subtotal,
-                        data.discountPercentage, receipt.discountAmount, receipt.workshopName);
+                        data.discountPercentage, receipt.discountAmount, receipt.workshopName,
+                        user.workshopId
+                    );
                 }
             } catch (notificationError) { console.error('No se pudo enviar el comprobante de servicio.', notificationError); }
         }
@@ -445,7 +447,8 @@ export async function createDirectSale(prevState: any, formData: FormData) {
                         saleNumber,
                         total,
                         data.paymentMethod,
-                        notificationItems
+                        notificationItems,
+                        user.workshopId
                     );
                 } else {
                     console.warn(`WhatsApp limit reached for org ${user.workshopId}. Skipping direct sale notification.`);

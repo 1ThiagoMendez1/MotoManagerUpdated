@@ -1,4 +1,6 @@
 'use server';
+
+import { hasWorkshopWhatsApp } from '@/lib/whatsapp-coexistence/server';
 import { requireWorkshop } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
@@ -197,7 +199,9 @@ export async function createWorkOrder(prevState: any, formData: FormData) {
                             model,
                             plate,
                             intakeDate,
-                            orderNumber
+                            orderNumber,
+                            undefined,
+                            user.workshopId
                         ).catch(err => console.error('Error sending WhatsApp moto ingreso update:', err));
                     } else {
                         console.warn(`WhatsApp notification skipped for moto ingreso (Limit reached)`);
@@ -349,7 +353,7 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
             const evolutionAvailable = Boolean(
                 process.env.EVOLUTION_API_URL && process.env.EVOLUTION_API_KEY && process.env.EVOLUTION_INSTANCE_NAME
             );
-            const metaAvailable = Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+            const metaAvailable = Boolean(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID) || await hasWorkshopWhatsApp(user.workshopId);
             if (!isReadyTransition && !evolutionAvailable && !metaAvailable) {
                 whatsappWarning = 'No hay un proveedor WhatsApp configurado para cambios de estado.';
             } else if (isReadyTransition && !metaAvailable && !evolutionAvailable) {
@@ -373,7 +377,8 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                             plate,
                             orderNum,
                             address,
-                            workshop?.businessHours ?? null
+                            workshop?.businessHours ?? null,
+                            user.workshopId
                         );
                         if (!delivery.success) {
                             whatsappWarning = delivery.error || 'Meta no aceptó el aviso de moto lista.';
@@ -398,7 +403,8 @@ export async function updateWorkOrderStatus(prevState: any, formData: FormData) 
                                 workshopName: workshop?.name,
                                 workshopAddress: workshop?.address,
                                 businessHours: formatBusinessHours(workshop?.businessHours)
-                            }
+                            },
+                            user.workshopId
                         );
                         if (!delivery.success) {
                             whatsappWarning = delivery.error || 'El proveedor no aceptó el aviso de cambio de estado.';
@@ -555,7 +561,8 @@ export async function sendQuoteWhatsApp(
         workOrderId,
         portalUrl,
         orderNumber,
-        technicianName
+        technicianName,
+        user.workshopId
     );
 
     revalidatePath('/work-orders/' + workOrderId);

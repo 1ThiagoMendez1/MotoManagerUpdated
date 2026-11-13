@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Shield,
   LifeBuoy,
+  MessageCircle,
   Sparkles,
   Home,
   ChevronRight,
@@ -102,6 +103,7 @@ export function AppSidebar({
     {
       title: 'Administración',
       items: [
+        ...( ['owner', 'admin'].includes(role) ? [{ title: 'WhatsApp del taller', url: '/dashboard/whatsapp', icon: MessageCircle, id: 'sidebar-nav-whatsapp' }] : []),
         { title: 'Equipo y Permisos', url: '/team', icon: Shield, id: 'sidebar-nav-team' },
         { title: 'Tickets de Soporte', url: '/tickets', icon: LifeBuoy, id: 'sidebar-nav-tickets' },
       ],

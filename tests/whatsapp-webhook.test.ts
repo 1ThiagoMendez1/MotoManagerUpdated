@@ -33,7 +33,9 @@ test('missing app configuration, forged signatures and modified bytes never pers
 
 test('a signed event is encrypted, bound to its app and hash, and persisted before ACK', async () => {
   let receipt: WebhookReceipt | undefined;
-  const result = await receiveWhatsAppWebhook(signed(), config, async r => { receipt = r; });
+  const result = await receiveWhatsAppWebhook(signed(), config, async (r, authenticatedPayload) => {
+    receipt = r; assert.deepEqual(authenticatedPayload, JSON.parse(payload));
+  });
   assert.equal(result.status, 200); assert.equal(await result.text(), 'EVENT_RECEIVED');
   assert.ok(receipt); assert.equal(receipt.bytes, Buffer.byteLength(payload));
   assert.equal(receipt.digest, createHash('sha256').update(payload).digest('hex'));

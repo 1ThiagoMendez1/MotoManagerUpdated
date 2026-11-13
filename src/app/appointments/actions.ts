@@ -132,7 +132,8 @@ export async function updateAppointmentStatus(id: string, status: string) {
               phone,
               customerName || 'Cliente',
               workshopName,
-              appointmentDate
+              appointmentDate,
+                user.workshopId
             ).catch(err => console.error('Error sending WhatsApp appointment confirmation:', err));
           } else {
             console.warn('WhatsApp notification skipped for appointment confirmation (Limit reached)');
@@ -311,7 +312,8 @@ export async function createAppointment(data: {
             customerPhone,
             cleanCustomerName,
             workshopName,
-            startDateObj
+            startDateObj,
+              user.workshopId
           ).catch(err => console.error('Error enviando WhatsApp API:', err));
         }
       } catch (waErr) {
