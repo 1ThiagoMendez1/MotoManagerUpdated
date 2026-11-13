@@ -4,7 +4,16 @@ import { isDatabaseMutation } from '../src/lib/supabase/transport';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac, randomBytes } from 'node:crypto';
-import { chooseCoexistencePhone, extractMessages, graphClient, MetaError, noticePayload, recipientNumber, seal, templateDefinition, unseal, validSignature, validateToken } from '../src/lib/whatsapp-coexistence/core';
+import { chooseCoexistencePhone, extractMessages, graphClient, MetaError, noticePayload, recipientNumber, seal, templateDefinition, trustedConnectionOrigin, unseal, validSignature, validateToken } from '../src/lib/whatsapp-coexistence/core';
+
+test('connection mutations trust only the configured HTTPS public origin behind a reverse proxy', () => {
+  const callback = 'https://motomanager.com.co/api/whatsapp/webhook';
+  assert.equal(trustedConnectionOrigin('https://motomanager.com.co', callback), true);
+  for (const origin of [null, 'null', 'http://motomanager.com.co', 'http://0.0.0.0:3000', 'https://motomanager.com.co.attacker.test', 'https://www.motomanager.com.co', 'https://other-workshop.motomanager.app'])
+    assert.equal(trustedConnectionOrigin(origin, callback), false);
+  for (const invalid of ['', 'http://motomanager.com.co/api/whatsapp/webhook', 'https://user:password@motomanager.com.co/api/whatsapp/webhook', callback + '?override=1', callback + '#fragment', 'https://motomanager.com.co/other'])
+    assert.equal(trustedConnectionOrigin('https://motomanager.com.co', invalid), false);
+});
 
 test('encrypted credentials are bound to a workshop and reject tampering or a wrong key', () => {
   const key = randomBytes(32).toString('base64');

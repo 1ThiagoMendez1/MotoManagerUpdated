@@ -25,6 +25,13 @@ export function validSignature(raw: string, signature: string | null, secret: st
 export function trustedMetaOrigin(origin: string): boolean {
   return ['https://www.facebook.com', 'https://web.facebook.com', 'https://business.facebook.com'].includes(origin);
 }
+export function trustedConnectionOrigin(origin: string | null, callback: string): boolean {
+  try {
+    const configured = new URL(callback);
+    return configured.protocol === 'https:' && !configured.username && !configured.password &&
+      configured.pathname === '/api/whatsapp/webhook' && !configured.search && !configured.hash && origin === configured.origin;
+  } catch { return false; }
+}
 export function recipientNumber(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   const number = digits.length === 10 ? '57' + digits : digits;

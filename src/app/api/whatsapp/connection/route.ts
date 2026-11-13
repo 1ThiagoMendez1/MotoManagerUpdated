@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { beginConnection, completeConnection, configuration, enabledFor, getConnection, patchConnection, publicConnection, refreshConnection, serviceRpc, setupReady } from '@/lib/whatsapp-coexistence/server';
-import { digest, unseal } from '@/lib/whatsapp-coexistence/core';
+import { digest, trustedConnectionOrigin, unseal } from '@/lib/whatsapp-coexistence/core';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const COOKIE = '__Host-mm-wa-state';
@@ -29,8 +29,10 @@ export async function GET(request: NextRequest) {
   } catch { return response({ error: 'No se pudo consultar WhatsApp. Intenta nuevamente.' }, 503); }
 }
 export async function POST(request: NextRequest) {
-  if (request.headers.get('origin') !== new URL(request.url).origin || !request.headers.get('content-type')?.startsWith('application/json'))
-    return response({ error: 'Solicitud no válida.' }, 403);
+  // The proxy's internal request URL is not the browser's public origin.
+  // Trust the configured onboarding origin, never client-supplied proxy headers.
+  if (!trustedConnectionOrigin(request.headers.get('origin'), configuration().callback) || !request.headers.get('content-type')?.startsWith('application/json'))
+    return response({ error: 'Abre esta conexión desde el panel principal de MotoManager.' }, 403);
   const user = await apiOwner();
   if (!user) return response({ error: 'No tienes permiso para administrar esta conexión.' }, 403);
   const length = Number(request.headers.get('content-length'));
@@ -39,8 +41,6 @@ export async function POST(request: NextRequest) {
   try { const raw = await request.text(); if (raw.length > 10000) return response({ error: 'Solicitud demasiado grande.' }, 413); data = JSON.parse(raw); }
   catch { return response({ error: 'Solicitud no válida.' }, 400); }
   try {
-    if (['begin', 'complete'].includes(data.action) && request.headers.get('origin') !== new URL(configuration().callback).origin)
-      return response({ error: 'Abre la conexión desde el panel principal de MotoManager.' }, 403);
     if (data.action === 'begin') {
       const state = await beginConnection(user.workshopId!, user.userId);
       const result = response({ state });

@@ -23,6 +23,7 @@ export default function WhatsAppConnection() {
   const attempt = useRef<{ state: string; code?: string; wabaId?: string; phoneId?: string; sent?: boolean } | null>(null);
   const mounted = useRef(true);
   const [olderAvailable, setOlderAvailable] = useState(true);
+  const canonicalPage = Boolean(snapshot?.sdk && typeof window !== 'undefined' && new URL(snapshot.sdk.onboardingUrl).origin === window.location.origin);
   const load = useCallback(async () => {
     const response = await fetch('/api/whatsapp/connection?messages=1', { cache: 'no-store' });
     const result = await response.json();
@@ -80,10 +81,10 @@ export default function WhatsAppConnection() {
   useEffect(() => {
     if (!snapshot?.connection || !['setting_up', 'syncing', 'pending_templates'].includes(snapshot.connection.status)) return;
     const timer = setInterval(() => {
-      void (snapshot.connection?.status === 'pending_templates' ? api('refresh').then(load) : load()).catch(() => {});
+      void (snapshot.connection?.status === 'pending_templates' && canonicalPage ? api('refresh').then(load) : load()).catch(() => {});
     }, snapshot.connection.status === 'pending_templates' ? 60000 : 15000);
     return () => clearInterval(timer);
-  }, [snapshot?.connection?.status, load]);
+  }, [snapshot?.connection?.status, canonicalPage, load]);
   const connect = () => {
     if (!sdk() || !snapshot?.sdk || !attempt.current) return;
     setError(''); setBusy(true);
@@ -115,7 +116,6 @@ export default function WhatsAppConnection() {
     } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo cargar el historial.'); } finally { setBusy(false); }
   };
   const connection = snapshot?.connection;
-  const canonicalPage = Boolean(snapshot?.sdk && typeof window !== 'undefined' && new URL(snapshot.sdk.onboardingUrl).origin === window.location.origin);
   return <main className="mx-auto w-full space-y-6 p-4 md:p-8">
     {snapshot?.allowed && snapshot.sdk && canonicalPage && <Script id="facebook-coexistence-sdk" src="https://connect.facebook.net/es_LA/sdk.js" strategy="afterInteractive" onLoad={initialize} onError={() => setError('No cargó la conexión con Meta. Revisa los bloqueadores de tu navegador y vuelve a intentar.')} />}
     <header className="flex items-center gap-3"><div className="rounded-2xl bg-emerald-500/10 p-3 text-emerald-600"><MessageCircle className="h-7 w-7" /></div><div><h1 className="text-2xl font-bold">WhatsApp de tu taller</h1><p className="text-muted-foreground">Tus clientes reciben los avisos desde tu propio número.</p></div></header>
@@ -131,12 +131,12 @@ export default function WhatsAppConnection() {
           {connection?.status === 'reconnect_required' && <p className="text-sm">Vuelve a autorizar tu número para recuperar los envíos automáticos.</p>}
         </div>
         <div className="flex flex-wrap gap-2 md:max-w-sm">
-          {snapshot?.allowed && snapshot.sdk && !canonicalPage && <Button asChild className="bg-emerald-600 text-white hover:bg-emerald-700"><a href={snapshot.sdk.onboardingUrl}><Smartphone className="mr-2 h-4 w-4" />Conectar WhatsApp Business</a></Button>}
+          {snapshot?.allowed && snapshot.sdk && !canonicalPage && <Button asChild className="bg-emerald-600 text-white hover:bg-emerald-700"><a href={snapshot.sdk.onboardingUrl}><Smartphone className="mr-2 h-4 w-4" />{connection ? 'Administrar WhatsApp' : 'Conectar WhatsApp Business'}</a></Button>}
           {snapshot?.allowed && canonicalPage && (!connection || ['reconnect_required', 'paused'].includes(connection.status)) && <Button onClick={prepared ? connect : () => { setError(''); void prepare().catch(e => setError(e.message)); }} disabled={busy || !sdkReady} className="bg-emerald-600 text-white hover:bg-emerald-700">{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}{busy ? 'Conectando…' : prepared ? 'Conectar WhatsApp Business' : 'Preparar nueva conexión'}</Button>}
           {busy && attempt.current && !attempt.current.sent && <Button variant="ghost" onClick={() => { attempt.current = null; setPrepared(false); setBusy(false); }}>Cerrar conexión</Button>}
           {connection && <Button variant="outline" asChild><a href="https://business.facebook.com/wa/manage/home/" target="_blank" rel="noopener noreferrer">Configurar pagos en Meta</a></Button>}
-          {connection && snapshot?.allowed && <Button variant="outline" onClick={refresh} disabled={busy}><RefreshCw className="mr-2 h-4 w-4" />Actualizar estado</Button>}
-          {connection && connection.status !== 'paused' && <Button variant="ghost" onClick={pause} disabled={busy}><PauseCircle className="mr-2 h-4 w-4" />Pausar envíos</Button>}
+          {connection && snapshot?.allowed && canonicalPage && <Button variant="outline" onClick={refresh} disabled={busy}><RefreshCw className="mr-2 h-4 w-4" />Actualizar estado</Button>}
+          {connection && canonicalPage && connection.status !== 'paused' && <Button variant="ghost" onClick={pause} disabled={busy}><PauseCircle className="mr-2 h-4 w-4" />Pausar envíos</Button>}
         </div>
       </section>
       <div className="grid gap-6 lg:grid-cols-2"><section className="space-y-4 rounded-2xl border bg-card p-6"><h2 className="font-semibold">Así funciona</h2>{['Autoriza tu número con Meta desde este botón.', 'Confirma la conexión en la app WhatsApp Business de tu celular.', 'Continúa atendiendo en el celular y recibe aquí los mensajes de tus clientes.'].map((text, i) => <p key={text} className="flex gap-3 text-sm"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary">{i + 1}</span>{text}</p>)}<p className="flex gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 shrink-0" />Meta te pedirá los permisos de conexión. Los mensajes automáticos están sujetos a sus tarifas y al método de pago de tu cuenta.</p></section>
