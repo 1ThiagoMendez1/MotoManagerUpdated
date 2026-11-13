@@ -120,6 +120,7 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
     analyticsGeoStatus(),
     db.rpc('web_trial_signup_diagnostics',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
     db.rpc('web_trial_signup_field_diagnostics',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
+    db.rpc('web_trial_phone_signup_diagnostics',{p_from:range.from,p_to:range.to,p_channel:channel,p_path:path||null}).abortSignal(request.signal),
   ]);
   for(const result of results.slice(0,2)){if(result.status==='rejected')throw new Error('Analytics unavailable');}
   const reportResult=results[0].status==='fulfilled'?results[0].value:null;
@@ -133,6 +134,8 @@ export async function loadAnalyticsPayload(request:Request):Promise<AnalyticsPay
   if(signup.status==='fulfilled'&&!signup.value.error&&signup.value.data?.available)report.signup=signup.value.data;
   const fields=results[4];
   if(report.signup&&fields.status==='fulfilled'&&!fields.value.error&&fields.value.data?.available)report.signup.fields=fields.value.data;
+  const phoneSignup=results[5];
+  if(phoneSignup.status==='fulfilled'&&!phoneSignup.value.error&&phoneSignup.value.data?.available)report.phoneSignup=phoneSignup.value.data;
   // Do not expose legacy identity links in the anonymous navigation report.
   // Verified account access events remain a separate administrator-only log.
   for(const row of report.sessions){
@@ -163,6 +166,10 @@ export function analyticsCsv(payload:AnalyticsPayload){
       for(const field of signup.fields.rows)rows.push([TRIAL_PROGRESS_FIELDS.find(row=>row.key===field.field)?.label||field.field,field.viewed,field.edited,field.valid,field.invalid,field.lastWithoutSubmit]);
       rows.push(['Últimos campos no distinguibles por edición simultánea',signup.fields.ambiguousLastEdits]);
     }
+  }
+  if(payload.report.phoneSignup){
+    const p=payload.report.phoneSignup;rows.push([],['Registro v3 WhatsApp · navegaciones'],['Llegadas',p.visits],['Escribieron',p.started],['Pidieron código',p.requested],['Enviaron código',p.verify],[],['Fases confirmadas por servidor · todos los canales']);
+    for(const [kind,total]of Object.entries(p.service))rows.push([kind,total]);
   }
   return '\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n');
 }

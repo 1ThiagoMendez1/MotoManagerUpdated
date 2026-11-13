@@ -130,7 +130,7 @@ function createTracker(getPath:()=>string){
   let formStarted=false;
   const onInput=(event:Event)=>{
     if(current()&&path==='/prueba-gratis'&&!formStarted&&event.target instanceof HTMLInputElement&&
-      TRIAL_FIELDS.includes(event.target.name as TrialField)&&event.target.closest('[data-trial-form]')){
+      (TRIAL_FIELDS.includes(event.target.name as TrialField)||event.target.name==='code')&&event.target.closest('[data-trial-form]')){
       formStarted=true;capture();push('form_start');void flush();
     }
   };

@@ -5,6 +5,9 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, ClipboardList, Gift, MessageCircle, ShieldCheck, Wallet } from 'lucide-react';
 import { getCurrentUserServer, getWorkshopDetails } from '@/lib/auth-server';
 import { TrialForm } from './TrialForm';
+import { PhoneAccessForm } from '@/components/auth/PhoneAccessForm';
+import { phoneAuthEnabled } from '@/lib/workshop-phone-auth-server';
+import { PHONE_AUTH_CAMPAIGN } from '@/lib/workshop-phone-shared';
 import { TRIAL_FIELD_CAMPAIGN } from '@/lib/analytics/trial-fields';
 
 export const metadata: Metadata = {
@@ -18,7 +21,8 @@ export default async function TrialPage() {
     const workshop = await getWorkshopDetails(user);
     redirect(workshop?.trial_expired ? '/dashboard/subscription' : '/' + (workshop?.slug || 'dashboard'));
   }
-  return <main data-campaign={TRIAL_FIELD_CAMPAIGN} className="relative min-h-dvh overflow-x-clip bg-[#050b18] px-4 pb-10 pt-4 text-white sm:px-6 sm:py-7">
+  const phoneEnabled = phoneAuthEnabled();
+  return <main data-campaign={phoneEnabled ? PHONE_AUTH_CAMPAIGN : TRIAL_FIELD_CAMPAIGN} className="relative min-h-dvh overflow-x-clip bg-[#050b18] px-4 pb-10 pt-4 text-white sm:px-6 sm:py-7">
     <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-80 w-72 rounded-full bg-orange-500/5 blur-3xl"/>
     <div className="relative mx-auto w-full max-w-6xl">
       <header className="flex min-h-11 items-center justify-between gap-3">
@@ -33,7 +37,7 @@ export default async function TrialPage() {
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-200"><span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-300"/>Sin tarjeta</span><span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-300"/>Sin cobros automáticos</span></div>
           <div className="mt-8 hidden lg:block"><TrialBenefits/></div>
         </section>
-        <div className="min-w-0">{user ? <section className="rounded-2xl border border-white/15 bg-[#0d1b2e] p-6"><h2 className="text-xl font-bold">Tu cuenta ya está abierta</h2><p className="mt-3 text-sm leading-6 text-slate-300">Continúa con la configuración de tu taller desde tu cuenta.</p><Link href="/no-workshop" className="mt-5 inline-flex rounded-xl bg-orange-400 px-5 py-3 font-bold text-slate-950">Continuar con mi cuenta</Link></section> : <TrialForm/>}</div>
+        <div className="min-w-0">{user ? <section className="rounded-2xl border border-white/15 bg-[#0d1b2e] p-6"><h2 className="text-xl font-bold">Tu cuenta ya está abierta</h2><p className="mt-3 text-sm leading-6 text-slate-300">Continúa con la configuración de tu taller desde tu cuenta.</p><Link href="/no-workshop" className="mt-5 inline-flex rounded-xl bg-orange-400 px-5 py-3 font-bold text-slate-950">Continuar con mi cuenta</Link></section> : phoneEnabled ? <PhoneAccessForm mode="signup"/> : <TrialForm/>}</div>
         <div className="lg:hidden"><TrialBenefits/></div>
       </div>
     </div>

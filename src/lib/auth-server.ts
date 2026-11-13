@@ -18,7 +18,7 @@ export const getCurrentUserServer = cache(async () => {
       const accessReview = isSuperAdmin(user) ? null : await getMyTrialReview();
       if (accessReview) {
         return {
-          userId: user.id, email: user.email, user_metadata: user.user_metadata, app_metadata: user.app_metadata,
+          userId: user.id, email: user.email, phone: user.phone, user_metadata: user.user_metadata, app_metadata: user.app_metadata,
           role: 'viewer', custom_permissions: null, workshopId: null,
           availableWorkshops: [] as string[], organization: null, accessReview,
         };
@@ -47,6 +47,7 @@ export const getCurrentUserServer = cache(async () => {
       return {
         userId: user.id,
         email: user.email,
+        phone: user.phone,
         user_metadata: user.user_metadata,
         app_metadata: user.app_metadata,
         role: orgMember?.role || 'viewer',

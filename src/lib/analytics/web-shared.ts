@@ -117,6 +117,7 @@ export type AnalyticsReport = {
   funnel: {visits:number; registration:number; formStarted:number; activated:number};
   coverage: { firstEvent:string|null; located:number; total:number; retentionDays:number };
   signup?: TrialSignupDiagnostics;
+  phoneSignup?: PhoneSignupDiagnostics;
 };
 export type TrialSignupDiagnostics = {
   available: boolean; firstMeasuredAt: string | null;
@@ -139,3 +140,9 @@ export function csvCell(value: unknown) {
   if (/^\s*[=+\-@]/.test(text)) text = "'" + text;
   return '"' + text.replaceAll('"', '""') + '"';
 }
+
+export type PhoneSignupDiagnostics = {
+  available: boolean; firstMeasuredAt: string | null; visits: number; started: number; requested: number; verify: number;
+  service: Partial<Record<'requested'|'accepted'|'delivered'|'failed'|'verified'|'created'|'first_order', number>>;
+  fields: { field: 'workshop'|'phone'|'code'; viewed: number; edited: number; valid: number; invalid: number }[];
+};
