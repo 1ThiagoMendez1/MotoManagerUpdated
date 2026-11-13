@@ -93,7 +93,7 @@ export function PhoneAccessForm({ mode }: { mode: 'signup' | 'login' }) {
     <p className="mb-4 flex items-center gap-2 text-xs font-semibold text-emerald-200"><ShieldCheck size={16}/>{challenge ? 'Paso 2 de 2 · Verifica tu número' : 'Sin correo ni contraseña'}</p>
     <h2 className="text-xl font-bold sm:text-2xl">{challenge ? 'Revisa tu WhatsApp' : signup ? 'Crea tu taller gratis' : 'Entra con tu WhatsApp'}</h2>
     <p className="mb-5 mt-2 text-sm leading-6 text-slate-300">{challenge ? `Escribe el código que solicitaste al número terminado en ${data.phone.replace(/\D/g, '').slice(-4)}. Dura 5 minutos.` : signup ? 'Pon el nombre de tu taller y recibe un código para activar tus 15 días de Full.' : 'Usa el número con el que creaste tu taller por WhatsApp. Te enviaremos un código de acceso.'}</p>
-    <form ref={form} onSubmit={submit} noValidate data-trial-form={signup ? 'v3-phone' : undefined} className="space-y-4">
+    <form key={challenge ? 'code' : 'details'} ref={form} onSubmit={submit} noValidate data-trial-form={signup ? 'v3-phone' : undefined} className="space-y-4">
       {!challenge ? <>
         {signup && <div data-phone-field="workshop"><label htmlFor="phone-workshop" className="text-sm font-semibold">Nombre del taller</label>
           <input id="phone-workshop" name="workshopName" autoComplete="organization" placeholder="Ej. Motos Passion" maxLength={120} required defaultValue={data.workshopName} onChange={() => measure('workshop', 'edit')} className={inputClass}/></div>}
@@ -121,6 +121,7 @@ export function PhoneAccessForm({ mode }: { mode: 'signup' | 'login' }) {
         <button type="button" disabled={pending || seconds > 0} onClick={() => void submit(undefined, true)} className="min-h-11 font-semibold text-orange-200 disabled:text-slate-500">{seconds > 0 ? `Reenviar en ${seconds} s` : 'Pedir otro código'}</button>
       </div>}
     </form>
+    {signup && challenge && (delivery === 'failed' || delivery === 'unknown' || errorCode === 'unavailable') && <p className="mt-4 text-center text-xs leading-5 text-slate-300">¿No puedes usar WhatsApp? <Link href="/prueba-gratis?method=email" className="font-semibold text-orange-200 underline">Puedes registrarte con correo</Link>.</p>}
     {!challenge && signup && <p className="mt-4 border-t border-white/10 pt-4 text-center text-xs text-slate-300">¿Ya tienes cuenta? <Link href="/login" className="font-semibold text-orange-200 underline">Inicia sesión</Link></p>}
     {!signup && <p className="mt-4 text-xs leading-5 text-slate-400">Si tu sesión sigue activa, entrarás sin pedir otro código.</p>}
   </section>;

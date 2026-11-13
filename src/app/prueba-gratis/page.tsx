@@ -15,13 +15,13 @@ export const metadata: Metadata = {
   description: 'Prueba MotoManager con las motos, órdenes y repuestos de tu taller. 15 días de Full por $0, sin tarjeta ni cobros automáticos.',
 };
 
-export default async function TrialPage() {
+export default async function TrialPage({ searchParams }: { searchParams: Promise<{ method?: string }> }) {
   const user = await getCurrentUserServer();
   if (user?.workshopId) {
     const workshop = await getWorkshopDetails(user);
     redirect(workshop?.trial_expired ? '/dashboard/subscription' : '/' + (workshop?.slug || 'dashboard'));
   }
-  const phoneEnabled = phoneAuthEnabled();
+  const phoneEnabled = phoneAuthEnabled() && (await searchParams).method !== 'email';
   return <main data-campaign={phoneEnabled ? PHONE_AUTH_CAMPAIGN : TRIAL_FIELD_CAMPAIGN} className="relative min-h-dvh overflow-x-clip bg-[#050b18] px-4 pb-10 pt-4 text-white sm:px-6 sm:py-7">
     <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-80 w-72 rounded-full bg-orange-500/5 blur-3xl"/>
     <div className="relative mx-auto w-full max-w-6xl">

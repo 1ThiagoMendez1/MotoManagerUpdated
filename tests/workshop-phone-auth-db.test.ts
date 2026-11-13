@@ -24,6 +24,8 @@ test('phone authentication is transactional, browser bound, one use, isolated fr
       GRANT USAGE ON SCHEMA public,auth,motomanager_private TO service_role;
       GRANT ALL ON public.organizations,public.profiles,public.organization_members,public.work_orders,motomanager_private.workshop_trial_claims TO service_role;
       GRANT SELECT(id,email) ON auth.users TO service_role;`);
+    const checkoutSource = await readFile(new URL('../supabase/migrations/20261109150531_subscription_wompi_checkout.sql', import.meta.url), 'utf8');
+    await db.exec(checkoutSource.slice(0, checkoutSource.indexOf('CREATE FUNCTION public.create_workshop_subscription_checkout(')));
     for (const name of ['20261030220017_web_analytics.sql','20261111200459_trial_signup_conversion_diagnostics.sql','20261112215121_trial_field_progress.sql','20261113222936_workshop_phone_trial_login.sql']) {
       await db.exec(await readFile(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8'));
     }
@@ -82,6 +84,21 @@ test('phone authentication is transactional, browser bound, one use, isolated fr
       const report = await scalar("SELECT web_trial_phone_signup_diagnostics(now()-interval '1 day',now()+interval '1 day')");
       assert.equal(report.service.created, 1); assert.equal(report.service.first_order, 1); assert.equal(report.service.delivered, 1);
       assert.equal(JSON.stringify(report).includes(request.phone), false); assert.equal(report.visits, 0);
+    });
+    await t.test('a phone owner may buy with a receipt email, while outsider and email-account checks stay strict', async () => {
+      const checkout = (actor: string, email: string | null) => scalar('SELECT public.create_workshop_subscription_checkout($1,$2,$3,$4,$5,$6,$7)', ['MM-SUB-'+randomUUID().replaceAll('-',''),organization,actor,'full','monthly',11990000,email]);
+      await assert.rejects(() => checkout(user, null), /Valid billing email required/);
+      const quote = await checkout(user, 'receipt@example.test');
+      assert.equal(quote.customer_email, 'receipt@example.test'); assert.equal(quote.actor_id, user);
+      assert.equal((await checkout(user, 'receipt@example.test')).reference, quote.reference);
+      assert.notEqual((await checkout(user, 'different@example.test')).reference, quote.reference);
+      await assert.rejects(() => checkout(randomUUID(), 'receipt@example.test'), /owner or administrator required/);
+      await db.exec('RESET ROLE');
+      const staff = randomUUID(); await db.query("INSERT INTO auth.users(id,email) VALUES($1,'staff@example.test')", [staff]);
+      await db.query("INSERT INTO organization_members VALUES($1,$2,'active','admin',now())", [staff,organization]);
+      await db.exec('SET ROLE service_role');
+      await assert.rejects(() => checkout(staff, 'different@example.test'), /owner or administrator required/);
+      assert.equal((await checkout(staff, 'staff@example.test')).customer_email, 'staff@example.test');
     });
     await t.test('existing phone/email accounts cannot be taken over or receive a second trial', async () => {
       await db.exec('RESET ROLE');

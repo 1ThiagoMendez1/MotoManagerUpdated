@@ -231,5 +231,39 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.web_trial_phone_signup_diagnostics(timestamptz,timestamptz,text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.web_trial_phone_signup_diagnostics(timestamptz,timestamptz,text,text) TO service_role;
+-- A phone login needs a receipt email only when buying, never as identity.
+CREATE OR REPLACE FUNCTION public.create_workshop_subscription_checkout(
+  p_reference text,p_organization_id uuid,p_actor_id uuid,p_plan text,p_cycle text,p_amount_in_cents bigint,p_email text
+) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
+DECLARE checkout motomanager_private.workshop_subscription_checkouts; config jsonb;
+BEGIN
+  SELECT settings INTO config FROM public.organizations WHERE id=p_organization_id FOR UPDATE;
+  IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.organization_members m JOIN auth.users u ON u.id=m.user_id
+    WHERE m.organization_id=p_organization_id AND m.user_id=p_actor_id AND m.status='active'
+      AND m.role IN ('owner','admin') AND (lower(trim(u.email))=lower(trim(p_email)) OR (
+        (u.email IS NULL OR u.email='') AND u.raw_app_meta_data->>'workshop_phone_auth'='true' AND
+        EXISTS(SELECT 1 FROM motomanager_private.workshop_phone_accounts a WHERE a.user_id=u.id AND a.phone=u.phone AND a.organization_id=p_organization_id)))) THEN
+    RAISE EXCEPTION 'Workshop owner or administrator required' USING ERRCODE='42501';
+  END IF;
+  IF p_email IS NULL OR length(p_email)>254 OR p_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' THEN
+    RAISE EXCEPTION 'Valid billing email required' USING ERRCODE='22023'; END IF;
+  IF config->>'trialReviewPaused'='true' THEN RAISE EXCEPTION 'Trial under review' USING ERRCODE='42501'; END IF;
+  -- Repeated clicks reuse an unsubmitted quote, instead of creating duplicate payments.
+  SELECT * INTO checkout FROM motomanager_private.workshop_subscription_checkouts
+    WHERE organization_id=p_organization_id AND actor_id=p_actor_id AND plan=p_plan AND cycle=p_cycle
+      AND amount_in_cents=p_amount_in_cents AND customer_email=lower(trim(p_email)) AND status='CREATED' AND created_at>now()-interval '15 minutes'
+    ORDER BY created_at DESC LIMIT 1;
+  IF FOUND THEN RETURN to_jsonb(checkout); END IF;
+  IF (SELECT count(*) FROM motomanager_private.workshop_subscription_checkouts
+      WHERE organization_id=p_organization_id AND created_at>now()-interval '10 minutes') >= 20 THEN
+    RAISE EXCEPTION 'Too many checkout attempts' USING ERRCODE='54000';
+  END IF;
+  INSERT INTO motomanager_private.workshop_subscription_checkouts(reference,organization_id,actor_id,plan,cycle,amount_in_cents,customer_email)
+    VALUES(p_reference,p_organization_id,p_actor_id,p_plan,p_cycle,p_amount_in_cents,lower(trim(p_email))) RETURNING * INTO checkout;
+  RETURN to_jsonb(checkout);
+END $$;
+
+REVOKE ALL ON FUNCTION public.create_workshop_subscription_checkout(text,uuid,uuid,text,text,bigint,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.create_workshop_subscription_checkout(text,uuid,uuid,text,text,bigint,text) TO service_role;
 NOTIFY pgrst,'reload schema';
 COMMIT;
