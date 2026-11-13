@@ -21,7 +21,7 @@ export function verifyWhatsAppWebhook(request: Request, expected: string) {
 // Kept independent of server credentials so the entire protocol can be tested
 // with fixtures. No event is acknowledged until durable persistence succeeds.
 export async function receiveWhatsAppWebhook(
-  request: Request, config: Config, persist: (receipt: WebhookReceipt) => Promise<void>,
+  request: Request, config: Config, persist: (receipt: WebhookReceipt, payload: object) => Promise<void>,
 ) {
   const { appId = '', appSecret = '', encryptionKey = '' } = config;
   const key = Buffer.from(encryptionKey, 'base64');
@@ -59,7 +59,7 @@ export async function receiveWhatsAppWebhook(
   cipher.setAAD(Buffer.from(`motomanager:whatsapp-webhook:v1:${appId}:${digest}`));
   const encrypted = Buffer.concat([cipher.update(raw), cipher.final()]);
   const ciphertext = ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.');
-  try { await persist({ appId, digest, ciphertext, bytes: size }); }
+  try { await persist({ appId, digest, ciphertext, bytes: size }, payload); }
   catch { return reply('Persistence unavailable', 503); }
   return reply('EVENT_RECEIVED', 200);
 }

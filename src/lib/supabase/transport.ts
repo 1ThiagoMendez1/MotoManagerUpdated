@@ -33,7 +33,7 @@ const workshopNeutralRPCs = new Set([
   'web_analytics_report', 'web_analytics_heatmap',
   'web_trial_signup_diagnostics', 'web_trial_signup_field_diagnostics', 'record_trial_signup_failure', 'workshop_parts_profitability',
   'get_my_trial_review', 'admin_list_trial_reviews',
-  'record_whatsapp_webhook_receipt',
+  'record_whatsapp_webhook_receipt', 'whatsapp_service',
 ]);
 
 export function isDatabaseMutation(url: string, method = 'GET') {

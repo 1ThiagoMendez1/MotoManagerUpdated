@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { sendWorkshopNotice } from '@/lib/whatsapp-coexistence/server';
+import { formatBusinessHours } from './business-hours';
 import { composeReadyNotice, buildReadyMetaTemplate } from './whatsapp-ready';
 import type { ReadyNotice } from './whatsapp-ready';
 import { statusTemplateParameters, STATUS_TEMPLATE_NAME } from './whatsapp-status';
@@ -93,7 +95,8 @@ export async function sendServiceSaleNotification(
   subtotal?: number,
   discountPercentage?: number,
   discountAmount?: number,
-  workshopName?: string
+  workshopName?: string,
+  organizationId?: string
 ) {
   console.log(`Redirecting sendServiceSaleNotification to sendVentaPorOrdenNotification...`);
   return sendVentaPorOrdenNotification(
@@ -106,7 +109,8 @@ export async function sendServiceSaleNotification(
     total,
     items || [],
     laborCost,
-    undefined // depositAmount
+    undefined, // depositAmount
+    organizationId
   );
 }
 
@@ -123,8 +127,12 @@ export async function sendOrderStatusUpdate(
     workshopName?: string;
     businessHours?: string;
     workshopAddress?: string;
-  }
+  },
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'order', values: [orderData.customerName, orderData.workshopName || 'Tu taller', orderData.orderNumber, orderData.status, `${orderData.motorcycleInfo}, placa ${orderData.plate}`] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const digits = customerPhone.replace(/[^0-9]/g, '');
@@ -249,8 +257,12 @@ export async function sendQuoteNotification(
   workOrderId: string,
   portalUrl: string,
   orderNumber?: string,
-  technicianName?: string
+  technicianName?: string,
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'quote', values: [customerName, workshopName, orderNumber || workOrderId, portalUrl] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -778,8 +790,12 @@ export async function sendTemplateReminderNotification(
   workshopName: string,
   lastServiceDate: string,
   serviceType: string,
-  workshopAddress: string
+  workshopAddress: string,
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'reminder', values: [customerName, workshopName, `${motorcycleMakeModel}, placa ${motorcyclePlate}`, serviceType] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -1312,8 +1328,12 @@ export async function sendMotoIngresoNotification(
   plate: string,
   intakeDate: Date | string,
   orderNumber: string,
-  workshopBrand: string = 'Motomanager'
+  workshopBrand: string = 'Motomanager',
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'order', values: [customerName, workshopName, orderNumber, 'Recibimos tu motocicleta para diagnóstico', `${brand} ${model}, placa ${plate}`] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const evolutionApiUrl = process.env.EVOLUTION_API_URL;
@@ -1463,8 +1483,12 @@ export async function sendDiagnosticadoReparadoNotification(
   plate: string,
   orderNumber: string,
   workshopAddress: string,
-  businessHours: unknown
+  businessHours: unknown,
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'order', values: [customerName, workshopName, orderNumber, `Reparado. Puedes recogerla en ${workshopAddress || 'el taller'}. Horario: ${formatBusinessHours(businessHours)}`, `${motorcycleInfo}, placa ${plate}`] });
+  if (own) return own;
+
   const digits = customerPhone.replace(/[^0-9]/g, '');
   const formattedPhone = digits.length === 10 ? '57' + digits : digits;
   if (!/^\d{11,15}$/.test(formattedPhone)) {
@@ -1549,8 +1573,12 @@ export async function sendVentaPorOrdenNotification(
   total: number,
   items: Array<{ name: string; quantity: number; price: number }>,
   laborCost?: number,
-  depositAmount?: number
+  depositAmount?: number,
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'receipt', values: [customerName, workshopName, orderNumber, '$' + total.toLocaleString('es-CO'), `${motorcycleInfo}, placa ${plate}. ${items.map(item => `${item.name} x${item.quantity}`).join('; ')}${depositAmount ? '. Abonos: $' + depositAmount.toLocaleString('es-CO') : ''}`] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -1729,8 +1757,12 @@ export async function sendDirectSalePaidNotification(
   saleNumber: string,
   total: number,
   paymentMethod: string = 'Wompi',
-  items: Array<{ name: string; quantity: number; price: number }> = []
+  items: Array<{ name: string; quantity: number; price: number }> = [],
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'receipt', values: [customerName, workshopName, saleNumber, '$' + total.toLocaleString('es-CO'), `${paymentMethod}. ${items.map(item => `${item.name} x${item.quantity}`).join('; ') || 'Compra registrada en el taller'}`] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const evolutionApiUrl = process.env.EVOLUTION_API_URL;
@@ -2104,8 +2136,12 @@ export async function sendCitaConfirmadaNotification(
   customerPhone: string,
   customerName: string,
   workshopName: string,
-  appointmentDate: Date | string
+  appointmentDate: Date | string,
+  organizationId?: string
 ) {
+  const own = await sendWorkshopNotice(organizationId, customerPhone, { kind: 'appointment', values: [customerName, workshopName, new Date(appointmentDate).toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'long', timeStyle: 'short' })] });
+  if (own) return own;
+
   const wpToken = process.env.WHATSAPP_API_TOKEN;
   const wpPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
