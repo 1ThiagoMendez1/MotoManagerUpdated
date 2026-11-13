@@ -69,6 +69,17 @@ test('WhatsApp credentials, one-time signup, sync and conversations stay isolate
       });
       assert.equal(await query('SELECT count(*)::int FROM motomanager_private.whatsapp_events WHERE organization_id=$1', [org]), 2);
     });
+    await t.test('renewal of the same connection preserves one-shot sync journals and completed history', async () => {
+      await asRole('service_role', async () => {
+        await rpc('patch', { org, patch: { details: { historyRequest: 'confirmed-history', smb_app_state_syncRequest: 'confirmed-contacts' } } });
+        await save();
+        const renewed = await rpc('get', { org });
+        assert.equal(renewed.details.history, 'complete');
+        assert.equal(renewed.details.historyRequest, 'confirmed-history');
+        assert.equal(renewed.details.smb_app_state_syncRequest, 'confirmed-contacts');
+        assert.equal(renewed.details.subscribed, undefined);
+      });
+    });
     await t.test('pauses and revocations survive late history and template updates', async () => {
       await asRole('service_role', async () => {
         await rpc('patch', { org, patch: { status: 'paused' } });
@@ -83,6 +94,8 @@ test('WhatsApp credentials, one-time signup, sync and conversations stay isolate
     await t.test('a reconnect retains its number history; changing number cannot inherit another inbox', async () => {
       await asRole('service_role', async () => {
         await save(); assert.equal((await rpc('messages', { org })).length, 1);
+        assert.equal((await rpc('get', { org })).details.historyRequest, undefined);
+        assert.equal((await rpc('get', { org })).details.history, 'pending');
         await save(org, owner, '333333', '777777'); assert.deepEqual(await rpc('messages', { org }), []);
         assert.equal((await rpc('find', { waba: '888888' })).organization_id, other);
       });

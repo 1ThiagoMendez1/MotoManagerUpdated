@@ -22,8 +22,12 @@ globalThis.fetch = async (input: any, options: any = {}) => {
       case 'claim': { const result = !claimed; claimed = true; return Response.json(result); }
       case 'get': return Response.json(d.org === org ? connection : null);
       case 'find': return Response.json(d.waba === connection?.waba_id ? connection : null);
-      case 'save': connection = { organization_id: org, waba_id: d.waba, phone_id: d.phone, display_phone: d.number, verified_name: d.name,
-        token_ciphertext: d.token, token_expires_at: d.expires, status: 'setting_up', details: {} }; return Response.json(true);
+      case 'save': {
+        const retained = connection?.phone_id === d.phone && connection?.waba_id === d.waba && !connection?.details.connectionRevoked ? { ...connection.details } : {};
+        delete retained.subscribed; delete retained.issue;
+        connection = { organization_id: org, waba_id: d.waba, phone_id: d.phone, display_phone: d.number, verified_name: d.name,
+          token_ciphertext: d.token, token_expires_at: d.expires, status: 'setting_up', details: retained }; return Response.json(true);
+      }
       case 'patch': connection.details = { ...connection.details, ...d.patch.details }; connection.status = d.patch.status || 'syncing'; return Response.json(connection);
       case 'ingest': if (persistFailure) return Response.json({ message: 'mock database unavailable' }, { status: 503 }); ingested.push(d); return Response.json(true);
       default: throw new Error('Unexpected RPC action');
@@ -52,6 +56,9 @@ async function main() {
   assert.deepEqual(graphCalls.find(c => c.path.endsWith('subscribed_apps'))?.body, { override_callback_uri: process.env.WHATSAPP_COEXISTENCE_CALLBACK_URL, verify_token: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN });
   assert.ok(!graphCalls.some(c => c.path.endsWith('/register') || c.path.endsWith('/deregister') || c.path.includes('/subscriptions')));
   await assert.rejects(() => completeConnection(org, actor, input), /ya se utilizó/);
+  claimed = false;
+  await completeConnection(org, actor, input);
+  assert.equal(graphCalls.filter(c => c.path.endsWith('smb_app_data')).length, 2, 'renewal must not repeat either one-shot sync');
   const notice = { kind: 'appointment' as const, values: ['Ana', 'Taller', 'Mañana a las 9'] };
   assert.equal((await sendWorkshopNotice(org, '3000000002', notice))?.success, false);
   connection.status = 'active';

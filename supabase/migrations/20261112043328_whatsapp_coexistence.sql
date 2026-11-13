@@ -79,7 +79,10 @@ BEGIN
     IF length(p_data->>'token') NOT BETWEEN 40 AND 20000 THEN RAISE EXCEPTION 'Invalid credential'; END IF;
     SELECT * INTO c FROM motomanager_private.whatsapp_connections WHERE organization_id=org FOR UPDATE;
     INSERT INTO motomanager_private.whatsapp_connections(organization_id,waba_id,phone_id,display_phone,verified_name,token_ciphertext,token_expires_at,connected_by,details)
-    VALUES(org,p_data->>'waba',p_data->>'phone',p_data->>'number',p_data->>'name',p_data->>'token',(p_data->>'expires')::timestamptz,actor,'{"history":"pending","progress":0}')
+    VALUES(org,p_data->>'waba',p_data->>'phone',p_data->>'number',p_data->>'name',p_data->>'token',(p_data->>'expires')::timestamptz,actor,
+      CASE WHEN c.phone_id=p_data->>'phone' AND c.waba_id=p_data->>'waba' AND coalesce(c.details->>'connectionRevoked','false')<>'true'
+        THEN '{"history":"pending","progress":0}'::jsonb || (coalesce(c.details,'{}')-'subscribed'-'issue')
+        ELSE '{"history":"pending","progress":0}'::jsonb END)
     ON CONFLICT(organization_id) DO UPDATE SET waba_id=EXCLUDED.waba_id,phone_id=EXCLUDED.phone_id,
       display_phone=EXCLUDED.display_phone,verified_name=EXCLUDED.verified_name,token_ciphertext=EXCLUDED.token_ciphertext,
       token_expires_at=EXCLUDED.token_expires_at,connected_by=actor,status='setting_up',details=EXCLUDED.details,updated_at=now();
@@ -111,7 +114,7 @@ BEGIN
         INSERT INTO motomanager_private.whatsapp_messages(organization_id,message_id,occurred_at,payload_ciphertext)
           VALUES(org,item->>'id',(item->>'timestamp')::timestamptz,item->>'payload') ON CONFLICT DO NOTHING;
       END LOOP;
-      IF p_data->>'disconnected'='true' THEN c.status='reconnect_required'; c.details=c.details||'{"issue":"authorization"}'; END IF;
+      IF p_data->>'disconnected'='true' THEN c.status='reconnect_required'; c.details=c.details||'{"issue":"authorization","connectionRevoked":true}'; END IF;
       IF p_data->>'field'='history' THEN
         next_progress=greatest(coalesce((c.details->>'progress')::integer,0),least(coalesce((p_data->>'progress')::integer,0),100));
         c.details=c.details||jsonb_build_object('progress',next_progress);

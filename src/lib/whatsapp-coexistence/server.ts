@@ -73,6 +73,7 @@ export async function completeConnection(org: string, userId: string, input: { s
   await serviceRpc('save', { org, actor: userId, waba: input.wabaId, phone: phone.id,
     number: String(phone.display_phone_number || ''), name: String(phone.verified_name || ''),
     token: seal(token, org, c.encryptionKey), expires: debug.data.expires_at ? new Date(debug.data.expires_at * 1000).toISOString() : null });
+  const saved = await getConnection(org);
   try {
     // Never replace the app-level callback: the same Mivra app serves other projects.
     const subscribed = await graph.request(input.wabaId + '/subscribed_apps', token,
@@ -80,6 +81,9 @@ export async function completeConnection(org: string, userId: string, input: { s
     if (subscribed.success !== true) throw new Error('Meta no confirmó la suscripción.');
     await patchConnection(org, { details: { subscribed: true } });
     for (const syncType of ['smb_app_state_sync', 'history']) {
+      // Renewing authorization on the same connection must not replay a one-shot
+      // sync. A confirmed offboarding resets these journals in the database.
+      if (saved?.details[syncType + 'Request']) continue;
       // A journal prevents replay of the one-shot synchronization requests after an ambiguous timeout.
       await patchConnection(org, { details: { [syncType + 'Request']: 'started' } });
       const sync = await graph.request(phone.id + '/smb_app_data', token, { messaging_product: 'whatsapp', sync_type: syncType });
