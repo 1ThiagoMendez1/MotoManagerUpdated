@@ -1,5 +1,6 @@
 'use server';
 
+import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { requireWorkshop, createAdminClient } from '@/lib/auth-server';
 import { revalidatePath } from 'next/cache';
@@ -9,15 +10,18 @@ import { fetchWompiTransaction, subscriptionCheckoutReady, wompiConfig } from '@
 import { wompiIntegrity, subscriptionReferencePattern } from '@/lib/payments/wompi-protocol';
 import { applySubscriptionTransaction } from '@/lib/payments/subscription-checkout';
 
-export async function startSubscriptionCheckout(plan: string, cycle: string) {
+export async function startSubscriptionCheckout(plan: string, cycle: string, receiptEmail?: string) {
   const user = await requireWorkshop({ allowExpired: true });
   if (!['owner','admin'].includes(user.role)) return { error: 'Solo el dueño o administrador puede contratar un plan.' };
   if (!['basic','pro','full'].includes(plan) || !['monthly','biannual','yearly'].includes(cycle)) return { error: 'Plan o periodo inválido.' };
   try {
     if (!subscriptionCheckoutReady()) throw new Error('El pago en línea no está disponible temporalmente. Intenta nuevamente en unos minutos.');
     const admin = await createAdminClient();
-    const { data: org, error } = await admin.from('organizations').select('settings').eq('id',user.workshopId).single();
+    const { data: org, error } = await admin.from('organizations').select('settings,email').eq('id',user.workshopId).single();
     if (error || !org) throw new Error('No encontramos tu taller.');
+    const phoneAccount = user.app_metadata?.workshop_phone_auth === true && !user.email;
+    const email = (user.email || (phoneAccount ? receiptEmail || org.email : '') || '').trim().toLowerCase();
+    if (!z.string().email().max(254).safeParse(email).success) return { needsBillingEmail: true as const };
     const settings = org.settings || {};
     const price = await catalogSubscriptionPrice(plan, cycle);
     const currentPrice = await catalogSubscriptionPrice(resolveWorkshopPlan(settings), settings.billingCycle || 'monthly');
@@ -26,7 +30,7 @@ export async function startSubscriptionCheckout(plan: string, cycle: string) {
     if (amountInCents < 150000) throw new Error('Tu saldo a favor cubre este cambio. Contacta a soporte para aplicarlo sin realizar un cobro.');
     const { data: quote, error: quoteError } = await admin.rpc('create_workshop_subscription_checkout', {
       p_reference: `MM-SUB-${randomUUID().replaceAll('-','')}`, p_organization_id: user.workshopId,
-      p_actor_id: user.userId, p_plan: plan, p_cycle: cycle, p_amount_in_cents: amountInCents, p_email: user.email,
+      p_actor_id: user.userId, p_plan: plan, p_cycle: cycle, p_amount_in_cents: amountInCents, p_email: email,
     });
     if (quoteError || !quote) throw new Error('No pudimos preparar tu compra. Intenta nuevamente; no se realizó ningún cobro.');
     const { publicKey, integritySecret } = wompiConfig();

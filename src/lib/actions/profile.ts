@@ -2,6 +2,7 @@
 import { getCurrentUserServer, requireWorkshop, getWorkshopDetails, createAdminClient, getScopedClient } from '@/lib/auth-server';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod';
 import { parseBusinessHours } from '@/lib/business-hours';
 import { getOwnAvatarUrl } from '@/app/clientes/reputation-actions';
 import { publicWorkshopImageUrl } from '@/lib/workshops/public-image';
@@ -16,7 +17,7 @@ export async function getProfileData() {
   const [{ data: workshop }, { data: profile }] = await Promise.all([
     supabase
       .from('organizations')
-      .select('name, slug, phone, settings')
+      .select('name, slug, phone, email, settings')
       .eq('id', user.workshopId!)
       .single(),
     supabase
@@ -46,6 +47,9 @@ export async function getProfileData() {
     ownerName: profileNameFallback || ownerNameFallback || '',
     ownerPhone: profile?.phone || '',
     email: user.email || '',
+    phoneAccess: user.app_metadata?.workshop_phone_auth === true,
+    loginPhone: user.phone || '',
+    billingEmail: workshop?.email || '',
     avatarUrl: await getOwnAvatarUrl(),
     workshopImageUrl: publicWorkshopImageUrl(settings, user.workshopId!, process.env.NEXT_PUBLIC_SUPABASE_URL!),
     userRole: user.role,
@@ -85,6 +89,9 @@ export async function updateProfileData(formData: FormData) {
   const workshopMapsLink = (formData.get('workshopMapsLink') as string)?.trim() || null
   const ownerName = (formData.get('ownerName') as string)?.trim()
   const ownerPhone = (formData.get('ownerPhone') as string)?.trim() || null
+
+  const billingEmail = String(formData.get('billingEmail') || '').trim().toLowerCase();
+  if (user.app_metadata?.workshop_phone_auth === true && billingEmail && !z.string().email().max(254).safeParse(billingEmail).success) return { error: 'Revisa el correo de contacto; también puedes dejarlo vacío.' };
 
   if (user.role === 'owner' && !workshopName) {
     return { error: 'El nombre del taller es obligatorio.' }
@@ -129,6 +136,15 @@ export async function updateProfileData(formData: FormData) {
     return { error: 'Error al actualizar los datos del perfil.' }
   }
 
+  if (user.role === 'owner' && user.app_metadata?.workshop_phone_auth === true && formData.has('billingEmail')) {
+    const { error } = await supabaseAdmin.from('organizations').update({ email: billingEmail || null }).eq('id', user.workshopId!);
+    if (error) return { error: 'No pudimos guardar el correo de contacto.' };
+  }
+  // This flag only controls the optional setup prompt; never authorization.
+  if (user.app_metadata?.workshop_phone_auth === true) {
+    const { error } = await supabase.auth.updateUser({ data: { first_name, last_name, profile_incomplete: false } });
+    if (error) return { error: 'Los datos se guardaron, pero no pudimos actualizar el nombre de acceso. Intenta guardar de nuevo.' };
+  }
   revalidatePath('/', 'layout')
   return { success: true }
 }

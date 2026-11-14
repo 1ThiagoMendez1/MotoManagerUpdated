@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { receiveWhatsAppWebhook, verifyWhatsAppWebhook } from '@/lib/whatsapp-webhook';
 import { persistWebhook } from '@/lib/whatsapp-coexistence/webhook';
+import { persistPhoneAuthStatuses } from '@/lib/workshop-phone-auth-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,5 +24,6 @@ export function POST(request: Request) {
     // Preserve the durable receipt while applying the tenant-scoped processor.
     // A processing failure returns 503 so Meta can retry; ingestion is idempotent.
     await persistWebhook(payload);
+    await persistPhoneAuthStatuses(payload);
   });
 }

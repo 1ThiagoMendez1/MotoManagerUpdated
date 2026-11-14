@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as NotificationToaster } from 'sonner';
 import { cn } from '@/lib/utils';
 import Header from '@/components/Header';
+import Link from 'next/link';
 import { AppSidebar } from '@/components/navigation/AppSidebar';
 import { TenantProvider } from '@/components/TenantContextProvider';
 
@@ -130,6 +131,7 @@ export default async function RootLayout({
               </footer>
             }
           >
+            {workshop && user?.app_metadata?.workshop_phone_auth === true && user?.user_metadata?.profile_incomplete === true && <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm"><strong>Tu taller ya está listo.</strong> Cuando quieras, <Link href="/dashboard/profile" className="font-semibold text-primary underline">completa tu nombre y los datos del taller</Link>. Puedes seguir trabajando.</div>}
             {children}
           </LayoutWrapper>
           <Toaster />

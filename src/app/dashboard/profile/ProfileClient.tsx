@@ -27,6 +27,9 @@ interface ProfileData {
   ownerName: string;
   ownerPhone: string;
   email: string;
+  phoneAccess?: boolean;
+  loginPhone?: string;
+  billingEmail?: string;
   avatarUrl?: string | null;
   workshopImageUrl?: string | null;
   userRole?: string;
@@ -331,8 +334,13 @@ export default function ProfileClient({ initialData }: { initialData: ProfileDat
 
               <div className="p-6 grid grid-cols-1 gap-4">
 
+                {data.phoneAccess && <>
+                  <p className="rounded-xl bg-primary/5 p-3 text-xs leading-5">Entras con WhatsApp al +{data.loginPhone}. Editar los teléfonos de contacto no cambia tu número de acceso.</p>
+                  {renderInput('billingEmail', 'Correo de contacto y facturación (opcional)', <Mail className="w-3.5 h-3.5"/>, 'email', 'tu@correo.com', editingSections.owner)}
+                  <p className="text-xs text-muted-foreground">No necesitas correo para entrar. Este correo de contacto no habilita acceso ni recuperación de contraseña.</p>
+                </>}
                 {/* Email (solo lectura) */}
-                <div className="flex flex-col gap-1.5">
+                <div className={data.phoneAccess ? "hidden" : "flex flex-col gap-1.5"}>
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5" /> Correo electrónico
                   </label>
