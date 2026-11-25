@@ -25,7 +25,7 @@ function geometry(){
 function measureLayout(path:string):{layout:AnalyticsLayout;info:ScrollGeometry}|null{
   const {root,info}=geometry();
   if(info.width<100||info.width>20000||info.height<100||info.height>150000)return null;
-  const ids=['hero','demo','why','funciones','como-funciona','prueba-gratis','planes','workshops','faq','closing'];
+  const ids=['hero','portal','como-empezar','demo','why','funciones','como-funciona','prueba-gratis','planes','workshops','faq','closing'];
   const sections=[...root.querySelectorAll<HTMLElement>('main > section')].slice(0,20).map((section,index)=>{
     const box=section.getBoundingClientRect();const start=(box.top-info.top+info.scrollTop)/info.height;
     return {key:Object.hasOwn(SECTION_LABELS,section.id)?section.id:ids[index]||'page',

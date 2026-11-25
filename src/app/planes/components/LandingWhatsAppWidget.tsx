@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, MessageCircle, X } from 'lucide-react';
 import styles from './whatsapp-widget.module.css';
 
-const message = 'Hola, equipo MotoManager. Quiero usar MotoManager en mi taller de motos para organizar órdenes, inventario y ventas. ¿Qué plan me recomiendan y cómo activo los 15 días gratis de Full?';
+const message = 'Hola, equipo MotoManager. Quiero usar MotoManager en mi taller de motos para organizar órdenes, inventario y ventas. ¿Qué plan me recomiendan y cómo activo los 30 días gratis de Full?';
 const contactUrl = 'https://wa.me/573232663710?text=' + encodeURIComponent(message);
 
 export function LandingWhatsAppWidget({ hasMobileDock = false }: { hasMobileDock?: boolean }) {
@@ -27,7 +27,7 @@ export function LandingWhatsAppWidget({ hasMobileDock = false }: { hasMobileDock
           </button>
         </div>
         <p className={styles.title}>¿MotoManager es para tu taller?</p>
-        <p className={styles.description}>Hablemos de lo que necesitas. Te ayudamos a elegir tu plan y empezar con <strong>15 días de Full gratis.</strong></p>
+        <p className={styles.description}>Hablemos de lo que necesitas. Te ayudamos a elegir tu plan y empezar con <strong>30 días de Full gratis.</strong></p>
         <a href={contactUrl} target="_blank" rel="noopener noreferrer" data-analytics-id="whatsapp_advice" className={styles.action}>
           Quiero asesoría para mi taller <ArrowUpRight size={18} aria-hidden="true" />
         </a>

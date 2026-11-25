@@ -10,7 +10,7 @@ RESET ROLE;
 SELECT set_config('test.trial_org', :'trial_org', true);
 DO $$ BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.organizations WHERE id=current_setting('test.trial_org')::uuid AND settings->>'plan'='full' AND settings->>'isTrial'='true' AND (settings->>'paidAmount')::numeric=0) THEN RAISE EXCEPTION 'Trial must be Full and free'; END IF;
-  IF NOT EXISTS(SELECT 1 FROM motomanager_private.workshop_trial_claims WHERE organization_id=current_setting('test.trial_org')::uuid AND ends_at-starts_at=interval '15 days') THEN RAISE EXCEPTION 'Trial length must be exactly 15 days'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM motomanager_private.workshop_trial_claims WHERE organization_id=current_setting('test.trial_org')::uuid AND ends_at-starts_at=interval '30 days') THEN RAISE EXCEPTION 'Trial length must be exactly 30 days'; END IF;
   IF has_function_privilege('authenticated','public.provision_workshop_account(uuid,text,text,text,text,boolean,text,timestamptz,timestamptz,text,text,text,text,numeric)','EXECUTE') OR has_function_privilege('anon','public.claim_trial_signup_attempt(text)','EXECUTE') OR has_function_privilege('authenticated','public.create_organization_with_owner(text,text,text,text,text,text,text,text,text)','EXECUTE') THEN RAISE EXCEPTION 'Provisioning must be server-only'; END IF;
   BEGIN
     PERFORM public.provision_workshop_account('aa000000-0000-4000-8000-000000000002','Trial Reused','trial-reused','3009990001');
@@ -50,11 +50,11 @@ SELECT public.activate_verified_workshop_subscription(:'early_org','pro','monthl
 RESET ROLE;
 DO $$ BEGIN
   IF (SELECT count(*) FROM motomanager_private.workshop_subscription_payments WHERE transaction_id='trial-regression-tx')<>1 THEN RAISE EXCEPTION 'Payment not idempotent'; END IF;
-  IF NOT EXISTS(SELECT 1 FROM public.organizations WHERE slug='trial-early' AND (settings->>'endDate')::timestamptz>=now()+interval '1 month 14 days' AND settings->>'isTrial'='false') THEN RAISE EXCEPTION 'Unused free days were lost'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.organizations WHERE slug='trial-early' AND (settings->>'endDate')::timestamptz>=now()+interval '1 month 29 days' AND settings->>'isTrial'='false') THEN RAISE EXCEPTION 'Unused free days were lost'; END IF;
   IF EXISTS(SELECT 1 FROM motomanager_private.workshop_trial_claims WHERE organization_id=current_setting('test.trial_org')::uuid AND converted_at IS NULL) THEN RAISE EXCEPTION 'Conversion did not end the trial'; END IF;
   IF NOT public.claim_trial_signup_attempt(repeat('a',64)) THEN RAISE EXCEPTION 'First attempt denied'; END IF;
   PERFORM public.claim_trial_signup_attempt(repeat('a',64)) FROM generate_series(1,4);
   IF public.claim_trial_signup_attempt(repeat('a',64)) THEN RAISE EXCEPTION 'Rate limit bypassed'; END IF;
 END $$;
 ROLLBACK;
-\echo 'PASS: Full 15-day trial, server-only provisioning, anti-reuse, protected dates, expiry, conversion, idempotency and throttling'
+\echo 'PASS: Full 30-day trial, server-only provisioning, anti-reuse, protected dates, expiry, conversion, idempotency and throttling'

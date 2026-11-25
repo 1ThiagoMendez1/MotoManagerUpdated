@@ -42,10 +42,10 @@ export function LandingNavbar({ user, halloween = false, christmas = false }: { 
             {user ? 'Ir al sistema' : 'Iniciar sesión'}
           </Link>
           <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} className="inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-5 py-3 text-sm font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
-            {user ? 'Ver mi plan' : '15 días gratis'} <ArrowRight className="h-4 w-4" />
+            {user ? 'Ver mi plan' : '30 días gratis'} <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        {christmas && <Link href={user ? '/dashboard/subscription' : '/prueba-gratis'} data-analytics-id="nav_trial" className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#ff8a1d] px-3 text-[11px] font-extrabold text-[#0a1425] sm:px-4 sm:text-xs xl:hidden">{user ? 'Mi plan' : '15 días gratis'} <ArrowRight className="h-3.5 w-3.5"/></Link>}
+        {christmas && <Link href={user ? '/dashboard/subscription' : '/prueba-gratis'} data-analytics-id="nav_trial" className="ml-auto inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#ff8a1d] px-3 text-[11px] font-extrabold text-[#0a1425] sm:px-4 sm:text-xs xl:hidden">{user ? 'Mi plan' : '30 días gratis'} <ArrowRight className="h-3.5 w-3.5"/></Link>}
         <button
           type="button" onClick={() => setOpen(v => !v)}
           aria-label={open ? 'Cerrar menú' : 'Abrir menú'} aria-controls="landing-mobile-menu" aria-expanded={open}
@@ -61,7 +61,7 @@ export function LandingNavbar({ user, halloween = false, christmas = false }: { 
             <Link href="/clientes" onClick={() => setOpen(false)} className="rounded-xl border border-orange-400/20 bg-orange-400/10 px-4 py-3 text-sm font-bold text-orange-200">🏍️ Mi garaje · Clientes</Link>
             <Link href={destination} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-100 hover:bg-white/10">{user ? 'Ir al sistema' : 'Iniciar sesión'}</Link>
             <Link data-analytics-id="nav_trial" href={user ? '/dashboard/subscription' : '/prueba-gratis'} onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-4 py-3 text-sm font-extrabold text-[#081121]">
-              {user ? 'Ver mi plan' : 'Activar 15 días gratis'} <ArrowRight className="h-4 w-4" />
+              {user ? 'Ver mi plan' : 'Activar 30 días gratis'} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

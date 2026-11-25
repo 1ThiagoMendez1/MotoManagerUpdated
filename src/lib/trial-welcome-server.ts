@@ -37,6 +37,7 @@ function dependencies(db: SupabaseClient, workshopId: string): WelcomeDeliveryDe
           fullName: [user.user_metadata?.first_name, user.user_metadata?.last_name].filter(v => typeof v === 'string').join(' ').trim() || 'Bienvenido',
           workshopName: org.name, email: user.email,
           startsAt: settings.trialStartDate, endsAt: settings.trialEndDate,
+          trialDays: settings.trialDurationDays === 30 ? 30 : 15,
           optedIn: permission?.source === '/prueba-gratis' && typeof permission?.at === 'string' && Number.isFinite(Date.parse(permission.at)),
         },
       } };

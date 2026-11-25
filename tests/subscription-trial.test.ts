@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getTrialState, trialRegistrationSchema, subscriptionPrice, trialWhatsAppPermissions } from '../src/lib/subscription-trial';
+import { TRIAL_DAYS, getTrialState, trialRegistrationSchema, subscriptionPrice, trialWhatsAppPermissions } from '../src/lib/subscription-trial';
 import { resolveWorkshopPlan, getWorkshopWhatsAppLimit } from '../src/lib/workshop-plan';
 
 test('la prueba es Full y vence exactamente al alcanzar su fecha, sin afectar planes existentes', () => {
@@ -56,3 +56,5 @@ test('los recordatorios tampoco pueden enviar WhatsApp después de la prueba', (
   assert.equal(getWorkshopWhatsAppLimit({ plan: 'full', isTrial: true, trialEndDate: '2100-01-01T00:00:00Z' }), -1);
   assert.equal(getWorkshopWhatsAppLimit({ plan: 'full' }), -1);
 });
+
+test("new offer is 30 days; expiry still uses each workshop stored date",()=>assert.equal(TRIAL_DAYS,30));

@@ -40,8 +40,8 @@ export async function startFullTrial(_previous: TrialFormState, form: FormData):
         email, password, email_confirm: true,
         user_metadata: {
           first_name: fullName.split(' ')[0], last_name: fullName.split(' ').slice(1).join(' '), phone,
-          trial_terms_accepted: { at: acceptedAt, source: '/prueba-gratis', version: '2026-11-11',
-            text: 'Prueba Full de 15 días por taller, correo y celular, sin cobros automáticos. Autorizo el tratamiento de datos para gestionar la cuenta.' },
+          trial_terms_accepted: { at: acceptedAt, source: '/prueba-gratis', version: '2026-11-25',
+            text: 'Prueba Full de 30 días por taller, correo y celular, sin cobros automáticos. Autorizo el tratamiento de datos para gestionar la cuenta.' },
           ...trialWhatsAppPermissions({ welcomeRequested, marketingRequested }, acceptedAt),
         },
       });

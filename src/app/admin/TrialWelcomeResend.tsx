@@ -42,14 +42,14 @@ export default function TrialWelcomeResend({ workshopId, expired }: { workshopId
 
   return <>
     <Button type="button" variant="outline" size="sm" disabled={expired || loading || sending}
-      title={expired ? 'La prueba ya venció' : 'Reenviar la bienvenida de los 15 días gratis'}
+      title={expired ? 'La prueba ya venció' : 'Reenviar la bienvenida de la prueba gratis'}
       onClick={openPreview} className="gap-2 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-300">
       <MessageCircle className="h-4 w-4"/><span className="whitespace-nowrap">Reenviar bienvenida</span>
     </Button>
     <Dialog open={open} onOpenChange={value => { if (!sendingRef.current) setOpen(value); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-emerald-500"/>Bienvenida de prueba · 15 días</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-emerald-500"/>Bienvenida de prueba</DialogTitle>
           <DialogDescription>Envía la plantilla de activación al WhatsApp registrado del propietario.</DialogDescription>
         </DialogHeader>
         {loading ? <div className="flex items-center justify-center gap-3 py-8 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin"/>Verificando taller y destinatario...</div>

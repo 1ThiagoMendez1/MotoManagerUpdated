@@ -356,7 +356,7 @@ export function ManageSubscriptionClient({
       {/* Header section */}
       <div className="text-center max-w-2xl mx-auto space-y-4">
         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">{isTrial ? 'Tu taller ya dio el primer paso. Sigue creciendo.' : 'Gestionar Suscripción'}</h1>
-        {isTrial && <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 p-5 text-sm leading-7"><p className="font-bold text-orange-600 dark:text-orange-300">{endDate && Date.parse(endDate) <= Date.now() ? 'Tus 15 días de prueba terminaron.' : 'Estás disfrutando Full gratis.'}</p><p>Elige tu plan y conserva clientes, motos, órdenes e inventario. Si contratas antes de terminar la prueba, conservas los días gratuitos que te quedan. Sin cobros automáticos por la prueba.</p></div>}
+        {isTrial && <div className="rounded-2xl border border-orange-400/30 bg-orange-500/10 p-5 text-sm leading-7"><p className="font-bold text-orange-600 dark:text-orange-300">{endDate && Date.parse(endDate) <= Date.now() ? 'Tu prueba gratuita terminó.' : 'Estás disfrutando Full gratis.'}</p><p>Elige tu plan y conserva clientes, motos, órdenes e inventario. Si contratas antes de terminar la prueba, conservas los días gratuitos que te quedan. Sin cobros automáticos por la prueba.</p></div>}
         <p className="text-muted-foreground text-lg">
           Tu plan actual es <span className={`font-semibold capitalize ${plans.find(p => p.id === normalizedActivePlan)?.accentText || 'text-primary'}`}>{getPlanLabel(activePlan)}</span>
         </p>
