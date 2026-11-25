@@ -102,6 +102,7 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=
 WHATSAPP_COEXISTENCE_CALLBACK_URL=https://motomanager.com.co/api/whatsapp/webhook
 WHATSAPP_COEXISTENCE_WEBHOOKS_READY=false
 WHATSAPP_COEXISTENCE_PILOT_ORGS=
+WHATSAPP_COEXISTENCE_PILOT_USERS=
 ```
 
 Generar claves independientes: cifrado de 32 bytes en base64 y verify token de
@@ -112,7 +113,7 @@ clave de cifrado de conexiones es distinta de la clave de la bandeja global.
 
 `WEBHOOKS_READY=true` es una confirmación operativa: establecerla solo después
 de verificar firma, suscripciones, persistencia y procesamiento de eventos. `pilot` exige
-una lista de UUID de talleres en `PILOT_ORGS`; `live` permite el registro general.
+una lista de UUID de talleres en `PILOT_ORGS`. Para administrar la conexión también exige el UUID autenticado en `WHATSAPP_COEXISTENCE_PILOT_USERS`; sin esa lista nadie puede iniciar el piloto, aunque sea propietario del taller. El menú, la página y la API aplican la misma restricción. `live` permite el registro general a propietarios/administradores con permiso.
 `off` impide nuevas conexiones y detiene los números propios ya registrados.
 
 ## Validación y despliegue
@@ -169,3 +170,9 @@ si la sesión de ese dominio no existe, se requiere iniciar sesión allí.
 El SDK no se carga ni se prepara un nonce en los subdominios de talleres. Los
 inicios y finalizaciones solo se aceptan desde el origen canónico configurado.
 El secreto de la app, los tokens y ambas claves de cifrado permanecen privados.
+
+## Piloto individual — 25 de noviembre de 2026
+
+Se limita la administración de coexistencia a la cuenta solicitada por el propietario de MotoManager, resuelta a su UUID de Auth y al taller FrankorMotos. Los UUID se configuran solo en el entorno privado del servidor; no se publica una lista de correos en el cliente. No se modifica ningún rol ni se envían mensajes durante la habilitación. Los números centrales y el login por WhatsApp conservan su configuración.
+
+La revisión de Meta se verificó en el panel de la app Mivra (2239085550357868): solicitud **No enviada**, app **Sin publicar**. Habilitar el botón no representa aprobación de Meta. Para clientes externos sigue pendiente completar y enviar la revisión de los permisos avanzados `whatsapp_business_messaging` y `whatsapp_business_management`.

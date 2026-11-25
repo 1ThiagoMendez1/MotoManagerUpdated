@@ -9,7 +9,7 @@ Object.assign(process.env, { CACHE_ENABLED: 'false', NEXT_PUBLIC_SUPABASE_URL: '
   META_EMBEDDED_SIGNUP_CONFIG_ID: '888888', WHATSAPP_CONNECTION_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: 'mock-verify-token-with-sufficient-length', WHATSAPP_GRAPH_API_VERSION: 'v27.0',
   WHATSAPP_COEXISTENCE_CALLBACK_URL: 'https://motomanager.example.test/api/whatsapp/webhook', WHATSAPP_COEXISTENCE_MODE: 'pilot',
-  WHATSAPP_COEXISTENCE_PILOT_ORGS: org, WHATSAPP_COEXISTENCE_WEBHOOKS_READY: 'true', WHATSAPP_BUSINESS_ACCOUNT_ID: '777777', WHATSAPP_PHONE_NUMBER_ID: '666666' });
+  WHATSAPP_COEXISTENCE_PILOT_ORGS: org, WHATSAPP_COEXISTENCE_PILOT_USERS: actor, WHATSAPP_COEXISTENCE_WEBHOOKS_READY: 'true', WHATSAPP_BUSINESS_ACCOUNT_ID: '777777', WHATSAPP_PHONE_NUMBER_ID: '666666' });
 let connection: any = null, claimed = false, wrongApp = false, deniedSend = false, persistFailure = false;
 const ingested: any[] = [];
 const graphCalls: { path: string; body: any }[] = [];
@@ -47,8 +47,28 @@ globalThis.fetch = async (input: any, options: any = {}) => {
   throw new Error('Unexpected Graph request: ' + path);
 };
 async function main() {
-  const { completeConnection, sendWorkshopNotice } = await import('../src/lib/whatsapp-coexistence/server');
+  const { beginConnection, completeConnection, sendWorkshopNotice } = await import('../src/lib/whatsapp-coexistence/server');
+  const { managementEnabledFor } = await import('../src/lib/whatsapp-coexistence/access');
   const input = { state: 's'.repeat(43), code: 'mock-exchange-code', wabaId: '555555', phoneId: '444444' };
+  assert.equal(managementEnabledFor(org, actor), true);
+  const unauthorizedActor = '33333333-3333-4333-8333-333333333333';
+  assert.equal(managementEnabledFor(org, unauthorizedActor), false, 'another owner of the same workshop is not a pilot user');
+  assert.equal(managementEnabledFor(unauthorizedActor, actor), false, 'the pilot user cannot connect another workshop');
+  assert.equal(managementEnabledFor(org, null), false);
+  delete process.env.WHATSAPP_COEXISTENCE_PILOT_USERS;
+  assert.equal(managementEnabledFor(org, actor), false, 'an unconfigured pilot must fail closed');
+  process.env.WHATSAPP_COEXISTENCE_PILOT_USERS = '  ' + actor + ' , ';
+  for (const [organization, user] of [[org, unauthorizedActor], [unauthorizedActor, actor]]) {
+    await assert.rejects(() => beginConnection(organization, user), /no está habilitada/);
+    await assert.rejects(() => completeConnection(organization, user, input), /no está habilitada/);
+  }
+  assert.equal(graphCalls.length, 0, 'denied users never reach Meta or consume an onboarding claim');
+  assert.equal(claimed, false);
+  process.env.WHATSAPP_COEXISTENCE_MODE = 'off';
+  assert.equal(managementEnabledFor(org, actor), false);
+  process.env.WHATSAPP_COEXISTENCE_MODE = 'live';
+  assert.equal(managementEnabledFor(org, unauthorizedActor), true);
+  process.env.WHATSAPP_COEXISTENCE_MODE = 'pilot';
   await completeConnection(org, actor, input);
   assert.equal(connection.phone_id, '444444');
   assert.ok(!connection.token_ciphertext.includes('mock-business-token'));

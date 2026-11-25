@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { managementEnabledFor } from './access';
 import { chooseCoexistencePhone, digest, graphClient, MetaError, metaId, noticePayload, noticeTemplates, seal, templateDefinition, unseal, validateToken, type Notice, type NoticeKind } from './core';
 
 export type Connection = {
@@ -50,13 +51,13 @@ export function encryptedToken(connection: Connection) {
   return unseal(connection.token_ciphertext, connection.organization_id, configuration().encryptionKey);
 }
 export async function beginConnection(org: string, userId: string) {
-  if (!enabledFor(org) || !setupReady()) throw new Error('La conexión de números propios todavía no está habilitada para este taller.');
+  if (!managementEnabledFor(org, userId) || !setupReady()) throw new Error('La conexión de números propios todavía no está habilitada para esta cuenta.');
   const state = randomBytes(32).toString('base64url');
   await serviceRpc('begin', { org, actor: userId, hash: digest(state) });
   return state;
 }
 export async function completeConnection(org: string, userId: string, input: { state: string; code: string; wabaId: string; phoneId?: string }) {
-  if (!enabledFor(org) || !setupReady()) throw new Error('La conexión de números propios todavía no está habilitada.');
+  if (!managementEnabledFor(org, userId) || !setupReady()) throw new Error('La conexión de números propios todavía no está habilitada para esta cuenta.');
   if (!await serviceRpc('claim', { org, actor: userId, hash: digest(input.state) })) throw new Error('La conexión venció o ya se utilizó. Empieza de nuevo.');
   const c = configuration(), graph = graphClient(c);
   const exchange = await graph.exchange(input.code);
