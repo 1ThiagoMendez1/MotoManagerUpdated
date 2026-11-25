@@ -11,7 +11,7 @@ import styles from './christmas.module.css';
 export function ChristmasRibbon() {
   return <div className={styles.ribbon}>
     <div className={styles.ribbonInner}>
-      <div className={styles.ribbonMessage}><Sparkles size={15} /><span>Especial de Navidad · <strong>15 días de Full sin pagar</strong></span></div>
+      <div className={styles.ribbonMessage}><Sparkles size={15} /><span>Especial de Navidad · <strong>30 días de Full sin pagar</strong></span></div>
       <Link href="/prueba-gratis" data-analytics-id="ribbon_trial" className={styles.ribbonLink}>Activar prueba <ArrowRight size={14} /></Link>
     </div>
   </div>;
@@ -31,7 +31,7 @@ export function ChristmasHero() {
         <span className={styles.eyebrow}><Star size={14} fill="currentColor" /> NAVIDAD 2026 · PARA TALLERES DE COLOMBIA</span>
         <span className={styles.holidayLabel}><Gift size={15} /> Esta Navidad, atiende con más tranquilidad</span>
         <h1 id="christmas-hero-title" className={styles.title}>Menos “¿cómo va mi moto?”. <span>Más control de tu taller.</span></h1>
-        <p className={styles.description}>Tu cliente consulta el estado de su moto desde su portal. Tú organizas <strong>órdenes, repuestos y ventas</strong> en un solo lugar. Pruébalo con tu taller real durante 15 días.</p>
+        <p className={styles.description}>Tu cliente consulta el estado de su moto desde su portal. Tú organizas <strong>órdenes, repuestos y ventas</strong> en un solo lugar. Pruébalo con tu taller real durante 30 días.</p>
         <div className={styles.actions}>
           <Link href="/prueba-gratis" data-analytics-id="hero_trial" className={styles.primaryCta}>Crear mi taller gratis <ArrowRight size={20} /></Link>
           <a href="#demo" data-analytics-id="hero_demo" className={styles.secondaryCta}><Play size={17} /> Ver cómo funciona</a>
@@ -39,7 +39,7 @@ export function ChristmasHero() {
         <div className={styles.assurances}>
           <span><CheckCircle2 size={15} /> Sin tarjeta</span>
           <span><CheckCircle2 size={15} /> Sin cobros automáticos</span>
-          <span><CheckCircle2 size={15} /> Full durante 15 días</span>
+          <span><CheckCircle2 size={15} /> Full durante 30 días</span>
         </div>
       </div>
       <div className={styles.productStage}>
@@ -96,7 +96,7 @@ export function ChristmasTrialOffer({fullPrice}:{fullPrice:number}) {
       <div className={styles.offerPriceCard}>
         <div className={styles.bow} aria-hidden="true"><Gift size={38}/></div>
         <span>ACTIVA FULL PARA TU TALLER</span>
-        <strong>15 <small>días</small></strong>
+        <strong>30 <small>días</small></strong>
         <b>GRATIS</b>
         <p>Hoy: $0 · Sin tarjeta ni cargos automáticos.</p>
         <Link href="/prueba-gratis" data-analytics-id="offer_trial" className={styles.offerButton}>Crear mi taller gratis <ArrowRight size={18}/></Link>
@@ -109,7 +109,7 @@ export function ChristmasTrialOffer({fullPrice}:{fullPrice:number}) {
 export function ChristmasMobileDock({user=false}:{user?:boolean}) {
   return <nav className={styles.mobileDock} aria-label="Acceso rápido a la prueba y demostración">
     <Link href={user?'/dashboard/subscription':'/prueba-gratis'} data-analytics-id="nav_trial" className={styles.dockPrimary}>
-      {user?'Ver mi suscripción':'Probar Full 15 días gratis'} <ArrowRight size={18}/>
+      {user?'Ver mi suscripción':'Probar Full 30 días gratis'} <ArrowRight size={18}/>
     </Link>
     <a href="#demo" data-analytics-id="hero_demo" className={styles.dockDemo}><Play size={16} fill="currentColor"/><span>Demo</span></a>
   </nav>;
@@ -117,6 +117,6 @@ export function ChristmasMobileDock({user=false}:{user?:boolean}) {
 
 export function ChristmasClosing(){
   return <section className={styles.closing}>
-    <div className={styles.closingInner}><span><Sparkles size={17}/> QUE DICIEMBRE TE ENCUENTRE PREPARADO</span><h2>Las motos seguirán llegando.<br/><em>Que tu taller tenga todo en orden.</em></h2><p>Conoce MotoManager durante 15 días sin pagar. Lo importante es descubrir si hace más sencillo tu trabajo.</p><Link href="/prueba-gratis" data-analytics-id="closing_trial">Crear mi taller gratis <ArrowRight size={19}/></Link></div>
+    <div className={styles.closingInner}><span><Sparkles size={17}/> QUE DICIEMBRE TE ENCUENTRE PREPARADO</span><h2>Las motos seguirán llegando.<br/><em>Que tu taller tenga todo en orden.</em></h2><p>Conoce MotoManager durante 30 días sin pagar. Lo importante es descubrir si hace más sencillo tu trabajo.</p><Link href="/prueba-gratis" data-analytics-id="closing_trial">Crear mi taller gratis <ArrowRight size={19}/></Link></div>
   </section>;
 }

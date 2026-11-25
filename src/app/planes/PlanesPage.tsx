@@ -21,8 +21,7 @@ import { LandingWhatsAppWidget } from './components/LandingWhatsAppWidget';
 import { PaymentModal, RegistrationModal } from './components/LandingModals';
 import { HalloweenClosing, HalloweenRibbon } from './components/HalloweenCampaign';
 import halloweenStyles from './components/halloween.module.css';
-import christmasStyles from './components/christmas.module.css';
-import { ChristmasRibbon, ChristmasHero, ChristmasDemoGuide, ChristmasTrialOffer, ChristmasMobileDock, ChristmasClosing } from './components/ChristmasCampaign';
+import { ChristmasLanding } from './components/ChristmasLanding';
 import { isSuperAdmin } from '@/lib/super-admin';
 
 interface Plan {
@@ -127,36 +126,35 @@ export default function PlanesPage({ plans = [], features = [], user, workshops 
   const christmasEdition = christmas && !halloween;
   const fullPrice = Number(plans.find(plan => plan.id === 'full')?.price || 119900);
   return (
-    <div className={`min-h-screen bg-[#081121] text-white ${halloween ? halloweenStyles.edition : ''} ${christmasEdition ? christmasStyles.edition : ''}`} data-campaign={halloween ? 'halloween-2026' : christmasEdition ? 'navidad-2026-v2' : 'trial-v2'}>
+    <div className={`min-h-screen bg-[#081121] text-white ${halloween ? halloweenStyles.edition : ''}`} data-campaign={halloween ? 'halloween-2026' : christmasEdition ? 'navidad-2026-v3' : 'trial-v2'}>
       <MetaPixelMarketing excluded={isSuperAdmin(user)} />
-      <LandingNavbar user={user} halloween={halloween} christmas={christmasEdition} />
+      {christmasEdition ? <ChristmasLanding plans={plans} features={features} user={user} workshops={workshops} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes}/> : <>
+      <LandingNavbar user={user} halloween={halloween} />
       <main>
-        {halloween ? <HalloweenRibbon /> : christmasEdition ? <ChristmasRibbon /> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-orange-400/20 bg-[#ff831b]/10 px-5 py-3 text-center text-sm"><span><strong className="text-[#ffad68]">15 días de Full gratis.</strong> Sin tarjeta. Tu taller, con todo activado.</span><Link href="/prueba-gratis" className="inline-flex items-center gap-1 font-bold text-[#ffad68] underline underline-offset-4">Activar prueba <ArrowRight className="h-3.5 w-3.5" /></Link></div>}
-        {christmasEdition ? <ChristmasHero /> : <LandingHero onScrollToPlanes={scrollToPlanes} halloween={halloween} />}
-        {christmasEdition && <ChristmasDemoGuide />}
+        {halloween ? <HalloweenRibbon /> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-orange-400/20 bg-[#ff831b]/10 px-5 py-3 text-center text-sm"><span><strong className="text-[#ffad68]">30 días de Full gratis.</strong> Sin tarjeta. Tu taller, con todo activado.</span><Link href="/prueba-gratis" className="inline-flex items-center gap-1 font-bold text-[#ffad68] underline underline-offset-4">Activar prueba <ArrowRight className="h-3.5 w-3.5" /></Link></div>}
+        <LandingHero onScrollToPlanes={scrollToPlanes} halloween={halloween} />
         <LandingDemoSection />
-        {christmasEdition && <ChristmasTrialOffer fullPrice={fullPrice} />}
         <LandingWhyChange halloween={halloween} />
         <LandingFeatures />
         <ProductFlow />
-        {!christmasEdition && <LandingTrial fullPrice={fullPrice} halloween={halloween} />}
+        <LandingTrial fullPrice={fullPrice} halloween={halloween} />
         <LandingPricing plans={plans} features={features} onSelectPlan={selectPlan} onScrollToPlanes={scrollToPlanes} christmas={christmasEdition} />
         <LandingTopWorkshops initialWorkshops={workshops} />
         <LandingTestimonialsAndFAQ />
-        {halloween ? <HalloweenClosing /> : christmasEdition ? <ChristmasClosing /> : <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
+        {halloween ? <HalloweenClosing /> : <section className="bg-[#0b2036] px-5 py-20 text-center text-white">
           <div className="mx-auto max-w-3xl">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Tu siguiente paso</span>
             <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">¿Listo para dejar el desorden atrás?</h2>
-            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Dale 15 días a una nueva forma de trabajar. Prueba Full con tus clientes, tus motos y tu equipo. Después decides cómo seguir.</p>
+            <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-300">Dale 30 días a una nueva forma de trabajar. Prueba Full con tus clientes, tus motos y tu equipo. Después decides cómo seguir.</p>
             <Link href="/prueba-gratis" data-analytics-id="closing_trial" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 font-extrabold text-[#0a1425] transition hover:bg-[#ffa149]">
-              Empezar mis 15 días gratis <ArrowRight className="h-4 w-4" />
+              Empezar mis 30 días gratis <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </section>}
       </main>
       <LandingFooter halloween={halloween} christmas={christmasEdition} />
-      {christmasEdition && <ChristmasMobileDock user={Boolean(user)} />}
-      {!activePlan && !regModal.open && <LandingWhatsAppWidget hasMobileDock={christmasEdition} />}
+      </>}
+      {!activePlan && !regModal.open && <LandingWhatsAppWidget hasMobileDock={false} />}
 
       {activePlan && <PaymentModal plan={activePlan} onClose={() => setActivePlan(null)} appUrl={appUrl} />}
       <RegistrationModal

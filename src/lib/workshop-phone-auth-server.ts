@@ -53,8 +53,8 @@ export async function verifyWorkshopPhone(challenge: string, code: string, brows
         id: claim.userId, phone: claim.phone, phone_confirm: true, password: newPhonePassword(),
         app_metadata: { workshop_phone_auth: true },
         user_metadata: { first_name: 'Administrador', phone: claim.phone, profile_incomplete: true,
-          trial_terms_accepted: { at, source: '/prueba-gratis', version: '2026-11-13',
-            text: 'Solicito verificar mi número por WhatsApp y activar 15 días de Full gratis, sin cobros automáticos. Autorizo el tratamiento de datos para gestionar mi cuenta.' },
+          trial_terms_accepted: { at, source: '/prueba-gratis', version: '2026-11-25',
+            text: 'Solicito verificar mi número por WhatsApp y activar 30 días de Full gratis, sin cobros automáticos. Autorizo el tratamiento de datos para gestionar mi cuenta.' },
           ...trialWhatsAppPermissions({ welcomeRequested: 'no', marketingRequested: claim.marketing ? 'yes' : 'no' }, at),
         },
       });

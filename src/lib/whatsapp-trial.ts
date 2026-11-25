@@ -1,6 +1,8 @@
 /** Exact template identity from WhatsApp Manager. Credentials are supplied only by the server. */
 export const TRIAL_WELCOME_TEMPLATE = 'bienvenida_prueba_gratis_15_dias';
 export const TRIAL_WELCOME_TEMPLATE_ID = '152539709393366';
+export const THIRTY_DAY_WELCOME_TEMPLATE = 'bienvenida_prueba_gratis_30_dias';
+export const THIRTY_DAY_WELCOME_TEMPLATE_ID = '1504308411596129';
 export const TRIAL_WELCOME_LANGUAGE = 'es_CO';
 
 export type TrialWelcomeInput = {
@@ -11,7 +13,15 @@ export type TrialWelcomeInput = {
   startsAt: string;
   endsAt: string;
   optedIn: boolean;
+  /** Stored at registration; review pauses never change the original offer. */
+  trialDays?: number;
 };
+
+function templateIdentity(input: TrialWelcomeInput) {
+  return input.trialDays === 30
+    ? { name: THIRTY_DAY_WELCOME_TEMPLATE, id: THIRTY_DAY_WELCOME_TEMPLATE_ID }
+    : { name: TRIAL_WELCOME_TEMPLATE, id: TRIAL_WELCOME_TEMPLATE_ID };
+}
 
 type TemplateComponent = { type: string; format?: string; text?: string; buttons?: { type: string; url?: string }[] };
 type Template = { id: string; name: string; language: string; status: string; components: TemplateComponent[] };
@@ -37,8 +47,9 @@ export function formatTrialWelcomeDate(value: string) {
  * draft's email variable (5). No header/button variables are guessed or retried. */
 export function buildTrialWelcomeTemplate(metadata: unknown, input: TrialWelcomeInput) {
   const template = metadata as Template | null;
-  if (!template || template.id !== TRIAL_WELCOME_TEMPLATE_ID ||
-    template.name !== TRIAL_WELCOME_TEMPLATE || template.language !== TRIAL_WELCOME_LANGUAGE ||
+  const identity = templateIdentity(input);
+  if (!template || template.id !== identity.id ||
+    template.name !== identity.name || template.language !== TRIAL_WELCOME_LANGUAGE ||
     template.status !== 'APPROVED' || !Array.isArray(template.components)) throw new Error('Unsupported trial template');
   const body = template.components.filter(component => component?.type === 'BODY');
   if (body.length !== 1 || typeof body[0].text !== 'string') throw new Error('Unsupported trial body');
@@ -68,7 +79,7 @@ export function buildTrialWelcomeTemplate(metadata: unknown, input: TrialWelcome
   if (count === 5) values.push(parameter(input.email, 254));
   values.push(formatTrialWelcomeDate(input.startsAt), formatTrialWelcomeDate(input.endsAt));
   return {
-    name: TRIAL_WELCOME_TEMPLATE,
+    name: identity.name,
     language: { code: TRIAL_WELCOME_LANGUAGE },
     components: [{ type: 'body', parameters: values.map(text => ({ type: 'text', text })) }],
   };
@@ -88,7 +99,7 @@ export function buildTrialWelcomeSendTemplate(input: TrialWelcomeInput, variable
   if (variableCount === 5) values.push(parameter(input.email, 254));
   values.push(formatTrialWelcomeDate(input.startsAt), formatTrialWelcomeDate(input.endsAt));
   return {
-    name: TRIAL_WELCOME_TEMPLATE,
+    name: templateIdentity(input).name,
     language: { code: TRIAL_WELCOME_LANGUAGE },
     components: [{ type: 'body', parameters: values.map(text => ({ type: 'text', text })) }],
   };

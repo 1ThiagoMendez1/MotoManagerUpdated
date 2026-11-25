@@ -337,7 +337,7 @@
 }
 
 @media (max-width: 639px) {
-  /* Keep the 15-day free trial CTA above Santa on every mobile viewport. */
+  /* Keep the 30-day free trial CTA above Santa on every mobile viewport. */
   .edition .heroContainer { gap: 4px; }
   .edition .productStage {
     min-height: 0;

@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { ChevronDown, MessageCircleQuestion } from 'lucide-react';
 import { getPlanLimits } from '@/lib/constants/plans';
 
-const FAQS = [
-  { question: '¿Cómo funcionan los 15 días gratis?', answer: 'Crea tu taller en dos pasos y entra directamente con tu correo y contraseña. No necesitas tarjeta ni esperar una llamada. La prueba Full comienza al crear el taller, dura 15 días y está disponible una vez por taller, correo y celular. Después tú decides si continúas con un plan.' },
-  { question: '¿Qué pasa cuando terminan los 15 días?', answer: 'No hay cobros automáticos por la prueba. El acceso operativo se pausa y puedes contratar Básico, Pro o Full desde tu suscripción. Al contratar conservas tus clientes, motos, órdenes e inventario. Si pagas antes de terminar la prueba, se conservan los días gratuitos que te quedan.' },
+export const FAQS = [
+  { question: '¿Cómo funcionan los 30 días gratis?', answer: 'Crea tu taller con su nombre y tu número de WhatsApp. Te enviamos un código para activar tu cuenta. No necesitas tarjeta ni esperar una llamada. La prueba Full comienza al crear el taller, dura 30 días y está disponible una vez por taller y celular. Después tú decides si continúas con un plan.' },
+  { question: '¿Qué pasa cuando terminan los 30 días?', answer: 'No hay cobros automáticos por la prueba. El acceso operativo se pausa y puedes contratar Básico, Pro o Full desde tu suscripción. Al contratar conservas tus clientes, motos, órdenes e inventario. Si pagas antes de terminar la prueba, se conservan los días gratuitos que te quedan.' },
   { question: 'Ya uso Excel y WhatsApp, ¿por qué cambiar?', answer: 'Una hoja de cálculo almacena filas; MotoManager relaciona la moto con su dueño, órdenes, diagnóstico, servicios e historial. Así reduces las búsquedas entre archivos y conversaciones separadas.' },
   { question: '¿Mi equipo necesita conocimientos técnicos?', answer: 'El sistema se organiza por tareas cotidianas como recibir una motocicleta, registrar una orden y consultar su estado. Puedes explorar primero la demostración y evaluar si encaja con la forma de trabajar de tu equipo.' },
 

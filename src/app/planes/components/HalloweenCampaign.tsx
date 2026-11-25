@@ -11,7 +11,7 @@ export function HalloweenRibbon() {
   return <div className={styles.ribbon}>
     <div className={styles.ribbonInner}>
       <span className={styles.ribbonLabel}><HalloweenDecor kind="pumpkin" /> EDICIÓN HALLOWEEN</span>
-      <p>Un trato de miedo: <strong>15 días de Full por $0.</strong> Sin tarjeta.</p>
+      <p>Un trato de miedo: <strong>30 días de Full por $0.</strong> Sin tarjeta.</p>
       <Link href="/prueba-gratis" data-analytics-id="ribbon_trial">Quiero mi prueba <ArrowRight size={14} /></Link>
     </div>
   </div>;
@@ -27,9 +27,9 @@ export function HalloweenHero({ onScrollToPlanes }: { onScrollToPlanes: () => vo
         <span className={styles.eyebrow}><span /> SOFTWARE PARA TALLERES DE MOTOS</span>
         <div className={styles.editionLabel}><HalloweenDecor kind="candy" /> TRATO, SIN TRUCOS.</div>
         <h1 id="halloween-title" className={styles.heroTitle}>Entierra el<br /><span>desorden.</span><em>Dale vida a tu taller.</em></h1>
-        <p className={styles.heroDescription}>Las órdenes perdidas, los repuestos fantasma y las cuentas de miedo se quedan atrás. Conecta tu taller con MotoManager y estrena <strong>15 días de nuestro plan Full gratis.</strong></p>
+        <p className={styles.heroDescription}>Las órdenes perdidas, los repuestos fantasma y las cuentas de miedo se quedan atrás. Conecta tu taller con MotoManager y estrena <strong>30 días de nuestro plan Full gratis.</strong></p>
         <div className={styles.heroActions}>
-          <Link href="/prueba-gratis" data-analytics-id="hero_trial" className={styles.primaryButton}>Quiero mis 15 días gratis <ArrowRight size={19} /></Link>
+          <Link href="/prueba-gratis" data-analytics-id="hero_trial" className={styles.primaryButton}>Quiero mis 30 días gratis <ArrowRight size={19} /></Link>
           <a href="#demo" data-analytics-id="hero_demo" className={styles.secondaryButton}><PlayCircle size={19} /> Verlo en acción</a>
         </div>
         <div className={styles.reassurance}>
@@ -90,7 +90,7 @@ export function HalloweenTrialOffer({ fullPrice }: { fullPrice: number }) {
         <p className={styles.ticketDescription}>Tu taller de verdad.<br />Nuestro plan más completo.</p>
         <div className={styles.ticketPerforation} aria-hidden="true" />
         <p className={styles.ticketTerms}>Después, tú decides. Full desde <strong>{fullPrice.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}/mes</strong> o elige otro plan. No se cobra automáticamente.</p>
-        <Link href="/prueba-gratis" data-analytics-id="offer_trial" className={styles.ticketButton}>Activar mis 15 días gratis <ArrowRight size={18} /></Link>
+        <Link href="/prueba-gratis" data-analytics-id="offer_trial" className={styles.ticketButton}>Activar mis 30 días gratis <ArrowRight size={18} /></Link>
         <a href="#planes" className={styles.ticketCompare}>Comparar los planes para después</a>
       </div>
     </div>
@@ -105,7 +105,7 @@ export function HalloweenClosing() {
     <HalloweenDecor kind="candy" className={styles.closingCandy} />
     <span className={styles.eyebrow}>QUE LOS SUSTOS SE QUEDEN EN HALLOWEEN</span>
     <h2>Tu taller merece<br /><span>un nuevo comienzo.</span></h2>
-    <p>15 días para descubrir otra forma de trabajar.<br />Full Taller. Con tu operación real. Por $0.</p>
+    <p>30 días para descubrir otra forma de trabajar.<br />Full Taller. Con tu operación real. Por $0.</p>
     <Link href="/prueba-gratis" data-analytics-id="closing_trial" className={styles.primaryButton}>Darle vida a mi taller <ArrowRight size={19} /></Link>
     <span className={styles.closingNote}>Sin tarjeta · Sin cobros automáticos · Tú decides cómo seguir</span>
   </section>;

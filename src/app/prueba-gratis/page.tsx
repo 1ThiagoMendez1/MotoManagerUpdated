@@ -11,8 +11,8 @@ import { PHONE_AUTH_CAMPAIGN } from '@/lib/workshop-phone-shared';
 import { TRIAL_FIELD_CAMPAIGN } from '@/lib/analytics/trial-fields';
 
 export const metadata: Metadata = {
-  title: 'Crea tu taller · 15 días de Full gratis | MotoManager',
-  description: 'Prueba MotoManager con las motos, órdenes y repuestos de tu taller. 15 días de Full por $0, sin tarjeta ni cobros automáticos.',
+  title: 'Crea tu taller · 30 días de Full gratis | MotoManager',
+  description: 'Prueba MotoManager con las motos, órdenes y repuestos de tu taller. 30 días de Full por $0, sin tarjeta ni cobros automáticos.',
 };
 
 export default async function TrialPage({ searchParams }: { searchParams: Promise<{ method?: string }> }) {
@@ -31,7 +31,7 @@ export default async function TrialPage({ searchParams }: { searchParams: Promis
       </header>
       <div className="grid items-start gap-7 pt-5 lg:grid-cols-[1fr_1fr] lg:gap-16 lg:pt-14">
         <section className="lg:sticky lg:top-12" aria-labelledby="trial-title">
-          <p className="inline-flex items-center gap-2 text-xs font-bold text-orange-200"><Gift size={17}/> 15 días de Full · Hoy pagas $0</p>
+          <p className="inline-flex items-center gap-2 text-xs font-bold text-orange-200"><Gift size={17}/> 30 días de Full · Hoy pagas $0</p>
           <h1 id="trial-title" className="mt-3 max-w-xl text-3xl font-extrabold leading-tight tracking-[-.045em] sm:text-4xl lg:text-5xl">Tu taller más organizado.<span className="text-orange-400"> Empieza gratis.</span></h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">Crea tu cuenta y entra a trabajar con tus propias motos, clientes y órdenes.</p>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-200"><span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-300"/>Sin tarjeta</span><span className="inline-flex items-center gap-1.5"><CheckCircle2 size={14} className="text-emerald-300"/>Sin cobros automáticos</span></div>
@@ -51,6 +51,6 @@ function TrialBenefits() {
       { Icon: MessageCircle, title: 'Tu cliente también puede consultar', detail: 'Comparte el seguimiento de la moto desde su portal.' },
       { Icon: Wallet, title: 'Lleva las cuentas con claridad', detail: 'Organiza inventario, ventas y finanzas de tu taller.' },
     ].map(({Icon,title,detail}) => <div key={title} className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-blue-300/10 bg-blue-400/10 text-blue-300"><Icon size={20}/></span><div><h2 className="text-sm font-semibold">{title}</h2><p className="mt-1 text-xs leading-5 text-slate-400">{detail}</p></div></div>)}</div>
-    <div className="rounded-xl border border-white/10 p-4 text-xs leading-6 text-slate-300"><p className="flex items-center gap-2 font-semibold text-slate-100"><ShieldCheck size={16} className="text-emerald-300"/>¿Qué pasa después de los 15 días?</p><p className="mt-2">Tú decides si continúas con un plan. Si no lo haces, se pausa el acceso operativo; la prueba no genera cobros automáticos. Al contratar conservas la información de tu taller.</p></div>
+    <div className="rounded-xl border border-white/10 p-4 text-xs leading-6 text-slate-300"><p className="flex items-center gap-2 font-semibold text-slate-100"><ShieldCheck size={16} className="text-emerald-300"/>¿Qué pasa después de los 30 días?</p><p className="mt-2">Tú decides si continúas con un plan. Si no lo haces, se pausa el acceso operativo; la prueba no genera cobros automáticos. Al contratar conservas la información de tu taller.</p></div>
   </div>;
 }

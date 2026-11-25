@@ -21,21 +21,22 @@ interface Props {
   onScrollToPlanes: () => void;
   previewMode?: boolean;
   christmas?: boolean;
+  className?: string;
 }
 
 const limitText = (value: number, single: string, multiple: string) =>
   value < 0 ? `${multiple} sin límite de plan` : `${value} ${value === 1 ? single : multiple}`;
 
-export function LandingPricing({ plans, onSelectPlan, previewMode = false, christmas = false }: Props) {
+export function LandingPricing({ plans, onSelectPlan, previewMode = false, christmas = false, className = '' }: Props) {
   const [cycle, setCycle] = useState<Cycle>('monthly');
   const config = CYCLES[cycle];
   const sortedPlans = [...plans].filter(p => ['basic', 'pro', 'full'].includes(p.id)).sort((a,b) => a.price - b.price);
 
   return (
-    <section id="planes" data-analytics-state={cycle} className={`scroll-mt-20 bg-[#091426] px-5 text-white ${previewMode ? 'py-12' : 'py-24 lg:py-28'}`}>
+    <section id="planes" data-analytics-state={cycle} className={`scroll-mt-20 bg-[#091426] px-5 text-white ${previewMode ? 'py-12' : 'py-24 lg:py-28'} ${className}`}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
-          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff9e4c]">{christmas ? 'Precios transparentes después de tus 15 días' : 'Elige el siguiente paso de tu taller'}</span>
+          <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff9e4c]">{christmas ? 'Precios transparentes después de tus 30 días' : 'Elige el siguiente paso de tu taller'}</span>
           <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">{christmas ? 'Que el taller crezca con orden.' : 'Invierte en control.'} <span className="text-[#ff9e4c]">{christmas ? 'Full para tu próxima etapa.' : 'Crece a tu ritmo.'}</span></h2>
           <p className="mt-5 text-base leading-7 text-slate-300">
             Precios claros, funciones reales y planes que acompañan el tamaño de tu operación. Sin necesidad de pagar para explorar la demo.
@@ -75,7 +76,7 @@ export function LandingPricing({ plans, onSelectPlan, previewMode = false, chris
               isFull ? 'Dashboard y permisos completos' : 'Permisos según tu plan',
             ];
             return (
-              <article key={plan.id} className={`relative flex flex-col rounded-[26px] border p-7 sm:p-8 ${featured ? 'border-[#ffb35f]/80 bg-[#153126] shadow-[0_22px_68px_rgba(255,172,56,0.15)]' : 'border-white/15 bg-white/[0.045]'}`}>
+              <article key={plan.id} data-plan={plan.id} className={`relative flex flex-col rounded-[26px] border p-7 sm:p-8 ${featured ? 'border-[#ffb35f]/80 bg-[#153126] shadow-[0_22px_68px_rgba(255,172,56,0.15)]' : 'border-white/15 bg-white/[0.045]'}`}>
                 {featured && <span className="absolute -top-3 left-7 rounded-full bg-[#ffb45a] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-950">{christmas ? 'Plan Full · Más herramientas para esta Navidad' : 'Para talleres que quieren avanzar'}</span>}
                 <div>
                   <p className="text-sm font-medium text-[#ffbd81]">{isFull ? 'Máxima capacidad' : isPro ? 'Para equipos en crecimiento' : 'Para comenzar organizado'}</p>

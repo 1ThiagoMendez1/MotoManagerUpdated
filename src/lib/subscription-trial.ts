@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TRIAL_DAYS = 15;
+export const TRIAL_DAYS = 30;
 export const TRIAL_WHATSAPP_CONSENT_TEXT = 'Al crear mi taller, solicito un mensaje de WhatsApp de MotoManager con los datos de mi prueba gratis y el enlace de acceso. Las promociones requieren mi elección opcional por separado.';
 export const TRIAL_WHATSAPP_MARKETING_TEXT = 'Quiero recibir consejos, novedades y promociones de MotoManager por WhatsApp. Es opcional y puedo pedir que dejen de enviármelos respondiendo al mensaje.';
 export function trialWhatsAppPermissions(input: { welcomeRequested: 'yes' | 'no'; marketingRequested: 'yes' | 'no' }, at: string) {

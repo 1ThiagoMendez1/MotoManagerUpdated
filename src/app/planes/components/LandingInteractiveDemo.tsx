@@ -392,7 +392,7 @@ export function LandingInteractiveDemo() {
           <a href="/prueba-gratis" data-analytics-id="demo_trial" className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-7 py-4 text-center text-sm font-extrabold text-[#091426] transition hover:bg-[#ffa14f] sm:w-auto">
             Crear mi taller gratis <ArrowRight className="h-4 w-4" />
           </a>
-          <p className="text-center text-sm text-slate-400">Prueba Full 15 días con tus propios datos. Sin tarjeta ni cobros automáticos.</p>
+          <p className="text-center text-sm text-slate-400">Prueba Full 30 días con tus propios datos. Sin tarjeta ni cobros automáticos.</p>
         </div>
       </div>
 

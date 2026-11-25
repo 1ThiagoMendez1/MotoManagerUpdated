@@ -24,12 +24,13 @@ export function publicAnalyticsPath(value: string): string | null {
 export const SECTION_LABELS: Record<string, string> = {
   hero: 'Portada', demo: 'Demo interactiva', why: 'Beneficios', funciones: 'Funcionalidades',
   'como-funciona': 'Cómo funciona', 'como-empezar': 'Primeros pasos', 'prueba-gratis': 'Oferta Full', planes: 'Planes',
-  workshops: 'Talleres', faq: 'Preguntas frecuentes', closing: 'Cierre comercial', page: 'Página',
+  portal: 'Portal del cliente', galeria: 'El taller', workshops: 'Talleres', faq: 'Preguntas frecuentes', closing: 'Cierre comercial', page: 'Página',
 };
 export const TARGET_LABELS: Record<string, string> = {
   hero_trial: 'Portada · Activar prueba', hero_demo: 'Portada · Ver demo', hero_pricing: 'Portada · Ver planes',
   nav_trial: 'Navegación · Activar prueba', ribbon_trial: 'Franja · Activar prueba',
   offer_trial: 'Oferta Full · Activar prueba', closing_trial: 'Cierre · Activar prueba',
+  steps_trial: 'Primeros pasos · Activar prueba', steps_preview_trial: 'Primeros pasos · Solicitar código',
   demo_open: 'Demo · Abrir demostración', demo_trial: 'Demo · Crear mi taller gratis',
   whatsapp_floating: 'WhatsApp · Botón flotante comercial', whatsapp_advice: 'WhatsApp · Asesoría para mi taller',
   plan_basic: 'Elegir Básico', plan_pro: 'Elegir Pro', plan_full: 'Elegir Full',

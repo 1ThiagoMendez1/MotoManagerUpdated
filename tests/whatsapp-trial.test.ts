@@ -170,3 +170,10 @@ test('Meta non-132000 rejection or ambiguous provider response never retried',as
     assert.equal(calls,1);
   }
 });
+
+// The stored offer chooses the approved welcome; elapsed review time never does.
+test('new 30-day trials use the new welcome and historical trials keep their template', () => {
+  assert.equal(buildTrialWelcomeSendTemplate({...input,trialDays:30}).name,'bienvenida_prueba_gratis_30_dias');
+  assert.equal(buildTrialWelcomeSendTemplate({...input,trialDays:15}).name,TRIAL_WELCOME_TEMPLATE);
+  assert.equal(buildTrialWelcomeSendTemplate(input).name,TRIAL_WELCOME_TEMPLATE);
+});

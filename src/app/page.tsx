@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'MotoManager | Software de gestión para talleres de motocicletas',
   description:
-    'Prueba MotoManager Full gratis por 15 días, sin tarjeta. Organiza clientes, motos, órdenes, inventario, ventas y finanzas de tu taller.',
+    'Prueba MotoManager Full gratis por 30 días, sin tarjeta. Organiza clientes, motos, órdenes, inventario, ventas y finanzas de tu taller.',
   keywords: [
     'CRM talleres motos Colombia',
     'software taller motos',

@@ -29,18 +29,18 @@ export function LandingHero({ onScrollToPlanes, halloween = false }: { onScrollT
           </h1>
           <p className="mt-7 max-w-lg text-base leading-8 text-slate-300 sm:text-lg">
             Deja de buscar información entre cuadernos y chats. Con MotoManager conectas
-            órdenes de trabajo, clientes, motocicletas, inventario y ventas en un solo lugar. Pruébalo con tu taller durante 15 días: plan Full, por $0.
+            órdenes de trabajo, clientes, motocicletas, inventario y ventas en un solo lugar. Pruébalo con tu taller durante 30 días: plan Full, por $0.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/prueba-gratis" data-analytics-id="hero_trial" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#ff831b] px-6 text-sm font-extrabold text-[#0a1425] shadow-[0_14px_40px_rgba(255,125,16,.23)] transition hover:-translate-y-0.5 hover:bg-[#ffa149]">
-              Activar mis 15 días gratis <ArrowRight className="h-5 w-5" />
+              Activar mis 30 días gratis <ArrowRight className="h-5 w-5" />
             </Link>
             <button data-analytics-id="hero_pricing" onClick={onScrollToPlanes} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-6 text-sm font-bold text-white transition hover:bg-white/10">
               Ver planes y precios <ArrowRight className="h-4 w-4" />
             </button>
           </div>
           <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-slate-400 sm:text-sm">
-            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Full por 15 días</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Full por 30 días</span>
             <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Sin tarjeta ni cobros automáticos</span>
             <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ff962f]" /> Diseñado para talleres de motos</span>
           </div>
