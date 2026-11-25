@@ -49,6 +49,7 @@ interface AppSidebarProps {
   customPermissions?: string[] | null;
   subscriptionPlan?: string | null;
   isPlatformAdmin?: boolean;
+  canManageWhatsApp?: boolean;
 }
 
 export function AppSidebar({
@@ -58,6 +59,7 @@ export function AppSidebar({
   customPermissions,
   subscriptionPlan = 'monthly',
   isPlatformAdmin = false,
+  canManageWhatsApp = false,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -103,7 +105,7 @@ export function AppSidebar({
     {
       title: 'Administración',
       items: [
-        ...( ['owner', 'admin'].includes(role) ? [{ title: 'WhatsApp del taller', url: '/dashboard/whatsapp', icon: MessageCircle, id: 'sidebar-nav-whatsapp' }] : []),
+        ...( canManageWhatsApp && ['owner', 'admin'].includes(role) ? [{ title: 'WhatsApp del taller', url: '/dashboard/whatsapp', icon: MessageCircle, id: 'sidebar-nav-whatsapp' }] : []),
         { title: 'Equipo y Permisos', url: '/team', icon: Shield, id: 'sidebar-nav-team' },
         { title: 'Tickets de Soporte', url: '/tickets', icon: LifeBuoy, id: 'sidebar-nav-tickets' },
       ],

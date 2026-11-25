@@ -52,6 +52,7 @@ import { WebAnalyticsTracker } from '@/components/analytics/WebAnalyticsTracker'
 import { MeasurementPreferences } from '@/components/analytics/MeasurementPreferences';
 import { isSuperAdmin } from '@/lib/super-admin';
 import { TrialAccessMonitor } from '@/components/auth/TrialAccessMonitor';
+import { managementEnabledFor } from '@/lib/whatsapp-coexistence/access';
 
 export default async function RootLayout({
   children,
@@ -114,6 +115,7 @@ export default async function RootLayout({
             }
             sidebar={
               <AppSidebar
+                canManageWhatsApp={managementEnabledFor(user?.workshopId, user?.userId)}
                 isPlatformAdmin={isSuperAdmin(user)}
                 workshopName={workshop?.name}
                 workshopSlug={workshop?.slug}
